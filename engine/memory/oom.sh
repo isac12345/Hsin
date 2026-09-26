@@ -3,21 +3,9 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 
-# Protected processes (NEVER modify)
-HSIN_OOM_PROTECTED="
-system_server
-zygote
-surfaceflinger
-servicemanager
-vold
-installd
-logd
-lmkd
-healthd
-adbd
-shell
-init
-"
+# Protected processes (NEVER modify). Satu baris spasi — WAJIB cocok
+# dengan cek `case " $HSIN_OOM_PROTECTED "` di bawah (multiline = mati).
+HSIN_OOM_PROTECTED="system_server zygote surfaceflinger servicemanager vold installd logd lmkd healthd adbd shell init"
 
 # Check if process is protected
 hsin_oom_is_protected() {
