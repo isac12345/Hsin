@@ -2,6 +2,10 @@
 # HSIN Memory Engine - OOM Engine
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# Path proc dari core/scan_cache.sh (satu-satunya definisi), default sama
+# dengan path yang sebelumnya ditulis langsung di file ini.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Protected processes (NEVER modify). Satu baris spasi — WAJIB cocok
 # dengan cek `case " $HSIN_OOM_PROTECTED "` di bawah (multiline = mati).
@@ -12,8 +16,8 @@ hsin_oom_is_protected() {
     _pid="$1"
     _name=""
 
-    if [ -r "/proc/$_pid/comm" ]; then
-        IFS= read -r _name < "/proc/$_pid/comm" 2>/dev/null
+    if [ -r "$HSIN_PROC/$_pid/comm" ]; then
+        IFS= read -r _name < "$HSIN_PROC/$_pid/comm" 2>/dev/null
     fi
 
     case " $HSIN_OOM_PROTECTED " in
@@ -28,10 +32,10 @@ hsin_oom_set() {
     _score="$2"
 
     # Check node exists
-    [ -f "/proc/$_pid/oom_score_adj" ] || return 1
+    [ -f "$HSIN_PROC/$_pid/oom_score_adj" ] || return 1
 
     # Check writable
-    [ -w "/proc/$_pid/oom_score_adj" ] || return 1
+    [ -w "$HSIN_PROC/$_pid/oom_score_adj" ] || return 1
 
     # Check if protected
     hsin_oom_is_protected "$_pid" && return 1
@@ -40,11 +44,11 @@ hsin_oom_set() {
     [ "$_score" -ge -1000 ] && [ "$_score" -le 1000 ] || return 1
 
     # Write
-    echo "$_score" > "/proc/$_pid/oom_score_adj" 2>/dev/null || return 1
+    echo "$_score" > "$HSIN_PROC/$_pid/oom_score_adj" 2>/dev/null || return 1
 
     # Verify (read builtin instead of forking cat)
     _verify=""
-    IFS= read -r _verify < "/proc/$_pid/oom_score_adj" 2>/dev/null
+    IFS= read -r _verify < "$HSIN_PROC/$_pid/oom_score_adj" 2>/dev/null
     [ "$_verify" = "$_score" ] && return 0 || return 1
 }
 
@@ -93,9 +97,10 @@ hsin_oom_protect_game() {
 
 # Release background apps (set oom_score_adj = 100)
 hsin_oom_release_background() {
-    _count=0
+    _ok=0
+    _skip=0
 
-    for _pid_dir in /proc/[0-9]*; do
+    for _pid_dir in "$HSIN_PROC"/[0-9]*; do
         [ -d "$_pid_dir" ] || continue
         [ -f "$_pid_dir/oom_score_adj" ] || continue
 
@@ -125,10 +130,29 @@ hsin_oom_release_background() {
         [ "$_adj" -ge 100 ] 2>/dev/null && continue
 
         # Set to allow kill
-        echo 100 > "$_pid_dir/oom_score_adj" 2>/dev/null && _count=$((_count + 1))
+        #
+        # BUG FIX: `echo 100 > ... && _ok++` menghitung redirect yang sukses,
+        # bukan bukti oom_score_adj benar-benar berisi 100. Redirect ke node
+        # oom_score_adj bisa gagal tanpa jejak (dihitung 0, tak dilaporkan)
+        # dan redirect yang sukses belum tentu bisa dibaca balik - keduanya
+        # dulu muncul sebagai "released N" padahal nilainya masih 000.
+        # Sekarang lewat hsin_oom_set: [-f] + [-w] + cek proteksi + tulis +
+        # readback verify; baru dihitung OK.
+        #
+        # hsin_oom_set juga gagal kalau proses/node oom_score_adj hilang di
+        # tengah scan. Cek ulang node-nya: masih ada = tulis ditolak/
+        # tidak terverifikasi (hitung SKIP + WARN), sudah hilang = prosesnya
+        # memang sudah mati, bukan kegagalan (dilewati tanpa warning).
+        if hsin_oom_set "$_pid_num" 100; then
+            _ok=$((_ok + 1))
+        elif [ -f "$_pid_dir/oom_score_adj" ]; then
+            _skip=$((_skip + 1))
+            hsin_log_warn "memory" \
+                "OOM: pid $_pid_num (adj=${_adj:-?}) release 100 ditolak/tidak terverifikasi (skip)"
+        fi
     done
 
-    echo "    OOM: released $_count background processes (GMS excluded)"
+    echo "    OOM: released $_ok background processes, skipped $_skip (GMS excluded)"
     return 0
 }
 
@@ -136,8 +160,8 @@ hsin_oom_release_background() {
 hsin_oom_state() {
     echo "  OOM State:"
     ps -A -o PID,NAME 2>/dev/null | head -15 | while read _pid _name; do
-        [ -f "/proc/$_pid/oom_score_adj" ] || continue
-        _adj=$(cat "/proc/$_pid/oom_score_adj" 2>/dev/null)
+        [ -f "$HSIN_PROC/$_pid/oom_score_adj" ] || continue
+        _adj=$(cat "$HSIN_PROC/$_pid/oom_score_adj" 2>/dev/null)
         _protected="no"
         hsin_oom_is_protected "$_pid" && _protected="yes"
         printf "    PID %-8s %-25s adj=%-6s protected=%s\n" "$_pid" "$_name" "${_adj:-?}" "$_protected"
