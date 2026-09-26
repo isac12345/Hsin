@@ -75,3 +75,8 @@
 - FIX5-ZRAMRB (2026-09-26, leader + dev-modul work/zram-readback):
   TERIMA + merge bcb09f0, push DONE, worktree/branch bersih.
   Readback algo, ok jujur, mapping utuh. Antrean: pre-check [siku].
+
+- FIX6-PRECHECK (2026-09-26, leader langsung, task cancel → ≤20
+  baris): pre-check + probe balanced lepas [siku] (78742cc, +8/-2).
+  Bukti: bash-n OK, shellcheck 0, uji 5 kasus (readback ketat utuh,
+  balanced `[zstd]`→zstd). Push DONE. Antrean: #7 thermal-status.
