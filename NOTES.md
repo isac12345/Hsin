@@ -153,6 +153,17 @@
   5) zram-readback 6) thermal-status 7) scheduler-log 8) dead-code
   putuskan 9) generic-msg 10) /proc→$HSIN_PROC bertahap.
 
+## Fix zram #2 (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/zram-fix → merge 8bcca04, 2 file 43+/19-): apply step 1
+  panggil hsin_zram_detect + log; zram_apply normalisasi numerik +
+  fallback var + tulis hanya bila [-w] + algo tersedia, selain itu
+  skip+WARN; absen → return 0.
+- Verifikasi leader: bash-n 2/2, shellcheck 0, diff hanya file boleh;
+  mapping algo (zstd/lz4 + swappiness) utuh. Uji pekerja 4/4 (tulis
+  ok=2, tak-tersedia skip+WARN, absen no-crash, read-only skip).
+- Jujur: tulis kini AKTIF (dulu mati); kernel bisa tolak EBUSY →
+  skip+WARN;   `memory state` masih tampil not-available (di luar scope).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
