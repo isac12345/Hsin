@@ -41,6 +41,30 @@
 - PELAJARAN audit: label "-fixed" jangan dipercaya tanpa grep ulang;
   bash-n hijau ≠ bersih.
 
+## Audit timing apply + peta scan (2026-09-26, leader + dev-modul, TERIMA)
+- Peta: boot scan 1x (service.sh hsin_detect_all + capability, re-detect
+  bila device.txt hilang); TAPI tiap apply manual/boost scan ULANG:
+  cpu_detect, gpu_detect (3x), thermal_detect + read 3x, mem, io 4 glob,
+  topo. Monitor tiap 10-15s dumpsys (terpisah, bukan apply).
+- Koreksi hipotesis leader: hsin_safe_write retry-sleep 0 CALL SITE
+  (tidak di jalur apply); sleep 1 SF hanya di live path (apply pakai
+  boot path); capability_scan.sh 565 baris MATI (tak di-source runtime).
+- Estimasi kasar apply manual T615 ≈ 3.5-9s (>15s bila zone/block 40+
+  + flash/binder lambat). Biang terbesar: thermal 3-pass x3 call
+  (1.1-3.6s), backup full tiap manual (~0.3-1.2s), binder settings
+  5-8x (0.5-1.5s), source ~45 file (0.2-0.4s).
+- Desain cache (disetujui arahnya, belum coding): $HSIN_DATA/
+  scan_cache.env flat KEY=VALUE (topologi+node valid, bukan suhu);
+  tulis saat boot + rescan manual + auto bila hilang/versi naik;
+  engine apply baca cache + 1 test [-w], fallback scan lama bila
+  cache absen; invalidasi via BOOT_ID/versi/rescan/>6 jam.
+- Urutan fix: 1) cache + collapse thermal 3→1 pass; 2) backup ganda→1,
+  safety 3→1, io 4→1 glob; 3) write+verify 1x + benahi marker.
+  Ukur via APPLY-TIME (catatan: date +%s%3N jalan di Termux, di HP
+  bionic mungkin %N mentah → cek di HP sebelum percaya marker 0ms).
+- PELAJARAN: file 500+ baris tak di-source = beban mati, jangan takut
+  hapus/matikan; hipotesis lambat wajib diverifikasi call-site dulu.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).

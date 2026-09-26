@@ -14,8 +14,9 @@
 - [ ] Syarat user (2026-09-26, dikunci): apply sekarang >15 dtk → harus
   singkat. Scan device gampang: scan SEMUA sekali lalu SIMPAN; ganti
   freq CPU/GPU/gov/tweak lain tinggal cek hasil scan itu (support/ga).
-- [ ] Ukur dulu fase apply paling lambat (pakai marker APPLY-TIME di
-  debug.log, bukan tebakan), lalu desain scan-sekali-cache + apply-cepat.
+- [x] Ukur + peta scan (dev-modul, TERIMA: scan ulang tiap apply =
+  biang; desain cache scan_cache.env disetujui arahnya).
+- [ ] Implementasi cache scan-sekali-simpan (tugas kecil per commit).
 - [ ] Daftar error per tweak + code + kompatibilitas device.
 - [ ] Fix satu per satu, kecil per commit (satu tujuan per tugas).
 - [ ] Verifikasi statis tiap fix (L1). Tanpa flash/build dulu.

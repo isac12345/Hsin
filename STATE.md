@@ -20,3 +20,10 @@
   build/ dikecualikan, secret-scan bersih, .devmode kosong ikut).
   Push DONE, main sinkron origin. BELUM diubah isinya sama sekali.
   Lanjut: audit timing apply + peta scan.
+
+- AUDIT-TIMING (2026-09-26, leader + dev-modul): DONE TERIMA
+  (verifikasi leader: capability_scan mati BENAR, safe_write 0
+  pemanggil BENAR, sleep-1 hanya live path BENAR, scan-per-apply
+  BENAR, git clean). Biang >15s = scan ulang tiap apply (thermal
+  9 pass dkk) + backup full + binder. Desain cache scan_cache.env
+  disetujui arahnya. Lanjut: implementasi cache (tugas kecil).
