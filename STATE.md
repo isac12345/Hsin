@@ -14,3 +14,9 @@
   bersih + extreme/ lengkap 5 file + git clean). Basis = hsin-dev
   v5-beta1. Branch main sinkron origin (2524226). Lanjut: impor basis
   ke repo (tanpa build), lalu fix isi per file. Tanpa flash/zip.
+
+- IMPOR-BASIS (2026-09-26, leader, perintah user "yes"): hsin-dev
+  v5-beta1 diimpor apa adanya ke main (commit c6e6957, 110 file,
+  build/ dikecualikan, secret-scan bersih, .devmode kosong ikut).
+  Push DONE, main sinkron origin. BELUM diubah isinya sama sekali.
+  Lanjut: audit timing apply + peta scan.
