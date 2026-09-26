@@ -16,13 +16,18 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 . "$HSIN_MODULE_PATH/engine/cpu/safety.sh" 2>/dev/null
 
 # Backup current CPU state
+# Daftar policy dari hsin_cpu_policy_ids() (cache scan-sekali-simpan, fallback
+# glob) supaya tidak ada glob cpufreq/policy* per apply. Isi snapshot per
+# policy tidak berubah.
 hsin_cpu_backup() {
     _backup_dir="$HSIN_DATA/backups/cpu_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$_backup_dir" 2>/dev/null
 
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
-        _name=$(basename "$_policy")
+        _name="policy$_pid"
         _backup_file="$_backup_dir/$_name"
         {
             [ -f "$_policy/scaling_governor" ] && echo "governor=$(cat "$_policy/scaling_governor" 2>/dev/null)"
@@ -41,8 +46,8 @@ hsin_cpu_restore() {
     _ok=0
     for _backup_file in "$_backup_dir"/policy*; do
         [ -f "$_backup_file" ] || continue
-        _name=$(basename "$_backup_file")
-        _policy="/sys/devices/system/cpu/cpufreq/$_name"
+        _name="${_backup_file##*/}"
+        _policy="$HSIN_SYSFS_CPU/cpufreq/$_name"
         [ -d "$_policy" ] || continue
 
         # Restore governor
@@ -82,7 +87,9 @@ hsin_cpu_verify() {
     _healthy=0
     _total=0
 
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
         _total=$((_total + 1))
 
@@ -140,6 +147,8 @@ hsin_cpu_apply() {
     # Step 1: Detect
     echo "  Step 1: Detect"
     hsin_cpu_detect
+    printf "    Source:   %s (policies: %s)\n" \
+        "${HSIN_CPU_POLICY_SOURCE:-scan}" "$HSIN_CPU_POLICY_IDS"
     printf "    Clusters: %s\n" "$HSIN_CPU_CLUSTER_COUNT"
     printf "    Cores:    %s\n" "$HSIN_CPU_CORES"
     printf "    Governor: %s\n" "${HSIN_CPU_GOVS:-none}"

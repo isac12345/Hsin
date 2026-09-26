@@ -3,6 +3,15 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# cpuinfo_max_freq + tabel OPP datang dari cache scan (topologi statis);
+# daftar policy dari hsin_cpu_policy_ids(). Nilai yang HSIN tulis sendiri
+# (scaling_min/max) tetap dibaca live.
+command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
+# Diisi hsin_scan_lookup() (core/scan_cache.sh) dan hsin_cpu_policy_hwmax()
+# (engine/cpu/detect.sh).
+_sc_f=""
+_hcpw=""
 
 hsin_cpu_freq_pick() {
     _pos="$1"
@@ -49,8 +58,24 @@ hsin_cpu_freq_pick() {
     esac
 }
 
+# Available frequencies of one policy: cache first (field 7 CPU_POLICY_<id>,
+# CSV) so the per-apply read + tr|grep|sort|tr chain disappears; fallback
+# reads scaling_available_frequencies exactly like before. Caller keeps
+# passing the policy path, the id comes from the basename.
+# The list is order-independent for every consumer (hsin_opp_min/max,
+# hsin_opp_floor_pick, hsin_opp_cap_pick, the " $_min " membership test),
+# so the unsorted cache order is safe.
 hsin_cpu_freq_available() {
     _policy="$1"
+    _hcf_pid="${_policy##*/policy}"
+    hsin_cpu_policy_ids
+    if [ "$HSIN_CPU_POLICY_SOURCE" = "cache" ]; then
+        hsin_scan_lookup "$HSIN_SCAN_CPU_POLICY_LINES" "$_hcf_pid" 7
+        hsin_cpu_csv_to_words "$_sc_f"
+        [ -n "$_hcd_words" ] || return 1
+        printf '%s\n' "$_hcd_words"
+        return 0
+    fi
     [ -f "$_policy/scaling_available_frequencies" ] || return 1
     tr ' ' '\n' < "$_policy/scaling_available_frequencies" 2>/dev/null | grep -v '^$' | sort -n | tr '\n' ' '
 }
@@ -60,8 +85,9 @@ hsin_cpu_freq_apply_one() {
     [ -d "$_policy" ] || return 1
     [ -w "$_policy/scaling_min_freq" ] || [ -w "$_policy/scaling_max_freq" ] || return 1
 
-    _avail=""
-    [ -f "$_policy/scaling_available_frequencies" ] && _avail=$(cat "$_policy/scaling_available_frequencies" 2>/dev/null)
+    # Validasi min/max harus ada di tabel OPP. Sumbernya sama dengan
+    # hsin_cpu_freq_apply (cache dulu), jadi tidak perlu baca file kedua.
+    _avail=$(hsin_cpu_freq_available "$_policy")
     if [ -n "$_avail" ]; then
         [ -z "$_min" ] || case " $_avail " in *" $_min "*) ;; *) return 1;; esac
         [ -z "$_max" ] || case " $_avail " in *" $_max "*) ;; *) return 1;; esac
@@ -96,13 +122,16 @@ hsin_cpu_freq_apply_one() {
 
 hsin_cpu_freq_apply() {
     _profile="$1"; _ok=0; _skip=0; _fail=0
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
         [ -w "$_policy/scaling_min_freq" ] || [ -w "$_policy/scaling_max_freq" ] || { _skip=$((_skip+1)); continue; }
         _avail=$(hsin_cpu_freq_available "$_policy")
         [ -z "$_avail" ] && { _skip=$((_skip+1)); continue; }
-        _stock_min=$(cat "$_policy/cpuinfo_min_freq" 2>/dev/null)
-        _stock_max=$(cat "$_policy/cpuinfo_max_freq" 2>/dev/null)
+        _stock_min=""
+        [ -f "$_policy/cpuinfo_min_freq" ] && read -r _stock_min < "$_policy/cpuinfo_min_freq" 2>/dev/null
+        hsin_cpu_policy_hwmax "$_pid"; _stock_max="$_hcpw"
         [ -z "$_stock_max" ] && _stock_max=$(hsin_opp_max "$_avail")
         [ -z "$_stock_min" ] && _stock_min=$(hsin_opp_min "$_avail")
         case "$_profile" in
@@ -119,10 +148,14 @@ hsin_cpu_freq_apply() {
 }
 
 hsin_cpu_freq_state() {
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
-        _min=$(cat "$_policy/scaling_min_freq" 2>/dev/null); _max=$(cat "$_policy/scaling_max_freq" 2>/dev/null)
-        printf "    %s: %s-%s kHz\n" "$(basename "$_policy")" "${_min:-?}" "${_max:-?}"
+        _min=""; _max=""
+        [ -f "$_policy/scaling_min_freq" ] && read -r _min < "$_policy/scaling_min_freq" 2>/dev/null
+        [ -f "$_policy/scaling_max_freq" ] && read -r _max < "$_policy/scaling_max_freq" 2>/dev/null
+        printf "    policy%s: %s-%s kHz\n" "$_pid" "${_min:-?}" "${_max:-?}"
     done
 }
 
