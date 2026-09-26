@@ -38,7 +38,8 @@ hsin_thermal_engine_apply() {
     # Step 3: Determine policy
     echo "  Step 3: Policy"
     . "$HSIN_MODULE_PATH/engine/thermal/policy.sh" 2>/dev/null
-    _perf=$(hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP")
+    hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP"
+    _perf="$HSIN_THERMAL_PERF_TARGET"
     printf "    Thermal Policy: %s\n" "$HSIN_THERMAL_POLICY"
     printf "    Perf Target:    %s%%\n" "$_perf"
     echo ""
@@ -59,7 +60,8 @@ hsin_thermal_engine_apply() {
     echo "  Step 6: Verify"
     hsin_thermal_read
     hsin_thermal_classify "$HSIN_THERMAL_MAX_TEMP"
-    _verify_perf=$(hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP")
+    hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP"
+    _verify_perf="$HSIN_THERMAL_PERF_TARGET"
 
     if [ "$_verify_perf" = "$_perf" ]; then
         printf "    Status:  OK\n"
