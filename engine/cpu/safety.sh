@@ -2,6 +2,9 @@
 # HSIN CPU Engine - Safety Engine
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+[ -n "$HSIN_SYSFS_THERMAL" ] || HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 
 # Temperature thresholds (millidegrees).
 # FIX: previous values (40/45/50/60C) were miscalibrated - 50C is normal
@@ -21,14 +24,54 @@ HSIN_BAT_LOW=15
 HSIN_BAT_MEDIUM=30
 
 # Get current temperature (max across all zones)
+# SATU pass atas daftar zona dari cache scan-sekali-simpan; sebelumnya tiga
+# pass per apply (hsin_cpu_safety_print 2x + hsin_cpu_safety_effective 1x),
+# masing-masing globby thermal_zone*/temp sendiri. Nilai SUHU tetap dibaca
+# live dari sysfs - yang di-cache hanya topologi/daftar zonanya, sama seperti
+# engine/thermal. Hasilnya di-memo per proses supaya tiga pemanggil dalam
+# satu apply berbagi satu bacaan (satu apply = satu proses, jadi tidak ada
+# suhu yang membeku antar-run).
+#
+# HSIN_SCAN_THERMAL_MAXZONE sengaja TIDAK dipakai mempersempit pencarian:
+# itu penanda zona terpanas saat scan, sedangkan zona terpanas hari ini bisa
+# pindah. Max tetap diambil dari semua zona, seperti versi lama.
+HSIN_CPU_SAFETY_TEMP=""
+HSIN_CPU_SAFETY_TEMP_READY=""
+
 hsin_cpu_safety_temp() {
+    if [ -n "$HSIN_CPU_SAFETY_TEMP_READY" ]; then
+        echo "$HSIN_CPU_SAFETY_TEMP"
+        return 0
+    fi
+
+    _zones=""
+    if command -v hsin_scan_thermal_zones_get >/dev/null 2>&1; then
+        hsin_scan_thermal_zones_get
+        _zones="$HSIN_SCAN_THERMAL_ZONES"
+    else
+        # core/scan_cache.sh tidak termuat -> globby sysfs seperti versi lama.
+        for _zone in "$HSIN_SYSFS_THERMAL"/thermal_zone*; do
+            [ -d "$_zone" ] || continue
+            _zones="${_zones:+${_zones} }${_zone##*/}"
+        done
+    fi
+
     _max=0
-    for _zone in /sys/class/thermal/thermal_zone*/temp; do
-        [ -f "$_zone" ] || continue
-        _t=$(cat "$_zone" 2>/dev/null)
-        [ -n "$_t" ] && [ "$_t" -gt "$_max" ] 2>/dev/null && _max="$_t"
+    for _zone in $_zones; do
+        _zpath="$HSIN_SYSFS_THERMAL/${_zone%%|*}/temp"
+        [ -f "$_zpath" ] || continue
+        _t=""
+        IFS= read -r _t < "$_zpath" 2>/dev/null
+        case "$_t" in ''|*[!0-9]*) continue ;; esac
+        [ "$_t" -gt "$_max" ] 2>/dev/null && _max="$_t"
     done
+
+    HSIN_CPU_SAFETY_TEMP="$_max"
+    HSIN_CPU_SAFETY_TEMP_READY=1
+    export HSIN_CPU_SAFETY_TEMP
+    hsin_scan_log "safety temp pass=1 zones=${HSIN_SCAN_THERMAL_SOURCE} max=$_max"
     echo "$_max"
+    return 0
 }
 
 # Get temperature status

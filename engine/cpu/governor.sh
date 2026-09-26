@@ -3,6 +3,12 @@
 # Credit: logic inspired by UPerf (CPU frequency control)
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# Daftar policy datang dari hsin_cpu_policy_ids() (cache scan-sekali-simpan,
+# fallback glob) - sumbernya sama dengan detect.sh, dan tidak ada field
+# daftar-governor di cache (yang tersimpan cuma governor saat ini), jadi
+# scaling_available_governors tetap dibaca live per policy.
+command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
 
 # Pick best governor for profile from available list
 hsin_cpu_governor_pick() {
@@ -54,9 +60,10 @@ hsin_cpu_governor_apply() {
     _skip=0
     _fail=0
 
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
-        _name=$(basename "$_policy")
 
         # Check if writable
         [ -w "$_policy/scaling_governor" ] || { _skip=$((_skip + 1)); continue; }
@@ -64,7 +71,8 @@ hsin_cpu_governor_apply() {
         # Check available governors
         [ -f "$_policy/scaling_available_governors" ] || { _skip=$((_skip + 1)); continue; }
 
-        _avail=$(cat "$_policy/scaling_available_governors" 2>/dev/null)
+        _avail=""
+        read -r _avail < "$_policy/scaling_available_governors" 2>/dev/null
         _target=$(hsin_cpu_governor_pick "$_profile" "$_avail")
 
         [ -z "$_target" ] && { _skip=$((_skip + 1)); continue; }
@@ -107,12 +115,13 @@ hsin_cpu_governor_apply() {
 
 # Get governor state for all clusters
 hsin_cpu_governor_state() {
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
-        _name=$(basename "$_policy")
         _gov=""
         [ -f "$_policy/scaling_governor" ] && _gov=$(cat "$_policy/scaling_governor" 2>/dev/null)
-        printf "    %s: %s\n" "$_name" "${_gov:-?}"
+        printf "    policy%s: %s\n" "$_pid" "${_gov:-?}"
     done
 }
 

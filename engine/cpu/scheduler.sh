@@ -2,17 +2,28 @@
 # HSIN CPU Engine - Scheduler Engine
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
+# Diisi hsin_cpu_policy_hwmax() (engine/cpu/detect.sh).
+_hcpw=""
 
 # Detect CPU topology (big vs LITTLE)
+# cpuinfo_max_freq per policy dari cache scan (topologi statis, field 5),
+# jadi tidak ada glob cpufreq/policy* dua kali seperti sebelumnya. Mask
+# `cpus` (bisa berubah saat hotplug) tetap dibaca live supaya hasilnya sama
+# persis dengan scan lama.
 hsin_cpu_topo_detect() {
     HSIN_CPU_BIG=""
     HSIN_CPU_LITTLE=""
     _max_overall=0
 
+    hsin_cpu_policy_ids
+
     # Find highest max_freq
-    for _p in /sys/devices/system/cpu/cpufreq/policy*; do
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_p" ] || continue
-        _max=$(cat "$_p/cpuinfo_max_freq" 2>/dev/null)
+        hsin_cpu_policy_hwmax "$_pid"; _max="$_hcpw"
         # Guard against empty/zero values so the arithmetic compare
         # never trips on a string.
         if [ -n "$_max" ] && [ "$_max" -gt "$_max_overall" ] 2>/dev/null; then
@@ -23,16 +34,20 @@ hsin_cpu_topo_detect() {
     [ "$_max_overall" -eq 0 ] && return 1
 
     # Split cores
-    for _p in /sys/devices/system/cpu/cpufreq/policy*; do
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_p" ] || continue
-        _max=$(cat "$_p/cpuinfo_max_freq" 2>/dev/null)
+        hsin_cpu_policy_hwmax "$_pid"; _max="$_hcpw"
         _cpus=""
         if [ -f "$_p/cpus" ]; then
-            _cpus=$(cat "$_p/cpus" 2>/dev/null | tr '\n' ' ')
+            IFS= read -r _cpus < "$_p/cpus" 2>/dev/null
         elif [ -f "$_p/related_cpus" ]; then
-            _cpus=$(cat "$_p/related_cpus" 2>/dev/null | tr '\n' ' ')
+            IFS= read -r _cpus < "$_p/related_cpus" 2>/dev/null
         fi
         [ -z "$_cpus" ] && continue
+        # Sama seperti "cat | tr '\n' ' '" yang lama: satu spasi penutup,
+        # supaya hasil sed di bawah identik dengan versi sebelumnya.
+        _cpus="$_cpus "
 
         if [ -n "$_max" ] && [ "$_max" -ge "$_max_overall" ] 2>/dev/null; then
             HSIN_CPU_BIG="${HSIN_CPU_BIG} $_cpus"
