@@ -5,7 +5,7 @@
   (gausah setting manual), HSIN manual/bebas (user setting sesuka hati).
 - Fokus: modul dulu, APK belakangan. Jangan build dulu — fix isi file
   HSIN + rakit dari awal.
-- Repo: isac12345/Hsin (public, dibuat 2026-09-26). Proyek lokal: ~/Hsin.
+- Repo: isac12345/Hsin (PRIVATE atas perintah user, dibuat 2026-09-26). Proyek lokal: ~/Hsin.
 - Sumber: /sdcard/hsin/ — 6 zip + hsin-dev (v5.0.0-beta1, struktur
   paling lengkap: core/engine/capability/config/profiles/extreme/bin/
   webroot). User lupa mana yang bagus, tiap file ada error.

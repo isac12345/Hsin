@@ -1,6 +1,7 @@
 # STATE.md — HSIN manual
 
-- INIT (2026-09-26, leader): repo isac12345/Hsin (public) dibuat via
+- INIT (2026-09-26, leader): repo isac12345/Hsin (private, diubah
+  dari public atas perintah user) dibuat via
   `gh repo create`, clone kosong ke ~/Hsin, kerangka AGENTS.md +
   NOTES.md + PLAN.md + STATE.md ditulis. Konsep dikunci: HSIN manual/
   bebas setting (Alpha adaptif). Fokus modul dulu, APK belakangan,
