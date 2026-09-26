@@ -1,0 +1,9 @@
+*.zip
+*.apk
+*.jks
+*.keystore
+keystore.properties
+build/
+build-output/
+work/tools/
+.opencode/
