@@ -63,3 +63,7 @@
 - FIX2-ZRAM (2026-09-26, leader + dev-modul work/zram-fix): TERIMA +
   merge 8bcca04, push DONE, worktree/branch bersih. zram detect→
   apply tersambung + guard tulis (algo utuh). Antrean: #3 dvfs.
+
+- FIX3-DVFS (2026-09-26, leader + dev-modul work/dvfs-verify): TERIMA
+  + merge 319238a, push DONE, worktree/branch bersih. Tulis DVFS
+  diverifikasi, lapor jujur. Antrean: #4 oom-verify + sisa.
