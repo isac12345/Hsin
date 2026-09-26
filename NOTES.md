@@ -60,8 +60,9 @@
   cache absen; invalidasi via BOOT_ID/versi/rescan/>6 jam.
 - Urutan fix: 1) cache + collapse thermal 3→1 pass; 2) backup ganda→1,
   safety 3→1, io 4→1 glob; 3) write+verify 1x + benahi marker.
-  Ukur via APPLY-TIME (catatan: date +%s%3N jalan di Termux, di HP
-  bionic mungkin %N mentah → cek di HP sebelum percaya marker 0ms).
+  Ukur via APPLY-TIME (TERJAWAB 2026-09-26, cek su langsung izin user:
+  `date +%s%3N` → `1790419620875` 13 digit bersih, Android 14, T615.
+  Marker MILIDETIK DIPERCAYA di HP ini, bukan 0ms).
 - PELAJARAN: file 500+ baris tak di-source = beban mati, jangan takut
   hapus/matikan; hipotesis lambat wajib diverifikasi call-site dulu.
 
