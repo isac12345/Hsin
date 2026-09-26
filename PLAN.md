@@ -1,5 +1,22 @@
 # PLAN.md — HSIN manual (modul dulu, tanpa build)
 
+## RENCANA BUAT USER (baca ini aja, bahasa simpel)
+- Target: HSIN manual/bebas setting, apply CEPAT (sekarang >15 dtk),
+  scan SEKALI-simpan (ganti setting tinggal cek cache, ga scan ulang).
+- Status: basis v5-beta1 sudah masuk repo (private). Belum ada yang
+  diubah isinya. Tanpa build/zip dulu.
+- Yang jalan otomatis (ga perlu kamu): implementasi cache + fix error
+  per tweak, kecil per commit, diverifikasi statis dulu (L1).
+- TUGAS KAMU (cuma 3, sesuai urutan):
+  1. SEKARANG (1 menit): jalankan di HP `su -c 'date +%s%3N'` → kirim
+     hasilnya ke saya. Ini nentuin alat ukur waktu bisa dipercaya/ga.
+  2. NANTI tiap fix L1 selesai: flash zip uji + apply manual 1x + kirim
+     baris `APPLY-TIME` dari `/data/adb/hsin/logs/debug.log` (itu bukti
+     cepat/lambatnya, bukan rasa).
+  3. PALING AKHIR: tes rasa (game adem/kenceng) = L2, bilang OK bila enak.
+- Urutan kerja saya: cache scan (1) → backup ganda→1 + safety/IO ramping
+  (2) → tulis+verify 1x (3) → error per tweak (4) → baru build bila kamu OK.
+
 ## Tahap 0 — Inventarisasi + basis rakit (JALAN)
 - [x] Repo GitHub isac12345/Hsin dibuat + proyek lokal ~/Hsin.
 - [x] Kerangka AGENTS/NOTES/PLAN/STATE ditulis.
@@ -8,7 +25,8 @@
   v4.2.7 bersih tapi Extreme no-op; v4_0 metadata salah v3.0).
 - [x] Pilih 1 basis rakit = hsin-dev v5.0.0-beta1 (0 dangling,
   0 kontaminasi, shellcheck 0, vCode 5001).
-- [ ] Impor basis ke repo sebagai commit awal rakit (tanpa build).
+- [x] Impor basis ke repo sebagai commit awal rakit (c6e6957, 110 file,
+  tanpa build/, secret bersih, push DONE).
 
 ## Tahap 1 — Fix isi modul (BELUM, tanpa build)
 - [ ] Syarat user (2026-09-26, dikunci): apply sekarang >15 dtk → harus
