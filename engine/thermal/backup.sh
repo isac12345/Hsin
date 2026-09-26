@@ -3,17 +3,40 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+[ -n "$HSIN_SYSFS_THERMAL" ] || HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
+
+hsin_thermal_log() {
+    command -v hsin_log_info >/dev/null 2>&1 && hsin_log_info "thermal" "$1"
+    return 0
+}
 
 # Backup thermal state
 hsin_thermal_backup() {
     _backup_dir="$HSIN_DATA/backups/thermal_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$_backup_dir" 2>/dev/null
 
-    # Backup thermal zones
-    for _zone_dir in /sys/class/thermal/thermal_zone*; do
-        [ -d "$_zone_dir" ] || continue
+    # Backup thermal zones.
+    # Daftar zona diambil dari cache scan-sekali-simpan (core/scan_cache.sh):
+    # kalau cache valid, jalur ini hanya iterasi HSIN_SCAN_THERMAL_ZONES tanpa
+    # glob thermal_zone* sama sekali. Cache absen/rusak/boot beda ->
+    # hsin_scan_thermal_zones_get() scan live (glob) seperti sebelumnya, jadi
+    # jalur fallback tetap menghasilkan backup yang sama.
+    hsin_scan_thermal_zones_get
+    _zone_src="${HSIN_SCAN_THERMAL_SOURCE:-scan}"
+    _zones=0
 
-        _zone_name=$(basename "$_zone_dir")
+    for _zone in $HSIN_SCAN_THERMAL_ZONES; do
+        _zone_name="${_zone%%|*}"
+        _zone_dir="$HSIN_SYSFS_THERMAL/$_zone_name"
+        if [ ! -d "$_zone_dir" ]; then
+            hsin_thermal_log "backup: zone gone, skip: $_zone_name"
+            continue
+        fi
+
+        _zones=$((_zones + 1))
         _zone_backup="$_backup_dir/$_zone_name"
         mkdir -p "$_zone_backup" 2>/dev/null
 
@@ -25,11 +48,14 @@ hsin_thermal_backup() {
         [ -f "$_zone_dir/trip_point_0_temp" ] && cp "$_zone_dir/trip_point_0_temp" "$_zone_backup/trip_point_0_temp" 2>/dev/null
     done
 
-    # Backup cooling devices
-    for _cdev_dir in /sys/class/thermal/cooling_device*; do
+    # Backup cooling devices. Scan cache hanya menyimpan zona, bukan cooling
+    # device, jadi daftar ini tetap diambil langsung dari sysfs.
+    _cdevs=0
+    for _cdev_dir in "$HSIN_SYSFS_THERMAL"/cooling_device*; do
         [ -d "$_cdev_dir" ] || continue
 
-        _cdev_name=$(basename "$_cdev_dir")
+        _cdevs=$((_cdevs + 1))
+        _cdev_name=${_cdev_dir##*/}
         _cdev_backup="$_backup_dir/$_cdev_name"
         mkdir -p "$_cdev_backup" 2>/dev/null
 
@@ -41,7 +67,8 @@ hsin_thermal_backup() {
     # Save backup path
     echo "$_backup_dir" > "$HSIN_DATA/thermal_backup_latest"
 
-    echo "[THERMAL] Backup saved: $_backup_dir"
+    hsin_thermal_log "backup: zones=$_zones src=$_zone_src cdevs=$_cdevs dir=$_backup_dir"
+    echo "[THERMAL] Backup saved: $_backup_dir (zones=$_zones source=$_zone_src cdevs=$_cdevs)"
 }
 
 # Restore thermal state from backup
@@ -63,8 +90,8 @@ hsin_thermal_restore() {
     for _zone_dir in "$_backup_dir"/thermal_zone*; do
         [ -d "$_zone_dir" ] || continue
 
-        _zone_name=$(basename "$_zone_dir")
-        _target="/sys/class/thermal/$_zone_name"
+        _zone_name=${_zone_dir##*/}
+        _target="$HSIN_SYSFS_THERMAL/$_zone_name"
         [ -d "$_target" ] || continue
 
         # Restore mode
@@ -90,8 +117,8 @@ hsin_thermal_restore() {
     for _cdev_dir in "$_backup_dir"/cooling_device*; do
         [ -d "$_cdev_dir" ] || continue
 
-        _cdev_name=$(basename "$_cdev_dir")
-        _target="/sys/class/thermal/$_cdev_name"
+        _cdev_name=${_cdev_dir##*/}
+        _target="$HSIN_SYSFS_THERMAL/$_cdev_name"
         [ -d "$_target" ] || continue
 
         [ -f "$_cdev_dir/cur_state" ] && {
