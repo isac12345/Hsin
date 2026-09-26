@@ -67,3 +67,7 @@
 - FIX3-DVFS (2026-09-26, leader + dev-modul work/dvfs-verify): TERIMA
   + merge 319238a, push DONE, worktree/branch bersih. Tulis DVFS
   diverifikasi, lapor jujur. Antrean: #4 oom-verify + sisa.
+
+- FIX4-OOM (2026-09-26, leader + dev-modul work/oom-verify): TERIMA +
+  merge ea9325a, push DONE, worktree/branch bersih. Release via
+  verify, hitung jujur, proteksi utuh. Antrean: #5 zram-readback.

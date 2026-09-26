@@ -173,6 +173,15 @@
   padahal max tetap (terbukti), kode baru SKIP+WARN+rc=1.
 - Catatan: log tetap dvfs.log (bukan boot.log, demi diff minimal).
 
+## Fix oom #4 (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/oom-verify → merge ea9325a, 1 file 36+/12-): release via
+  hsin_oom_set (tulis+readback) + ok/skip jujur + WARN per gagal +
+  /proc via $HSIN_PROC (sandboxable) + logger.
+- Verifikasi leader: bash-n OK, shellcheck 0, diff 1 file; proteksi
+  byte-identik (md5 sama); logika jujur ada di kode. Red-green
+  pekerja: lama "released 4" padahal 3, baru "released 3, skipped 2".
+- Bonus: oom.sh kini bisa di-sandbox penuh (dulu 9 /proc literal).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
