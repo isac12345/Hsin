@@ -1,5 +1,16 @@
 # NOTES.md — HSIN manual
 
+## OC GPU 1.5GHz vendor_boot (2026-09-26, penasaran user, TERBUKTI)
+- File: /sdcard/download/Vendor Boot Overclock Gpu 1.5Ghz.zip (1 img
+  VNDRBOOT 100M). Parse DTB beneran (bukan strings): gpu@23100000
+  sprd,dvfs-lists top level = 1500000 kHz @1100mV (4 level bawah sama).
+- Live HP (su read-only): DT + available_frequencies = top 850000 kHz
+  @800mV → HP jalan STOCK, img BELUM flash. Jadi klaim 1.5GHz di file
+  BENERAN ADA (bukan teks), tapi di HP sekarang NILAINYA GA SEGITU.
+- Catatan jujur: 850→1500 = +76% di Mali-G57 MP1, volt 0.8→1.1V.
+  Kalau flash: risiko panas/instabil; driver/thermal/binning bisa
+  nahan juga. Bukan bagian HSIN (tanpa ubah keputusan modul).
+
 ## Konsep (2026-09-26, perintah user)
 - HSIN = modul + aplikasi, sama kayak Alpha. Bedanya: Alpha adaptif
   (gausah setting manual), HSIN manual/bebas (user setting sesuka hati).
