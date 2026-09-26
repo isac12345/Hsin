@@ -66,6 +66,25 @@
 - PELAJARAN: file 500+ baris tak di-source = beban mati, jangan takut
   hapus/matikan; hipotesis lambat wajib diverifikasi call-site dulu.
 
+## Cache scan langkah-1 (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/scan-cache → merge ab92aa3, 8 file 698+/151-): modul baru
+  core/scan_cache.sh (502 baris, cache $HSIN_DATA/scan_cache.env flat,
+  tulis atomik, komit-setelah-valid, TTL 6 jam + BOOT_ID); thermal
+  baca cache + [ -w ] tanpa fork + collapse 3→1 pass + marker
+  `Zones from: cache|scan`; hook service boot + hsin-cli rescan +
+  action capabilities; fallback scan lama bila cache absen/rusak.
+- Verifikasi leader: main utuh pra-merge, bash-n 8/8, shellcheck 0,
+  tanpa TODO/curl, marker ada, diff hanya file boleh. Klaim sandbox
+  (cache-hit tanpa glob ulang, fallback identik, sampah→scan exit 0,
+  old 16s→cache 0.2s di Termux) konsisten dengan kode yang dibaca.
+- BUG LAMA ditemukan pekerja (belum fix, di luar scope): policy
+  dipanggil dalam $( ) (apply.sh:41/:62) → HSIN_THERMAL_POLICY/
+  PERF_TARGET di parent selalu default → cap thermal praktis no-op.
+  Masuk antrean langkah-2 (fix = throttle nyata aktif, perlu L2 HP).
+- Sisa glob: thermal/backup.sh masih glob (di luar daftar) → langkah-2.
+- PELAJARAN: angka sandbox Termux ≠ HP — klaim cepat wajib L2
+  via APPLY-TIME di HP sebelum bilang selesai.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).

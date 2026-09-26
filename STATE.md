@@ -22,8 +22,11 @@
   Lanjut: audit timing apply + peta scan.
 
 - AUDIT-TIMING (2026-09-26, leader + dev-modul): DONE TERIMA
-  (verifikasi leader: capability_scan mati BENAR, safe_write 0
-  pemanggil BENAR, sleep-1 hanya live path BENAR, scan-per-apply
-  BENAR, git clean). Biang >15s = scan ulang tiap apply (thermal
-  9 pass dkk) + backup full + binder. Desain cache scan_cache.env
-  disetujui arahnya. Lanjut: implementasi cache (tugas kecil).
+  (verifikasi leader 6 klaim cocok). Biang >15s = scan ulang tiap
+  apply + backup full + binder. Desain cache disetujui.
+
+- CACHE-LANGKAH1 (2026-09-26, leader + dev-modul work/scan-cache):
+  TERIMA + merge ab92aa3 ke main, push DONE, worktree/branch
+  dibersihkan. Thermal kini cache-first (fallback aman). Antrean:
+  fix policy-subshell (throttle no-op) + backup.sh glob + engine
+  lain ke cache. L2: butuh flash + APPLY-TIME HP.

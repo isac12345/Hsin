@@ -34,7 +34,11 @@
   freq CPU/GPU/gov/tweak lain tinggal cek hasil scan itu (support/ga).
 - [x] Ukur + peta scan (dev-modul, TERIMA: scan ulang tiap apply =
   biang; desain cache scan_cache.env disetujui arahnya).
-- [ ] Implementasi cache scan-sekali-simpan (tugas kecil per commit).
+- [x] Implementasi cache scan (langkah-1 DONE: core/scan_cache.sh +
+  thermal cache-first, merge ab92aa3, push, L1).
+- [ ] Langkah-2: fix policy-subshell (throttle no-op) + backup.sh ke
+  cache + engine lain (cpu/gpu/mem/io) ke cache, satu per tugas.
+- [ ] Tugas kamu-2 (L2): flash + apply + kirim APPLY-TIME (bukti cepat).
 - [ ] Daftar error per tweak + code + kompatibilitas device.
 - [ ] Fix satu per satu, kecil per commit (satu tujuan per tugas).
 - [ ] Verifikasi statis tiap fix (L1). Tanpa flash/build dulu.
