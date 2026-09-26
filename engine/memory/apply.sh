@@ -84,8 +84,12 @@ hsin_mem_apply() {
     # Step 1: Detect
     echo "  Step 1: Detect"
     hsin_mem_detect
+    # Kabel detect->apply: hsin_mem_detect hanya mengisi HSIN_MEM_ZRAM_*,
+    # sedangkan hsin_zram_apply (dan hsin_zram_state) baca HSIN_ZRAM_*.
+    # Tanpa probe zram.sh di sini, apply selalu "not available".
+    hsin_zram_detect
     hsin_mem_print
-    hsin_log_info "memory" "apply detect: zram=$HSIN_MEM_ZRAM_COUNT src=$HSIN_MEM_ZRAM_SOURCE"
+    hsin_log_info "memory" "apply detect: zram=$HSIN_MEM_ZRAM_COUNT src=$HSIN_MEM_ZRAM_SOURCE zram_list=$HSIN_ZRAM_COUNT"
 
     # Step 2: Validate
     echo "  Step 2: Validate"
