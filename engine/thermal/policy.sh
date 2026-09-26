@@ -4,7 +4,12 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# shellcheck disable=SC1091
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+# Diisi hsin_scan_lookup() (core/scan_cache.sh) tiap lookup field.
+_sc_f=""
 
 # Policy thresholds (millidegrees).
 # BUG FIX: these were still the same miscalibrated values already fixed
@@ -54,6 +59,10 @@ hsin_thermal_policy_determine() {
 }
 
 # Apply thermal policy to CPU frequency
+# Daftar policy + cpuinfo_max_freq + tabel OPP diambil dari cache scan
+# (core/scan_cache.sh), jadi tidak ada glob cpufreq/policy* dan tidak ada
+# cat cpuinfo_max_freq per apply. Tinggal satu test [ -w ] tanpa fork tepat
+# sebelum tulis; nilai max_freq yang di-cache hanya untuk picking OPP.
 hsin_thermal_apply_cpu() {
     _policy="$1"
     _base_max="$2"
@@ -67,60 +76,63 @@ hsin_thermal_apply_cpu() {
     _reduced=$(( _base_max * HSIN_THERMAL_PERF_TARGET / 100 ))
     [ -z "$_reduced" ] && _reduced=0
 
-    for _policy_dir in /sys/devices/system/cpu/cpufreq/policy*; do
-        [ -d "$_policy_dir" ] || continue
-        [ -f "$_policy_dir/scaling_max_freq" ] || continue
-        [ -f "$_policy_dir/cpuinfo_max_freq" ] || continue
+    hsin_scan_cpu_get
+    for _id in $HSIN_SCAN_CPU_POLICIES; do
+        hsin_scan_lookup "$HSIN_SCAN_CPU_POLICY_LINES" "$_id" 5
+        _hw_max="$_sc_f"
+        # Guard: kosong/non-numeric akan error di arithmetic.
+        case "$_hw_max" in ''|*[!0-9]*) continue ;; esac
+        [ "$_hw_max" -le 0 ] 2>/dev/null && continue
 
-        _hw_max=$(cat "$_policy_dir/cpuinfo_max_freq" 2>/dev/null || echo 0)
-        # Guard: empty/non-numeric _hw_max would error on arithmetic.
-        if [ -z "$_hw_max" ] || [ "$_hw_max" -le 0 ] 2>/dev/null; then
-            continue
-        fi
+        _dir="$HSIN_SYSFS_CPU/cpufreq/policy$_id"
         _new_max=$(( _hw_max * HSIN_THERMAL_PERF_TARGET / 100 ))
-        _avail=$(cat "$_policy_dir/scaling_available_frequencies" 2>/dev/null)
-        [ -n "$_avail" ] && _new_max=$(hsin_opp_cap_pick "$_new_max" "$_avail")
-        [ -n "$_new_max" ] && [ -w "$_policy_dir/scaling_max_freq" ] && {
-            printf '%s\n' "$_new_max" > "$_policy_dir/scaling_max_freq" 2>/dev/null
-        }
+        hsin_scan_lookup "$HSIN_SCAN_CPU_POLICY_LINES" "$_id" 7
+        _opp_csv="$_sc_f"
+        if [ -n "$_opp_csv" ]; then
+            _avail=$(printf '%s' "$_opp_csv" | tr ',' ' ')
+            _new_max=$(hsin_opp_cap_pick "$_new_max" "$_avail")
+        fi
+        [ -n "$_new_max" ] && [ -w "$_dir/scaling_max_freq" ] && \
+            printf '%s\n' "$_new_max" > "$_dir/scaling_max_freq" 2>/dev/null
     done
 }
 
 # Apply thermal policy to GPU
+# Sama seperti CPU: node devfreq + available_frequencies dari cache, satu
+# test [ -w ] sebelum tulis, max_freq tetap dibaca live karena itu nilai
+# yang berubah tiap apply.
 hsin_thermal_apply_gpu() {
     _policy="$1"
 
-    case "$_policy" in
-        critical|hot)
-            # Reduce GPU frequency
-            for _devfreq in /sys/class/devfreq/*; do
-                [ -d "$_devfreq" ] || continue
-                [ -f "$_devfreq/max_freq" ] || continue
-                [ -f "$_devfreq/available_frequencies" ] || continue
+    hsin_scan_devfreq_get
+    for _node in $HSIN_SCAN_DEVFREQ_NODES; do
+        _dir="$HSIN_SYSFS_DEVFREQ/$_node"
+        [ -f "$_dir/max_freq" ] || continue
 
-                # Get max available
-                _avail=$(cat "$_devfreq/available_frequencies" 2>/dev/null)
-                _max_avail=$(hsin_opp_max "$_avail")
-                [ -n "$_max_avail" ] || continue
+        hsin_scan_lookup "$HSIN_SCAN_DEVFREQ_LINES" "$_node" 1
+        _opp_csv="$_sc_f"
+        _avail=$(printf '%s' "$_opp_csv" | tr ',' ' ')
+        [ -n "$_avail" ] || continue
 
+        case "$_policy" in
+            critical|hot)
                 # Use an actual OPP, never an arbitrary value such as 1200
                 # MHz on a 384/768/1500 MHz GPU table.
+                _max_avail=$(hsin_opp_max "$_avail")
+                [ -n "$_max_avail" ] || continue
                 _target=$(hsin_opp_cap_pick "$(( _max_avail * 80 / 100 ))" "$_avail")
-                [ -n "$_target" ] && [ -w "$_devfreq/max_freq" ] && printf '%s\n' "$_target" > "$_devfreq/max_freq" 2>/dev/null
-            done
-            ;;
-        *)
-            # Let DVFS handle it
-            for _devfreq in /sys/class/devfreq/*; do
-                [ -d "$_devfreq" ] || continue
-                [ -f "$_devfreq/max_freq" ] || continue
-                [ -f "$_devfreq/available_frequencies" ] || continue
+                ;;
+            *)
+                # Let DVFS handle it
+                _max_avail=$(hsin_opp_max "$_avail")
+                [ -n "$_max_avail" ] || continue
+                _target="$_max_avail"
+                ;;
+        esac
 
-                _max_avail=$(hsin_opp_max "$(cat "$_devfreq/available_frequencies" 2>/dev/null)")
-                [ -n "$_max_avail" ] && [ -w "$_devfreq/max_freq" ] && printf '%s\n' "$_max_avail" > "$_devfreq/max_freq" 2>/dev/null
-            done
-            ;;
-    esac
+        [ -n "$_target" ] && [ -w "$_dir/max_freq" ] && \
+            printf '%s\n' "$_target" > "$_dir/max_freq" 2>/dev/null
+    done
 }
 
 # Apply thermal policy to scheduling

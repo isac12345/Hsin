@@ -4,6 +4,7 @@
 # Usage:
 #   hsin-cli status        Show system status
 #   hsin-cli detect        Run hardware detection
+#   hsin-cli rescan        Rebuild the scan cache (topology scan-once)
 #   hsin-cli capability    Show capability scoring
 #   hsin-cli backup        Create backup snapshot
 #   hsin-cli rollback      Restore last backup
@@ -64,6 +65,22 @@ case "$1" in
         hsin_detect_all
         echo "device.json: $HSIN_DATA/device.json"
         echo "device.txt:  $HSIN_DATA/device.txt"
+        ;;
+    rescan)
+        # Paksa tulis ulang cache topologi (mis. setelah update modul, atau
+        # perangkat yang berubah/hotplug yang tidak diketahui engine).
+        . "$MODPATH/core/logger.sh" 2>/dev/null
+        . "$MODPATH/core/scan_cache.sh" 2>/dev/null
+        if ! command -v hsin_scan_write >/dev/null 2>&1; then
+            echo "core/scan_cache.sh missing - cannot rescan"
+            exit 1
+        fi
+        if hsin_scan_write; then
+            hsin_scan_cache_status
+        else
+            echo "Scan cache write failed: $HSIN_SCAN_CACHE_FILE"
+            exit 1
+        fi
         ;;
     capability)
         . "$MODPATH/core/detector.sh"
@@ -141,6 +158,7 @@ case "$1" in
         echo "Commands:"
         echo "  status              Show system status"
         echo "  detect              Run hardware detection"
+        echo "  rescan              Rebuild the scan cache"
         echo "  capability          Show capability scoring"
         echo "  backup [name]       Create backup snapshot"
         echo "  rollback            Restore last backup"
