@@ -111,6 +111,15 @@
   butuh field cache baru); policy-baru-pasca-scan tak terlihat s/d
   rescan; `fail=2`   battery di sandbox = perilaku lama (bukan regresi).
 
+## GPU ke cache 2d (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/gpu-cache → merge c223501, 4 file 144+/20-): detector/
+  devfreq/generic cache-first (OPP dari cache, -4 fork), node hilang
+  = SKIP tanpa crash, tanpa OPP = gov saja, read-only = skip.
+- Verifikasi leader: bash-n 4/4, shellcheck 0, diff hanya file boleh;
+  literal tuning IDENTIK kecuali `1091` komentar (pola sama 2c).
+- Sisa jujur: dvfs.sh masih glob (di luar daftar); node/OPP baru
+  pasca-scan tak terlihat s/d rescan; kbase tak ikut backup (lama).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
