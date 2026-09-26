@@ -20,6 +20,7 @@ hsin_thermal_engine_apply() {
     echo "  Step 1: Detect"
     . "$HSIN_MODULE_PATH/engine/thermal/detect.sh" 2>/dev/null
     hsin_thermal_detect
+    printf "    Zones from: %s\n" "${HSIN_SCAN_THERMAL_SOURCE:-scan}"
 
     # Step 2: Read temperatures
     echo "  Step 2: Read"

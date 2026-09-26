@@ -148,6 +148,14 @@ hsin_action_capabilities() {
         _sched_lat="true"
     fi
 
+    # Scan cache: Capabilities dipanggil dari WebUI, jadi ini tempat
+    # paling murah untuk memastikan cache topologi ada (tulis kalau
+    # hilang/kuno/versi naik) tanpa scan sysfs berulang di tiap apply.
+    # Gagal di sini tidak fatal - engine jatuh ke scan live.
+    if . "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null; then
+        command -v hsin_scan_cache_ensure >/dev/null 2>&1 && hsin_scan_cache_ensure >/dev/null 2>&1
+    fi
+
     printf '{"cpu_tuning":%s,"gpu_devfreq":%s,"thermal_node":%s,"fpsgo":%s,"kgsl":%s,"sched_lat":%s}\n' \
         "$_cpu_tuning" "$_gpu_devfreq" "$_thermal_node" "$_fpsgo" "$_kgsl" "$_sched_lat"
 }
