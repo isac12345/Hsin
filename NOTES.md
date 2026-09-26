@@ -203,6 +203,12 @@
 - Bug tetangga antrean: pre-check case tak lepas [siku] → algo aktif
   bisa ter-skip sebagai "tak didukung" (task terpisah).
 
+## Fix precheck-siku #6 (2026-09-26, leader langsung, task cancel)
+- Isi (78742cc, 1 file +8/-2): pre-check apply + probe balanced
+  lepas [siku] via tr (cek dukungan saja; readback #5 tetap ketat).
+- Bukti: bash-n OK, shellcheck 0, uji 5 kasus (4 readback + balanced
+  `[zstd]`→zstd yang dulu jatuh lz4). Push DONE.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
