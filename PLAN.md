@@ -8,8 +8,8 @@
 - Yang jalan otomatis (ga perlu kamu): implementasi cache + fix error
   per tweak, kecil per commit, diverifikasi statis dulu (L1).
 - TUGAS KAMU (cuma 3, sesuai urutan):
-  1. SEKARANG (1 menit): jalankan di HP `su -c 'date +%s%3N'` → kirim
-     hasilnya ke saya. Ini nentuin alat ukur waktu bisa dipercaya/ga.
+  1. [x] SELESAI (2026-09-26, leader cek su izin user): `date +%s%3N`
+     → 13 digit bersih, marker ms DIPERCAYA. HP Android 14, T615.
   2. NANTI tiap fix L1 selesai: flash zip uji + apply manual 1x + kirim
      baris `APPLY-TIME` dari `/data/adb/hsin/logs/debug.log` (itu bukti
      cepat/lambatnya, bukan rasa).
