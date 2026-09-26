@@ -164,6 +164,15 @@
 - Jujur: tulis kini AKTIF (dulu mati); kernel bisa tolak EBUSY →
   skip+WARN;   `memory state` masih tampil not-available (di luar scope).
 
+## Fix dvfs #3 (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/dvfs-verify → merge 319238a, 1 file 61+/19-): tulis clamp
+  via hsin_node_write_verify + counter _fail + WARN per node + lapor
+  "OK x / SKIP y"; rc=1 hanya bila semua gagal (sebagian tetap 0).
+- Verifikasi leader: bash-n OK, shellcheck 0, diff 1 file; logika
+  verify+fail ada di kode. Red-green pekerja: kode lama "OK applied"
+  padahal max tetap (terbukti), kode baru SKIP+WARN+rc=1.
+- Catatan: log tetap dvfs.log (bukan boot.log, demi diff minimal).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
