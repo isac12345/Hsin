@@ -120,6 +120,17 @@
 - Sisa jujur: dvfs.sh masih glob (di luar daftar); node/OPP baru
   pasca-scan tak terlihat s/d rescan; kbase tak ikut backup (lama).
 
+## Mem/IO/DVFS ke cache 2e (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/memio-cache → merge 8adc31d, 8 file 265+/76-): mem/io/
+  dvfs cache-first (zram via module-param num_devices + log bila tak
+  baca; /proc via $HSIN_PROC; dvfs reuse cpu/gpu helper 2c/2d).
+- Verifikasi leader: bash-n 8/8, shellcheck 0, diff hanya file boleh;
+  literal tuning IDENTIK kecuali 1091/32 (bukan tuning); bug zram
+  TERBUKTI (apply.sh panggil apply tanpa detect → selalu not-available).
+- BUG antrean: aktifkan hsin_zram_detect di apply (perilaku berubah:
+  zram mulai ditulis → perlu L2 hati-hati).
+- Sisa: hsin_vm_read masih cat; node baru pasca-scan tak terlihat.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
