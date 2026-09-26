@@ -71,7 +71,10 @@ hsin_zram_algo() {
                 [ -f "$_algo_file" ] || continue
                 _avail=""
                 IFS= read -r _avail < "$_algo_file" 2>/dev/null
-                case " $_avail " in
+                # Lepas [siku] aktif HANYA untuk cek dukungan (readback
+                # tetap ketat di hsin_zram_algo_live).
+                _avail_nosq=$(printf '%s' "$_avail" | tr -d '[]')
+                case " $_avail_nosq " in
                     *" zstd "*) echo "zstd"; return 0 ;;
                     *" lz4 "*)  echo "lz4"; return 0 ;;
                 esac
@@ -153,7 +156,10 @@ hsin_zram_apply() {
         # Isi comp_algorithm = daftar algo yang DIDUKUNG device, bukan algo
         # yang sedang aktif. Target harus ada di daftar itu; kalau tidak,
         # kernel menolak tulis dan zram tetap jalan dengan algo lama.
-        case " $_algo " in
+        # Lepas [siku] aktif HANYA untuk cek dukungan ini (readback di
+        # bawah tetap ketat: aktif = [siku]/persis).
+        _algo_nosq=$(printf '%s' "$_algo" | tr -d '[]')
+        case " $_algo_nosq " in
             *" $_target_algo "*)
                 if echo "$_target_algo" > "$_afile" 2>/dev/null; then
                     # Exit 0 shell bukan bukti algo benar-benar berganti:
