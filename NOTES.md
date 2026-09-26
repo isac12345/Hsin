@@ -99,6 +99,18 @@
   rollback CPU kini via session-restore (perlu L2 HP).
 - Worktree sisa wt-policy-fix (tugas cancel) ikut dibersihkan.
 
+## CPU ke cache 2c (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/cpu-cache → merge f58d2ed, 6 file 265+/47-): detect/apply/
+  governor/frequency/scheduler cache-first (fallback identik, live:
+  mask online + gov list + [ -w ]); safety 3→1 pass (suhu live,
+  max dibanding semua zone, THERMAL_MAXZONE tak dipakai persempit).
+- Verifikasi leader: bash-n 6/6, shellcheck 0, diff hanya file boleh;
+  literal tuning (angka 4-7 digit + gov) IDENTIK kecuali `1091` dari
+  komentar shellcheck-disable (bukan tuning); marker Source ada.
+- Sisa jujur: ~6 read/policy + 1 pass zone masih live (nol mutlak
+  butuh field cache baru); policy-baru-pasca-scan tak terlihat s/d
+  rescan; `fail=2`   battery di sandbox = perilaku lama (bukan regresi).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
