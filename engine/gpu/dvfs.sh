@@ -18,6 +18,19 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/cpu/frequency.sh" 2>/dev/null
+# Daftar node devfreq GPU + daftar policy CPU dari cache scan (topologi
+# statis), sama seperti engine/gpu/apply.sh: apply DVFS tidak perlu glob
+# /sys/class/devfreq/* atau cpufreq/policy* sendiri. frequency.sh sudah
+# menarik engine/cpu/detect.sh (hsin_cpu_policy_ids) kalau belum termuat.
+. "$HSIN_MODULE_PATH/engine/gpu/detector.sh" 2>/dev/null
+# Path sysfs dari core/scan_cache.sh, default sama dengan path yang
+# sebelumnya ditulis langsung di file ini.
+[ -n "$HSIN_SYSFS_CPU" ] || HSIN_SYSFS_CPU="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
+[ -n "$HSIN_SYSFS_DEVFREQ" ] || HSIN_SYSFS_DEVFREQ="${SYSFS_DEVFREQ_PREFIX:-/sys/class/devfreq}"
+# Diisi hsin_cpu_policy_hwmax() (engine/cpu/detect.sh) dan
+# hsin_gpu_opp_list() (engine/gpu/detector.sh).
+_hcpw=""
+_hgo_avail=""
 
 _hsin_dvfs_log() {
     mkdir -p "$HSIN_DATA/logs" 2>/dev/null
@@ -32,16 +45,20 @@ hsin_dvfs_cpu_apply() {
     [ "$_pct" -gt 100 ] 2>/dev/null && _pct=100
 
     _applied=0
-    for _p in /sys/devices/system/cpu/cpufreq/policy*; do
-        [ -d "$_p" ] || continue
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
+        [ -d "$_p" ] || { _hsin_dvfs_log "cpu policy$_pid hilang sejak scan (skip)"; continue; }
         [ -w "$_p/scaling_max_freq" ] || continue
-        _hw_max=$(cat "$_p/cpuinfo_max_freq" 2>/dev/null)
+        hsin_cpu_policy_hwmax "$_pid"; _hw_max="$_hcpw"
         [ -z "$_hw_max" ] && continue
 
         if [ "$_pct" -eq 100 ]; then
             _target="$_hw_max"
         else
-            _avail=$(cat "$_p/scaling_available_frequencies" 2>/dev/null)
+            # available_frequencies = topologi statis -> cache dulu; nilai
+            # scaling_max_freq yang HSIN tulis sendiri tetap live di atas.
+            _avail=$(hsin_cpu_freq_available "$_p")
             if [ -n "$_avail" ]; then
                 _target=$(hsin_cpu_freq_pick "cap:$_pct" "$_avail")
             else
@@ -53,7 +70,7 @@ hsin_dvfs_cpu_apply() {
         echo "$_target" > "$_p/scaling_max_freq" 2>/dev/null && _applied=$((_applied + 1))
     done
 
-    _hsin_dvfs_log "cpu_limit=$_pct% applied to $_applied policy node(s)"
+    _hsin_dvfs_log "cpu_limit=$_pct% applied to $_applied policy node(s) src=$HSIN_CPU_POLICY_SOURCE"
     echo "OK: cpu_limit=$_pct% applied ($_applied policies)"
     return 0
 }
@@ -66,15 +83,16 @@ hsin_dvfs_gpu_apply() {
     [ "$_pct" -gt 100 ] 2>/dev/null && _pct=100
 
     _applied=0
-    for _d in /sys/class/devfreq/*; do
-        [ -d "$_d" ] || continue
-        hsin_devfreq_gpu_candidate "$_d" || continue
+    hsin_gpu_devfreq_candidates
+    for _d in $HSIN_GPU_DEVFRES; do
+        [ -d "$_d" ] || { _hsin_dvfs_log "gpu node ${_d##*/} hilang sejak scan (skip)"; continue; }
         [ -w "$_d/max_freq" ] || continue
 
+        # available_frequencies = topologi statis -> cache dulu (dengan
+        # fallback baca file), jadi rantai tr|grep|sort|tail per node hilang.
+        hsin_gpu_opp_list "$_d"; _avail="$_hgo_avail"
         _hw_max=""
-        if [ -f "$_d/available_frequencies" ]; then
-            _hw_max=$(tr ' ' '\n' < "$_d/available_frequencies" 2>/dev/null | grep -v '^$' | sort -n | tail -1)
-        fi
+        [ -n "$_avail" ] && _hw_max=$(hsin_opp_max "$_avail")
         [ -z "$_hw_max" ] && _hw_max=$(cat "$_d/max_freq" 2>/dev/null)
         [ -z "$_hw_max" ] && continue
 
@@ -82,8 +100,8 @@ hsin_dvfs_gpu_apply() {
             _target="$_hw_max"
         else
             _target=$((_hw_max * _pct / 100))
-            if [ -f "$_d/available_frequencies" ]; then
-                _best=$(hsin_opp_cap_pick "$_target" "$(cat "$_d/available_frequencies" 2>/dev/null)")
+            if [ -n "$_avail" ]; then
+                _best=$(hsin_opp_cap_pick "$_target" "$_avail")
                 [ -n "$_best" ] && _target="$_best"
             fi
         fi
@@ -92,7 +110,7 @@ hsin_dvfs_gpu_apply() {
         echo "$_target" > "$_d/max_freq" 2>/dev/null && _applied=$((_applied + 1))
     done
 
-    _hsin_dvfs_log "gpu_limit=$_pct% applied to $_applied devfreq node(s)"
+    _hsin_dvfs_log "gpu_limit=$_pct% applied to $_applied devfreq node(s) src=$HSIN_GPU_NODE_SOURCE"
     echo "OK: gpu_limit=$_pct% applied ($_applied devfreq nodes)"
     return 0
 }
@@ -137,18 +155,20 @@ hsin_dvfs_restore() {
 
 hsin_dvfs_status() {
     echo "  DVFS Limiter State:"
-    for _p in /sys/devices/system/cpu/cpufreq/policy*; do
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_p" ] || continue
         _cur=$(cat "$_p/scaling_max_freq" 2>/dev/null)
-        _hw=$(cat "$_p/cpuinfo_max_freq" 2>/dev/null)
+        hsin_cpu_policy_hwmax "$_pid"; _hw="$_hcpw"
         [ -n "$_cur" ] && [ -n "$_hw" ] && [ "$_hw" -gt 0 ] 2>/dev/null && \
-            printf "    %s: max=%s (%d%% of hw max %s)\n" "$(basename "$_p")" "$_cur" "$((_cur * 100 / _hw))" "$_hw"
+            printf "    %s: max=%s (%d%% of hw max %s)\n" "policy$_pid" "$_cur" "$((_cur * 100 / _hw))" "$_hw"
     done
-    for _d in /sys/class/devfreq/*; do
+    hsin_gpu_devfreq_candidates
+    for _d in $HSIN_GPU_DEVFRES; do
         [ -d "$_d" ] || continue
-        hsin_devfreq_gpu_candidate "$_d" || continue
         _cur=$(cat "$_d/max_freq" 2>/dev/null)
-        [ -n "$_cur" ] && printf "    %s: max_freq=%s\n" "$(basename "$_d")" "$_cur"
+        [ -n "$_cur" ] && printf "    %s: max_freq=%s\n" "${_d##*/}" "$_cur"
     done
 }
 

@@ -2,6 +2,12 @@
 # HSIN Memory Engine - VM Tuning
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+# Path proc dari core/scan_cache.sh (satu-satunya definisi), default sama
+# dengan path yang sebelumnya ditulis langsung di file ini.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Safe VM tunables with ranges
 HSIN_VM_SAFE="
@@ -15,7 +21,7 @@ page-cluster|0|5|3|3|2|0
 # Read VM node
 hsin_vm_read() {
     _name="$1"
-    _path="/proc/sys/vm/$_name"
+    _path="$HSIN_PROC/sys/vm/$_name"
     [ -f "$_path" ] && cat "$_path" 2>/dev/null || echo ""
 }
 
@@ -23,7 +29,7 @@ hsin_vm_read() {
 hsin_vm_write() {
     _name="$1"
     _val="$2"
-    _path="/proc/sys/vm/$_name"
+    _path="$HSIN_PROC/sys/vm/$_name"
 
     # Check node exists
     [ -f "$_path" ] || return 1
@@ -153,7 +159,7 @@ hsin_vm_state() {
         [ -z "$_n" ] && continue
         _cur=$(hsin_vm_read "$_n")
         _w="false"
-        [ -w "/proc/sys/vm/$_n" ] && _w="true"
+        [ -w "$HSIN_PROC/sys/vm/$_n" ] && _w="true"
         printf "    %-30s = %-10s (writable=%s)\n" "$_n" "${_cur:-?}" "$_w"
     done <<EOF
 $HSIN_VM_SAFE

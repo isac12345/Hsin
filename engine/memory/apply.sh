@@ -38,8 +38,8 @@ hsin_mem_restore() {
 
 # Verify memory state after apply
 hsin_mem_verify() {
-    # Check if /proc/meminfo is still readable
-    [ -f /proc/meminfo ] || return 2
+    # Check if meminfo is still readable
+    [ -f "$HSIN_PROC/meminfo" ] || return 2
 
     # If no VM nodes were writable before, don't fail
     return 0
@@ -85,6 +85,7 @@ hsin_mem_apply() {
     echo "  Step 1: Detect"
     hsin_mem_detect
     hsin_mem_print
+    hsin_log_info "memory" "apply detect: zram=$HSIN_MEM_ZRAM_COUNT src=$HSIN_MEM_ZRAM_SOURCE"
 
     # Step 2: Validate
     echo "  Step 2: Validate"
