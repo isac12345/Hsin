@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HSIN v5</title>
+<style>
+:root{--bg:#0a0e17;--card:#111827;--card2:#1a2235;--border:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#3b82f6;--accent2:#2563eb;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--radius:12px}
+[data-theme=light]{--bg:#f1f5f9;--card:#fff;--card2:#f8fafc;--border:#e2e8f0;--text:#1e293b;--text2:#64748b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.page{display:none;padding:16px;padding-bottom:80px;max-width:480px;margin:0 auto}
+.page.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-sm{padding:12px}
+.card h3{font-size:14px;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.header-card{background:linear-gradient(135deg,var(--accent2),#7c3aed);border:none;color:#fff;text-align:center;padding:24px 16px}
+.header-card h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.header-card .badge{display:inline-block;background:rgba(255,255,255,.2);padding:2px 10px;border-radius:20px;font-size:12px;margin-top:6px}
+.header-card .sub{font-size:13px;opacity:.8;margin-top:4px}
+.status-row{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap}
+.status-chip{background:rgba(255,255,255,.15);padding:3px 10px;border-radius:16px;font-size:11px}
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.profile-card{background:var(--card2);border:2px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;cursor:pointer;transition:border-color .2s}
+.profile-card.active{border-color:var(--accent)}
+.profile-card:active{transform:scale(.97)}
+.profile-card .icon{font-size:28px;margin-bottom:4px}
+.profile-card .name{font-weight:600;font-size:14px}
+.profile-card .desc{font-size:11px;color:var(--text2);margin-top:2px}
+.profile-card.battery .icon{color:var(--green)}
+.profile-card.balanced .icon{color:var(--accent)}
+.profile-card.performance .icon{color:var(--orange)}
+.profile-card.extreme .icon{color:var(--red)}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;text-align:center}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:active{background:var(--accent2)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-row .label{color:var(--text2)}
+.info-row .value{font-weight:500}
+.cap-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cap-item{display:flex;align-items:center;gap:6px;font-size:12px;padding:6px 8px;background:var(--card2);border-radius:8px}
+.cap-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cap-dot.on{background:var(--green)}
+.cap-dot.off{background:var(--red)}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-row .info{flex:1}
+.toggle-row .info .name{font-size:14px;font-weight:500}
+.toggle-row .info .desc{font-size:11px;color:var(--text2);margin-top:2px}
+.switch{position:relative;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;background:var(--border);border-radius:24px;cursor:pointer;transition:.2s}
+.switch .slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--accent)}
+.switch input:checked+.slider:before{transform:translateX(20px)}
+.radio-group{display:flex;flex-direction:column;gap:8px}
+.radio-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.radio-item.selected{border-color:var(--accent);background:rgba(59,130,246,.1)}
+.radio-item input{display:none}
+.radio-dot{width:18px;height:18px;border:2px solid var(--border);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.radio-item.selected .radio-dot{border-color:var(--accent)}
+.radio-item.selected .radio-dot:after{content:'';width:10px;height:10px;background:var(--accent);border-radius:50%}
+.radio-item .rlabel{font-size:13px}
+.radio-item .rdesc{font-size:11px;color:var(--text2)}
+.slider-row{padding:12px 0}
+.slider-row .slider-header{display:flex;justify-content:space-between;margin-bottom:8px}
+.slider-row .slider-label{font-size:13px;font-weight:500}
+.slider-row .slider-value{font-size:13px;color:var(--accent);font-weight:600}
+input[type=range]{width:100%;-webkit-appearance:none;height:6px;background:var(--border);border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:var(--accent);border-radius:50%;cursor:pointer}
+.game-card{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card2);border-radius:var(--radius);margin-bottom:8px}
+.game-card .game-icon{font-size:24px;width:36px;text-align:center}
+.game-card .game-info{flex:1;min-width:0}
+.game-card .game-pkg{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game-card .game-badges{display:flex;gap:4px;margin-top:4px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.badge-perf{background:rgba(245,158,11,.15);color:var(--orange)}
+.badge-bal{background:rgba(59,130,246,.15);color:var(--accent)}
+.badge-bat{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-ext{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-heavy{background:rgba(168,85,247,.15);color:#a855f7}
+.game-card .btn-del{background:none;border:none;color:var(--text2);font-size:18px;padding:4px 8px;cursor:pointer}
+.game-card .btn-del:active{color:var(--red)}
+.add-game-row{display:flex;gap:8px;margin-top:8px}
+.add-game-row input{flex:1;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none}
+.add-game-row input:focus{border-color:var(--accent)}
+.add-game-row select{padding:10px 8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none}
+.add-game-row .btn{width:auto;padding:10px 16px;font-size:13px;flex-shrink:0}
+.log-box{background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:12px;max-height:50vh;overflow-y:auto;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:11px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
+.log-line{margin-bottom:2px}
+.log-ts{color:#8b949e}
+.log-level{font-weight:600}
+.log-level.ERROR{color:var(--red)}
+.log-level.WARN{color:var(--orange)}
+.log-level.INFO{color:var(--accent)}
+.log-level.DEBUG{color:var(--text2)}
+.log-level.OK{color:var(--green)}
+.log-level.APPLY{color:#a855f7}
+.empty-state{text-align:center;padding:32px;color:var(--text2);font-size:13px}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:100;max-width:480px;margin:0 auto}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;font-size:10px;color:var(--text2);cursor:pointer;gap:2px}
+.nav-item.active{color:var(--accent)}
+.nav-item svg{width:20px;height:20px}
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:10px 20px;border-radius:var(--radius);font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:var(--radius) var(--radius) 0 0;padding:20px;width:100%;max-width:480px;max-height:60vh;overflow-y:auto}
+.modal h3{margin-bottom:12px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<!-- ===== PAGE: HOME ===== -->
+<div id="page-home" class="page active">
+  <div class="card header-card">
+    <h1>HSIN Smart Engine</h1>
+    <div class="badge" id="hd-version">v5.0.0-beta</div>
+    <div class="sub" id="hd-soc">Detecting...</div>
+    <div class="status-row">
+      <span class="status-chip" id="hd-root">checking</span>
+      <span class="status-chip" id="hd-module">checking</span>
+    </div>
+  </div>
+
+  <div class="card card-sm" id="active-profile-banner">
+    <h3>Current Profile</h3>
+    <div style="font-size:20px;font-weight:700" id="ap-name">--</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:2px" id="ap-status"></div>
+  </div>
+
+  <h3 style="font-size:13px;color:var(--text2);margin:12px 0 8px">Select Profile</h3>
+  <div class="profile-grid" id="profile-grid">
+    <div class="profile-card performance" data-profile="performance" onclick="selectProfile(this)">
+      <div class="icon">&#9889;</div>
+      <div class="name">Performance</div>
+      <div class="desc">Optimized for speed</div>
+    </div>
+    <div class="profile-card balanced" data-profile="balanced" onclick="selectProfile(this)">
+      <div class="icon">&#9672;</div>
+      <div class="name">Balanced</div>
+      <div class="desc">Default balanced</div>
+    </div>
+    <div class="profile-card battery" data-profile="battery" onclick="selectProfile(this)">
+      <div class="icon">&#9889;</div>
+      <div class="name">Battery</div>
+      <div class="desc">Maximum savings</div>
+    </div>
+    <div class="profile-card extreme" data-profile="extreme" onclick="selectProfile(this)">
+      <div class="icon">&#9760;</div>
+      <div class="name">Extreme</div>
+      <div class="desc">Max performance</div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" style="margin-top:12px" onclick="applyProfile()">Apply Profile</button>
+</div>
+
+<!-- ===== PAGE: DEVICE ===== -->
+<div id="page-device" class="page">
+  <div class="card">
+    <h3>Device Info</h3>
+    <div id="device-info"><div class="empty-state">Loading...</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Capabilities</h3>
+    <div class="cap-grid" id="cap-list"><div class="empty-state">Loading...</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Quick Actions</h3>
+    <div class="row">
+      <button class="btn btn-outline" onclick="doBackup()">Backup</button>
+      <button class="btn btn-outline" onclick="showRollbackModal()">Rollback</button>
+      <button class="btn btn-outline" onclick="doDoctor()">Doctor</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: SETTINGS ===== -->
+<div id="page-settings" class="page">
+  <div class="card">
+    <h3>Engine Settings</h3>
+    <div class="toggle-row">
+      <div class="info">
+        <div class="name">Game Auto-Boost</div>
+        <div class="desc">Automatically boost profile when a known game is in foreground</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="cfg-gam" onchange="saveConfig()"><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="info">
+        <div class="name">Allow Extreme Profile</div>
+        <div class="desc">Opt-in to enable extreme mode (requires reboot)</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="cfg-extreme" onchange="saveConfig()"><span class="slider"></span></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Render Backend</h3>
+    <div class="radio-group" id="render-group">
+      <div class="radio-item selected" data-value="system" onclick="selectRender(this)">
+        <div class="radio-dot"></div>
+        <div><div class="rlabel">Vendor Default</div><div class="rdesc">Use device default renderer</div></div>
+      </div>
+      <div class="radio-item" data-value="skiagl" onclick="selectRender(this)">
+        <div class="radio-dot"></div>
+        <div><div class="rlabel">Skia GL</div><div class="rdesc">OpenGL rendering backend</div></div>
+      </div>
+      <div class="radio-item" data-value="skiavk" onclick="selectRender(this)">
+        <div class="radio-dot"></div>
+        <div><div class="rlabel">Skia Vulkan</div><div class="rdesc">Vulkan rendering backend</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>System Downscale <span style="font-size:11px;color:var(--text2);font-weight:400">(per-profile)</span></h3>
+    <div class="slider-row">
+      <div class="slider-header">
+        <span class="slider-label">Resolution Scale</span>
+        <span class="slider-value" id="ds-value">0%</span>
+      </div>
+      <input type="range" id="ds-slider" min="0" max="75" value="0" step="1" oninput="updateDownscaleLabel()">
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px">Applied on next profile apply. 0% = native resolution.</div>
+    <button class="btn btn-outline" style="margin-top:10px;font-size:13px" onclick="saveDownscale()">Save to Active Profile</button>
+  </div>
+</div>
+
+<!-- ===== PAGE: GAMES ===== -->
+<div id="page-games" class="page">
+  <div class="card">
+    <h3>Game Profiles</h3>
+    <div id="game-list"><div class="empty-state">Loading...</div></div>
+    <div class="add-game-row">
+      <input type="text" id="add-pkg" placeholder="Package name">
+      <select id="add-prof">
+        <option value="performance">Perf</option>
+        <option value="balanced">Bal</option>
+        <option value="battery">Bat</option>
+        <option value="extreme">Ext</option>
+      </select>
+      <button class="btn btn-primary" onclick="addGame()">+ Add</button>
+    </div>
+    <div style="margin-top:6px">
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="add-heavy"> Mark as Heavy
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: LOGS ===== -->
+<div id="page-logs" class="page">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">Logs</h3>
+      <select id="log-type" onchange="loadLogs()" style="padding:4px 8px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <option value="apply">Apply</option>
+        <option value="hsin">General</option>
+        <option value="extreme">Extreme</option>
+      </select>
+    </div>
+    <div class="log-box" id="log-content"><div class="empty-state">Loading...</div></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn btn-outline" onclick="loadLogs()">Refresh</button>
+      <button class="btn btn-outline" onclick="exportLogs()">Export</button>
+    </div>
+  </div>
+
+  <div class="card card-sm" id="svc-status">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:10px;height:10px;border-radius:50%;background:var(--green)"></div>
+      <div>
+        <div style="font-size:13px;font-weight:500" id="svc-msg">Checking status...</div>
+        <div style="font-size:11px;color:var(--text2)" id="svc-sub"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BOTTOM NAV ===== -->
+<nav class="bottom-nav">
+  <div class="nav-item active" onclick="showPage('home')" data-page="home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+    Home
+  </div>
+  <div class="nav-item" onclick="showPage('device')" data-page="device">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+    Device
+  </div>
+  <div class="nav-item" onclick="showPage('settings')" data-page="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    Settings
+  </div>
+  <div class="nav-item" onclick="showPage('games')" data-page="games">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M18 12h.01"/><path d="M10 10v4M14 10v4"/></svg>
+    Games
+  </div>
+  <div class="nav-item" onclick="showPage('logs')" data-page="logs">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+    Logs
+  </div>
+</nav>
+
+<!-- ===== ROLLBACK MODAL ===== -->
+<div class="modal-overlay" id="rollback-modal" onclick="if(event.target===this)closeRollbackModal()">
+  <div class="modal">
+    <h3>Restore Backup</h3>
+    <div id="rollback-sessions"><div class="empty-state">Loading sessions...</div></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-outline" onclick="closeRollbackModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="rollbackLatest()">Restore Latest</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== UTILITIES =====
+var MODpath='/data/adb/modules/hsin';
+var HSIN_DATA='/data/adb/hsin';
+var selectedProfile='balanced';
+var _cbCounter=0;
+
+function shAsync(cmd,cb){
+  var cbName='hsin_cb_'+(_cbCounter++)+'_'+Date.now();
+  window[cbName]=function(errno,stdout,stderr){
+    delete window[cbName];
+    cb((stdout||'').trim(), errno);
+  };
+  try{
+    ksu.exec(cmd, JSON.stringify({}), cbName);
+  }catch(e){
+    delete window[cbName];
+    cb('', -1);
+  }
+}
+function toast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show '+(type||'');
+  setTimeout(function(){t.className='toast';},2500);
+}
+function parseKV(raw){
+  var o={};if(!raw)return o;
+  raw.split('\n').forEach(function(l){
+    if(!l||l.charAt(0)==='#')return;
+    var i=l.indexOf('=');
+    if(i>0)o[l.substring(0,i)]=l.substring(i+1);
+  });return o;
+}
+
+// ===== NAVIGATION =====
+function showPage(name){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelector('[data-page="'+name+'"]').classList.add('active');
+  if(name==='home')loadHome();
+  else if(name==='device')loadDevice();
+  else if(name==='settings')loadSettings();
+  else if(name==='games')loadGames();
+  else if(name==='logs')loadLogs();
+}
+
+// ===== PAGE: HOME =====
+function loadHome(){
+  // Version from module.prop
+  shAsync('cat '+MODpath+'/module.prop 2>/dev/null',function(mp){
+    var ver=mp.match(/^version=(.+)/m);
+    document.getElementById('hd-version').textContent=ver?ver[1]:'v5';
+    var modActive=mp.length>0;
+    document.getElementById('hd-module').textContent=modActive?'Module Active':'Module Missing';
+    document.getElementById('hd-module').style.color=modActive?'var(--green)':'var(--red)';
+  });
+
+  // Root check
+  shAsync('id 2>/dev/null',function(idOut){
+    var rootOk=idOut.indexOf('uid=0')>=0;
+    document.getElementById('hd-root').textContent=rootOk?'Root Granted':'No Root';
+    document.getElementById('hd-root').style.color=rootOk?'var(--green)':'var(--red)';
+  });
+
+  // Live status
+  shAsync('sh '+MODpath+'/action.sh status',function(raw){
+    try{
+      var d=JSON.parse(raw);
+      var p=d.profile||'none';
+      selectedProfile=p;
+      document.getElementById('ap-name').textContent=p.charAt(0).toUpperCase()+p.slice(1);
+      document.getElementById('ap-status').textContent='Status: '+(d.apply_status||'unknown');
+      // Highlight active card
+      document.querySelectorAll('.profile-card').forEach(function(c){
+        c.classList.toggle('active',c.dataset.profile===p);
+      });
+      // Live stats
+      if(d.cpu_temp&&d.cpu_temp>0){
+        document.getElementById('ap-status').textContent+=' | CPU: '+Math.round(d.cpu_temp/1000)+'C';
+      }
+    }catch(e){}
+  });
+
+  // Device info for header
+  shAsync('sh '+MODpath+'/action.sh device',function(raw){
+    try{
+      var d=JSON.parse(raw);
+      document.getElementById('hd-soc').textContent='SoC: '+(d.soc||'unknown')+' | GPU: '+(d.gpu||'?');
+    }catch(e){}
+  });
+}
+
+function selectProfile(el){
+  document.querySelectorAll('.profile-card').forEach(function(c){c.classList.remove('active');});
+  el.classList.add('active');
+  selectedProfile=el.dataset.profile;
+}
+
+function applyProfile(){
+  if(selectedProfile==='extreme'){
+    shAsync('cat /sdcard/Android/hsin/hsin.conf 2>/dev/null',function(conf){
+      if(conf.indexOf('ALLOW_EXTREME=true')<0){
+        if(!confirm('Extreme mode requires ALLOW_EXTREME=true in config.\nApply anyway (will be downgraded to performance on reboot)?'))return;
+      }
+      _doApplyProfile();
+    });
+  }else{
+    _doApplyProfile();
+  }
+}
+
+function _doApplyProfile(){
+  toast('Applying '+selectedProfile+'...','success');
+  shAsync('sh '+MODpath+'/action.sh apply '+selectedProfile,function(r){
+    if(r&&r.indexOf('OK')===0)toast('Applied '+selectedProfile,'success');
+    else toast('Apply failed: '+r,'error');
+    loadHome();
+  });
+}
+
+// ===== PAGE: DEVICE =====
+function loadDevice(){
+  shAsync('sh '+MODpath+'/action.sh device',function(raw){
+    try{
+      var d=JSON.parse(raw);
+      var ram=d.ram_kb?Math.round(d.ram_kb/1024)+' MB':'?';
+      document.getElementById('device-info').innerHTML=
+        infoRow('SoC',d.soc||'?')+
+        infoRow('GPU',d.gpu||'?')+
+        infoRow('Kernel',d.kernel||'?')+
+        infoRow('RAM',ram)+
+        infoRow('Device ID',(d.device_id||'?').substring(0,16)+'...');
+    }catch(e){document.getElementById('device-info').innerHTML='<div class="empty-state">Failed to load</div>';}
+  });
+
+  // Capabilities from cache
+  shAsync('cat '+HSIN_DATA+'/.capability_cache 2>/dev/null',function(raw){
+    if(!raw){document.getElementById('cap-list').innerHTML='<div class="empty-state">No capability data. Run detect first.</div>';return;}
+    var caps=parseKV(raw);
+    var friendly={
+      CPU_GOV_WRITABLE:'CPU Governor',CPU_FREQ_WRITABLE:'CPU Freq',CPU_FREQ_MIN_WRITABLE:'CPU Freq Min',
+      CPU_FREQ_MAX_WRITABLE:'CPU Freq Max',GPU_DEVFREQ_WRITABLE:'GPU Devfreq',GPU_KGSL_WRITABLE:'GPU KGSL',
+      GPU_MALI_PLATFORM_WRITABLE:'GPU Mali',GPU_MALI_KBASE_WRITABLE:'GPU Mali Kbase',GPU_FPSGO:'GPU FPSGO',
+      THERMAL_WRITABLE:'Thermal',CPUSET_WRITABLE:'cpuset',IO_SCHEDULER_WRITABLE:'IO Scheduler',
+      IO_READAHEAD_WRITABLE:'IO Readahead',ZRAM_AVAILABLE:'ZRAM',VM_SWAPPINESS_WRITABLE:'VM Swappiness',
+      NETWORK_TCP_WRITABLE:'Network TCP',NETWORK_SYSCTL_WRITABLE:'Network Sysctl',
+      INPUT_BOOST:'Input Boost',REFRESH_RATE:'Refresh Rate',SF_PROPS:'SF Props'
+    };
+    var html='';
+    Object.keys(friendly).forEach(function(k){
+      var v=parseInt(caps[k]||'0',10);
+      html+='<div class="cap-item"><div class="cap-dot '+(v>0?'on':'off')+'"></div>'+friendly[k]+'</div>';
+    });
+    document.getElementById('cap-list').innerHTML=html;
+  });
+}
+
+function infoRow(l,v){return '<div class="info-row"><span class="label">'+l+'</span><span class="value">'+v+'</span></div>';}
+
+// ===== PAGE: SETTINGS =====
+function loadSettings(){
+  shAsync('cat /sdcard/Android/hsin/hsin.conf 2>/dev/null',function(conf){
+    document.getElementById('cfg-gam').checked=conf.indexOf('GAM_BOOST_ENABLED=true')>=0;
+    document.getElementById('cfg-extreme').checked=conf.indexOf('ALLOW_EXTREME=true')>=0;
+  });
+
+  // Load current profile's downscale
+  shAsync('sh '+MODpath+'/action.sh status',function(raw){
+    try{
+      var d=JSON.parse(raw);
+      var p=d.profile||'balanced';
+      // Read downscale from profile conf
+      shAsync('grep downscale_percent '+MODpath+'/profiles/'+p+'.conf 2>/dev/null',function(line){
+        var m=line.match(/downscale_percent=(\d+)/);
+        var v=m?parseInt(m[1],10):0;
+        document.getElementById('ds-slider').value=v;
+        document.getElementById('ds-value').textContent=v+'%';
+      });
+    }catch(e){}
+  });
+
+  // Check current renderer
+  shAsync('getprop debug.hwui.renderer 2>/dev/null',function(r){
+    var items=document.querySelectorAll('#render-group .radio-item');
+    items.forEach(function(it){
+      it.classList.toggle('selected',it.dataset.value===(r||'system'));
+    });
+  });
+}
+
+function saveConfig(){
+  var dir='/sdcard/Android/hsin';
+  var confPath=dir+'/hsin.conf';
+  shAsync('mkdir -p '+dir+' 2>/dev/null; cat '+confPath+' 2>/dev/null',function(existing){
+    var kv=parseKV(existing);
+    kv['PROFILE']=kv['PROFILE']||'balanced';
+    kv['MONITOR_INTERVAL']=kv['MONITOR_INTERVAL']||'3';
+    kv['ALLOW_EXTREME']=document.getElementById('cfg-extreme').checked?'true':'false';
+    kv['GAM_BOOST_ENABLED']=document.getElementById('cfg-gam').checked?'true':'false';
+    var lines=Object.keys(kv).map(function(k){return k+'='+kv[k];});
+    shAsync('printf "%s\\n" "'+lines.join('" "')+'" > '+confPath,function(){
+      toast('Config saved','success');
+    });
+  });
+}
+
+function selectRender(el){
+  document.querySelectorAll('#render-group .radio-item').forEach(function(r){r.classList.remove('selected');});
+  el.classList.add('selected');
+  var v=el.dataset.value;
+  if(v==='system'){
+    shAsync('sh '+MODpath+'/bin/hsin render system',function(){toast('Renderer: system default','success');});
+  }else{
+    shAsync('sh '+MODpath+'/bin/hsin render '+v,function(r){
+      toast(r&&r.indexOf('OK')>=0?'Renderer: '+v:'Render failed','success');
+    });
+  }
+}
+
+function updateDownscaleLabel(){
+  document.getElementById('ds-value').textContent=document.getElementById('ds-slider').value+'%';
+}
+
+function saveDownscale(){
+  var pct=document.getElementById('ds-slider').value;
+  shAsync('sh '+MODpath+'/action.sh status',function(raw){
+    try{
+      var d=JSON.parse(raw);
+      var p=d.profile||'balanced';
+      var f=MODpath+'/profiles/'+p+'.conf';
+      shAsync('sed -i "s/^downscale_percent=.*/downscale_percent='+pct+'/" '+f,function(){
+        toast('Downscale saved: '+pct+'% for '+p,'success');
+      });
+    }catch(e){toast('Failed to save','error');}
+  });
+}
+
+// ===== PAGE: GAMES =====
+function loadGames(){
+  shAsync('sh '+MODpath+'/action.sh game_list',function(raw){
+    try{
+      var games=JSON.parse(raw);
+      if(!games.length){document.getElementById('game-list').innerHTML='<div class="empty-state">No games added yet</div>';return;}
+      var html='';
+      games.forEach(function(g){
+        var profBadge={
+          performance:'badge-perf',balanced:'badge-bal',battery:'badge-bat',extreme:'badge-ext'
+        }[g.profile]||'badge-perf';
+        html+='<div class="game-card">'+
+          '<div class="game-icon">&#127918;</div>'+
+          '<div class="game-info">'+
+            '<div class="game-pkg">'+esc(g.package)+'</div>'+
+            '<div class="game-badges">'+
+              '<span class="badge '+profBadge+'">'+g.profile+'</span>'+
+              (g.heavy?'<span class="badge badge-heavy">Heavy</span>':'')+
+            '</div>'+
+          '</div>'+
+          '<button class="btn-del" onclick="removeGame(\''+esc(g.package)+'\')">&times;</button>'+
+        '</div>';
+      });
+      document.getElementById('game-list').innerHTML=html;
+    }catch(e){document.getElementById('game-list').innerHTML='<div class="empty-state">Failed to load games</div>';}
+  });
+}
+
+function addGame(){
+  var pkg=document.getElementById('add-pkg').value.trim();
+  if(!pkg){toast('Enter package name','error');return;}
+  var prof=document.getElementById('add-prof').value;
+  var heavy=document.getElementById('add-heavy').checked?'heavy':'';
+  shAsync('sh '+MODpath+'/action.sh game_add '+pkg+' '+prof+' '+heavy,function(r){
+    toast(r&&r.indexOf('OK')>=0?'Game added':'Failed','success');
+    document.getElementById('add-pkg').value='';
+    loadGames();
+  });
+}
+
+function removeGame(pkg){
+  if(!confirm('Remove '+pkg+'?'))return;
+  shAsync('sh '+MODpath+'/action.sh game_remove '+pkg,function(r){
+    toast('Removed','success');
+    loadGames();
+  });
+}
+
+// ===== PAGE: LOGS =====
+function loadLogs(){
+  var type=document.getElementById('log-type').value;
+  shAsync('sh '+MODpath+'/action.sh logs '+type+' 100',function(raw){
+    try{
+      var lines=JSON.parse(raw);
+      if(!lines.length){document.getElementById('log-content').innerHTML='<div class="empty-state">No log entries</div>';return;}
+      var html='';
+      lines.forEach(function(l){
+        var cls='DEBUG';
+        if(l.indexOf('[ERROR]')>=0)cls='ERROR';
+        else if(l.indexOf('[WARN]')>=0)cls='WARN';
+        else if(l.indexOf('[INFO]')>=0)cls='INFO';
+        else if(l.indexOf('[OK]')>=0)cls='OK';
+        else if(l.indexOf('[APPLY]')>=0)cls='APPLY';
+        html+='<div class="log-line"><span class="log-level '+cls+'">'+esc(l)+'</span></div>';
+      });
+      document.getElementById('log-content').innerHTML=html;
+      var box=document.getElementById('log-content');
+      box.scrollTop=box.scrollHeight;
+    }catch(e){document.getElementById('log-content').innerHTML='<div class="empty-state">Failed to load logs</div>';}
+  });
+
+  // Service status
+  shAsync('cat '+HSIN_DATA+'/state.lock 2>/dev/null',function(raw){
+    var kv=parseKV(raw);
+    var status=kv.APPLY_STATUS||'unknown';
+    var profile=kv.ACTIVE_PROFILE||'none';
+    var ready=kv.SERVICE_READY==='true';
+    document.getElementById('svc-msg').textContent=ready?'HSIN is running':'HSIN is not active';
+    document.getElementById('svc-msg').style.color=ready?'var(--green)':'var(--red)';
+    document.getElementById('svc-sub').textContent='Profile: '+profile+' | Status: '+status;
+  });
+}
+
+function exportLogs(){
+  shAsync('sh '+MODpath+'/action.sh export',function(r){
+    toast(r&&r.indexOf('OK')>=0?'Exported to '+HSIN_DATA+'/HSIN_DEBUG_REPORT.txt':'Export failed','success');
+  });
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ===== ROLLBACK =====
+function showRollbackModal(){
+  document.getElementById('rollback-modal').classList.add('show');
+  shAsync('ls -1 '+HSIN_DATA+'/backup/ 2>/dev/null',function(raw){
+    if(!raw){document.getElementById('rollback-sessions').innerHTML='<div class="empty-state">No backup sessions found</div>';return;}
+    var sessions=raw.split('\n').filter(Boolean).sort();
+    var html='';
+    sessions.forEach(function(s){
+      html+='<div class="radio-item" data-session="'+esc(s)+'" onclick="selectRollbackSession(this)">'+
+        '<div class="radio-dot"></div>'+
+        '<div><div class="rlabel">'+esc(s)+'</div></div>'+
+      '</div>';
+    });
+    document.getElementById('rollback-sessions').innerHTML=html;
+  });
+}
+function closeRollbackModal(){document.getElementById('rollback-modal').classList.remove('show');}
+function selectRollbackSession(el){
+  document.querySelectorAll('#rollback-sessions .radio-item').forEach(function(r){r.classList.remove('selected');});
+  el.classList.add('selected');
+}
+function rollbackLatest(){
+  var sel=document.querySelector('#rollback-sessions .radio-item.selected');
+  var session=sel?sel.dataset.session:'latest';
+  toast('Restoring '+session+'...','success');
+  shAsync('sh '+MODpath+'/bin/hsin rollback '+session,function(r){
+    toast(r?'Restored '+session:'Restore failed',r?'success':'error');
+    closeRollbackModal();
+  });
+}
+
+function doBackup(){
+  toast('Creating backup...','success');
+  shAsync('sh '+MODpath+'/bin/hsin backup',function(r){toast(r||'Backup created','success');});
+}
+function doDoctor(){
+  shAsync('sh '+MODpath+'/bin/hsin doctor',function(r){toast(r?'Doctor complete':'No issues found','success');});
+}
+
+// ===== INIT =====
+loadHome();
+</script>
+</body>
+</html>

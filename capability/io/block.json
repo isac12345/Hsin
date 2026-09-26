@@ -1,0 +1,20 @@
+{
+  "name": "Block Device Optimization",
+  "enabled": false,
+  "detect_nodes": [
+    "/sys/block"
+  ],
+  "required_nodes": [
+    "queue/scheduler"
+  ],
+  "optional_nodes": [
+    "queue/logical_block_size",
+    "queue/physical_block_size",
+    "queue/max_sectors_kb",
+    "queue/optimal_io_size",
+    "queue/rotational"
+  ],
+  "write_support": true,
+  "risk_level": "low",
+  "engine_priority": 60
+}

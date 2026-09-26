@@ -1,0 +1,2080 @@
+/* =========================================================================
+   HSIN Universal Engine - WebUI stylesheet
+   Visual pass: modern / minimal / native-app feel. Dark translucent glass
+   over the anime background, green accent used sparingly, thin borders,
+   restrained motion. Every class/id below is referenced by index.html
+   and/or script.js - names are preserved 1:1, only the values changed.
+   ========================================================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+    /* Core surface */
+    --bg: #05060a;
+    --card: rgba(255, 255, 255, 0.035);
+    --card-border: rgba(255, 255, 255, 0.07);
+    --text: #eef1f5;
+    --text-dim: #8991a0;
+
+    /* Accents */
+    --accent: #22c55e;
+    --accent-dim: rgba(34, 197, 94, 0.14);
+    --gpu-accent: #a855f7;
+    --gpu-accent-dim: rgba(168, 85, 247, 0.14);
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+
+    /* Shape */
+    --radius: 18px;
+    --radius-sm: 13px;
+    --radius-xs: 9px;
+
+    /* Active-profile accent - overwritten at runtime by script.js
+       (applyProfileTheme) so every profile gets its own color instead of
+       everything defaulting to green. Falls back to the balanced blue. */
+    --profile-color: #3b82f6;
+    --profile-color-border: rgba(59, 130, 246, 0.14);
+    --profile-color-bg: rgba(59, 130, 246, 0.10);
+    --profile-color-glow: rgba(59, 130, 246, 0.18);
+
+    /* Customizable assets */
+    --bg-image: url('assets/background.jpg');
+}
+
+html, body {
+    height: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Background art + dark scrim so every card reads as glass over the
+   same wallpaper instead of a flat black app underneath a banner image. */
+.bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-image: var(--bg-image);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(5, 6, 10, 0.62) 0%, rgba(5, 6, 10, 0.82) 55%, rgba(5, 6, 10, 0.92) 100%);
+}
+
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: max(44px, env(safe-area-inset-top, 44px)) 16px 32px;
+}
+
+/* ============================= Header ============================= */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.app-id {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.app-icon {
+    position: relative;
+    overflow: hidden;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), #16a34a);
+    color: #05070a;
+    font-weight: 800;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.app-icon-fallback {
+    line-height: 1;
+}
+
+.app-icon-img {
+    display: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.app-titles {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.app-titles h1 {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+.app-subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.2px;
+}
+
+.version {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--card);
+    padding: 5px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+/* ========================== Status chips =========================== */
+.chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--card);
+    padding: 6px 10px;
+    border-radius: 20px;
+}
+
+.chip-muted {
+    color: var(--text-dim);
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.dot-green {
+    background: var(--green);
+}
+
+.dot-red {
+    background: var(--red);
+}
+
+@keyframes hsin-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.dot.pulse {
+    /* PATCH v4: opacity-only pulse re-enabled - opacity is composited on
+       the GPU, a tiny dot costs almost nothing (v3 disabled ALL infinite
+       animations incl. this cheap one). Keeps the "LIVE" feel. */
+    animation: hsin-pulse 2.4s ease-in-out infinite;
+    will-change: opacity;
+}
+
+/* ====================== Hero / profile banner ====================== */
+.hero-banner {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    min-height: 176px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 14px;
+    background: var(--card);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    transition: box-shadow 0.3s ease;
+}
+
+.banner-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+}
+
+.hero-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(5, 6, 10, 0.1) 0%, rgba(5, 6, 10, 0.75) 100%);
+    z-index: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: left;
+    padding: 18px;
+    width: 100%;
+}
+
+.hero-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0.1px;
+    margin-bottom: 2px;
+}
+
+.hero-subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+}
+
+.hero-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+}
+
+.hero-profile-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hero-profile-icon {
+    width: 17px;
+    height: 17px;
+    color: var(--profile-color);
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.hero-profile-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.hero-mode {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: capitalize;
+    word-break: break-word;
+    flex: 1;
+}
+
+.hero-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--profile-color);
+    letter-spacing: 0.6px;
+    background: var(--profile-color-bg);
+    padding: 4px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+@keyframes hsin-pulse-profile {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.hero-active .dot.pulse {
+    background: var(--profile-color);
+    animation-name: hsin-pulse-profile;
+}
+
+.hero-chevron {
+    color: var(--text-dim);
+    font-size: 17px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* ========================= Mode selector grid ========================= */
+.mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.mode-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    background: var(--card);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.mode-card:active {
+    transform: scale(0.98);
+}
+
+.mode-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mode-icon {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+    color: var(--text-dim);
+    transition: color 0.15s ease;
+}
+
+.mode-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.mode-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+
+.mode-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    transition: color 0.15s ease;
+}
+
+.mode-sub {
+    font-size: 10.5px;
+    color: var(--text-dim);
+}
+
+.mode-chevron {
+    color: var(--text-dim);
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+/* Selection state picks up each profile's own accent color (set on
+   :root by applyProfileTheme() in script.js). One thin ring, no glow. */
+.mode-card.selected {
+    border-color: var(--profile-color);
+    background: var(--profile-color-bg);
+}
+
+.mode-card.selected .mode-icon,
+.mode-card.selected .mode-name {
+    color: var(--profile-color);
+}
+
+/* ============================== Buttons ============================== */
+.btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-apply-wide.btn-primary {
+    background: var(--profile-color);
+    color: #05070a;
+    border-color: var(--profile-color);
+    transition: background 0.25s ease, border-color 0.25s ease, transform 0.1s ease;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-apply-wide {
+    border-radius: 999px;
+    margin-bottom: 18px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+}
+
+.btn-apply-wide::before {
+    content: "\25B6";
+    display: inline-block;
+    font-size: 10px;
+    vertical-align: middle;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+.actions .btn {
+    flex: 1;
+}
+
+/* Actions rendered as icon tiles (Device tab) */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.action-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.action-tile:active {
+    transform: scale(0.96);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.action-tile .action-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+}
+
+.action-tile .action-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.btn-clear {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: rgba(255, 255, 255, 0.04);
+    border: none;
+    padding: 5px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.btn-clear:active {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+/* ============================== Cards ============================== */
+.grid {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 10px;
+    min-width: 0;
+}
+
+.grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.card {
+    /* PERF: backdrop-filter blur(20px) over the wallpaper was the main
+       source of the stutter/jank across every tab - live-blurring a
+       photographic background behind every single card is very GPU-heavy
+       on Unisoc/Mali WebViews, and it gets recomputed on every scroll,
+       toggle, and layout change (e.g. show/hide rows in tab-control).
+       Swapped for a solid dark surface - same "glass panel" read, none of
+       the per-frame blur cost. Do not reintroduce backdrop-filter here. */
+    background: rgba(15, 18, 24, 0.92);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+    min-width: 0;
+    /* Isolate each card's layout/paint so toggling a row inside one card
+       (display:none show/hide) can't force a reflow/repaint of sibling
+       cards on the same tab - this is what made tab-control feel
+       stiff/patah-patah every time a toggle or slider was touched. */
+    contain: layout style paint;
+}
+
+.grid .card {
+    margin-bottom: 0;
+}
+
+.card h2 {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    letter-spacing: 0.3px;
+}
+
+.card-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.card-title-row h2 {
+    margin-bottom: 0;
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-title h2 {
+    margin-bottom: 0;
+}
+
+.card-icon {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: var(--text-dim);
+}
+
+.card-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+}
+
+.label {
+    color: var(--text-dim);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.value {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text);
+    max-width: 60%;
+    min-width: 0;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.status.on { color: var(--green); }
+.status.off { color: var(--red); }
+
+/* Device tab: plain spec rows */
+.device-spec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* Device tab: capability rows */
+.cap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cap-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.cap-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: var(--text-dim);
+}
+
+.cap-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.cap-icon-on { color: var(--green); }
+.cap-icon-off { color: var(--red); }
+
+.cap-label {
+    font-size: 13px;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cap-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 4px 9px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+.cap-badge.cap-on {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.cap-badge.cap-off {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+/* ======================= System Monitor: stat tiles ======================= */
+.monitor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 13px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+}
+
+/* State/accent color now lives on the icon only - no decorative
+   left-border stripe on every tile. */
+.stat-tile.accent-gpu .stat-icon   { color: var(--gpu-accent); }
+.stat-tile.accent-green .stat-icon { color: var(--green); }
+.stat-tile.state-warn .stat-icon   { color: var(--yellow); }
+.stat-tile.state-danger .stat-icon { color: var(--red); }
+
+.stat-value.state-warn, .live-mini-value.state-warn { color: var(--yellow); }
+.stat-value.state-danger, .live-mini-value.state-danger { color: var(--red); }
+.stat-tile.state-warn .stat-bar-fill { background-color: var(--yellow); }
+.stat-tile.state-danger .stat-bar-fill { background-color: var(--red); }
+
+.stat-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+.stat-icon.accent-gpu { color: var(--gpu-accent); }
+.stat-icon.accent-red { color: #f87171; }
+.stat-icon.accent-green { color: var(--green); }
+.stat-tile.accent-gpu .stat-icon { color: var(--gpu-accent); }
+.stat-tile.accent-red .stat-icon { color: #f87171; }
+.stat-tile.accent-green .stat-icon { color: var(--green); }
+
+.stat-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.stat-label {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+}
+
+.stat-value {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Defensive: scoped to the 4 live sensor readings specifically (the ones
+   that come straight from a sysfs poll and can occasionally be a bad
+   reading) - if an unexpectedly long/garbled value ever slips through,
+   keep it from overflowing onto the row below instead of visually
+   overlapping it. Not applied to the shared .stat-value class in general
+   since some other stat-values are intentionally multi-line text. */
+#cpu-freq, #gpu-freq, #cpu-temp, #gpu-temp {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.stat-unit {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-left: 3px;
+}
+
+.stat-bar-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.cpu-cluster-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.cpu-cluster-item b {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 4px;
+    background: var(--accent);
+    /* PERF: transform:scaleX instead of animating width - width changes
+       are layout-triggering, scaleX is compositor-only. This bar updates
+       on every ~1.2s monitor poll, so this is the one that matters most
+       for keeping the Monitor tab cheap. */
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-tile.accent-green .stat-bar-fill { background-color: var(--green); }
+.stat-tile.accent-gpu .stat-bar-fill { background-color: var(--gpu-accent); }
+
+/* ========================= Mini history graphs ========================= */
+.mini-graph-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.mini-graph-card {
+    min-width: 0;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+}
+
+.mini-graph-card svg {
+    display: block;
+    width: 100%;
+    height: 44px;
+    margin: 6px 0 4px;
+}
+
+.mini-graph-foot {
+    display: flex;
+    justify-content: flex-end;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.graph-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--card-border);
+}
+
+.graph-stat-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.graph-stat-line b {
+    font-weight: 700;
+    color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+}
+
+.drain-rate {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    min-height: 12px;
+}
+
+/* ============================ Skeletons ============================ */
+.skeleton {
+    display: inline-block;
+    width: 70px;
+    height: 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    position: relative;
+    overflow: hidden;
+    vertical-align: middle;
+}
+
+.skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    transform: translateX(-100%);
+    animation: none; /* PATCH v3: shimmer sweep off */
+}
+
+@keyframes hsin-skeleton-sweep {
+    100% { transform: translateX(100%); }
+}
+
+.skeleton-line {
+    width: 100%;
+    height: 13px;
+}
+
+.skeleton-row {
+    padding: 8px 0;
+}
+
+/* ======================= Bridge health warning ======================= */
+.bridge-warning {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 9px 12px;
+    border-radius: var(--radius-xs);
+    margin-bottom: 12px;
+}
+
+.btn-retry {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fca5a5;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.btn-retry:active {
+    transform: scale(0.94);
+}
+
+@keyframes hsin-spin {
+    to { transform: rotate(360deg); }
+}
+
+.action-icon.is-spinning svg {
+    animation: hsin-spin 0.9s linear infinite;
+}
+
+.last-updated {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    opacity: 0.7;
+    margin: -6px 0 10px;
+}
+
+/* Success pulse ring on the Apply button after a profile confirms active */
+@keyframes hsin-apply-pulse {
+    0% { box-shadow: 0 0 0 0 var(--profile-color-glow); }
+    70% { box-shadow: 0 0 0 12px rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+
+.btn-apply-wide.pulse-success {
+    animation: hsin-apply-pulse 0.6s ease-out;
+}
+
+.btn-spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    flex-shrink: 0;
+}
+
+.btn-apply-wide.is-applying .btn-spinner {
+    display: inline-block;
+    animation: hsin-spin 0.7s linear infinite;
+}
+
+.btn-apply-wide.is-applying {
+    opacity: 0.85;
+    cursor: wait;
+}
+
+body.reduce-motion .btn-apply-wide.is-applying .btn-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.35);
+    border-right-color: #fff;
+}
+
+.hero-active.is-switching {
+    color: var(--yellow);
+    background: rgba(234, 179, 8, 0.12);
+}
+
+@keyframes hsin-pulse-switching {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.hero-active.is-switching .dot {
+    background: var(--yellow);
+}
+
+.hero-active.is-switching .dot.pulse {
+    animation: none; /* PATCH v3: switching pulse off */
+}
+
+.setting-saved-check {
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    margin-right: 4px;
+}
+
+.setting-saved-check.is-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Nav badge (unread log warnings/errors) */
+.nav-icon-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -7px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background: var(--red);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 22px 12px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+}
+
+.empty-state svg {
+    width: 28px;
+    height: 28px;
+    opacity: 0.5;
+}
+
+.no-conflicts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px;
+    background: rgba(34, 197, 94, 0.08);
+    border-radius: var(--radius-sm);
+}
+
+.no-conflicts svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+}
+
+/* Reduce-motion preference (manual toggle, Control tab) */
+body.reduce-motion .stat-bar-fill,
+body.reduce-motion .skeleton::after,
+body.reduce-motion .dot.pulse,
+body.reduce-motion .action-icon.is-spinning svg,
+body.reduce-motion .tab-pane,
+body.reduce-motion .log-line,
+body.reduce-motion .btn-apply-wide.pulse-success,
+body.reduce-motion .tab-pane.is-active .card,
+body.reduce-motion .stat-tile.stat-flash {
+    animation: none !important;
+}
+
+body.reduce-motion .hero-banner,
+body.reduce-motion .mode-card.selected,
+body.reduce-motion .stat-bar-fill,
+body.reduce-motion .card,
+body.reduce-motion .btn,
+body.reduce-motion .action-tile,
+body.reduce-motion .mode-card,
+body.reduce-motion .nav-item {
+    transition: none !important;
+}
+
+/* Night tint: subtle darkening after ~8pm / before ~6am */
+body.is-night .bg-layer {
+    filter: brightness(0.72);
+}
+
+/* ============================= Conflicts ============================= */
+.conflicts {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.conflict-item {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+}
+
+.conflict-item.warning {
+    box-shadow: inset 2px 0 0 var(--yellow);
+}
+
+.conflict-name {
+    font-weight: 700;
+    color: var(--yellow);
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.conflict-detail {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.conflict-detail strong {
+    color: var(--text);
+}
+
+.loading {
+    color: var(--text-dim);
+    font-size: 13px;
+}
+
+/* =============================== Log =============================== */
+.log {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11.5px;
+}
+
+.log-line {
+    color: var(--text-dim);
+    padding: 3px 0;
+    /* Lightweight entrance for newly-appended lines only (CSS animations
+       play once on element creation, not on ones already in the DOM) -
+       opacity+transform, compositor-only, no layout cost. */
+    animation: hsin-fade-in 0.15s ease;
+}
+
+.log-line.success { color: var(--green); }
+.log-line.error { color: var(--red); }
+.log-line.warning { color: var(--yellow); }
+
+/* ============================ Scrollbar ============================ */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ============================ Responsive ============================ */
+@media (max-width: 420px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .hero-mode { font-size: 32px; }
+    .actions { flex-direction: column; }
+}
+
+.footer-notice {
+    text-align: center;
+    font-size: 10.5px;
+    opacity: 0.45;
+    padding: 12px 0 20px;
+    line-height: 1.6;
+}
+
+.footer-notice a {
+    color: inherit;
+    opacity: 0.8;
+}
+
+/* ========================= Game Profiles list ========================= */
+.game-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.game-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease;
+}
+
+.game-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.game-item-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+}
+
+.game-item-icon svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+}
+
+.game-item-pkg {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+}
+
+.game-item-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.game-profile-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.game-profile-badge.profile-performance { color: #f97316; }
+.game-profile-badge.profile-balanced    { color: var(--accent); }
+.game-profile-badge.profile-battery     { color: var(--green); }
+.game-profile-badge.profile-extreme     { color: #f43f5e; }
+
+.game-item-icon.profile-performance { color: #f97316; background: rgba(249, 115, 22, 0.12); }
+.game-item-icon.profile-balanced    { color: var(--accent); background: var(--accent-dim); }
+.game-item-icon.profile-battery     { color: var(--green); background: rgba(34, 197, 94, 0.12); }
+.game-item-icon.profile-extreme     { color: #f43f5e; background: rgba(244, 63, 94, 0.12); }
+
+.game-item-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 17px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 8px;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.game-item-remove:active {
+    background: rgba(244, 63, 94, 0.15);
+    color: #f43f5e;
+    transform: scale(0.92);
+}
+
+.game-list-empty {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 12px 0;
+}
+
+/* ========================= Add Game picker modal ========================= */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-overlay.hidden {
+    display: flex;
+}
+
+.modal-box {
+    background: #10131a;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 18px 16px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-overlay.open .modal-box {
+    transform: translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.modal-header h3 {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.confirm-modal-box {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+.confirm-modal-message {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    margin-bottom: 18px;
+}
+
+.confirm-modal-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.confirm-modal-actions .confirm-modal-cancel-btn {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 14px;
+    border-radius: var(--radius-sm);
+}
+
+.confirm-modal-actions .btn {
+    flex: 1.4;
+    margin-bottom: 0;
+}
+
+.btn-danger {
+    background: #ef4444 !important;
+    color: #fff !important;
+    border-color: #ef4444 !important;
+}
+
+.game-search {
+    width: 100%;
+    padding: 11px 12px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.app-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.app-list-item {
+    padding: 11px 12px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    word-break: break-all;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.app-list-item:active {
+    transform: scale(0.98);
+    background: var(--accent-dim);
+}
+
+.picker-selected-pkg {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+
+.picker-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.profile-pick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.profile-pick-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    background: var(--card);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    color: var(--text-dim);
+    font-family: inherit;
+    text-align: left;
+}
+
+.profile-pick-btn:active {
+    transform: scale(0.96);
+}
+
+.profile-pick-btn .mode-icon {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+    color: inherit;
+}
+
+.profile-pick-btn .mode-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.profile-pick-btn .mode-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+}
+
+.profile-pick-btn[data-profile="performance"]:active { border-color: #f97316; background: rgba(249, 115, 22, 0.12); color: #f97316; }
+.profile-pick-btn[data-profile="balanced"]:active    { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+.profile-pick-btn[data-profile="battery"]:active     { border-color: var(--green); background: rgba(34, 197, 94, 0.12); color: var(--green); }
+.profile-pick-btn[data-profile="extreme"]:active     { border-color: #f43f5e; background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
+
+.picker-loading {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 16px 0;
+}
+
+.hidden { display: none; }
+
+/* ========================== Settings / toggles ========================== */
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 0;
+}
+
+.setting-row + .setting-row {
+    border-top: 1px solid var(--card-border);
+}
+
+.setting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.setting-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.setting-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.setting-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    opacity: 0.7;
+}
+
+.renderer-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.renderer-pick {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--card);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.renderer-pick:active {
+    transform: scale(0.98);
+}
+
+.renderer-pick input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.renderer-pick-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.renderer-pick-sub {
+    font-size: 10.5px;
+    color: var(--text-dim);
+}
+
+.renderer-pick.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.renderer-pick.selected .renderer-pick-name {
+    color: var(--accent);
+}
+
+/* Toggle switch - flatter, smaller, native-feeling */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 26px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease;
+}
+
+.toggle input:checked + .toggle-slider {
+    background: var(--accent);
+}
+
+.toggle input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+}
+
+/* ======================================================
+   Tabbed app-shell layout (Home / Monitor / Device / Control / Log)
+   ====================================================== */
+
+.app-shell {
+    max-width: 720px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: calc(env(safe-area-inset-top, 0px) + 44px) 16px 0;
+}
+
+.app-shell .app-header {
+    margin-bottom: 16px;
+}
+
+.app-shell .chips-row {
+    margin-bottom: 16px;
+}
+
+.tab-content {
+    flex: 1;
+    min-width: 0;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.tab-pane {
+    display: none;
+    animation: hsin-fade-in 0.18s ease;
+}
+
+.tab-pane.is-active {
+    display: block;
+}
+
+@keyframes hsin-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================== Toasts ============================== */
+.toast-container {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 76px;
+    z-index: 60;
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    pointer-events: none;
+}
+
+.toast {
+    max-width: 100%;
+    padding: 10px 16px;
+    border-radius: 20px;
+    background: rgba(20, 22, 27, 0.95);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 600;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    text-align: center;
+}
+
+.toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(34, 197, 94, 0.35); }
+.toast-error { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(239, 68, 68, 0.35); color: #fca5a5; }
+.toast-warning { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(234, 179, 8, 0.35); }
+
+/* ============================ Bottom nav bar ============================ */
+.bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    /* PERF: this bar is fixed on top of the scrolling tab content on
+       every single tab, so a live blur() here had to be recomputed on
+       every scroll frame - solid background instead, same look, no
+       per-frame cost. */
+    background: rgba(9, 11, 15, 0.97);
+    border-top: 1px solid var(--card-border);
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 7px 2px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-dim);
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.nav-item:active {
+    transform: scale(0.92);
+}
+
+.nav-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.nav-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.nav-item.is-active {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.nav-label {
+    font-weight: 600;
+    letter-spacing: 0.1px;
+}
+
+#tab-log .footer-notice {
+    padding: 4px 0 4px;
+}
+
+/* Home tab: compact live monitor strip below Apply */
+.live-mini-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.live-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.live-mini-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+}
+
+.live-mini-label {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+}
+
+.live-mini-value {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.log-card {
+    position: relative;
+}
+
+/* Log tab: health status banner - flat translucent panel, no artwork */
+.status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(21, 46, 33, 0.55);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+}
+
+.status-banner.is-warning {
+    background: rgba(46, 37, 14, 0.55);
+}
+
+.status-banner.is-error {
+    background: rgba(48, 18, 18, 0.55);
+}
+
+.status-banner-icon {
+    width: 21px;
+    height: 21px;
+    flex-shrink: 0;
+    color: var(--green);
+}
+
+.status-banner.is-warning .status-banner-icon { color: var(--yellow); }
+.status-banner.is-error .status-banner-icon { color: var(--red); }
+
+.status-banner-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.status-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.status-banner-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.status-banner-desc {
+    font-size: 11.5px;
+    color: var(--text-dim);
+}
+
+.card-title-row .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (max-width: 420px) {
+    .app-shell {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 46px);
+    }
+}
+
+/* =========================================================================
+   Downscale percent slider (custom, no <input type=range> - see script.js
+   for why). Modern/premium spec: thin rounded track, small knob, value
+   read clearly above, no neon glow. JS only ever touches:
+     - .hsin-slider-fill  -> style.transform = scaleX(pct)
+     - .hsin-slider-thumb -> style.left = pct%
+     - .hsin-slider       -> classList 'is-dragging'
+   so any visual change here is safe as long as those three keep working.
+   ========================================================================= */
+.hint-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+}
+
+.hsin-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    color: var(--text, #fff);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 36px;
+}
+
+.hsin-select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.hsin-slider {
+    position: relative;
+    width: 100%;
+    height: 36px;
+    touch-action: pan-y;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.hsin-slider-track {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 6px;
+    margin-top: -3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    overflow: hidden;
+}
+
+.hsin-slider-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--accent, #22c55e);
+    border-radius: 999px;
+    transform: scaleX(0.3);
+    transform-origin: left center;
+    will-change: transform;
+}
+
+/* Small solid knob, thin accent ring, one soft drop shadow for depth -
+   no radial glow, no double box-shadow ring. */
+.hsin-slider-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 15px;
+    height: 15px;
+    margin-top: -7.5px;
+    margin-left: -7.5px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--accent, #22c55e);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    will-change: left, transform;
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+}
+
+.hsin-slider:active .hsin-slider-thumb,
+.hsin-slider.is-dragging .hsin-slider-thumb {
+    transform: scale(1.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+body.reduce-motion .hsin-slider-thumb {
+    transition: none !important;
+}
+
+.hsin-slider-endlabels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--text-dim);
+}
+
+/* ====================== PATCH v4: cheap one-shot animations ====================== */
+/* Entrance tiap buka tab: opacity+translateY only, jalan sekali per tab
+   switch (display:none -> .is-active me-restart animasinya). Stagger tipis
+   biar nggak monoton tapi tetap compositor-friendly. */
+@keyframes hsin-fade-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.tab-pane.is-active .card {
+    animation: hsin-fade-up 0.22s ease both;
+}
+
+.tab-pane.is-active .grid .card:nth-child(2) { animation-delay: 0.03s; }
+.tab-pane.is-active .grid .card:nth-child(3) { animation-delay: 0.06s; }
+.tab-pane.is-active .grid .card:nth-child(4) { animation-delay: 0.09s; }
+.tab-pane.is-active .grid .card:nth-child(5) { animation-delay: 0.12s; }
+.tab-pane.is-active .grid .card:nth-child(6) { animation-delay: 0.15s; }
+
+/* Flash singkat di stat tile yang nilainya berubah (JS kasih .stat-flash).
+   Sekali jalan ~450ms lalu class dilepas - nggak ada repaint berulang. */
+@keyframes hsin-stat-flash {
+    0% { opacity: 1; }
+    35% { opacity: 0.55; }
+    100% { opacity: 1; }
+}
+
+.stat-tile.stat-flash {
+    animation: hsin-stat-flash 0.45s ease;
+}
