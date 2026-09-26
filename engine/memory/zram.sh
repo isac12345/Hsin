@@ -84,6 +84,30 @@ hsin_zram_algo() {
     esac
 }
 
+# hsin_zram_algo_live() - cek apakah algo target benar-benar AKTIF di node
+# comp_algorithm. Isi node bukan cuma daftar algo yang didukung: kernel
+# menandai algo yang SEDANG DIPAKAI di dalam kurung siku ("lz4 deflate
+# [zstd] lzo "), jadi target yang cuma muncul sebagai token biasa belum
+# tentu aktif - itu bentuk paling umum dari kernel menolak tulis diam-diam
+# (mis. zram sudah dipakai / EBUSY) yang shell tetap laporkan exit 0.
+# Aturan: (1) target di dalam kurung siku = aktif, (2) isi node sama persis
+# dengan target = aktif (node yang show hanya nilai saat ini). Selain itu
+# belum terkonfirmasi. Nilai live disimpan di HSIN_ZRAM_LIVE supaya bisa
+# dicantumkan di log saat tak terkonfirmasi.
+hsin_zram_algo_live() {
+    _zal_t="$1"
+    _zal_mark="[$_zal_t]"
+    HSIN_ZRAM_LIVE=""
+    # 2>/dev/null ditulis sebelum redirect: kalau node hilang di antara tulis
+    # dan readback, shell tidak sempat suppress pesan "cannot open".
+    IFS= read -r HSIN_ZRAM_LIVE 2>/dev/null < "$2"
+    case "$HSIN_ZRAM_LIVE" in
+        *"$_zal_mark"*) return 0 ;;
+        "$_zal_t")     return 0 ;;
+    esac
+    return 1
+}
+
 # Apply zRAM settings for profile
 hsin_zram_apply() {
     _profile="$1"
@@ -132,7 +156,16 @@ hsin_zram_apply() {
         case " $_algo " in
             *" $_target_algo "*)
                 if echo "$_target_algo" > "$_afile" 2>/dev/null; then
-                    _ok=$((_ok + 1))
+                    # Exit 0 shell bukan bukti algo benar-benar berganti:
+                    # comp_algorithm ditulis ulang di store(), isinya tetap
+                    # SHOW dari kernel. Tanpa readback, zram yang tetap jalan
+                    # dengan algo lama dilaporkan "ok".
+                    if hsin_zram_algo_live "$_target_algo" "$_afile"; then
+                        _ok=$((_ok + 1))
+                    else
+                        _skip=$((_skip + 1))
+                        hsin_log_warn "memory" "zRAM $_name: algo $_target_algo tidak aktif setelah tulis, live='${HSIN_ZRAM_LIVE:-tak terbaca}' (skip)"
+                    fi
                 else
                     _skip=$((_skip + 1))
                     hsin_log_warn "memory" "zRAM $_name: tulis $_target_algo ditolak (skip)"
