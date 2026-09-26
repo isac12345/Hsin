@@ -1,5 +1,13 @@
 # NOTES.md — HSIN manual
 
+## Kernel HP + root (2026-09-26, inventaris su read-only)
+- Kernel jalan: 5.15.211-GrayRavens-Zenithed-Stable-KSUN (SUDAH
+  GrayRavens). Root: KernelSU-Next (ksu/ksud/kpm + neozygisk),
+  BUKAN Magisk. Aetherium (SukiSU) = ganti sistem root → tolak.
+- Nagram: GrayRavens zip = sekeluarga (update aman); Aetherium =
+  jangan. Kombo OC GPU: vendor_boot OC + GrayRavens (DTB vendor
+  kepakai, driver Mali vendor utuh, do.modules=0).
+
 ## OC GPU 1.5GHz vendor_boot (2026-09-26, penasaran user, TERBUKTI)
 - File: /sdcard/download/Vendor Boot Overclock Gpu 1.5Ghz.zip (1 img
   VNDRBOOT 100M). Parse DTB beneran (bukan strings): gpu@23100000
