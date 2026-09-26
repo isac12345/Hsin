@@ -58,4 +58,8 @@
 - FIX1-OOM (2026-09-26, leader langsung, ≤20 baris): proteksi daemon
   jadi satu baris spasi (7070f13, +3/-15). Bukti: bash-n OK,
   shellcheck 0, uji fungsi 12/12 cocok + non-proteksi lolos. Push
-  DONE. Lanjut: fix #2 zram.
+  DONE.
+
+- FIX2-ZRAM (2026-09-26, leader + dev-modul work/zram-fix): TERIMA +
+  merge 8bcca04, push DONE, worktree/branch bersih. zram detect→
+  apply tersambung + guard tulis (algo utuh). Antrean: #3 dvfs.
