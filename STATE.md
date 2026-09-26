@@ -45,3 +45,8 @@
   TERIMA + merge c223501, push DONE, worktree/branch bersih.
   GPU cache-first + OPP cache (tuning identik). Antrean:
   mem/io ke cache + dvfs.sh glob + error per tweak.
+
+- MEMIO-CACHE-2E (2026-09-26, leader + dev-modul work/memio-cache):
+  TERIMA + merge 8adc31d, push DONE, worktree/branch bersih.
+  Mem/IO/dvfs cache-first (tuning identik). Antrean: bug zram
+  (apply tanpa detect) + error per tweak + L2 HP.
