@@ -85,6 +85,20 @@
 - PELAJARAN: angka sandbox Termux ≠ HP — klaim cepat wajib L2
   via APPLY-TIME di HP sebelum bilang selesai.
 
+## Backup ke cache 2b (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/backup-cache → merge 5e80e74, 3 file 87+/20-): backup.sh
+  baca zone dari cache (fallback glob, tanpa glob saat cache-hit);
+  koordinasi HSIN_APPLY_BACKUP → 1 snapshot per apply manual, boost
+  tetap skip; cpu/apply reuse snapshot (step 4/6/7 saja).
+- Verifikasi leader: bash-n 3/3, shellcheck 0, diff hanya file boleh,
+  logika cache-first + backup-once ada di kode. Uji sandbox pekerja
+  (cache-hit 0 glob, fallback identik, zone siluman tak ikut,
+  roundtrip persis, manual=1 snapshot/boost=0) konsisten.
+- Sisa jujur: cooling_device* masih glob (cache tak simpan, di luar
+  scope); zona tanpa type tak ikut backup (konsisten detect/policy);
+  rollback CPU kini via session-restore (perlu L2 HP).
+- Worktree sisa wt-policy-fix (tugas cancel) ikut dibersihkan.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).

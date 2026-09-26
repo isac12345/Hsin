@@ -30,3 +30,8 @@
   dibersihkan. Thermal kini cache-first (fallback aman). Antrean:
   fix policy-subshell (throttle no-op) + backup.sh glob + engine
   lain ke cache. L2: butuh flash + APPLY-TIME HP.
+
+- BACKUP-CACHE-2B (2026-09-26, leader + dev-modul work/backup-cache):
+  TERIMA + merge 5e80e74, push DONE, worktree/branch bersih.
+  Backup thermal cache-first, 1 snapshot/apply. Antrean: engine
+  cpu/gpu/mem/io ke cache + error per tweak.
