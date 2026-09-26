@@ -2,6 +2,80 @@
 # HSIN CPU Engine - Detection
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+[ -n "$HSIN_SYSFS_CPU" ] || HSIN_SYSFS_CPU="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
+# Diisi hsin_scan_lookup() (core/scan_cache.sh) - default biar tidak kelihatan
+# "belum diassign" kalau tabel cache/scan kosong.
+_sc_f=""
+
+# Daftar id policy cpufreq untuk SEMUA engine CPU (detect/governor/frequency/
+# scheduler). Cache-first: hsin_scan_cpu_get() isi HSIN_SCAN_CPU_POLICIES
+# tanpa menyentuh direktori sama sekali. Cache absen/rusak/versi naik/boot
+# beda -> scan live (satu glob cpufreq/policy*, sama seperti dulu).
+# Di-resolve SEKALI per proses (HSIN_CPU_POLICY_READY) supaya 4 file yang
+# memakainya tetap satu scan, bukan masing-masing satu scan.
+HSIN_CPU_POLICY_IDS=""
+HSIN_CPU_POLICY_SOURCE=""
+HSIN_CPU_POLICY_READY=""
+
+hsin_cpu_policy_ids() {
+    [ -n "$HSIN_CPU_POLICY_READY" ] && return 0
+    command -v hsin_scan_cpu_get >/dev/null 2>&1 && hsin_scan_cpu_get
+    if [ "${HSIN_SCAN_CPU_SOURCE:-}" = "cache" ]; then
+        HSIN_CPU_POLICY_IDS="$HSIN_SCAN_CPU_POLICIES"
+        HSIN_CPU_POLICY_SOURCE="cache"
+    else
+        for _hcp_p in "$HSIN_SYSFS_CPU"/cpufreq/policy*; do
+            [ -d "$_hcp_p" ] || continue
+            _hcp_id="${_hcp_p##*/policy}"
+            case "$_hcp_id" in ''|*[!0-9]*) continue ;; esac
+            HSIN_CPU_POLICY_IDS="${HSIN_CPU_POLICY_IDS:+${HSIN_CPU_POLICY_IDS} }$_hcp_id"
+        done
+        HSIN_CPU_POLICY_SOURCE="scan"
+    fi
+    HSIN_CPU_POLICY_READY=1
+    export HSIN_CPU_POLICY_SOURCE
+    return 0
+}
+
+# cpuinfo_max_freq satu policy (topologi statis): dari tabel cache/scan kalau
+# ada, kalau tidak (mis. core/scan_cache.sh tak termuat) baca live. Hasil di
+# _hcpw, supaya scheduler.sh tidak perlu tahu asal-usulnya.
+hsin_cpu_policy_hwmax() {
+    _hcpw=""
+    if command -v hsin_scan_lookup >/dev/null 2>&1; then
+        hsin_scan_lookup "$HSIN_SCAN_CPU_POLICY_LINES" "$1" 5
+        _hcpw="$_sc_f"
+    fi
+    if [ -z "$_hcpw" ]; then
+        IFS= read -r _hcpw < "$HSIN_SYSFS_CPU/cpufreq/policy$1/cpuinfo_max_freq" 2>/dev/null
+    fi
+    return 0
+}
+
+# FieldOPP di cache disimpan sebagai koma (supaya satu item per policy tidak
+# pecah jadi beberapa kata). Ubah ke spasi tanpa fork dan tanpa menyentuh IFS
+# global - hasil di _hcd_words.
+hsin_cpu_csv_to_words() {
+    _hcd_words=""
+    _hcd_rest="$1"
+    while [ -n "$_hcd_rest" ]; do
+        _hcd_tok="${_hcd_rest%%,*}"
+        if [ "$_hcd_tok" = "$_hcd_rest" ]; then
+            _hcd_rest=""
+        else
+            _hcd_rest="${_hcd_rest#*,}"
+        fi
+        [ -z "$_hcd_tok" ] && continue
+        if [ -z "$_hcd_words" ]; then
+            _hcd_words="$_hcd_tok"
+        else
+            _hcd_words="$_hcd_words $_hcd_tok"
+        fi
+    done
+    return 0
+}
 
 # Detect all CPU clusters and properties
 hsin_cpu_detect() {
@@ -18,21 +92,31 @@ hsin_cpu_detect() {
     HSIN_CPU_WRITABLE_MAX="false"
     HSIN_CPU_WRITABLE_GOV="false"
 
-    # Count cores
-    for _cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-        [ -d "$_cpu" ] || continue
-        _base="${_cpu##*/}"
-        _num="${_base#cpu}"
-        HSIN_CPU_CORES="${HSIN_CPU_CORES}${_num} "
-        HSIN_CPU_CORE_COUNT=$((HSIN_CPU_CORE_COUNT + 1))
-    done
+    # Count cores / clusters via cached policy list
+    hsin_cpu_policy_ids
+
+    # Count cores. Jalur cache memakai field `cores` per policy dari cache
+    # (tanpa glob cpu[0-9]*), jalur scan tetap globby seperti sebelumnya -
+    # hasilnya urutan yang sama (policy urut, cpus urut).
+    if [ "$HSIN_CPU_POLICY_SOURCE" != "cache" ]; then
+        for _cpu in "$HSIN_SYSFS_CPU"/cpu[0-9]*; do
+            [ -d "$_cpu" ] || continue
+            _base="${_cpu##*/}"
+            _num="${_base#cpu}"
+            HSIN_CPU_CORES="${HSIN_CPU_CORES}${_num} "
+            HSIN_CPU_CORE_COUNT=$((HSIN_CPU_CORE_COUNT + 1))
+        done
+    fi
 
     # Detect clusters via cpufreq policies
-    for _policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_policy" ] || continue
-        _name="${_policy##*/}"
+        _name="policy$_pid"
 
-        # Get CPUs in this policy
+        # Get CPUs in this policy. `cpus` = mask core yang SEDANG online
+        # (berubah saat hotplug), jadi tetap dibaca live di kedua jalur
+        # supaya hasil cache-hit dan scan identik.
         _cpus=""
         if [ -f "$_policy/cpus" ]; then
             read -r _cpus < "$_policy/cpus" 2>/dev/null
@@ -40,24 +124,33 @@ hsin_cpu_detect() {
             read -r _cpus < "$_policy/related_cpus" 2>/dev/null
         fi
 
-        # Get freq range
+        # Get freq range. cpuinfo_min_freq TIDAK disimpan di cache, jadi
+        # selalu live; cpuinfo_max_freq = topologi statis -> hsin_cpu_policy_hwmax.
         _min=""
         _max=""
         [ -f "$_policy/cpuinfo_min_freq" ] && read -r _min < "$_policy/cpuinfo_min_freq" 2>/dev/null
-        [ -f "$_policy/cpuinfo_max_freq" ] && read -r _max < "$_policy/cpuinfo_max_freq" 2>/dev/null
+        hsin_cpu_policy_hwmax "$_pid"; _max="$_hcpw"
 
-        # Get current freq
+        # Get current freq (dinamis - HSIN sendiri yang menulisnya, jadi
+        # TIDAK boleh pakai nilai cache).
         _cur_min=""
         _cur_max=""
         [ -f "$_policy/scaling_min_freq" ] && read -r _cur_min < "$_policy/scaling_min_freq" 2>/dev/null
         [ -f "$_policy/scaling_max_freq" ] && read -r _cur_max < "$_policy/scaling_max_freq" 2>/dev/null
 
-        # Get available frequencies
+        # Get available frequencies. Tabel OPP statis -> dari cache (field 7,
+        # dipisah koma); fallback baca file seperti sebelumnya.
         _avail_freqs=""
-        [ -f "$_policy/scaling_available_frequencies" ] && \
+        if [ "$HSIN_CPU_POLICY_SOURCE" = "cache" ]; then
+            hsin_scan_lookup "$HSIN_SCAN_CPU_POLICY_LINES" "$_pid" 7
+            hsin_cpu_csv_to_words "$_sc_f"
+            _avail_freqs="$_hcd_words"
+        elif [ -f "$_policy/scaling_available_frequencies" ]; then
             read -r _avail_freqs < "$_policy/scaling_available_frequencies" 2>/dev/null
+        fi
 
-        # Get available governors
+        # Get available governors. Tidak ada field daftar-governor di cache
+        # (yang tersimpan cuma governor saat ini), jadi tetap live.
         _avail_govs=""
         [ -f "$_policy/scaling_available_governors" ] && \
             read -r _avail_govs < "$_policy/scaling_available_governors" 2>/dev/null
@@ -66,13 +159,26 @@ hsin_cpu_detect() {
         _cur_gov=""
         [ -f "$_policy/scaling_governor" ] && read -r _cur_gov < "$_policy/scaling_governor" 2>/dev/null
 
-        # Check writability
+        # Check writability. Dipakai sebagai guard sebelum tulis, jadi
+        # selalu dicek live (bukan flag `w` cache): permission bisa diubah
+        # root kapan saja, cache tidak menyimpan itu.
         _w_min="false"
         _w_max="false"
         _w_gov="false"
         [ -w "$_policy/scaling_min_freq" ] && _w_min="true"
         [ -w "$_policy/scaling_max_freq" ] && _w_max="true"
         [ -w "$_policy/scaling_governor" ] && _w_gov="true"
+
+        # Core list (hanya jalur cache; jalur scan sudah hitung di atas).
+        if [ "$HSIN_CPU_POLICY_SOURCE" = "cache" ]; then
+            for _c in $_cpus; do
+                case " $HSIN_CPU_CORES " in
+                    *" $_c "*) ;;
+                    *) HSIN_CPU_CORES="${HSIN_CPU_CORES}${_c} "
+                       HSIN_CPU_CORE_COUNT=$((HSIN_CPU_CORE_COUNT + 1)) ;;
+                esac
+            done
+        fi
 
         # Determine cluster type by max freq - guard against empty
         # value so an unset/zero doesn't trip the `[ -ge 2000000 ]` check
@@ -128,6 +234,9 @@ hsin_cpu_detect() {
             esac
         done
     done
+
+    hsin_scan_log "cpu detect source=$HSIN_CPU_POLICY_SOURCE policies=$HSIN_CPU_POLICY_IDS clusters=$HSIN_CPU_CLUSTER_COUNT cores=$HSIN_CPU_CORE_COUNT"
+    return 0
 }
 
 # Print detection report
