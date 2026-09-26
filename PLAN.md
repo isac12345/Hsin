@@ -3,8 +3,11 @@
 ## Tahap 0 — Inventarisasi + basis rakit (JALAN)
 - [x] Repo GitHub isac12345/Hsin dibuat + proyek lokal ~/Hsin.
 - [x] Kerangka AGENTS/NOTES/PLAN/STATE ditulis.
-- [ ] Audit tiap varian di /sdcard/hsin (error apa, siapa bagus).
-- [ ] Pilih 1 basis rakit (kemungkinan hsin-dev v5-beta1, tunggu audit).
+- [x] Audit tiap varian di /sdcard/hsin (dev-modul, TERIMA L1 statis:
+  v4.2.5-consolidated + v4.2.6-fixed TERKONTAMINASI 9Router;
+  v4.2.7 bersih tapi Extreme no-op; v4_0 metadata salah v3.0).
+- [x] Pilih 1 basis rakit = hsin-dev v5.0.0-beta1 (0 dangling,
+  0 kontaminasi, shellcheck 0, vCode 5001).
 - [ ] Impor basis ke repo sebagai commit awal rakit (tanpa build).
 
 ## Tahap 1 — Fix isi modul (BELUM, tanpa build)
