@@ -1,0 +1,23 @@
+{
+  "name": "TCP/IP Network Stack",
+  "enabled": false,
+  "detect_nodes": [
+    "/proc/sys/net/ipv4"
+  ],
+  "required_nodes": [
+    "tcp_congestion_control"
+  ],
+  "optional_nodes": [
+    "tcp_available_congestion_control",
+    "tcp_low_latency",
+    "tcp_ecn",
+    "tcp_fastopen",
+    "tcp_sack",
+    "tcp_timestamps",
+    "tcp_window_scaling",
+    "tcp_mtu_probing"
+  ],
+  "write_support": true,
+  "risk_level": "low",
+  "engine_priority": 50
+}

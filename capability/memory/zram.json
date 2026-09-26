@@ -1,0 +1,20 @@
+{
+  "name": "ZRAM Compressed Swap",
+  "enabled": false,
+  "detect_nodes": [
+    "/dev/block/zram0",
+    "/sys/block/zram0"
+  ],
+  "required_nodes": [
+    "disksize"
+  ],
+  "optional_nodes": [
+    "comp_algorithm",
+    "max_comp_streams",
+    "mm_stat",
+    "io_stat"
+  ],
+  "write_support": true,
+  "risk_level": "low",
+  "engine_priority": 60
+}

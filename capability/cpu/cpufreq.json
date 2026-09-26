@@ -1,0 +1,22 @@
+{
+  "name": "CPU Frequency Control",
+  "enabled": false,
+  "detect_nodes": [
+    "/sys/devices/system/cpu/cpufreq"
+  ],
+  "required_nodes": [
+    "scaling_available_frequencies",
+    "scaling_cur_freq"
+  ],
+  "optional_nodes": [
+    "scaling_min_freq",
+    "scaling_max_freq",
+    "scaling_governor",
+    "scaling_available_governors",
+    "cpuinfo_max_freq",
+    "cpuinfo_min_freq"
+  ],
+  "write_support": true,
+  "risk_level": "medium",
+  "engine_priority": 80
+}

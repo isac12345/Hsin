@@ -1,0 +1,19 @@
+{
+  "name": "CPU Governor Control",
+  "enabled": false,
+  "detect_nodes": [
+    "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor"
+  ],
+  "required_nodes": [
+    "scaling_governor",
+    "scaling_available_governors"
+  ],
+  "optional_nodes": [
+    "schedutil/rate_limit_us",
+    "schedutil/hispeed_freq",
+    "schedutil/hispeed_load"
+  ],
+  "write_support": true,
+  "risk_level": "medium",
+  "engine_priority": 75
+}

@@ -1,0 +1,158 @@
+#!/system/bin/sh
+# shellcheck disable=SC1090
+# HSIN CLI Tool
+# Usage:
+#   hsin-cli status        Show system status
+#   hsin-cli detect        Run hardware detection
+#   hsin-cli capability    Show capability scoring
+#   hsin-cli backup        Create backup snapshot
+#   hsin-cli rollback      Restore last backup
+#   hsin-cli apply <p>     Apply profile (battery|balanced|performance|extreme)
+#   hsin-cli log [lines]   Show recent log
+#   hsin-cli list-backup   List backup sessions
+#   hsin-cli monitor       Start monitor loop in foreground
+
+# Allow override via env (untuk test)
+HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+HSIN_LOG_DIR="$HSIN_DATA/logs"
+HSIN_LOG_FILE="$HSIN_LOG_DIR/hsin.log"
+HSIN_LOG_LEVEL="${HSIN_LOG_LEVEL:-3}"
+export HSIN_DATA HSIN_LOG_DIR HSIN_LOG_FILE HSIN_LOG_LEVEL
+
+# Cari path module (cari parent dir yang ada service.sh)
+_find_modpath() {
+    # Pakai HSIN_MODULE_PATH env dulu kalau valid
+    [ -n "$HSIN_MODULE_PATH" ] && [ -f "$HSIN_MODULE_PATH/service.sh" ] && {
+        echo "$HSIN_MODULE_PATH"; return 0
+    }
+    for p in /data/adb/modules/hsin /data/adb/modules_update/hsin; do
+        if [ -f "$p/service.sh" ]; then
+            echo "$p"
+            return 0
+        fi
+    done
+    return 1
+}
+
+MODPATH="$(_find_modpath)"
+HSIN_MODULE_PATH="$MODPATH"
+export HSIN_MODULE_PATH
+[ -z "$MODPATH" ] && {
+    echo "HSIN module not installed (try /data/adb/modules/hsin)"
+    exit 1
+}
+
+case "$1" in
+    status)
+        echo "=== HSIN STATUS ==="
+        echo "Module path: $MODPATH"
+        echo "Data dir:    $HSIN_DATA"
+        [ -f "$HSIN_DATA/service.state" ] && echo "Service:     $(cat "$HSIN_DATA/service.state")"
+        [ -f "$HSIN_DATA/current_profile" ] && echo "Profile:     $(cat "$HSIN_DATA/current_profile")"
+        [ -f "$HSIN_DATA/device.txt" ] && {
+            echo "--- DEVICE ---"
+            grep -E '^(SOC|VENDOR|GPU|KERNEL|ANDROID|SDK|ARCH|RAM_KB|ZRAM|THERMAL|CORES_ON|GOVS|TCP_CUR)=' \
+                "$HSIN_DATA/device.txt" | sed 's/^/  /'
+        }
+        [ -f "$HSIN_DATA/capability.json" ] && {
+            echo "--- CAPABILITY ---"
+            grep -E '"status"' "$HSIN_DATA/capability.json" | sed 's/^/  /'
+        }
+        ;;
+    detect)
+        . "$MODPATH/core/detector.sh"
+        hsin_detect_all
+        echo "device.json: $HSIN_DATA/device.json"
+        echo "device.txt:  $HSIN_DATA/device.txt"
+        ;;
+    capability)
+        . "$MODPATH/core/detector.sh"
+        . "$MODPATH/core/capability.sh"
+        hsin_detect_all >/dev/null 2>&1
+        hsin_capability_run
+        cat "$HSIN_DATA/capability.json" 2>/dev/null
+        ;;
+    backup)
+        . "$MODPATH/core/backup.sh"
+        hsin_backup_all "${2:-manual_$(date '+%Y%m%d_%H%M%S')}"
+        ;;
+    rollback)
+        . "$MODPATH/core/rollback.sh"
+        hsin_rollback_all
+        ;;
+    apply)
+        profile="${2:-balanced}"
+        case "$profile" in
+            battery|balanced|performance|extreme) ;;
+            *) echo "Invalid profile: $profile"; exit 1 ;;
+        esac
+        # Parse config
+        HSIN_PROFILE="$profile"
+        HSIN_ALLOW_EXTREME="false"
+        [ -f "/sdcard/Android/hsin/hsin.conf" ] && {
+            while IFS='=' read -r k v; do
+                case "$k" in
+                    ALLOW_EXTREME) HSIN_ALLOW_EXTREME="$v" ;;
+                esac
+            done < "/sdcard/Android/hsin/hsin.conf"
+        }
+        export HSIN_PROFILE HSIN_ALLOW_EXTREME ALLOW_EXTREME="$HSIN_ALLOW_EXTREME"
+        [ "$profile" = "extreme" ] && [ "$HSIN_ALLOW_EXTREME" != "true" ] && {
+            echo "extreme requires ALLOW_EXTREME=true in config"
+            exit 1
+        }
+        # BUG FIX (v4.0.2): jalur ini dulu manggil engine cpu/gpu/thermal/
+        # memory/io/network SATU-SATU secara manual, TERPISAH total dari
+        # pipeline core/apply_engines.sh yang dipakai WebUI. Akibatnya:
+        # (1) kalau device lagi Extreme Mode terus user apply profile lain
+        #     lewat CLI ini, restore extreme (unlock freq/GPU override/
+        #     thermal trip override) TIDAK PERNAH dipanggil -> nyangkut;
+        # (2) display/render, DVFS limiter, dan wiring khusus extreme sama
+        #     sekali dilewati.
+        # Disamakan sekarang: baca prev profile dari state.lock lalu pakai
+        # pipeline yang sama persis dengan action.sh/monitor.sh.
+        _prev_profile="none"
+        [ -f "$HSIN_DATA/state.lock" ] && _prev_profile=$(grep "^ACTIVE_PROFILE=" "$HSIN_DATA/state.lock" 2>/dev/null | cut -d= -f2)
+        [ -z "$_prev_profile" ] && _prev_profile="none"
+        . "$MODPATH/core/state_manager.sh" 2>/dev/null
+        command -v hsin_state_init >/dev/null 2>&1 && hsin_state_init
+        . "$MODPATH/core/apply_engines.sh" && hsin_apply_all_engines "$HSIN_PROFILE" "$_prev_profile" "" "manual"
+        command -v hsin_state_profile >/dev/null 2>&1 && hsin_state_profile "$HSIN_PROFILE"
+        echo "$HSIN_PROFILE" > "$HSIN_DATA/current_profile"
+        echo "HSIN apply $HSIN_PROFILE complete"
+        ;;
+    log)
+        lines="${2:-50}"
+        [ -f "$HSIN_LOG_DIR/hsin.log" ] && tail -n "$lines" "$HSIN_LOG_DIR/hsin.log"
+        ;;
+    list-backup)
+        . "$MODPATH/core/backup.sh"
+        hsin_backup_list
+        ;;
+    monitor)
+        . "$MODPATH/core/monitor.sh"
+        hsin_monitor_loop
+        ;;
+    help|--help|-h|"")
+        echo "HSIN CLI - Heterogeneous System Intelligence Network"
+        echo ""
+        echo "Usage: hsin-cli <command> [args]"
+        echo ""
+        echo "Commands:"
+        echo "  status              Show system status"
+        echo "  detect              Run hardware detection"
+        echo "  capability          Show capability scoring"
+        echo "  backup [name]       Create backup snapshot"
+        echo "  rollback            Restore last backup"
+        echo "  apply <profile>     Apply profile (battery|balanced|performance|extreme)"
+        echo "  log [lines]         Show recent log"
+        echo "  list-backup         List backup sessions"
+        echo "  monitor             Run monitor loop (foreground)"
+        echo ""
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Run 'hsin-cli help' for usage"
+        exit 1
+        ;;
+esac

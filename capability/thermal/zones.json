@@ -1,0 +1,26 @@
+{
+  "name": "Thermal Zone Sensors",
+  "enabled": false,
+  "detect_nodes": [
+    "/sys/class/thermal/thermal_zone0"
+  ],
+  "required_nodes": [
+    "temp",
+    "type"
+  ],
+  "optional_nodes": [
+    "policy",
+    "trip_point_0_temp",
+    "trip_point_0_type",
+    "sustainable_power",
+    "mode"
+  ],
+  "write_support": true,
+  "risk_level": "high",
+  "engine_priority": 90,
+  "safety": {
+    "never_disable": true,
+    "min_trip_delta": 5000,
+    "max_temp_override": 95000
+  }
+}
