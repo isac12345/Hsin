@@ -37,6 +37,14 @@ _hsin_dvfs_log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$HSIN_DATA/logs/dvfs.log" 2>/dev/null
 }
 
+# Catat satu node yang TIDAK jadi ter-clamp: _fail++ + WARN berisi alasannya
+# (read-only / target ditolak kernel / target kosong). Dipanggil di dalam
+# loop CPU & GPU, jadi _fail harus di-set 0 oleh pemanggil sebelum loop.
+_hsin_dvfs_skip() {
+    _fail=$((_fail + 1))
+    _hsin_dvfs_log "WARN: $1"
+}
+
 # --- CPU side: clamp scaling_max_freq per policy to a % of that policy's
 # own cpuinfo_max_freq. Restores to cpuinfo_max_freq (i.e. unclamped) at 100.
 hsin_dvfs_cpu_apply() {
@@ -45,13 +53,14 @@ hsin_dvfs_cpu_apply() {
     [ "$_pct" -gt 100 ] 2>/dev/null && _pct=100
 
     _applied=0
+    _fail=0
     hsin_cpu_policy_ids
     for _pid in $HSIN_CPU_POLICY_IDS; do
         _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
-        [ -d "$_p" ] || { _hsin_dvfs_log "cpu policy$_pid hilang sejak scan (skip)"; continue; }
-        [ -w "$_p/scaling_max_freq" ] || continue
+        [ -d "$_p" ] || { _hsin_dvfs_log "cpu policy$_pid hilang sejak scan (skip)"; _fail=$((_fail + 1)); continue; }
+        [ -w "$_p/scaling_max_freq" ] || { _hsin_dvfs_skip "cpu policy$_pid scaling_max_freq read-only (skip)"; continue; }
         hsin_cpu_policy_hwmax "$_pid"; _hw_max="$_hcpw"
-        [ -z "$_hw_max" ] && continue
+        [ -z "$_hw_max" ] && { _hsin_dvfs_skip "cpu policy$_pid cpuinfo_max_freq kosong (skip)"; continue; }
 
         if [ "$_pct" -eq 100 ]; then
             _target="$_hw_max"
@@ -65,13 +74,26 @@ hsin_dvfs_cpu_apply() {
                 _target=$((_hw_max * _pct / 100))
             fi
         fi
-        [ -z "$_target" ] && continue
+        [ -z "$_target" ] && { _hsin_dvfs_skip "cpu policy$_pid tidak punya target clamp (skip)"; continue; }
 
-        echo "$_target" > "$_p/scaling_max_freq" 2>/dev/null && _applied=$((_applied + 1))
+        # Redirect sukses != clamp dipakai: kernel bisa tolak diam-diam.
+        # Tulis + readback, baru dihitung OK.
+        if hsin_node_write_verify "$_p/scaling_max_freq" "$_target"; then
+            _applied=$((_applied + 1))
+        else
+            _cur=$(hsin_node_read "$_p/scaling_max_freq" 2>/dev/null)
+            [ -n "$_cur" ] || _cur="tidak terbaca"
+            _hsin_dvfs_skip "cpu policy$_pid scaling_max_freq tetap $_cur (target $_target ditolak kernel)"
+        fi
     done
 
-    _hsin_dvfs_log "cpu_limit=$_pct% applied to $_applied policy node(s) src=$HSIN_CPU_POLICY_SOURCE"
-    echo "OK: cpu_limit=$_pct% applied ($_applied policies)"
+    _hsin_dvfs_log "cpu_limit=$_pct% -> OK $_applied / SKIP $_fail policy node(s) src=$HSIN_CPU_POLICY_SOURCE"
+    if [ "$_applied" -gt 0 ]; then
+        echo "OK: cpu_limit=$_pct% applied ($_applied policies) SKIP $_fail"
+    else
+        echo "SKIP: cpu_limit=$_pct% tidak ter-clamp di policy mana pun (SKIP $_fail)"
+    fi
+    [ "$_fail" -gt 0 ] && [ "$_applied" -eq 0 ] && return 1
     return 0
 }
 
@@ -83,10 +105,11 @@ hsin_dvfs_gpu_apply() {
     [ "$_pct" -gt 100 ] 2>/dev/null && _pct=100
 
     _applied=0
+    _fail=0
     hsin_gpu_devfreq_candidates
     for _d in $HSIN_GPU_DEVFRES; do
-        [ -d "$_d" ] || { _hsin_dvfs_log "gpu node ${_d##*/} hilang sejak scan (skip)"; continue; }
-        [ -w "$_d/max_freq" ] || continue
+        [ -d "$_d" ] || { _hsin_dvfs_log "gpu node ${_d##*/} hilang sejak scan (skip)"; _fail=$((_fail + 1)); continue; }
+        [ -w "$_d/max_freq" ] || { _hsin_dvfs_skip "gpu node ${_d##*/} max_freq read-only (skip)"; continue; }
 
         # available_frequencies = topologi statis -> cache dulu (dengan
         # fallback baca file), jadi rantai tr|grep|sort|tail per node hilang.
@@ -94,7 +117,7 @@ hsin_dvfs_gpu_apply() {
         _hw_max=""
         [ -n "$_avail" ] && _hw_max=$(hsin_opp_max "$_avail")
         [ -z "$_hw_max" ] && _hw_max=$(cat "$_d/max_freq" 2>/dev/null)
-        [ -z "$_hw_max" ] && continue
+        [ -z "$_hw_max" ] && { _hsin_dvfs_skip "gpu node ${_d##*/} tidak punya max_freq terbaca (skip)"; continue; }
 
         if [ "$_pct" -eq 100 ]; then
             _target="$_hw_max"
@@ -105,13 +128,24 @@ hsin_dvfs_gpu_apply() {
                 [ -n "$_best" ] && _target="$_best"
             fi
         fi
-        [ -z "$_target" ] && continue
+        [ -z "$_target" ] && { _hsin_dvfs_skip "gpu node ${_d##*/} tidak punya target clamp (skip)"; continue; }
 
-        echo "$_target" > "$_d/max_freq" 2>/dev/null && _applied=$((_applied + 1))
+        if hsin_node_write_verify "$_d/max_freq" "$_target"; then
+            _applied=$((_applied + 1))
+        else
+            _cur=$(hsin_node_read "$_d/max_freq" 2>/dev/null)
+            [ -n "$_cur" ] || _cur="tidak terbaca"
+            _hsin_dvfs_skip "gpu node ${_d##*/} max_freq tetap $_cur (target $_target ditolak kernel)"
+        fi
     done
 
-    _hsin_dvfs_log "gpu_limit=$_pct% applied to $_applied devfreq node(s) src=$HSIN_GPU_NODE_SOURCE"
-    echo "OK: gpu_limit=$_pct% applied ($_applied devfreq nodes)"
+    _hsin_dvfs_log "gpu_limit=$_pct% -> OK $_applied / SKIP $_fail devfreq node(s) src=$HSIN_GPU_NODE_SOURCE"
+    if [ "$_applied" -gt 0 ]; then
+        echo "OK: gpu_limit=$_pct% applied ($_applied devfreq nodes) SKIP $_fail"
+    else
+        echo "SKIP: gpu_limit=$_pct% tidak ter-clamp di devfreq node mana pun (SKIP $_fail)"
+    fi
+    [ "$_fail" -gt 0 ] && [ "$_applied" -eq 0 ] && return 1
     return 0
 }
 
@@ -119,8 +153,10 @@ hsin_dvfs_gpu_apply() {
 hsin_dvfs_apply() {
     _cpu_pct="${1:-100}"
     _gpu_pct="${2:-100}"
-    hsin_dvfs_cpu_apply "$_cpu_pct"
-    hsin_dvfs_gpu_apply "$_gpu_pct"
+    _rc=0
+    hsin_dvfs_cpu_apply "$_cpu_pct" || _rc=1
+    hsin_dvfs_gpu_apply "$_gpu_pct" || _rc=1
+    return $_rc
 }
 
 # Read ADVANCED_DVFS_CPU_LIMIT / ADVANCED_DVFS_GPU_LIMIT from a profile
@@ -148,9 +184,15 @@ hsin_dvfs_apply_from_conf() {
 
 # Restore both to 100% (unclamped / hardware default).
 hsin_dvfs_restore() {
-    hsin_dvfs_cpu_apply 100
-    hsin_dvfs_gpu_apply 100
-    echo "OK: DVFS limiter restored to hardware default (100%)"
+    _rc=0
+    hsin_dvfs_cpu_apply 100 || _rc=1
+    hsin_dvfs_gpu_apply 100 || _rc=1
+    if [ "$_rc" -eq 0 ]; then
+        echo "OK: DVFS limiter restored to hardware default (100%)"
+    else
+        echo "PARTIAL: DVFS restore diminta (100%) tapi ada node yang tidak ter-clamp - cek OK/SKIP di atas"
+    fi
+    return $_rc
 }
 
 hsin_dvfs_status() {
