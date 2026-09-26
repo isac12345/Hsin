@@ -40,3 +40,8 @@
   TERIMA + merge f58d2ed, push DONE, worktree/branch bersih.
   CPU cache-first (tuning identik), safety 1 pass. Antrean:
   gpu/mem/io ke cache + error per tweak.
+
+- GPU-CACHE-2D (2026-09-26, leader + dev-modul work/gpu-cache):
+  TERIMA + merge c223501, push DONE, worktree/branch bersih.
+  GPU cache-first + OPP cache (tuning identik). Antrean:
+  mem/io ke cache + dvfs.sh glob + error per tweak.
