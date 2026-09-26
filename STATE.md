@@ -54,4 +54,8 @@
 - AUDIT-ERROR-2F (2026-09-26, leader + dev-modul): DONE TERIMA
   (harness t1-t11, repo bersih, verifikasi leader: OOM-proteksi
   mati BENAR + dvfs-bohong BENAR). 14 temuan, antrean 10 fix.
-  Lanjut: fix #1 OOM-protected (1-2 baris, kritis).
+
+- FIX1-OOM (2026-09-26, leader langsung, ≤20 baris): proteksi daemon
+  jadi satu baris spasi (7070f13, +3/-15). Bukti: bash-n OK,
+  shellcheck 0, uji fungsi 12/12 cocok + non-proteksi lolos. Push
+  DONE. Lanjut: fix #2 zram.
