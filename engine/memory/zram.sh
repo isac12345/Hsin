@@ -2,24 +2,40 @@
 # HSIN Memory Engine - zRAM Engine
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+[ -n "$HSIN_SYSFS_BLOCK" ] || HSIN_SYSFS_BLOCK="${SYSFS_BLOCK_PREFIX:-/sys/block}"
+# hsin_mem_zram_names() (daftar nama zram tanpa glob /sys/block/zram*)
+# defined di detect.sh; file ini di-source setelahnya oleh apply.sh, tapi
+# kalau di-source sendiri detect.sh tetap diambil.
+command -v hsin_mem_zram_names >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/memory/detect.sh" 2>/dev/null
 
 # Detect zRAM devices
 hsin_zram_detect() {
     HSIN_ZRAM_LIST=""
     HSIN_ZRAM_COUNT=0
 
-    for _dev in /sys/block/zram*; do
-        [ -d "$_dev" ] || continue
-        _name=$(basename "$_dev")
+    # Nama device dari module param kernel (hsin_mem_zram_names), bukan
+    # glob /sys/block/zram*; nilai SELALU live karena HSIN sendiri yang
+    # menulis comp_algorithm/disksize.
+    hsin_mem_zram_names
+    for _name in $HSIN_MEM_ZRAM_NAMES; do
+        _dev="$HSIN_SYSFS_BLOCK/$_name"
+        if [ ! -d "$_dev" ]; then
+            hsin_log_warn "memory" "zRAM: $_name hilang sejak probe (skip)"
+            continue
+        fi
 
         _size=""
-        [ -f "$_dev/disksize" ] && _size=$(cat "$_dev/disksize" 2>/dev/null)
+        [ -f "$_dev/disksize" ] && IFS= read -r _size < "$_dev/disksize" 2>/dev/null
 
         _algo=""
-        [ -f "$_dev/comp_algorithm" ] && _algo=$(cat "$_dev/comp_algorithm" 2>/dev/null)
+        [ -f "$_dev/comp_algorithm" ] && IFS= read -r _algo < "$_dev/comp_algorithm" 2>/dev/null
 
         _max_streams=""
-        [ -f "$_dev/max_comp_streams" ] && _max_streams=$(cat "$_dev/max_comp_streams" 2>/dev/null)
+        [ -f "$_dev/max_comp_streams" ] && IFS= read -r _max_streams < "$_dev/max_comp_streams" 2>/dev/null
 
         _writable="false"
         [ -w "$_dev/comp_algorithm" ] && _writable="true"
@@ -49,11 +65,13 @@ hsin_zram_algo() {
         battery)     echo "zstd" ;;
         balanced)
             # Try zstd first, fallback to lz4
-            for _dev in /sys/block/zram*; do
-                [ -d "$_dev" ] || continue
-                [ -f "$_dev/comp_algorithm" ] || continue
-                _avail=$(cat "$_dev/comp_algorithm" 2>/dev/null)
-                case " $_avail" in
+            hsin_mem_zram_names
+            for _name in $HSIN_MEM_ZRAM_NAMES; do
+                _algo_file="$HSIN_SYSFS_BLOCK/$_name/comp_algorithm"
+                [ -f "$_algo_file" ] || continue
+                _avail=""
+                IFS= read -r _avail < "$_algo_file" 2>/dev/null
+                case " $_avail " in
                     *" zstd "*) echo "zstd"; return 0 ;;
                     *" lz4 "*)  echo "lz4"; return 0 ;;
                 esac
@@ -95,7 +113,7 @@ hsin_zram_apply() {
                     ;;
                 *)
                     # Try to set algorithm
-                    if echo "$_target_algo" > "/sys/block/$_name/comp_algorithm" 2>/dev/null; then
+                    if echo "$_target_algo" > "$HSIN_SYSFS_BLOCK/$_name/comp_algorithm" 2>/dev/null; then
                         _ok=$((_ok + 1))
                     else
                         _skip=$((_skip + 1))
@@ -115,8 +133,10 @@ EOF
 
 # Trigger zRAM compaction (optional, safe)
 hsin_zram_compact() {
-    for _dev in /sys/block/zram*; do
-        [ -d "$_dev" ] || continue
+    hsin_mem_zram_names
+    for _name in $HSIN_MEM_ZRAM_NAMES; do
+        _dev="$HSIN_SYSFS_BLOCK/$_name"
+        [ -d "$_dev" ] || { hsin_log_warn "memory" "zRAM compact: $_name hilang sejak probe (skip)"; continue; }
         [ -w "$_dev/compact" ] && echo 1 > "$_dev/compact" 2>/dev/null
     done
 }
