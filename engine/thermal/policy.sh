@@ -165,7 +165,8 @@ hsin_thermal_apply() {
     hsin_thermal_read
 
     # Determine policy
-    _perf=$(hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP")
+    hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP"
+    _perf="$HSIN_THERMAL_PERF_TARGET"
 
     # Apply based on profile
     case "$_profile" in
@@ -197,7 +198,8 @@ hsin_thermal_apply() {
 hsin_thermal_policy_print() {
     . "$HSIN_MODULE_PATH/engine/thermal/monitor.sh" 2>/dev/null
     hsin_thermal_read
-    _perf=$(hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP")
+    hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP"
+    _perf="$HSIN_THERMAL_PERF_TARGET"
 
     echo ""
     echo "╔══════════════════════════════════════╗"
