@@ -21,6 +21,8 @@ hsin_io_apply() {
     echo ""
 
     # Apply scheduler
+    hsin_io_block_devs
+    hsin_log_info "io" "blocks src=$HSIN_IO_BLOCK_SOURCE: $HSIN_IO_BLOCKS"
     hsin_io_apply_scheduler "$_profile"
 
     # Apply readahead
