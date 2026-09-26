@@ -131,6 +131,28 @@
   zram mulai ditulis → perlu L2 hati-hati).
 - Sisa: hsin_vm_read masih cat; node baru pasca-scan tak terlihat.
 
+## Audit error per tweak 2f (2026-09-26, leader + dev-modul, TERIMA)
+- Metode: harness sysfs palsu t1-t11, repo 0 berubah (verifikasi
+  leader: porcelain kosong). Temuan (14, bukti harness):
+- KRITIS #1 OOM proteksi MATI: HSIN_OOM_PROTECTED newline-separated
+  tapi cek `case " $LIST "` pola spasi → system_server/zygote/SF/lmkd
+  TAK PERNAH cocok (terbukti od -c + rc=1) → daemon bisa diobok.
+  Fix 1-2 baris (satu baris spasi).
+- #2 zram mati total (varian tak sinkron, sudah antrean 2e).
+- #3 dvfs "OK applied" BOHONG: `echo > node && _applied++` (dvfs.sh:
+  70,110) hitung redirect sukses, bukan nilai nyata (terbukti max
+  tetap) → user percaya throttle aktif padahal tidak.
+- #4 oom.sh:140 tanpa [-w]+verify (released 3 padahal 0).
+- #5 zram readback absen; #6 devfreq.sh dead-code (0 pemanggil);
+  #7 thermal_manager status kosong; #8 scheduler salah var log;
+  #9 apply_sched no-op 0 pemanggil; #10 DEVFRES = false positive
+  (dipakai konsisten 4x); #11 safety global bocor (kosmetik);
+  #12 sisa | while benign; #13 komentar disksize salah; #14 91 /proc
+  literal (penghalang sandbox, bertahap).
+- Antrean fix: 1) OOM-protected 2) zram 3) dvfs-verify 4) oom-verify
+  5) zram-readback 6) thermal-status 7) scheduler-log 8) dead-code
+  putuskan 9) generic-msg 10) /proc→$HSIN_PROC bertahap.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).

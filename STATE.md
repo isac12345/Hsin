@@ -50,3 +50,8 @@
   TERIMA + merge 8adc31d, push DONE, worktree/branch bersih.
   Mem/IO/dvfs cache-first (tuning identik). Antrean: bug zram
   (apply tanpa detect) + error per tweak + L2 HP.
+
+- AUDIT-ERROR-2F (2026-09-26, leader + dev-modul): DONE TERIMA
+  (harness t1-t11, repo bersih, verifikasi leader: OOM-proteksi
+  mati BENAR + dvfs-bohong BENAR). 14 temuan, antrean 10 fix.
+  Lanjut: fix #1 OOM-protected (1-2 baris, kritis).
