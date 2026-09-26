@@ -35,3 +35,8 @@
   TERIMA + merge 5e80e74, push DONE, worktree/branch bersih.
   Backup thermal cache-first, 1 snapshot/apply. Antrean: engine
   cpu/gpu/mem/io ke cache + error per tweak.
+
+- CPU-CACHE-2C (2026-09-26, leader + dev-modul work/cpu-cache):
+  TERIMA + merge f58d2ed, push DONE, worktree/branch bersih.
+  CPU cache-first (tuning identik), safety 1 pass. Antrean:
+  gpu/mem/io ke cache + error per tweak.
