@@ -2,6 +2,12 @@
 # HSIN GPU Engine - Devfreq Management
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+. "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# available_frequencies statis -> cache scan lewat hsin_gpu_opp_list(); tanpa
+# cache dibaca file seperti sebelumnya.
+command -v hsin_gpu_opp_list >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/gpu/detector.sh" 2>/dev/null
+_hgo_avail=""
 
 # Apply devfreq GPU governor
 hsin_gpu_devfreq_apply() {
@@ -63,13 +69,16 @@ hsin_gpu_devfreq_freq() {
 
     [ -d "$_devfreq" ] || return 1
 
-    # Get available frequencies
-    [ -f "$_devfreq/available_frequencies" ] || return 1
-    _avail=$(cat "$_devfreq/available_frequencies" 2>/dev/null)
+    # Get available frequencies (cache scan dulu, fallback file live)
+    hsin_gpu_opp_list "$_devfreq"
+    _avail="$_hgo_avail"
+    [ -n "$_avail" ] || return 1
 
     # Get min/max from available
-    _min_avail=$(echo "$_avail" | tr ' ' '\n' | grep -v '^$' | sort -n | head -1)
-    _max_avail=$(echo "$_avail" | tr ' ' '\n' | grep -v '^$' | sort -nr | head -1)
+    _min_avail=$(hsin_opp_min "$_avail")
+    _max_avail=$(hsin_opp_max "$_avail")
+    [ -n "$_min_avail" ] || return 1
+    [ -n "$_max_avail" ] || return 1
 
     case "$_profile" in
         battery)

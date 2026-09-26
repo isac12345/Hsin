@@ -12,7 +12,7 @@ hsin_gpu_backup() {
     mkdir -p "$_d" 2>/dev/null
     hsin_gpu_detect
     for _n in $HSIN_GPU_DEVFREQS; do
-        [ -d "$_n" ] || continue
+        [ -d "$_n" ] || { hsin_report_skip "backup GPU: node ${_n##*/} tidak ada"; continue; }
         _id=$(basename "$_n")
         mkdir -p "$_d/$_id" 2>/dev/null
         for _f in governor min_freq max_freq; do
@@ -32,7 +32,7 @@ hsin_gpu_restore() {
     _d="$1"; [ -d "$_d" ] || return 1
     hsin_gpu_detect
     for _n in $HSIN_GPU_DEVFREQS; do
-        [ -d "$_n" ] || continue
+        [ -d "$_n" ] || { hsin_report_skip "restore GPU: node ${_n##*/} tidak ada"; continue; }
         _id=$(basename "$_n")
         for _f in governor max_freq min_freq; do
             [ -f "$_d/$_id/$_f" ] && [ -w "$_n/$_f" ] && printf '%s\n' "$(cat "$_d/$_id/$_f" 2>/dev/null)" > "$_n/$_f" 2>/dev/null
@@ -66,7 +66,7 @@ hsin_gpu_adreno_kgsl_apply() {
 hsin_gpu_apply() {
     _profile="$1"
     hsin_gpu_detect
-    echo "    GPU backend: vendor=${HSIN_GPU_VENDOR} devfreq=${HSIN_GPU_DEVFREQ:-none}"
+    echo "    GPU backend: vendor=${HSIN_GPU_VENDOR} devfreq=${HSIN_GPU_DEVFREQ:-none} (nodes=${HSIN_GPU_NODE_SOURCE:-scan})"
     if [ -n "$HSIN_GPU_DEVFREQS" ]; then
         for _d in $HSIN_GPU_DEVFREQS; do
             [ -d "$_d" ] || continue
