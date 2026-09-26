@@ -2,6 +2,12 @@
 # HSIN GPU Engine - Generic devfreq backend (works across vendors)
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# Daftar OPP devfreq (available_frequencies) statis -> dari cache scan lewat
+# hsin_gpu_opp_list(); tanpa cache dibaca file seperti sebelumnya. Daftar
+# governor TIDAK ada di cache, jadi tetap live.
+command -v hsin_gpu_opp_list >/dev/null 2>&1 || \
+    . "$HSIN_MODULE_PATH/engine/gpu/detector.sh" 2>/dev/null
+_hgo_avail=""
 
 hsin_gpu_generic_pick_gov() {
     _profile="$1"; _avail="$2"
@@ -16,8 +22,11 @@ hsin_gpu_generic_pick_gov() {
 
 hsin_gpu_generic_apply() {
     _profile="$1"; _d="$2"
-    [ -d "$_d" ] || return 1
-    _avail=""; [ -f "$_d/available_frequencies" ] && _avail=$(cat "$_d/available_frequencies" 2>/dev/null)
+    if [ ! -d "$_d" ]; then
+        hsin_report_skip "GPU node ${_d##*/} tidak ada (devfreq hilang/umum)"
+        return 1
+    fi
+    hsin_gpu_opp_list "$_d"; _avail="$_hgo_avail"
     _max=$(hsin_opp_max "$_avail")
     _min=$(hsin_opp_min "$_avail")
     case "$_profile" in
@@ -31,6 +40,7 @@ hsin_gpu_generic_apply() {
     if [ "$_pct" -lt 100 ]; then
         [ -n "$_max" ] && _target_max=$(hsin_opp_cap_pick "$((_max * _pct / 100))" "$_avail")
     fi
+    [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati, governor tetap"
     _ok=0; _fail=0
     if [ -n "$_target_max" ] && [ -w "$_d/max_freq" ]; then
         if hsin_node_write_verify "$_d/max_freq" "$_target_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
