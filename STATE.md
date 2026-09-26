@@ -71,3 +71,7 @@
 - FIX4-OOM (2026-09-26, leader + dev-modul work/oom-verify): TERIMA +
   merge ea9325a, push DONE, worktree/branch bersih. Release via
   verify, hitung jujur, proteksi utuh. Antrean: #5 zram-readback.
+
+- FIX5-ZRAMRB (2026-09-26, leader + dev-modul work/zram-readback):
+  TERIMA + merge bcb09f0, push DONE, worktree/branch bersih.
+  Readback algo, ok jujur, mapping utuh. Antrean: pre-check [siku].

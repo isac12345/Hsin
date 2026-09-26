@@ -193,6 +193,16 @@
   pekerja: lama "released 4" padahal 3, baru "released 3, skipped 2".
 - Bonus: oom.sh kini bisa di-sandbox penuh (dulu 9 /proc literal).
 
+## Fix zram-readback #5 (2026-09-26, leader + dev-modul, TERIMA + MERGE)
+- Isi (work/zram-readback → merge bcb09f0, 1 file 34+/1-): fungsi
+  hsin_zram_algo_live (cocok = dalam [siku] atau nilai persis);
+  ok hanya bila live cocok, selain itu skip+WARN + live dicatat.
+- Verifikasi leader: bash-n OK, shellcheck 0, diff 1 file; mapping
+  algo utuh (0 baris mapping terhapus). Matriks 8 format cocok/skip
+  benar + red-green (dulu ok=1tenang, kini skip+WARN).
+- Bug tetangga antrean: pre-check case tak lepas [siku] → algo aktif
+  bisa ter-skip sebagai "tak didukung" (task terpisah).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
