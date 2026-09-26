@@ -164,9 +164,29 @@ hsin_cpu_apply() {
     echo ""
 
     # Step 4: Backup
+    # The pipeline (core/apply_engines.sh) or the boot path (service.sh) already
+    # took ONE snapshot of these nodes - reuse it instead of snapshotting the
+    # same governor/min/max a second time. Outside those paths (standalone CLI
+    # apply) keep taking an engine snapshot so step 6 rollback always has a
+    # source.
     echo "  Step 4: Backup"
-    _backup_dir=$(hsin_cpu_backup)
-    echo "    Saved: $_backup_dir"
+    if [ -z "${HSIN_APPLY_BACKUP:-}" ] && [ -n "${HSIN_BACKUP_CUR:-}" ] \
+        && [ -f "$HSIN_BACKUP_CUR/nodes.list" ]; then
+        HSIN_APPLY_BACKUP="$HSIN_BACKUP_CUR"
+    fi
+    case "${HSIN_APPLY_BACKUP:-}" in
+        ''|none)
+            _backup_dir=$(hsin_cpu_backup)
+            _backup_ref="$_backup_dir"
+            ;;
+        *)
+            _backup_dir=""
+            _backup_ref="$HSIN_APPLY_BACKUP"
+            command -v hsin_log_info >/dev/null 2>&1 && \
+                hsin_log_info "cpu" "backup reuse pipeline snapshot: $_backup_ref"
+            ;;
+    esac
+    echo "    Snapshot: $_backup_ref"
     echo ""
 
     # Step 5: Apply
@@ -202,7 +222,21 @@ hsin_cpu_apply() {
         2)
             _status_str="FAILED"
             echo "    Status: FAILED - rolling back"
-            hsin_cpu_restore "$_backup_dir"
+            if [ -n "$_backup_dir" ]; then
+                hsin_cpu_restore "$_backup_dir"
+            elif [ -n "${HSIN_APPLY_BACKUP:-}" ] \
+                && [ -f "$HSIN_APPLY_BACKUP/nodes.list" ] \
+                && command -v hsin_restore_session >/dev/null 2>&1; then
+                # Roll back from the pipeline snapshot (nodes.list format, not
+                # the per-policy files hsin_cpu_restore reads). At this point
+                # only CPU nodes have been touched, so restoring the session is
+                # CPU-only in effect; sched-latency nodes live outside the
+                # session and are restored separately.
+                hsin_restore_session "${HSIN_APPLY_BACKUP##*/}"
+                hsin_cpu_sched_lat_restore
+            else
+                echo "    No snapshot available - nothing to roll back"
+            fi
             ;;
         *)
             # Defensive: any other return code (e.g. shell injected 127).
@@ -213,7 +247,7 @@ hsin_cpu_apply() {
     echo ""
 
     # Step 7: Log
-    hsin_cpu_log "$_profile" "$_status_str" "$_backup_dir"
+    hsin_cpu_log "$_profile" "$_status_str" "$_backup_ref"
 
     echo "╔══════════════════════════════════════╗"
     echo "║   CPU Apply Complete                  ║"

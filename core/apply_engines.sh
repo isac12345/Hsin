@@ -69,12 +69,18 @@ hsin_apply_all_engines() {
         _mark "extreme-restore(pre-groupA)"
     fi
 
-    # Full snapshots are needed for manual/profile changes, but game-boost
-    # transitions can happen repeatedly. Avoid disk-heavy snapshots on the
-    # boost hot path; the next manual apply/boot still refreshes the backup.
+    # Exactly ONE snapshot per apply, owned by the pipeline. Engines no longer
+    # take a second backup of the same nodes; they reuse HSIN_APPLY_BACKUP for
+    # their rollback. "none" = this path deliberately has no snapshot (boost:
+    # transitions can fire repeatedly and the snapshots are disk-heavy; the
+    # next manual apply/boot refreshes them).
+    HSIN_APPLY_BACKUP="none"
     if [ "$_src" != "boost" ]; then
         hsin_backup_all >/dev/null 2>&1
         _mark "backup"
+        if [ -n "${HSIN_BACKUP_CUR:-}" ] && [ -f "$HSIN_BACKUP_CUR/nodes.list" ]; then
+            HSIN_APPLY_BACKUP="$HSIN_BACKUP_CUR"
+        fi
     else
         _mark "backup-skip(boost)"
     fi
