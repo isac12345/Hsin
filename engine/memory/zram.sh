@@ -88,8 +88,20 @@ hsin_zram_algo() {
 hsin_zram_apply() {
     _profile="$1"
 
-    # Check if zRAM exists
-    [ "$HSIN_ZRAM_COUNT" -gt 0 ] 2>/dev/null || { echo "    zRAM: not available"; return 0; }
+    # HSIN_ZRAM_COUNT/LIST hanya diisi hsin_zram_detect, sementara jalur
+    # apply (hsin_mem_apply) memanggil hsin_mem_detect yang mengisi
+    # HSIN_MEM_ZRAM_COUNT/LIST. Akibatnya var zram kosong di tengah apply
+    # dan comp_algorithm tak pernah ditulis. Kalau detect menemukan device,
+    # probe ulang di sini supaya list + flag writable selalu live; kalau
+    # zram memang absen, jatuh ke "not available" (aman, tanpa tulis).
+    _zcount="${HSIN_ZRAM_COUNT:-0}"
+    case "$_zcount" in ''|*[!0-9]*) _zcount=0 ;; esac
+    if [ "$_zcount" -eq 0 ] && [ "${HSIN_MEM_ZRAM_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        hsin_zram_detect
+        _zcount="${HSIN_ZRAM_COUNT:-0}"
+        case "$_zcount" in ''|*[!0-9]*) _zcount=0 ;; esac
+    fi
+    [ "$_zcount" -gt 0 ] || { echo "    zRAM: not available"; return 0; }
 
     _target_algo=$(hsin_zram_algo "$_profile")
     _ok=0
@@ -105,24 +117,32 @@ hsin_zram_apply() {
     while IFS='|' read -r _name _size _algo _streams _w; do
         [ -z "$_name" ] && continue
 
-        # Change algorithm if writable and different
-        if [ "$_w" = "true" ] && [ -n "$_target_algo" ]; then
-            case " $_algo" in
-                *" $_target_algo "*) # Already set
-                    _ok=$((_ok + 1))
-                    ;;
-                *)
-                    # Try to set algorithm
-                    if echo "$_target_algo" > "$HSIN_SYSFS_BLOCK/$_name/comp_algorithm" 2>/dev/null; then
-                        _ok=$((_ok + 1))
-                    else
-                        _skip=$((_skip + 1))
-                    fi
-                    ;;
-            esac
-        else
+        # Tulis hanya ke node yang writable, dicek ULANG saat tulis (bukan
+        # hanya dari flag hasil probe) karena hak tulis bisa berubah.
+        _afile="$HSIN_SYSFS_BLOCK/$_name/comp_algorithm"
+        if [ "$_w" != "true" ] || [ ! -w "$_afile" ]; then
             _skip=$((_skip + 1))
+            hsin_log_warn "memory" "zRAM $_name: comp_algorithm tidak writable (skip)"
+            continue
         fi
+
+        # Isi comp_algorithm = daftar algo yang DIDUKUNG device, bukan algo
+        # yang sedang aktif. Target harus ada di daftar itu; kalau tidak,
+        # kernel menolak tulis dan zram tetap jalan dengan algo lama.
+        case " $_algo " in
+            *" $_target_algo "*)
+                if echo "$_target_algo" > "$_afile" 2>/dev/null; then
+                    _ok=$((_ok + 1))
+                else
+                    _skip=$((_skip + 1))
+                    hsin_log_warn "memory" "zRAM $_name: tulis $_target_algo ditolak (skip)"
+                fi
+                ;;
+            *)
+                _skip=$((_skip + 1))
+                hsin_log_warn "memory" "zRAM $_name: algo $_target_algo tidak didukung (skip)"
+                ;;
+        esac
     done <<EOF
 $HSIN_ZRAM_LIST
 EOF
