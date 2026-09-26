@@ -279,6 +279,19 @@ hsin_detect_all
 . "$MODPATH/core/capability.sh"
 hsin_capability_run
 
+# 5b. Scan cache - topologi hardware scan SEKALI lalu disimpan, dipakai
+# engine apply (thermal sudah, engine lain menyusul). Tanpa cache, tiap
+# apply globby sysfs ulang. Ditulis di sini, bukan tiap apply: boot = saat
+# paling murah untuk scan, hasilnya cukup untuk boot berikutnya.
+. "$MODPATH/core/scan_cache.sh" 2>/dev/null
+if command -v hsin_scan_cache_ensure >/dev/null 2>&1; then
+    if hsin_scan_cache_ensure; then
+        hsin_log_ok "main" "Scan cache ready: $HSIN_SCAN_CACHE_FILE"
+    else
+        hsin_log_warn "main" "Scan cache gagal ditulis - engine akan scan sysfs langsung"
+    fi
+fi
+
 # 6. Backup semua node yang akan dimodifikasi (sebelum apply apapun)
 . "$MODPATH/core/backup.sh"
 hsin_backup_all "$(date '+%Y%m%d_%H%M%S')_preapply"

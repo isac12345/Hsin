@@ -3,6 +3,9 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
+[ -n "$HSIN_SYSFS_THERMAL" ] || HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 
 # Thermal thresholds (millidegrees).
 # BUG FIX: same miscalibration already fixed once in engine/cpu/safety.sh
@@ -29,57 +32,48 @@ HSIN_THERMAL_MAX_TEMP=0
 HSIN_THERMAL_CPU_TEMP=0
 HSIN_THERMAL_GPU_TEMP=0
 HSIN_THERMAL_BATTERY_TEMP=0
+# Max seluruh zona (semua kelas), bukan cuma CPU/GPU/battery. Dipakai
+# hsin_thermal_max_temp() di detect.sh - versi lamanya memang begitu,
+# jadi keduanya harus tetap dibedakan.
+HSIN_THERMAL_MAX_TEMP_ALL=0
+# Diisi hsin_scan_classify() (core/scan_cache.sh) tiap zona di loop baca.
+_sc_class="other"
 
 # Read current temperatures
+# SATU pass atas daftar zona (dari cache scan-sekali-simpan, atau glob live
+# kalau cache tidak ada) instead of 3 pass terpisah CPU/GPU/battery yang
+# dulu globby thermal_zone* dan baca ulang file type tiap apply. Suhu tetap
+# dibaca dari sysfs tiap call - yang di-cache hanya topologinya.
 hsin_thermal_read() {
-    HSIN_THERMAL_MAX_TEMP=0
+    hsin_scan_thermal_zones_get
 
-    # CPU
     HSIN_THERMAL_CPU_TEMP=0
-    for _zone in /sys/class/thermal/thermal_zone*/temp; do
-        [ -f "$_zone" ] || continue
-        _dir=$(dirname "$_zone")
-        [ -f "$_dir/type" ] || continue
-        _type=$(cat "$_dir/type" 2>/dev/null)
-        case "$_type" in
-            *cpu*|*CPU*)
-                _t=$(cat "$_zone" 2>/dev/null)
-                [ -n "$_t" ] && [ "$_t" -gt "$HSIN_THERMAL_CPU_TEMP" ] 2>/dev/null && HSIN_THERMAL_CPU_TEMP="$_t"
-                ;;
-        esac
-    done
-
-    # GPU
     HSIN_THERMAL_GPU_TEMP=0
-    for _zone in /sys/class/thermal/thermal_zone*/temp; do
-        [ -f "$_zone" ] || continue
-        _dir=$(dirname "$_zone")
-        [ -f "$_dir/type" ] || continue
-        _type=$(cat "$_dir/type" 2>/dev/null)
-        case "$_type" in
-            *gpu*|*GPU*|*kgsl*)
-                _t=$(cat "$_zone" 2>/dev/null)
-                [ -n "$_t" ] && [ "$_t" -gt "$HSIN_THERMAL_GPU_TEMP" ] 2>/dev/null && HSIN_THERMAL_GPU_TEMP="$_t"
-                ;;
-        esac
-    done
-
-    # Battery
     HSIN_THERMAL_BATTERY_TEMP=0
-    for _zone in /sys/class/thermal/thermal_zone*/temp; do
-        [ -f "$_zone" ] || continue
-        _dir=$(dirname "$_zone")
-        [ -f "$_dir/type" ] || continue
-        _type=$(cat "$_dir/type" 2>/dev/null)
-        case "$_type" in
-            *battery*|*batt*|*Battery*)
-                _t=$(cat "$_zone" 2>/dev/null)
-                [ -n "$_t" ] && [ "$_t" -gt "$HSIN_THERMAL_BATTERY_TEMP" ] 2>/dev/null && HSIN_THERMAL_BATTERY_TEMP="$_t"
-                ;;
+    HSIN_THERMAL_MAX_TEMP=0
+    HSIN_THERMAL_MAX_TEMP_ALL=0
+
+    for _zone in $HSIN_SCAN_THERMAL_ZONES; do
+        _zname="${_zone%%|*}"
+        _ztype="${_zone#*|}"
+        _ztype="${_ztype%%|*}"
+        _zpath="$HSIN_SYSFS_THERMAL/$_zname"
+        [ -f "$_zpath/temp" ] || continue
+        _t=""
+        IFS= read -r _t < "$_zpath/temp" 2>/dev/null
+        case "$_t" in ''|*[!0-9]*) continue ;; esac
+
+        [ "$_t" -gt "$HSIN_THERMAL_MAX_TEMP_ALL" ] 2>/dev/null && HSIN_THERMAL_MAX_TEMP_ALL="$_t"
+
+        hsin_scan_classify "$_ztype"
+        case "$_sc_class" in
+            cpu) [ "$_t" -gt "$HSIN_THERMAL_CPU_TEMP" ] 2>/dev/null && HSIN_THERMAL_CPU_TEMP="$_t" ;;
+            gpu) [ "$_t" -gt "$HSIN_THERMAL_GPU_TEMP" ] 2>/dev/null && HSIN_THERMAL_GPU_TEMP="$_t" ;;
+            battery) [ "$_t" -gt "$HSIN_THERMAL_BATTERY_TEMP" ] 2>/dev/null && HSIN_THERMAL_BATTERY_TEMP="$_t" ;;
         esac
     done
 
-    # Overall max
+    # Overall max (hanya kelas yang ikut kebijakan, seperti sebelumnya)
     [ "$HSIN_THERMAL_CPU_TEMP" -gt "$HSIN_THERMAL_MAX_TEMP" ] 2>/dev/null && HSIN_THERMAL_MAX_TEMP="$HSIN_THERMAL_CPU_TEMP"
     [ "$HSIN_THERMAL_GPU_TEMP" -gt "$HSIN_THERMAL_MAX_TEMP" ] 2>/dev/null && HSIN_THERMAL_MAX_TEMP="$HSIN_THERMAL_GPU_TEMP"
     [ "$HSIN_THERMAL_BATTERY_TEMP" -gt "$HSIN_THERMAL_MAX_TEMP" ] 2>/dev/null && HSIN_THERMAL_MAX_TEMP="$HSIN_THERMAL_BATTERY_TEMP"
@@ -173,6 +167,10 @@ hsin_thermal_monitor_print() {
 # Monitor loop (runs in background)
 hsin_thermal_monitor_loop() {
     _interval="${1:-$HSIN_THERMAL_MONITOR_INTERVAL}"
+
+    # Auto-refresh cache: kalau hilang / versi naik / lebih tua dari TTL,
+    # scan ulang SEKALI di awal loop. Setelah itu loop cuma baca.
+    hsin_scan_cache_ensure
 
     while true; do
         hsin_thermal_read
