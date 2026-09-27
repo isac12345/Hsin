@@ -1,0 +1,62 @@
+name: lint-and-test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: ShellCheck all .sh (except build/)
+        run: |
+          set -e
+          find . -type f -name '*.sh' | grep -v '^./build/' | while read f; do
+            echo "--- shellcheck $f ---"
+            shellcheck "$f" || { echo "FAIL: $f"; exit 1; }
+          done
+
+      - name: sh -n syntax validation
+        run: |
+          set -e
+          find . -type f -name '*.sh' | grep -v '^./build/' | while read f; do
+            echo "--- sh -n $f ---"
+            sh -n "$f" || { echo "FAIL: sh -n $f"; exit 1; }
+          done
+
+      - name: JSON config validation
+        run: |
+          set -e
+          for f in capability/*.json config/*.json; do
+            [ -f "$f" ] || continue
+            echo "--- python3 -m json.tool $f ---"
+            python3 -m json.tool "$f" > /dev/null || { echo "FAIL JSON: $f"; exit 1; }
+          done
+          echo "No JSON config files to validate (skipped safely)."
+
+      - name: Mandatory file checks
+        run: |
+          set -e
+          for f in action.sh service.sh post-fs-data.sh customize.sh uninstall.sh module.prop build_release.sh bin/hsin; do
+            [ -f "$f" ] || { echo "FAIL: mandatory file missing: $f"; exit 1; }
+            echo "OK: $f present"
+          done
+
+      - name: module.prop validation
+        run: |
+          set -e
+          [ -f module.prop ] || { echo "FAIL: module.prop missing"; exit 1; }
+          grep -q '^id=' module.prop || { echo "FAIL: module.prop missing id"; exit 1; }
+          grep -q '^version=' module.prop || { echo "FAIL: module.prop missing version"; exit 1; }
+          grep -q '^versionCode=' module.prop || { echo "FAIL: module.prop missing versionCode"; exit 1; }
+          echo "OK: module.prop valid (id/version/versionCode present)"
