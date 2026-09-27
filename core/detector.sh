@@ -6,6 +6,8 @@ HSIN_DATA_DEVICE="$HSIN_DATA/device.json"
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 HSIN_DATA_DEVICE_TXT="$HSIN_DATA/device.txt"
 
 # Helper: cek file exist + readable + writable
@@ -21,13 +23,13 @@ _node_ro() {
 # SoC detection via multi-source
 detect_soc() {
     _soc=""
-    # 1. /proc/device-tree/model (paling reliable untuk ARM64)
-    if [ -f /proc/device-tree/model ]; then
-        _soc=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
+    # 1. $HSIN_PROC/device-tree/model (paling reliable untuk ARM64)
+    if [ -f $HSIN_PROC/device-tree/model ]; then
+        _soc=$(tr -d '\0' < $HSIN_PROC/device-tree/model 2>/dev/null)
     fi
-    # 2. /proc/device-tree/compatible
-    if [ -z "$_soc" ] && [ -f /proc/device-tree/compatible ]; then
-        _soc=$(tr -d '\0' < /proc/device-tree/compatible 2>/dev/null | cut -d, -f1)
+    # 2. $HSIN_PROC/device-tree/compatible
+    if [ -z "$_soc" ] && [ -f $HSIN_PROC/device-tree/compatible ]; then
+        _soc=$(tr -d '\0' < $HSIN_PROC/device-tree/compatible 2>/dev/null | cut -d, -f1)
     fi
     # 3. getprop ro.soc.model
     if [ -z "$_soc" ]; then
@@ -42,9 +44,9 @@ detect_soc() {
         _soc=$(getprop ro.board.platform 2>/dev/null)
         [ -z "$_soc" ] && _soc=$(getprop ro.product.board 2>/dev/null)
     fi
-    # 6. /proc/cpuinfo Hardware
+    # 6. $HSIN_PROC/cpuinfo Hardware
     if [ -z "$_soc" ]; then
-        _soc=$(grep -m1 '^Hardware' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')
+        _soc=$(grep -m1 '^Hardware' $HSIN_PROC/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')
     fi
     [ -z "$_soc" ] && _soc="unknown"
     echo "$_soc"
@@ -74,13 +76,13 @@ classify_soc_vendor() {
 # GPU vendor detection
 detect_gpu_vendor() {
     _gpu=""
-    # 1. /proc/gpuinfo (kebanyakan ARM)
-    if [ -f /proc/gpuinfo ]; then
-        _gpu=$(grep -m1 -i 'model\|vendor' /proc/gpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')
+    # 1. $HSIN_PROC/gpuinfo (kebanyakan ARM)
+    if [ -f $HSIN_PROC/gpuinfo ]; then
+        _gpu=$(grep -m1 -i 'model\|vendor' $HSIN_PROC/gpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[ \t]*//')
     fi
-    # 2. /proc/driver/gpu
-    if [ -z "$_gpu" ] && [ -d /proc/driver/gpu ]; then
-        _gpu=$(find /proc/driver/gpu -maxdepth 2 -name 'model' 2>/dev/null | head -1 | xargs cat 2>/dev/null)
+    # 2. $HSIN_PROC/driver/gpu
+    if [ -z "$_gpu" ] && [ -d $HSIN_PROC/driver/gpu ]; then
+        _gpu=$(find $HSIN_PROC/driver/gpu -maxdepth 2 -name 'model' 2>/dev/null | head -1 | xargs cat 2>/dev/null)
     fi
     # 3. Mali via /sys/devices/platform/*.mali (silent kalau tidak ada)
     if [ -z "$_gpu" ]; then
@@ -172,8 +174,8 @@ detect_governor_list() {
 
 # RAM detection
 detect_ram() {
-    _total=$(grep '^MemTotal' /proc/meminfo 2>/dev/null | awk '{print $2}')
-    _avail=$(grep '^MemAvailable' /proc/meminfo 2>/dev/null | awk '{print $2}')
+    _total=$(grep '^MemTotal' $HSIN_PROC/meminfo 2>/dev/null | awk '{print $2}')
+    _avail=$(grep '^MemAvailable' $HSIN_PROC/meminfo 2>/dev/null | awk '{print $2}')
     echo "$_total|$_avail"
 }
 
@@ -227,8 +229,8 @@ detect_storage() {
 
 # Network capabilities
 detect_network() {
-    _tcp_avail=$(cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    _tcp_curr=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
+    _tcp_avail=$(cat $HSIN_PROC/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    _tcp_curr=$(cat $HSIN_PROC/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
     echo "${_tcp_curr}|${_tcp_avail}"
 }
 
