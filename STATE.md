@@ -127,3 +127,11 @@
   ram/uptime/load dari prefix palsu, device_info soc, sched-latency
   tuning identik). /proc 95→0 eksekutable (sisa 9 komentar). Antrean:
   L2 HP (flash + APPLY-TIME).
+
+- KNOBS-API + 3 BUG (2026-09-27, dev-modul + review leader): aksi
+  `knobs` JSON untuk app (bb50517, read-only; review: 18 fungsi eksternal
+  semua ada, escaper benar, sandbox 2 skenario valid, 0 regresi). Review
+  menemukan 3 bug: f319da0 scan_cache hilang dari runtime release (cache
+  scan mati di ZIP release), 6f494f6 refresh_hz salah baca bentuk `=`,
+  30c1fbb cache KOSONG diterima sah -> thermal/safety buta (paling serius).
+  Semua push DONE. Antrean: L2 HP + rencana app (Tahap 3).

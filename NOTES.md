@@ -342,7 +342,79 @@
   (action.sh 4, scan_cache 2, detect memory 1, cpu/scheduler 1).
   #14 SELESAI (L1) — semua jalur /proc kini sandboxable.
 
-## PELAJARAN (warisan Alpha, berlaku di sini)
+## Knobs API (2026-09-27, action.sh knobs)
+- `core/knobs.sh` (baru) + 1 case `knobs)` di dispatcher + 1 baris source
+  di action.sh + core/knobs.sh masuk daftar runtime build_release.sh.
+  READ-ONLY: nol tulis sysfs/proc. Satu baris JSON, exit 0 apa pun yang
+  absen. Semua angka dari node nyata; yang tidak ada -> [] / 0 / "" +
+  `supported:false` di bagiannya.
+- Kontrak app: `{"v":1,"profiles":[],"cpu":{"policies":[…]},"gpu":{"nodes":[…]
+  },"memory":{swappiness,zram},"io":{blocks},"network":{tcp_cc,tfo},"display":
+  {modes_hz,cur_hz,renderers,cur_renderer,downscale},"features":{6 flag},
+  "capabilities":{available_frequencies_source}}`.
+- Sumber data = helper yang sudah ada (bukan logika baru): hsin_cpu_detect
+  (policy/gov/OPP/writable), hsin_gpu_devfreq_candidates + hsin_gpu_opp_list
+  (node GPU), hsin_mem_zram_names (zram), hsin_io_block_devs (block),
+  hsin_profile_list (profil), hsin_refresh_detect_supported + hsin_render_*
+  (display), scan cache untuk capabilities. Setiap daftar OPP wajib
+  lolos hsin_opp_min/max supaya "N/A" tidak pernah jadi angka.
+- `memory.zram.algos` dan `io.*.schedulers` apa adanya (kurung siku = aktif,
+  info itu dibutuhkan app); field `cur` sudah bersih dari kurung.
+- `features.*` = switch conf menyala DAN alatnya ada (node writable untuk
+  DVFS, settings/cmd untuk RR, resetprop/setprop untuk SF + frame limit).
+- swappiness 0..100 (batas kernel; HSIN_VM_SAFE menerima tulis sampai 200
+  tapi kernel meng-clamp di 100, jadi 100 yang jujur untuk UI). Downscale
+  1..99 (validasi downscale-enable; 100 = resolusi native = fitur mati).
+- CATATAN ke leader: `cur_hz` sengaja memakai urutan parse yang sama dengan
+  status WebUI (renderFrameRate > refreshRateOverride > fps= pertama).
+  Di dump asli `renderFrameRate=90.0` bertanda "=", sedangkan grep status
+  mencari "renderFrameRate " (spasi) -> cabang pertama tidak pernah kena,
+  jadi cur_hz jatuh ke fps= pertama (mode terkecil). Pre-existing di
+  action.sh:598-640, TIDAK diubah di tugas ini; app akan melihat nilai yang
+  sama dengan tile status.
+- Bukti: bash-n 3 file 0, shellcheck 0, `rg '/sys/|/proc/' core/knobs.sh`
+  kosong, sandbox A (2 policy + 1 GPU + zram kurung siku + sda + swappiness/
+  tcp/tfo + boot_id, dengan & tanpa scan cache) dan B (pohon kosong) dua-dua
+  exit 0 + 1 baris + JSON valid, plus skenario node sampah (governor berisi
+  kutip/backslash, OPP kosong, "N/A", "abc") tetap JSON valid.
+
+## Knobs API + 3 bug yang ketemu saat review (2026-09-27, leader)
+-bb50517 `action.sh knobs` (core/knobs.sh 620 baris) → SATU baris JSON:
+  profiles/cpu.policies(govs+opp+writable)/gpu.nodes/zram.algos/io.blocks/
+  network/display/features/capabilities. App nanti render dari sini, bukan
+  hardcode. Read-only (tak ada redirect tulis/pemanggilan apply).
+  Review leader: 18 fungsi eksternal semua ada definisinya (anti API
+  karangan), escaper per-karakter (quote/backslash/CR), 0 literal
+  /sys|/proc, JSON valid di pohon terisi + kosong, 0 stderr, 1 baris,
+  zramAlgo kurzung siku `[zstd]` terjaga, `info/config-get/capabilities/
+  conflicts/status/device` tetap rc=0.
+- f319da0 BUG BUILD: `core/scan_cache.sh` TIDAK ada di daftar runtime
+  build_release.sh, sedangkan release menghapus `core/*.sh` (kecuali
+  runtime.sh) + engine/ + extreme/ + capability/ dan entrypoint di-rewrite
+  source runtime.sh saja → di ZIP RELEASE semua 18 fungsi cache-scan hilang
+  (thermal/safety/engine jadi live scan, cache 6 jam tidak kepakai).
+  Di ZIP dev (.devmode) tidak terjadi → hanya muncul di release.
+- 6f494f6 BUG STATUS: `renderFrameRate [0-9.]*` hanya menerima bentuk
+  SPASI; dumpsys modern `renderFrameRate=90.0` → gagal → fallback `fps=`
+  ambil mode PERTAMA (60) bukan mode aktif (90). Pola sekarang terima
+  `=`/spasi (label tanpa angka → tr -cd '0-9.'); 4 bentuk dump diuji.
+- 30c1fbb BUG CACHE (paling serius): `hsin_scan_write` menulis cache tanpa
+  gerbang, dan `hsin_scan_cache_load` hanya cek "key ada" bukan "nilai ada"
+  → cache KOSONG diterima sah (load_rc=0, SCAN_OK=1) sampai TTL 6 jam →
+  `hsin_thermal_read`/safety baca 0 policy + 0 zona = BUTA (timbang "cool").
+  Terbukti di sandbox (cache karatan → 0 policy). Fix: tulis menolak saat
+  CPU+thermal+devfreq kosong semua; baca menolak nilai kosong. Uji: pohon
+  kosong → write_rc=1 tanpa file; pohon ada → write 0 + load 0 (2 policy);
+  cache racun lama → load_rc=1 + fallback scan live.
+  Catatan: klaim lama "komit-setelah-valid" di section cache langkah-1
+  TERBUKAT SALAH.
+- PELAJARAN: (1) harness dengan nama file node yang salah sempat
+  "menemukan" bug yang sebenarnya bukan bug (scaling_available_governors,
+  bukan available_governors) — cocokkan dulu nama node dengan kode asli;
+  (2) file cache milik HSIN_DATA ikut teruji, jadi satu harness pernah
+  menulis cache kosong ke data uji dan menyamar sebagai bug produk —
+  bersihkan HSIN_DATA uji tiap kali. (3) Cek `git diff HEAD~` isi tiap
+  commit sebelum push; 3 commit dipisah tanpa stash.
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
 - Pola sed BRE: `\(` = grup, bukan kurung literal; `\n` di pola tak match.
