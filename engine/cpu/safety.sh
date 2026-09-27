@@ -68,7 +68,6 @@ hsin_cpu_safety_temp() {
 
     HSIN_CPU_SAFETY_TEMP="$_max"
     HSIN_CPU_SAFETY_TEMP_READY=1
-    export HSIN_CPU_SAFETY_TEMP
     hsin_scan_log "safety temp pass=1 zones=${HSIN_SCAN_THERMAL_SOURCE} max=$_max"
     echo "$_max"
     return 0

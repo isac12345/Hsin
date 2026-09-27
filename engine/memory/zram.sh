@@ -18,8 +18,8 @@ hsin_zram_detect() {
     HSIN_ZRAM_COUNT=0
 
     # Nama device dari module param kernel (hsin_mem_zram_names), bukan
-    # glob /sys/block/zram*; nilai SELALU live karena HSIN sendiri yang
-    # menulis comp_algorithm/disksize.
+    # glob /sys/block/zram*; nilai dibaca live dari sysfs tiap detect
+    # (HSIN hanya menulis comp_algorithm, bukan disksize).
     hsin_mem_zram_names
     for _name in $HSIN_MEM_ZRAM_NAMES; do
         _dev="$HSIN_SYSFS_BLOCK/$_name"
