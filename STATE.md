@@ -99,3 +99,9 @@
   SC2115 pre-existing di luar scope. Susulan 157be9a: hapusan
   devfreq.sh lepas dari e8864a1 (staging lepas habis stash-pop),
   ter-commit susulan, push DONE. Antrean: #10 generic-msg.
+
+- FIX10-GENERICMSG (2026-09-27, leader langsung, pesan saja):
+  generic.sh tanpa OPP klaim governor prematur + max kosong
+  (14bd9fe, 2+-2-, nol perilaku). Bukti: bash-n OK, shellcheck 0,
+  sandbox 3 kasus (A/B/C, C regresi nihil). Antrean: sisa kosmetik
+  (DEVFRES/safety-while/disksize) + /proc→$HSIN_PROC bertahap.
