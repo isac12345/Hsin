@@ -83,7 +83,7 @@ _clean_stage() {
         core/state_manager.sh core/protect.sh core/backup.sh core/policy_engine.sh \
         core/detector.sh core/hardware.sh core/capability.sh core/capability_scan.sh \
         core/root_check.sh core/rollback.sh core/doctor.sh core/export.sh \
-        core/knobs.sh core/user_knobs.sh core/safe_apply.sh core/boot_guard.sh core/load_overrides.sh core/engine_guard.sh \
+        core/knobs.sh core/user_knobs.sh core/safe_apply.sh core/boot_guard.sh core/load_overrides.sh core/engine_guard.sh core/thermal_check.sh \
         engine/cpu/detect.sh engine/cpu/governor.sh engine/cpu/frequency.sh \
         engine/cpu/scheduler.sh engine/cpu/safety.sh engine/cpu/apply.sh \
         engine/gpu/detector.sh engine/gpu/generic.sh \
