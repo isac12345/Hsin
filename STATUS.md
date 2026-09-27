@@ -140,7 +140,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   thermal guardrail, degradasi per-engine), 1 device tervalidasi +
   lainnya graceful degrade eksplisit (tanpa matriks chipset), log
   locations, status boot guard, uninstall, support.
-- [ ] **Step 14** — TESTING.md (prosedur + template laporan).
+- [x] **PQ Step 14** — TESTING.md — DONE 2026-09-27. Prosedur
+  baseline→install→functional→stability→cleanup; functional mencakup
+  guard on/off, 5 kategori safe apply, thermal 4 state, degradasi
+  per-engine; stability wajib reboot 3x di HP fisik; template laporan
+  berbasis capability (tanpa matriks nama chipset).
 - [ ] **Step 15** — TROUBLESHOOTING.md (masalah umum + langkah debug).
 - [ ] **Step 16** — DEVICE_COMPATIBILITY.md ("TERVALIDASI" vs
   "GRACEFUL DEGRADE" — jangan klaim rata; saat ini tervalidasi:
