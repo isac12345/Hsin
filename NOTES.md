@@ -712,3 +712,19 @@
 - STATUS.md: 1.1.1-1.1.3 DONE. STOP — Phase 2 menunggu approve user.
 - PELAJARAN: sintaks lambda Java (`msg ->`) bukan Kotlin (`{ msg -> }`) —
   cek silang CI; Kotlin DSL `path` minta File (`file(...)`), bukan String.
+
+## Step 4 detector + Step 5 overrides (2026-09-27, roadmap 10/10)
+- STEP 4 (5b373ea, core/detector.sh 241+/2-): detect_qualcomm/mediatek/exynos/
+  unisoc/apple + xclipse fallback di detect_gpu_vendor existing + THERMAL_PATH
+  global + detect_cpu_policies + cache_detection (detected.conf 5 baris).
+  2 fix leader: guard SYSFS_*_PREFIX (baris 11-12, tanpa ini baca /sys asli)
+  + urutan model MTK (soc.model→platform→lib). sh -n OK, shellcheck 0,
+  4/6 skenario mock OK (apple/empty bentrok getprop mock = harness, bukan
+  kode; L2 HP wajib). PELAJARAN: `. file 2>/dev/null` yang hilang = fatal
+  rc=2 di dash (dot gagal buka file → exit); harness wajib set
+  HSIN_MODULE_PATH + file ada.
+- STEP 5 (77b3a2b, capability/device_overrides.json 62 baris): 4 profil +
+  powervr/xclipse fallback; json.tool + assertion OK.
+- CI: lint-and-test #36310498729 + #36310518169 success; apk #36303140779
+  success (NDK r26 + Java + lambda fix). STATUS.md 1.1.1-1.1.3, 1.2.1, 1.2.2
+  DONE. STOP: Step 6+ menunggu approve.

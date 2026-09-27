@@ -202,3 +202,6 @@
   (ignoreUnknownKeys). CI: modul #36301125635 + apk #36301127388 success.
   L2: flash + reboot + tes HP oleh user.
 
+
+- STEP4-STEP5 (2026-09-27): Step 4 detector (5b373ea) + Step 5 overrides
+  (77b3a2b) + STATUS.md DONE (a65f32c, 3cb91cf). CI hijau semua. STOP.
