@@ -80,3 +80,10 @@
   baris): pre-check + probe balanced lepas [siku] (78742cc, +8/-2).
   Bukti: bash-n OK, shellcheck 0, uji 5 kasus (readback ketat utuh,
   balanced `[zstd]`→zstd). Push DONE. Antrean: #7 thermal-status.
+
+- FIX7-THERMALSTATUS (2026-09-27, leader langsung, ≤20 baris):
+  status kosong di thermal_manager.sh 2 site (e20a351, +4/-2,
+  `_status=$(classify)` → panggil + baca $HSIN_THERMAL_STATE).
+  Bukti: bash-n OK, shellcheck 0, red-green (lama kosong+basi,
+  baru hot/normal/panic benar). Worktree/branch basi
+  work/zram-precheck dibersihkan. Antrean: #8 scheduler-log.
