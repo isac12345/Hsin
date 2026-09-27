@@ -123,6 +123,22 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
+## ⚠️ Known Issues (out of scope — dicatat, belum diperbaiki)
+
+- `core/scan_cache.sh:47` — set `HSIN_SYSFS_BLOCK` TANPA guard
+  `[ -n ... ] ||`, menimpa prefix sandbox yang di-export harness dan
+  bertabrakan dengan reset `HSIN_IO_BLOCKS(_READY)` di
+  `engine/io/scheduler.sh` (baris 17-19, jalan tiap file di-source) —
+  merusak state test sandbox IO (test terpaksa seed `HSIN_IO_BLOCKS`
+  manual pasca-source; terbukti saat Step 6 skenario 10, 2x gagal sebelum
+  ketemu akar).
+- Prioritas: FIX SEBELUM lanjut kerja apa pun di `engine/io/` berikutnya
+  (`readahead.sh` baru dimigrasi ke safe_apply, `scheduler.sh` berbagi
+  source yang sama — risiko test false-positive kalau dibiarkan).
+- Belum fix sekarang karena di luar scope Step 6 (perintah user).
+
+---
+
 ## 📊 Summary Stats (konsisten dengan checkbox di atas — hitung ulang tiap update)
 
 | Metric | Value |
