@@ -17,6 +17,9 @@
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# Dipakai untuk menghormati override eksplisit user (kandidat max_freq
+# absolut) - cap persen profil tidak boleh menimpa pilihan user.
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/cpu/frequency.sh" 2>/dev/null
 # Daftar node devfreq GPU + daftar policy CPU dari cache scan (topologi
 # statis), sama seperti engine/gpu/apply.sh: apply DVFS tidak perlu glob
@@ -58,6 +61,16 @@ hsin_dvfs_cpu_apply() {
     for _pid in $HSIN_CPU_POLICY_IDS; do
         _p="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
         [ -d "$_p" ] || { _hsin_dvfs_log "cpu policy$_pid hilang sejak scan (skip)"; _fail=$((_fail + 1)); continue; }
+        # Override eksplisit user (kandidat max_freq absolut) menang atas cap
+        # persen profil. Tanpa ini, tahap DVFS - yang jalan PALING AKHIR di
+        # pipeline - menimpa hasil engine CPU sekaligus pilihan user, jadi
+        # "HSIN manual" berakhir sama saja. Log agar jelas node ini dilewati
+        # karena atas permintaan user, bukan karena gagal.
+        _uk_abs=$(hsin_uk_cpu_field "$_pid" max_khz 2>/dev/null)
+        if [ -n "$_uk_abs" ]; then
+            _hsin_dvfs_log "cpu policy$_pid dilewati: override user max_khz=$_uk_abs (kirim cpu_limit=100 untuk mengoverride override)"
+            continue
+        fi
         [ -w "$_p/scaling_max_freq" ] || { _hsin_dvfs_skip "cpu policy$_pid scaling_max_freq read-only (skip)"; continue; }
         hsin_cpu_policy_hwmax "$_pid"; _hw_max="$_hcpw"
         [ -z "$_hw_max" ] && { _hsin_dvfs_skip "cpu policy$_pid cpuinfo_max_freq kosong (skip)"; continue; }
@@ -109,6 +122,12 @@ hsin_dvfs_gpu_apply() {
     hsin_gpu_devfreq_candidates
     for _d in $HSIN_GPU_DEVFRES; do
         [ -d "$_d" ] || { _hsin_dvfs_log "gpu node ${_d##*/} hilang sejak scan (skip)"; _fail=$((_fail + 1)); continue; }
+        # Sama seperti CPU: override user menang atas cap persen profil.
+        _uk_gabs=$(hsin_uk_gpu_field "${_d##*/}" max_khz 2>/dev/null)
+        if [ -n "$_uk_gabs" ]; then
+            _hsin_dvfs_log "gpu node ${_d##*/} dilewati: override user max_khz=$_uk_gabs (kirim gpu_limit=100 untuk mengoverride override)"
+            continue
+        fi
         [ -w "$_d/max_freq" ] || { _hsin_dvfs_skip "gpu node ${_d##*/} max_freq read-only (skip)"; continue; }
 
         # available_frequencies = topologi statis -> cache dulu (dengan

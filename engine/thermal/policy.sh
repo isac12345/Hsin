@@ -92,8 +92,23 @@ hsin_thermal_apply_cpu() {
             _avail=$(printf '%s' "$_opp_csv" | tr ',' ' ')
             _new_max=$(hsin_opp_cap_pick "$_new_max" "$_avail")
         fi
-        [ -n "$_new_max" ] && [ -w "$_dir/scaling_max_freq" ] && \
-            printf '%s\n' "$_new_max" > "$_dir/scaling_max_freq" 2>/dev/null
+        # Thermal adalah PENAHAM, bukan penguat: kalau targetnya >= nilai
+        # yang sekarang, jangan tulis sama sekali. Sebelumnya baris ini
+        # menulis apa adanya, dan karena HSIN_THERMAL_PERF_TARGET = 100
+        # pada kondisi "cool" (<60C), setiap apply pada suhu biasa menulis
+        # scaling_max_freq kembali ke hw_max - membatalkan cap frekuensi
+        # profil (mis. battery 65-80%) DAN override pilihan user. Itu
+        # membuat "HSIN manual" selalu berakhir sama saja.
+        _cur_max=""
+        [ -f "$_dir/scaling_max_freq" ] && \
+            IFS= read -r _cur_max < "$_dir/scaling_max_freq" 2>/dev/null
+        case "$_cur_max" in
+            ''|*[!0-9]*) _cur_max=0 ;;
+        esac
+        if [ -n "$_new_max" ] && [ "$_new_max" -lt "$_cur_max" ] 2>/dev/null; then
+            [ -w "$_dir/scaling_max_freq" ] && \
+                printf '%s\n' "$_new_max" > "$_dir/scaling_max_freq" 2>/dev/null
+        fi
     done
 }
 
@@ -123,15 +138,27 @@ hsin_thermal_apply_gpu() {
                 _target=$(hsin_opp_cap_pick "$(( _max_avail * 80 / 100 ))" "$_avail")
                 ;;
             *)
-                # Let DVFS handle it
+                # Device adem: thermal tidak boleh APA-APUN. Sebelumnya
+                # cabang ini menulis max OPP tertinggi, yang membatalkan
+                # cap profil GPU dan override pilihan user. Sekarang
+                # thermal hanya menurunkan (lihat gate di bawah).
                 _max_avail=$(hsin_opp_max "$_avail")
                 [ -n "$_max_avail" ] || continue
                 _target="$_max_avail"
                 ;;
         esac
 
-        [ -n "$_target" ] && [ -w "$_dir/max_freq" ] && \
-            printf '%s\n' "$_target" > "$_dir/max_freq" 2>/dev/null
+        # Sama seperti CPU: thermal = penaham. Tulis hanya kalau target
+        # lebih rendah dari nilai sekarang, kalau tidak dilewati diam-diam.
+        _cur_max=""
+        [ -f "$_dir/max_freq" ] && IFS= read -r _cur_max < "$_dir/max_freq" 2>/dev/null
+        case "$_cur_max" in
+            ''|*[!0-9]*) _cur_max=0 ;;
+        esac
+        if [ -n "$_target" ] && [ "$_target" -lt "$_cur_max" ] 2>/dev/null; then
+            [ -w "$_dir/max_freq" ] && \
+                printf '%s\n' "$_target" > "$_dir/max_freq" 2>/dev/null
+        fi
     done
 }
 
