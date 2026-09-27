@@ -170,6 +170,20 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ## ✅ Fixed Issues (dulu Known Issues — sudah diperbaiki)
 
+- `core/thermal_check.sh` hilang dari bundle rilis — DITEMUKAN +
+  DIFIX 2026-09-27 (leader, saat verifikasi PQ Step 12; commit
+  `ee5f85b`, 1 baris daftar runtime `build_release.sh`). Sejak Step 10
+  file tidak ada di daftar bundle → di ZIP rilis source-nya di-rewrite
+  jadi `core/runtime.sh` sehingga guard thermal diam-diam tidak jalan
+  (tanpa crash). Bukti red-green dari build `release` sungguhan di
+  salinan repo: pra-fix 0 marker thermal di `core/runtime.sh` rilis;
+  pasca-fix 19 marker + `service.sh` ZIP me-source runtime +
+  `runtime.sh` rilis di-source di sandbox → CRITICAL + intervensi via
+  safe_apply jalan (maxfreq 1800000→300000, rc=3). Audit gap bundle:
+  27 `core/*.sh` vs daftar — satu-satunya gap lain
+  `core/_bootstrap.sh` (tidak di-source siapa pun = benign, tidak
+  dibundle).
+
 - `core/scan_cache.sh:47` (guard prefix) — FIXED 2026-09-27, commit
   `000c83a` (= STEP 8 versi perintah user). Keenam prefix sysfs
   (CPU/THERMAL/DEVFREQ/GPU/BLOCK/PROC) kini pakai guard `[ -n ... ] ||`
