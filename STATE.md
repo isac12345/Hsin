@@ -120,3 +120,10 @@
   (f891245, probe utuh). Bukti: bash-n 6/6, shellcheck 0, sandbox
   (hardware/root_check/backup/capability_scan). /proc 55→32.
   Antrean: proc batch-4 (action.sh + engine/*) + L2 HP.
+
+- PROC-4 + #14 SELESAI (2026-09-27, leader langsung): action.sh +
+  engine/{imgtec,validator,scheduler,governor} via $HSIN_PROC (f174dcc).
+  Bukti: bash-n 5/5, shellcheck 0 baru, sandbox end-to-end (status JSON
+  ram/uptime/load dari prefix palsu, device_info soc, sched-latency
+  tuning identik). /proc 95→0 eksekutable (sisa 9 komentar). Antrean:
+  L2 HP (flash + APPLY-TIME).
