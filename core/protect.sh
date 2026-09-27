@@ -71,7 +71,7 @@ hsin_protect_integrity_full() {
     command -v md5sum >/dev/null 2>&1 || return 1
     _manifest_full="$HSIN_MODULE_PATH/core/.integrity.manifest.full"
 
-    # Auto-generate full manifest if missing (same logic as light check)
+    # Full manifest juga harus sudah ada (dari build_release.sh); jika tidak, gagal aman.
     if [ ! -s "$_manifest_full" ]; then
         return 1
     fi
@@ -101,12 +101,8 @@ _do_actual_integrity_check() {
     # a machine without a C compiler, so bin/hsin-verify never got produced).
     command -v md5sum >/dev/null 2>&1 || return 1
 
-    # If no manifest exists, auto-generate a baseline from the critical
-    # scripts on first boot. This gives release builds that were installed
-    # without a compiled verifier at least a basic self-check: any edits
-    # made AFTER the first boot will be caught. Edits made BEFORE the
-    # first boot won't be (the manifest captures the "as-installed"
-    # state), but that's acceptable since the user just installed it.
+    # Manifest harus sudah ada (dihasilkan build_release.sh); jika tidak ada,
+    # tidak ada baseline untuk diperiksa, jadi gagal aman.
     if [ ! -s "$HSIN_MANIFEST" ]; then
         return 1
     fi
