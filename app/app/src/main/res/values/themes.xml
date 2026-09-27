@@ -8,7 +8,7 @@
         <item name="colorTertiaryContainer">@color/hsin_tertiary_container</item>
         <item name="colorSurface">@color/hsin_surface</item>
         <item name="colorSurfaceVariant">@color/hsin_surface_variant</item>
-        <item name="colorBackground">@color/hsin_background</item>
+        <item name="android:colorBackground">@color/hsin_background</item>
         <item name="colorError">@color/hsin_error</item>
         <item name="colorOnPrimary">@color/hsin_on_primary</item>
         <item name="colorOnPrimaryContainer">@color/hsin_on_primary_container</item>
@@ -22,8 +22,6 @@
         <item name="colorOnError">@color/hsin_on_error</item>
         <item name="colorOutline">@color/hsin_outline</item>
         <item name="colorOutlineVariant">@color/hsin_outline_variant</item>
-        <item name="colorShadow">@color/hsin_shadow</item>
-        <item name="colorScrim">@color/hsin_scrim</item>
         <item name="colorInverseSurface">@color/hsin_inverse_surface</item>
         <item name="colorInverseOnSurface">@color/hsin_inverse_on_surface</item>
         <item name="colorSurfaceTint">@color/hsin_surface_tint</item>
