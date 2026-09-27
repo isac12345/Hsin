@@ -3,6 +3,8 @@
 # Credit: logic inspired by GTurbo (GPU governor control)
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Apply MediaTek GED tweaks
 hsin_gpu_imgtec_apply() {
@@ -41,18 +43,18 @@ hsin_gpu_imgtec_apply() {
     fi
 
     # gpufreq interface (if available)
-    if [ -f /proc/gpufreq/gpufreq_power_limited ]; then
+    if [ -f $HSIN_PROC/gpufreq/gpufreq_power_limited ]; then
         case "$_profile" in
             battery)
                 # Limit max frequency
-                _max_freq=$(cat /proc/gpufreq/gpufreq_opp_dump 2>/dev/null | head -1 | awk '{print $1}')
+                _max_freq=$(cat $HSIN_PROC/gpufreq/gpufreq_opp_dump 2>/dev/null | head -1 | awk '{print $1}')
                 [ -n "$_max_freq" ] && {
-                    echo "0 $_max_freq" > /proc/gpufreq/gpufreq_power_limited 2>/dev/null && _applied=$((_applied + 1))
+                    echo "0 $_max_freq" > $HSIN_PROC/gpufreq/gpufreq_power_limited 2>/dev/null && _applied=$((_applied + 1))
                 }
                 ;;
             balanced|performance|extreme)
                 # Allow full frequency
-                echo "0 0" > /proc/gpufreq/gpufreq_power_limited 2>/dev/null && _applied=$((_applied + 1))
+                echo "0 0" > $HSIN_PROC/gpufreq/gpufreq_power_limited 2>/dev/null && _applied=$((_applied + 1))
                 ;;
         esac
     fi
@@ -87,8 +89,8 @@ hsin_gpu_imgtec_state() {
             printf "    ged_dvfs_boost: %s\n" "$_boost"
         }
     fi
-    if [ -f /proc/gpufreq/gpufreq_opp_dump ]; then
-        _opp=$(cat /proc/gpufreq/gpufreq_opp_dump 2>/dev/null | head -3)
+    if [ -f $HSIN_PROC/gpufreq/gpufreq_opp_dump ]; then
+        _opp=$(cat $HSIN_PROC/gpufreq/gpufreq_opp_dump 2>/dev/null | head -3)
         printf "    gpufreq_opp:\n%s\n" "$_opp"
     fi
 }

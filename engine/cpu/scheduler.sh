@@ -2,6 +2,8 @@
 # HSIN CPU Engine - Scheduler Engine
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
     . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
 # Diisi hsin_cpu_policy_hwmax() (engine/cpu/detect.sh).
@@ -229,8 +231,8 @@ _hsin_sched_lat_ensure_debugfs() {
 # or nothing (+ exit 1) if neither location has it.
 _hsin_sched_lat_resolve_path() {
     _canon="$1"
-    if [ -w "/proc/sys/kernel/$_canon" ]; then
-        echo "/proc/sys/kernel/$_canon"
+    if [ -w "$HSIN_PROC/sys/kernel/$_canon" ]; then
+        echo "$HSIN_PROC/sys/kernel/$_canon"
         return 0
     fi
     _short="${_canon#sched_}"   # sched_latency_ns -> latency_ns

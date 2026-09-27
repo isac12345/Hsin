@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # ===== Hidden dev-only debug log =====
 HSIN_DEBUG_LOG="$HSIN_DATA/logs/debug.log"
@@ -62,9 +64,9 @@ hsin_action_device_info() {
     _devid=$(hsin_protect_device_fingerprint 2>/dev/null)
 
     # SoC
-    if [ -f /proc/device-tree/compatible ]; then
+    if [ -f "$HSIN_PROC/device-tree/compatible" ]; then
         _soc=""
-        read -r _soc < /proc/device-tree/compatible 2>/dev/null
+        read -r _soc < "$HSIN_PROC/device-tree/compatible" 2>/dev/null
         _soc="${_soc%% *}"  # take first word before any space/null
     fi
 
@@ -82,7 +84,7 @@ hsin_action_device_info() {
     # with spaces, the whole value matched " *" and got stripped to "",
     # which is why RAM always showed N/A. Using `set --` lets normal word
     # splitting drop the leading/trailing whitespace before we take $1.
-    if [ -f /proc/meminfo ]; then
+    if [ -f "$HSIN_PROC/meminfo" ]; then
         while IFS=: read -r _mk _mv; do
             case "$_mk" in
                 MemTotal)
@@ -91,7 +93,7 @@ hsin_action_device_info() {
                     break
                     ;;
             esac
-        done < /proc/meminfo
+        done < "$HSIN_PROC/meminfo"
     fi
 
     # Single-line JSON: some WebUI exec bridges only pass through the last
@@ -491,13 +493,13 @@ hsin_action_live_status() {
     # fields exist on every modern Android kernel regardless of vendor.
     _ram_total_kb="0"
     _ram_avail_kb="0"
-    if [ -f /proc/meminfo ]; then
+    if [ -f "$HSIN_PROC/meminfo" ]; then
         while IFS=: read -r _mk _mv; do
             case "$_mk" in
                 MemTotal) set -- $_mv; _ram_total_kb="${1:-0}" ;;
                 MemAvailable) set -- $_mv; _ram_avail_kb="${1:-0}" ;;
             esac
-        done < /proc/meminfo
+        done < "$HSIN_PROC/meminfo"
     fi
     _ram_used_kb="0"
     if [ "$_ram_total_kb" -gt 0 ] 2>/dev/null && [ "$_ram_avail_kb" -ge 0 ] 2>/dev/null; then
@@ -526,9 +528,9 @@ hsin_action_live_status() {
     # JSON wire (e.g. 235 = 2.35). /proc/loadavg is a plain kernel stat,
     # identical format on every Android build.
     _cpu_load_x100=0
-    if [ -f /proc/loadavg ]; then
+    if [ -f "$HSIN_PROC/loadavg" ]; then
         _la1=""
-        read -r _la1 _rest < /proc/loadavg 2>/dev/null
+        read -r _la1 _rest < "$HSIN_PROC/loadavg" 2>/dev/null
         case "$_la1" in
             *.*)
                 _la_int="${_la1%%.*}"
@@ -658,8 +660,8 @@ hsin_action_live_status() {
     # System uptime (seconds since boot) - /proc/uptime is universal across
     # every Android kernel/chipset, used for the Device tab uptime display.
     _uptime_sec="0"
-    if [ -f /proc/uptime ]; then
-        read -r _uptime_sec _rest < /proc/uptime 2>/dev/null
+    if [ -f "$HSIN_PROC/uptime" ]; then
+        read -r _uptime_sec _rest < "$HSIN_PROC/uptime" 2>/dev/null
         _uptime_sec="${_uptime_sec%%.*}"
     fi
     case "$_uptime_sec" in ''|*[!0-9]*) _uptime_sec="0" ;; esac

@@ -3,6 +3,8 @@
 # Credit: logic inspired by UPerf (CPU frequency control)
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 # Daftar policy datang dari hsin_cpu_policy_ids() (cache scan-sekali-simpan,
 # fallback glob) - sumbernya sama dengan detect.sh, dan tidak ada field
 # daftar-governor di cache (yang tersimpan cuma governor saat ini), jadi
@@ -99,14 +101,14 @@ hsin_cpu_governor_apply() {
     # Scheduler: sched_child_runs_first
     # Ensures child processes (like app spawns) run before parents,
     # reducing app launch latency. Enabled on performance/extreme.
-    if [ -w /proc/sys/kernel/sched_child_runs_first ]; then
+    if [ -w $HSIN_PROC/sys/kernel/sched_child_runs_first ]; then
         case "$_profile" in
             performance|extreme) _scrf="1" ;;
             *)                   _scrf="0" ;;
         esac
-        _cur_scrf=$(cat /proc/sys/kernel/sched_child_runs_first 2>/dev/null)
+        _cur_scrf=$(cat $HSIN_PROC/sys/kernel/sched_child_runs_first 2>/dev/null)
         if [ "$_cur_scrf" != "$_scrf" ]; then
-            echo "$_scrf" > /proc/sys/kernel/sched_child_runs_first 2>/dev/null
+            echo "$_scrf" > $HSIN_PROC/sys/kernel/sched_child_runs_first 2>/dev/null
         fi
     fi
 
