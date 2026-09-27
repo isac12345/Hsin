@@ -56,7 +56,7 @@ PHASE 5: QA, Release & Maintenance         [░░░░░░░░░░] 0% �
 
 ### 1.2 Improve Core Device Detection [0/6 tasks]
 
-- [ ] **Task 1.2.1** — Enhance `core/detector.sh`
+- [x] **Task 1.2.1** — Enhance `core/detector.sh` (Step 4) — DONE (2026-09-27; 241+/2-; mock 5 vendor + THERMAL_PATH + cache; getprop mock apple/empty masih bentrok harness — bukan kode, L2 wajib)
   - Add Qualcomm detection (SDM/SM/MSM)
   - Add MediaTek detection (MTK/Dimensity)
   - Add Exynos detection (Samsung)
