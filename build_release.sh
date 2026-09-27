@@ -75,6 +75,9 @@ _clean_stage() {
     # Keep WebUI untouched; remove duplicated source trees from the shipped ZIP.
     _runtime="$_stage/core/runtime.sh"
     : > "$_runtime"
+    # Idempotent guard: no-op murah saat source ulang dalam proses yang sama.
+    printf '%s\n' '[ -n "$_HSIN_RUNTIME_LOADED" ] && return 0 2>/dev/null || true' >> "$_runtime"
+    printf '%s\n' '_HSIN_RUNTIME_LOADED=1' >> "$_runtime"
     for _src in \
         core/sysfs.sh core/scan_cache.sh core/logger.sh core/validator.sh core/profile_loader.sh \
         core/state_manager.sh core/protect.sh core/backup.sh core/policy_engine.sh \
