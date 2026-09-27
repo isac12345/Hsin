@@ -135,7 +135,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ## 📋 PHASE 4: Documentation (Steps 13-18) — BLOCKED
 
-- [ ] **Step 13** — README.md (quick start, profil, log, uninstall).
+- [x] **PQ Step 13** — README.md — DONE 2026-09-27. Quick start,
+  requirements, profil, safety features (boot guard, safe apply,
+  thermal guardrail, degradasi per-engine), 1 device tervalidasi +
+  lainnya graceful degrade eksplisit (tanpa matriks chipset), log
+  locations, status boot guard, uninstall, support.
 - [ ] **Step 14** — TESTING.md (prosedur + template laporan).
 - [ ] **Step 15** — TROUBLESHOOTING.md (masalah umum + langkah debug).
 - [ ] **Step 16** — DEVICE_COMPATIBILITY.md ("TERVALIDASI" vs
