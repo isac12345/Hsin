@@ -3,6 +3,7 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Load dependencies
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
@@ -22,7 +23,7 @@ hsin_network_apply() {
     # Apply TCP
     echo "  TCP:"
     if hsin_network_apply_tcp "$_profile"; then
-        _tcp=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
+        _tcp=$(cat $HSIN_PROC/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
         echo "    tcp_congestion: $_tcp"
     else
         echo "    tcp_congestion: skip (not writable)"
