@@ -9,8 +9,8 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 # ===== Hidden dev-only debug log =====
 HSIN_DEBUG_LOG="$HSIN_DATA/logs/debug.log"
 [ -d "$HSIN_DATA/logs" ] || mkdir -p "$HSIN_DATA/logs" 2>/dev/null
-# Skip debug log write on the hot-path status command (called every ~3s)
-# to avoid forking date on every WebUI poll.
+# Skip debug log write on the hot-path status command
+# (APK refresh saat buka + swipe manual, bukan polling WebUI).
 case "${1:-info}" in
     status) ;;
     *) echo "----- $(date '+%Y-%m-%d %H:%M:%S') action.sh $* -----" >> "$HSIN_DEBUG_LOG" 2>/dev/null ;;
@@ -360,7 +360,7 @@ hsin_action_live_status() {
     # integrity check (the profiling log showed that finishing in 0s).
     _cpu_temp="0"
     _gpu_temp="0"
-    for _zone in /sys/class/thermal/thermal_zone*/temp; do
+    for _zone in ${HSIN_SYSFS_THERMAL:-/sys/class/thermal}/thermal_zone*/temp; do
         [ -f "$_zone" ] || continue
         _dir="${_zone%/temp}"
         [ -f "$_dir/type" ] || continue
@@ -460,7 +460,7 @@ hsin_action_live_status() {
     # across Unisoc, MediaTek, Qualcomm and Exynos devices.
     _gpu_freq="0"
     _gpu_max_khz="0"
-    for _devfreq in /sys/class/devfreq/*; do
+    for _devfreq in ${HSIN_SYSFS_DEVFREQ:-/sys/class/devfreq}/*; do
         [ -d "$_devfreq" ] || continue
         _name="${_devfreq##*/}"
         case "$_name" in
