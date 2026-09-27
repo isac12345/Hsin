@@ -80,7 +80,7 @@ isac12345/Alpha (fail count + auto-disable + clear log when guard fires).
   - Format: `timestamp:count`
 - [ ] Create `hsin_boot_guard_check()` function
   - Read current failure count
-  - If count >= 3 and within 24h → return 1 (guard active, skip tuning)
+  - If count >= 2 and within 24h → return 1 (guard active, skip tuning)
   - If 24h elapsed → reset counter, return 0
   - Return 0 if count < 3
 - [ ] Create `hsin_boot_guard_increment()` function
@@ -92,16 +92,16 @@ isac12345/Alpha (fail count + auto-disable + clear log when guard fires).
   N failures in 24h") — user harus tahu dari log, bukan menebak
 
 **Acceptance Criteria:**
-- [ ] All 4 functions work (sandbox: 3x increment → check returns 1;
+- [ ] All 4 functions work (sandbox: 2x increment → check returns 1;
   reset → check returns 0; stale timestamp >24h → auto-reset)
 - [ ] State file created/tracked correctly
 - [ ] ShellCheck: 0 errors, sh -n: passes, CI lint-and-test passes
 
 **Expected Output:**
 ```bash
-$ cat /data/adb/hsin/.boot_guard_state
-1758976800:2
-$ hsin_boot_guard_check; echo $?   # 0 (masih di bawah threshold)
+$ cat /data/adb/hsin/.boot_fail_count
+1758976800:1
+$ hsin_boot_guard_check; echo $?   # 0 (masih di bawah threshold 2)
 ```
 
 **Commit Message:**
@@ -109,7 +109,7 @@ $ hsin_boot_guard_check; echo $?   # 0 (masih di bawah threshold)
 feat: boot guard with fail-count auto-disable (Phase 2, Step 5)
 
 - Track boot failures with timestamp (format timestamp:count)
-- Auto-disable tuning after 3 failures in 24h
+- Auto-disable tuning after >= 2x consecutive failures (Alpha-proven)
 - Clear log line when guard fires; reset on successful boot
 - Reference pattern: service.sh repo isac12345/Alpha
 - ShellCheck: 0 errors, sh -n: pass
