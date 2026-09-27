@@ -37,10 +37,20 @@ jobs:
       - name: Setup Android SDK
         run: |
           # sdkmanager tidak ada di PATH default runner; ada di cmdline-tools.
+          # PENTING: $GITHUB_PATH hanya berlaku untuk STEP BERIKUTNYA, jadi
+          # step ini juga harus export PATH langsung.
           for _d in "$ANDROID_HOME"/cmdline-tools/*/bin; do
             [ -d "$_d" ] && echo "$_d" >> "$GITHUB_PATH"
           done
+          _sdk_bin="$(echo "$ANDROID_HOME"/cmdline-tools/*/bin | tr ' ' '\n' | grep -m1 . || true)"
+          if [ -z "$_sdk_bin" ]; then
+            echo "ERROR: cmdline-tools tidak ditemukan di $ANDROID_HOME" >&2
+            ls -la "$ANDROID_HOME" >&2
+            exit 1
+          fi
+          export PATH="$PATH:$_sdk_bin"
           echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "sdkmanager di: $(command -v sdkmanager)"
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
