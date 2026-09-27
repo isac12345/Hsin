@@ -1,88 +1,128 @@
-# PLAN.md — HSIN manual (modul dulu, app)
+# PLAN.md — HSIN manual (arsitektur capability-first)
+
+## KENAPA ARAH BERUBAH (baca dulu sebelum kerja — histori, bukan teori)
+
+- Dulu (Step 5 lama, commit `77b3a2b`): `capability/device_overrides.json`
+  keyed by NAMA CHIPSET (`unisoc_t615`, `snapdragon_888`, `dimensity_9200`,
+  `exynos_1280`, …). Nilai tuning per device ditulis tangan berdasarkan nama.
+- Masalahnya: itu pola `DEVICE NAME → RANDOM TWEAK` — dilarang skill
+  `alpha-hsin-engineering`. Nama chipset tidak menjamin capability sama
+  (satu "Snapdragon 888" di ROM/kernel berbeda bisa beda governor, OPP
+  table, thermal zone, node writable). Angka per-chipset yang belum
+  divalidasi di hardware nyata = klaim palsu + risiko apply ke node yang
+  tidak ada/tidak cocok.
+- Keputusan user 2026-09-27: Step 5 DIREVERT total (`36d2256`), file
+  `capability/device_overrides.json` DIHAPUS dari tree. Penggantinya:
+  override keyed by CAPABILITY SIGNATURE — hasil deteksi
+  `core/detector.sh` (Step 4): mis. jumlah CPU policy, governor yang
+  tersedia, devfreq writable atau tidak, jumlah thermal zone. Device yang
+  tidak cocok signature mana pun → fallback aman default, bukan skip total
+  dan bukan override belum tervalidasi.
+- Prioritas juga dibalik: boot guard + safe apply (Phase 2) dimajukan
+  melewati device overrides (Phase 3). Alasan: boot guard + safe apply
+  yang membedakan modul stabil vs berisiko bootloop — skor stabilitas
+  paling ditentukan di sini, bukan di banyaknya nama chipset di JSON.
+- Aturan klaim device (berlaku semua file): "mendukung device X" HANYA
+  untuk yang BENERAN divalidasi di hardware asli (saat ini: Unisoc/Mali
+  milik user). Device lain = "graceful degrade" sampai ada bukti test nyata.
+- Total step berubah 31 → 22 (lihat PRIORITY_QUEUE.md): Step 5 lama dihapus,
+  thermal JSON angka-tetap diganti `thermal_check.sh`, migrasi 7 engine
+  diringkas jadi 1 bukti pola (engine/cpu), bump versionCode dipindah ke
+  gate rilis Phase 5.
 
 ## RENCANA BUAT USER (baca ini aja, bahasa simpel)
-- Target: HSIN manual/bebas setting, apply CEPAT (dulu >15 dtk), scan
-  SEKALI-simpan. Sekarang semua tweak/setting pindah ke APLICASI (webui
-  sudah dihapus).
-- Status: modul sudah dibetulkan TOTAL di sisi kode (14 temuan audit +
-  3 bug bonus review), semua L1. Aplikasi sudah ada skeletonnya (3 tab).
-  BELUM ada yang dijalankan di HP dan BELUM ada yang dikompilasi.
-- Yang jalan otomatis (ga perlu kamu): perbaikan kode modul + app,
-  kecil per commit, diverifikasi statis dulu (L1).
+
+- Target: HSIN manual/bebas setting, apply CEPAT + AMAN (tidak bootloop,
+  tidak tulis buta ke node yang tidak ada). Semua pilihan user tetap lewat
+  aplikasi (3 tab: Status, Knobs, Logs).
+- Status: fondasi SELESAI (Step 1-4: testing framework, CI, validasi build,
+  detector). Berikutnya: boot guard + safe apply (Step 5-8), baru overrides
+  + thermal (Step 9-12), dokumentasi (Step 13-18), QA + rilis (Step 19-22).
+- Yang jalan otomatis (ga perlu kamu): perbaikan kode modul + app, kecil
+  per commit, diverifikasi statis dulu (L1).
 - TUGAS KAMU (urutan):
-  1. [x] SELESAI (2026-09-26): `date +%s%3N` → 13 digit, marker ms
-     DIPERCAYA. HP Android 14, T615.
+  1. [x] SELESAI (2026-09-26): `date +%s%3N` → 13 digit, marker ms DIPERCAYA.
   2. [x] SELESAI (2026-09-27): BUILD ZIP modul + APK lewat GitHub Actions
      berhasil (APK run #36296279179, Modul run #36296491773).
-  3. [ ] L2: flash zip, apply manual 1x, kirim baris `APPLY-TIME` dari
-     `/data/adb/hsin/logs/debug.log` (bukti cepat/lambat, bukan rasa).
+  3. [ ] L2 (nanti, setelah Phase 2-3 selesai): flash zip, apply manual 1x,
+     kirim baris `APPLY-TIME` dari `/data/adb/hsin/logs/debug.log`.
   4. [ ] L2.app: pasang APK, cek tiap tweak bisa dipilih + Apply berhasil.
   5. [ ] PALING AKHIR: tes rasa (game adem/kenceng) = L2, bilang OK.
+- DILARANG naikkan versionCode ke rilis stabil sebelum Phase 2-3 selesai
+  DAN divalidasi di HP nyata (gate Step 22).
 
-## Tahap 0 — Inventarisasi + basis rakit (SELESAI)
-- [x] Repo GitHub isac12345/Hsin (private) + proyek lokal ~/Hsin.
-- [x] Audit 6 varian: v4.2.5-consolidated & v4.2.6-fixed TERKONTAMINASI
-  9Router, v4.2.7 bersih tapi Extreme no-op, v4_0 metadata salah.
-- [x] Basis = hsin-dev v5.0.0-beta1 (c6e6957, 110 file, tanpa build/).
+## Fase 1 — Testing Infrastructure (Step 1-4, SELESAI)
 
-## Tahap 1 — Fix isi modul (KODE SELESAI, nunggu L2)
-- [x] Audit timing apply: biang = scan ulang tiap apply (>15 dtk).
-- [x] Cache scan `core/scan_cache.sh` (scan sekali, dipakai semua engine).
-- [x] Backup/safety/IO/CPU/GPU/mem/IO/DVFS ke cache-first.
-- [x] 14 temuan audit per tweak SELESAI (thermal-status, sched-log,
-  dead-code, generic-msg, OOM proteksi, zram, dvfs-verify, oom-verify,
-  zram-readback, precheck, kosmetik, /proc→HSIN_PROC 95→0).
-- [x] 3 bug bonus dari review: cache kosong tidak lagi dianggap sah
-  (dulu thermal+CPU safety bisa buta), scan_cache ikut runtime release
-  (dulu cache-scan mati di ZIP release), refresh_hz baca `=`.
-- [x] Kontrak untuk app: `action.sh knobs` (JSON inventaris semua tweak +
-  nilai yang benar-benar ada di device).
-- [x] Jalur tulis pilihan user: `knob-set` / `knob-reset` / `knob-list`
-  (override tervalidasi di $HSIN_DATA/user_knobs.env).
-- [ ] **Integrasi override ke jalur apply** (pilihan user benar-benar dipakai
-  saat apply) — SEDANG DIKERJAKAN, butuh L2 karena mengubah perilaku.
-- [x] Guard idempotent runtime P1 (source-ulang 456KB jadi no-op) + luruskan
-  komentar integrity 2d — L1 DONE (b5cbf73, bbf27ee), nunggu L2.
-- [ ] Audit blank P2f: error app terbukti tampil pesan (statis) → tersisa
-  sisi shell/HP, pemisah = Task 2a manual oleh user (lihat NOTES).
-- [ ] Bump versi: `module.prop` + `bin/hsin HSIN_VERSION` (wajib sebelum build).
-- [ ] L2: flash + reboot (berat?) + `su -c 'sh .../action.sh status/knobs'`
-  (blank?) + kirim APPLY-TIME.
+- [x] Step 1: `tests/` testing framework + template device report.
+- [x] Step 2: `.github/workflows/lint-and-test.yml` (shellcheck `-S error`,
+  sh -n, validasi JSON, cek file wajib, format module.prop).
+- [x] Step 3: `tests/validate_build.sh` (validasi pra/pasca-zip).
+- [x] Step 4: `core/detector.sh` — deteksi SoC/GPU/CPU-policy/thermal-zone
+  komprehensif + cache `detected.conf` (fondasi signature capability).
+- Detail hash/commit: lihat STATUS.md (Step 1-4 DONE dengan hash asli).
 
-## Tahap 2 — Rakit final modul (menunggu perintah build)
-- [ ] Bump versi ke vCode baru + cek semua lokasi versi.
-- [x] Build/zip HANYA lewat GitHub Actions (`.github/workflows/build-modul.yml`,
-      manual). BERHASIL (run #36296491773, artifact `hsin-modul-dev`).
-- [x] Verifikasi isi ZIP: `core/runtime.sh` punya cache-scan + override
-      (otomatis dicek di workflow, lulus).
+## Fase 2 — Boot Guard & Safe Apply (Step 5-8, BERIKUTNYA)
 
-## Tahap 3 — Aplikasi (jalan, belum terverifikasi compile)
-- Keputusan user: (a) Gradle+Kotlin sendiri, (b) webui DIHAPUS, (c) paket com.hsin.
-- [x] Webroot dihapus; notif_icon → `assets/`; logo/banner/bg → `branding/`.
-- [x] `app/`: Gradle 8.7 + Kotlin 2.0 + AGP 8.6, Material 3, ViewBinding,
-      kotlinx.serialization, minSdk 26 / target 34.
-- [x] `RootExec`: `su -c` + stdout capture + timeout 20s + quoting POSIX.
-- [x] `HsinRepository`: knobs/status/device/knob-set/config-set/apply/logs/
-      backup/rollback; ambil baris JSON terakhir.
-- [x] 3 tab: Status (live + device), Knobs (dinamis dari `knobs`), Logs.
-- [x] Apply: knob-set* + config-set* → satu `apply <profil>`.
-- [x] Perbaikan scaffold yang tidak akan kompilasi: adapter baris datar,
-      signature ArrayAdapter, import decodeFromString, akses private,
-      manifest, layout, 0 TODO/placeholder, wrapper Gradle palsu dihapus.
-- [x] **Compile verification** — lolos via CI (`.github/workflows/build-apk.yml`,
-      run #36296279179, artifact `hsin-debug-apk`). 0 error compile.
-- [ ] Extreme opt-in sudah ada sebagai switch ALLOW_EXTREME; perlu dipastikan
-      apply extreme memakai profil extreme (bukan balanced).
-- [ ] Game list (add/remove) — belum ada UI.
-- [ ] Backup/Rollback button — method sudah ada, UI belum.
-- [ ] Polish: mode gelap (values-night), ikon adaptive, animasi, ringkasan
-      draft sebelum Apply.
+- [ ] Step 5 (NEXT): `core/boot_guard.sh` — referensi pola dari repo
+  isac12345/Alpha (`service.sh`): hitung boot fail count, auto-disable
+  tuning kalau gagal berturut-turut, log jelas kapan guard aktif.
+- [ ] Step 6: integrasi boot guard ke `service.sh` (cek di awal boot,
+  skip tuning + exit bersih bila guard aktif, reset bila boot sukses).
+- [ ] Step 7: `core/safe_apply.sh` — referensi `apply_tweak()` dari Alpha:
+  cek node exist + writable, write, read-back, verify, kategorikan hasil
+  APPLIED / SKIPPED / FALLBACK / FAILED. Tanpa verify = tanpa klaim sukses.
+- [ ] Step 8: migrasi minimal SATU engine (`engine/cpu`) ke `safe_apply.sh`
+  sebagai bukti pola terpakai (engine lain menyusul setelah pola terbukti).
+
+## Fase 3 — Capability-Driven Overrides & Thermal Safety (Step 9-12)
+
+- [ ] Step 9: `capability/capability_overrides.json` — keyed by CAPABILITY
+  SIGNATURE, BUKAN nama chipset (ganti total rencana Step 5 lama yang
+  direvert). Format signature baku, mis.
+  `cpu2+_gpu-devfreq_thermal2+`, plus entry `default` sebagai fallback aman.
+- [ ] Step 10: `core/load_overrides.sh` — hitung signature device dari
+  `detected.conf` + cek writability live, pilih entry cocok, fallback ke
+  `default` bila tidak ada yang cocok (dengan log alasannya).
+- [ ] Step 11: `core/thermal_check.sh` — threshold NORMAL / HIGH /
+  VERY HIGH / CRITICAL berbasis data thermal_zone yang TERDETEKSI, bukan
+  angka tetap per chipset. Tanpa thermal zone → fitur thermal degrade
+  jadi no-op + log, bukan crash dan bukan throttle buta.
+- [ ] Step 12: graceful degradation formal — engine gagal != module gagal
+  (counter applied/failed per engine, partial success = return 0, service
+  lanjut ke engine berikut).
+
+## Fase 4 — Documentation (Step 13-18)
+
+- [ ] Step 13: README.md (quick start, profil, log, uninstall).
+- [ ] Step 14: TESTING.md (prosedur + template laporan).
+- [ ] Step 15: TROUBLESHOOTING.md (masalah umum + langkah debug).
+- [ ] Step 16: DEVICE_COMPATIBILITY.md — bedakan "TERVALIDASI" (Unisoc/Mali
+  milik user, bukti nyata) vs "GRACEFUL DEGRADE" (device lain, belum ada
+  bukti). Jangan klaim rata.
+- [ ] Step 17: API.md (untuk modder: tambah profil, deteksi, tweak).
+- [ ] Step 18: CHANGELOG.md.
+
+## Fase 5 — QA & Release (Step 19-22)
+
+- [ ] Step 19: QA_CHECKLIST.md (kode, build, device, fungsional, stabilitas,
+  edge case, uninstall — termasuk validasi build ala Step 7 lama).
+- [ ] Step 20: RELEASE_NOTES.md (fitur, keterbatasan jujur).
+- [ ] Step 21: SUPPORT_POLICY.md (SLA, kanal, matriks kompatibilitas).
+- [ ] Step 22: final status update + GATE RILIS: versionCode baru HANYA
+  bila Phase 2-3 selesai DAN tervalidasi di HP nyata (L2). Tanpa L2 = tanpa
+  rilis stabil.
 
 ## Aturan
+
 - **Build hanya lewat GitHub Actions** (perintah user 2026-09-27). Termux
   tidak punya JDK/Android SDK → Termux = tulis source + verifikasi statis.
 - Workflow build MANUAL (workflow_dispatch): tidak ada build otomatis saat push.
 - Tanpa flash/sentuh perangkat tanpa izin.
 - Satu tugas = satu tujuan. Verifikasi tiap langkah (L1 = bukti konkret).
 - L2 wajib sebelum menyebut selesai; tanpa L2 status tetap "tunggu HP test".
+- Apply tidak pernah diklaim sukses tanpa write → read-back → verify
+  (APPLIED / SKIPPED / FALLBACK / FAILED).
 - Tanpa secret di repo. Tanpa force push.
+- Nomor step + status di PLAN.md, STATUS.md, PRIORITY_QUEUE.md,
+  ROADMAP_10_10.md harus SELALU sama — bila tidak sama, yang salah adalah
+  file yang tidak diupdate, bukan rencana.
