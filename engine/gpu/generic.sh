@@ -40,7 +40,7 @@ hsin_gpu_generic_apply() {
     if [ "$_pct" -lt 100 ]; then
         [ -n "$_max" ] && _target_max=$(hsin_opp_cap_pick "$((_max * _pct / 100))" "$_avail")
     fi
-    [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati, governor tetap"
+    [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati (hasil governor ikut baris hasil di bawah)"
     _ok=0; _fail=0
     if [ -n "$_target_max" ] && [ -w "$_d/max_freq" ]; then
         if hsin_node_write_verify "$_d/max_freq" "$_target_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
@@ -52,7 +52,7 @@ hsin_gpu_generic_apply() {
         if hsin_node_write_verify "$_d/governor" "$_gov"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
     fi
     if [ "$_ok" -gt 0 ]; then
-        echo "    GPU node $(basename "$_d"): profile=$_profile max=$_target_max gov=${_gov:-unchanged} ok=$_ok fail=$_fail"
+        echo "    GPU node $(basename "$_d"): profile=$_profile max=${_target_max:-unchanged} gov=${_gov:-unchanged} ok=$_ok fail=$_fail"
         return 0
     fi
     echo "    SKIP: GPU node $(basename "$_d") has no writable supported controls"
