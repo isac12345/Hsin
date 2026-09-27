@@ -111,3 +111,7 @@
   (aa719a7); proc langkah-1 network via $HSIN_PROC (f4ac85c, tuning
   utuh). Bukti: bash-n, shellcheck 0, sandbox (bbr/tfo/sysctl/state),
   /proc 95→73. Antrean: proc batch-2 per area + L2 HP.
+
+- PROC-2 (2026-09-27, leader langsung): core/detector.sh via
+  $HSIN_PROC (a620ea5, deteksi utuh). Bukti: bash-n OK, shellcheck
+  0, sandbox 5 fungsi. /proc 73→55. Antrean: proc batch-3 + L2 HP.
