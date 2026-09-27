@@ -114,6 +114,13 @@ hsin_debug() {
 # worth breaking anything over). Re-uses the same tag every time so repeat
 # notifications replace each other instead of stacking up.
 hsin_notify() {
+    # Gate sandbox: saat modul dijalankan di Termux untuk uji (prefix sysfs
+    # palsu), command di bawah benar-benar menyentuh HP sungguhan - `cmd
+    # notification post` memunculkan notifikasi, `su -lp 2000` memicu root.
+    # HSIN_SANDBOX=1 mematikan semua itu tanpa mengubah perilaku di HP.
+    case "${HSIN_SANDBOX:-}" in
+        1|true|yes) return 0 ;;
+    esac
     _title="$1"
     _text="$2"
     command -v cmd >/dev/null 2>&1 || return 0
