@@ -58,6 +58,9 @@ class KnobsFragment : Fragment() {
             try {
                 val r = repo.knobs()
                 knobs = r
+                if (r.profiles.isEmpty() && r.cpu.policies.isEmpty() && r.gpu.nodes.isEmpty()) {
+                    toast("Tidak ada knob terdeteksi di device ini (scan kosong)")
+                }
                 profile = r.profiles.firstOrNull { it == "balanced" } ?: r.profiles.firstOrNull() ?: "balanced"
                 render()
             } catch (t: Throwable) {
