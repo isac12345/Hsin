@@ -52,16 +52,17 @@
 - Keputusan: (a) Gradle sendiri + Kotlin (bukan decompile Alpha); (b) webroot DIHAPUS; (c) paket com.hsin.
 - [x] Sisi-modul kontrak siap: `action.sh knobs` → 1 baris JSON inventaris SEMUA tweak + nilai tersedia di device (bb50517).
 - [x] Webroot dihapus, notif_icon → assets/, branding/logo+bg → branding/ (65c6538).
-- [ ] Scaffold Gradle project: app/ (source), branding/ (aset), build.gradle.kts, manifest, Material 3 theme.
-- [ ] RootExec layer (su -c, stdout capture, timeout 20s, quoting aman — port Alpha RootExecutor + stdout).
-- [ ] Repository: panggil action.sh (knobs/status/device/apply/config-set/logs).
-- [ ] Layar 1 (Status live): device info + JSON status, pull-to-refresh.
-- [ ] Layar 2 (Knobs): baca `knobs`, render daftar dinamis (CPU gov/freq, GPU gov/OPP, zram algo, IO scheduler, TCP CC, RR Hz, renderer, ds%, game mode, extreme opt-in). Draft lokal, 1 tombol Apply → config-set* lalu apply.
-- [ ] Layar 3 (Logs): boot/apply/rollback/error.
-- [ ] Extreme opt-in switch (ALLOW_EXTREME) + game list (game-add/remove).
-- [ ] Backup/Restore screen.
+- [x] Scaffold Gradle project: app/ (source), branding/ (aset), build.gradle.kts, manifest, Material 3 theme (7a0402a).
+- [x] RootExec layer (su -c, stdout capture, timeout 20s, quoting aman — port Alpha RootExecutor + stdout).
+- [x] Repository: panggil action.sh (knobs/status/device/apply/config-set/logs).
+- [x] Layar 1 (Status live): device info + JSON status, pull-to-refresh.
+- [x] Layar 2 (Knobs): baca `knobs`, render daftar dinamis (CPU gov/freq, GPU gov/OPP, zram algo, IO scheduler, TCP CC, RR Hz, renderer, ds%, game mode, extreme opt-in). Draft lokal, 1 tombol Apply → config-set* lalu apply.
+- [x] Layar 3 (Logs): boot/apply/rollback/error.
+- [ ] Extreme opt-in switch (ALLOW_EXTREME) + game list (game-add/remove) — UI ada, backend repo method siap.
+- [ ] Backup/Restore screen — repo method siap, UI minimal.
 - [ ] CI workflow DISABLED dulu (user: "jangan build") — nanti perintah user.
 - [ ] Bump module.prop versionCode + bin/hsin HSIN_VERSION sebelum build.
+- [ ] Polish UI: warna ekstrakt dari logo, ikon adaptive, animasi, validasi draft.
 
 ## Aturan
 - Tanpa build/zip/flash sampai user bilang.
