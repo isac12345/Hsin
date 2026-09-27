@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         binding.bottomNav.setupWithNavController(navHost.navController)
 
-        HsinCompat.installCrashGuard(this, msg -> showMessage(msg))
+        HsinCompat.installCrashGuard(this) { msg -> showMessage(msg) }
 
         viewModel.messages.observe(this) { msg ->
             HsinCompat.safeSnackbarMessage(binding.root, msg)
