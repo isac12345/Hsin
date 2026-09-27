@@ -326,6 +326,22 @@
 - Sisa 32: action.sh 14 (kode ~9), imgtec 6, validator 2, scheduler 2,
   governor 3, export/scan_cache/detector2 sisanya komentar.
 
+## Proc batch-4 + PENUTUP #14 (2026-09-27, leader langsung)
+- Isi (f174dcc, 5 file +33/-23): action.sh 9 situs (device-tree,
+  meminfo x2 blok, loadavg, uptime) + engine/{gpu/imgtec,gpu/validator,
+  cpu/scheduler,cpu/governor}.sh → guard HSIN_PROC + swap prefix.
+- Bukti (kuat, end-to-end): bash-n 5/5, shellcheck 0 baru (SC2154
+  action.sh:772 + SC2043 governor:31 terbukti pre-existing via
+  `git show HEAD:f`), sandbox prefix palsu:
+  * `action.sh status` JSON nyata: ram_total=8000000, ram_used=4000000,
+    uptime=98765, cpu_load_x100=235 (2.35) — 4 nilai palsu mengalir.
+  * `hsin_action_device_info`: soc="Unisoc,T615", ram_kb=8000000.
+  * scheduler: resolve+capture+apply performance → latency 24000000→70%
+    =16800000, wakeup floor 500000, 0 WARNING (tuning identik).
+- HASIL: literal /proc 95→0 EKSEKUTABLE. Sisa 9 = 100% komentar
+  (action.sh 4, scan_cache 2, detect memory 1, cpu/scheduler 1).
+  #14 SELESAI (L1) — semua jalur /proc kini sandboxable.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
