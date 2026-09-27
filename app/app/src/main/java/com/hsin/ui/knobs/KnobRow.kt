@@ -22,7 +22,7 @@ sealed interface KnobRow {
     }
 
     data class Choice(
-        val id: String,
+        override val id: String,
         val title: String,
         val options: List<String>,
         val selectedIndex: Int,
@@ -32,7 +32,7 @@ sealed interface KnobRow {
     ) : KnobRow
 
     data class Toggle(
-        val id: String,
+        override val id: String,
         val title: String,
         val checked: Boolean,
         val enabled: Boolean = true,
