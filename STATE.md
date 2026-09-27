@@ -87,3 +87,8 @@
   Bukti: bash-n OK, shellcheck 0, red-green (lama kosong+basi,
   baru hot/normal/panic benar). Worktree/branch basi
   work/zram-precheck dibersihkan. Antrean: #8 scheduler-log.
+
+- FIX8-SCHEDLOG (2026-09-27, leader langsung, 1 baris): log cpuset
+  BIG pakai $HSIN_CPU_BIG bukan $_cpus basi (3034cf4, 1+-1-).
+  Bukti: bash-n OK, shellcheck 0, demo red-green. IO scheduler
+  bersih. Antrean: #9 dead-code/no-op.

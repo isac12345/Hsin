@@ -231,6 +231,18 @@
 - Sisa cabang basi work/zram-precheck (varian helper c78cb22, diganti
   78742cc saat task cancel) dibersihkan (worktree remove + branch -D).
 
+## Fix scheduler-log #8 (2026-09-27, leader langsung, 1 baris)
+- Bug: engine/cpu/scheduler.sh:97 log
+  `top-app/foreground -> BIG ($_cpus)` padahal `$_cpus` tak pernah
+  di-set di `hsin_cpu_cpuset_apply` (hanya var loop di
+  `hsin_cpu_topo_detect`) → log cetak kosong/sisa basi policy
+  terakhir (bisa LITTLE), sementara tulis aktual pakai $HSIN_CPU_BIG.
+- Isi (3034cf4, 1 file 1+-1-): log pakai `($HSIN_CPU_BIG)`.
+  IO scheduler (engine/io/scheduler.sh) dicek bersih ($_name/$_ok/
+  $_skip semua ter-set).
+- Bukti: bash-n OK, shellcheck 0, demo (basi LITTLE vs BIG benar),
+  sisa `$_cpus` di file hanya di dalam topo_detect (sah).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
