@@ -24,6 +24,7 @@ exec 2>>"$HSIN_DEBUG_LOG"
 . "$HSIN_MODULE_PATH/core/profile_loader.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/policy_engine.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/state_manager.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/knobs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/protect.sh" 2>/dev/null
 if ! command -v hsin_protect_watermark >/dev/null 2>&1; then
     echo "ERROR: core/protect.sh missing or tampered - refusing to run"
@@ -1237,6 +1238,9 @@ _main() {
             ;;
         config-set)
             hsin_action_config_set "$1" "$2"
+            ;;
+        knobs)
+            hsin_knobs_json
             ;;
         renderer-apply)
             . "$HSIN_MODULE_PATH/engine/render/renderer.sh" 2>/dev/null
