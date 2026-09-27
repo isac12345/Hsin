@@ -305,6 +305,20 @@ hsin_scan_write() {
     case "$HSIN_SCAN_TS" in ''|*[!0-9]*) HSIN_SCAN_TS=0 ;; esac
     HSIN_SCAN_OK=1
 
+    # Cache yang benar-benar kosong TIDAK boleh dikommit. Begitu ditulis,
+    # file itu dianggap sah sampai TTL habis atau reboot, dan pembaca
+    # (termasuk apply) lalu memakai 0 policy + 0 zona sebagai fakta -
+    # artinya hsin_thermal_read() dan hsin_cpu_safety_temp() membaca nol
+    # lalu menganggap device "cool", bukan jatuh ke scan live. Scan kosong
+    # terjadi di dunia nyata (sysfs belum naik saat boot, permission,
+    # mount telat), jadi lebih aman membiarkan cache kosong tidak
+    # tertulis sama sekali. Device yang memang tidak punya zona termal
+    # tetap aman: yang dilarang hanya cache kosong, bukan device tanpa zona.
+    if [ -z "$HSIN_SCAN_CPU_POLICIES$HSIN_SCAN_THERMAL_ZONES$HSIN_SCAN_DEVFREQ_NODES" ]; then
+        hsin_scan_log "scan kosong (tanpa policy/zona/devfreq) - cache TIDAK ditulis, pembaca tetap scan live"
+        return 1
+    fi
+
     _sw_tmp="$HSIN_SCAN_CACHE_FILE.tmp.$$"
     {
         echo "SCAN_VERSION=$HSIN_SCAN_VERSION"
@@ -404,6 +418,10 @@ hsin_scan_cache_load() {
     [ "$_sl_have_zones" = "1" ] || return 1
     [ "$_sl_have_policies" = "1" ] || return 1
     [ "$_sl_have_devfreq" = "1" ] || return 1
+    # Key boleh ada tapi nilainya kosong - itu cache dari scan yang gagal,
+    # dan menerimanya membuat thermal/CPU safety buta (lihat gate tulis di
+    # hsin_scan_write). Fallback ke scan live selalu lebih aman.
+    [ -n "$_sl_cpu_policies$_sl_zones$_sl_devfreq_nodes" ] || return 1
 
     # boot_id beda = cache dari boot sebelumnya (atau device lain).
     if [ -n "$_sl_boot" ]; then
