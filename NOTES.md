@@ -284,6 +284,28 @@
   (regresi nihil). /tmp read-only di Termux ini → scratch pakai
   /usr/tmp/opencode (pelajaran alat).
 
+## Sisa audit 2F (2026-09-27, leader, verifikasi + batch-1)
+- #10 DEVFRES false-positive TERKONFIRMASI: ejaan tunggal, definisi
+  detector.sh:31 + set :38/:44/:53, baca :124/:159 + dvfs.sh:110/:210
+  (4 situs baca, konsisten) → tanpa fix.
+- #11 safety export mati: safety.sh:71 `export HSIN_CPU_SAFETY_TEMP`
+  tanpa pembaca (0 rujukan di luar file; baris 38-39 reset tiap
+  source; READY tak ikut export) → hapus 1 baris (aa719a7, nol perilaku).
+- #12 `| while` benign TERKONFIRMASI: detect.sh:257/:263 print-only
+  (tak ada state keluar loop) → tanpa fix. (zram apply sudah heredoc
+  sejak dulu, state :208 print-only.)
+- #13 komentar disksize salah: zram.sh:22 klaim HSIN menulis
+  comp_algorithm/disksize — grep buktikan disksize TAK PERNAH ditulis
+  (semua situs read) → komentar diluruskan (aa719a7).
+- #14 /proc bertahap LANGKAH-1 (f4ac85c): engine/network/tcp.sh 21 +
+  network_manager.sh 1 → `$HSIN_PROC` (pola mem, default /proc),
+  tuning UTUH (hanya swap prefix, 22 baris).
+- Bukti langkah-1: bash-n 2/2, shellcheck 0, sandbox prefix palsu
+  (perf→bbr, tfo→3, backlog 16384/1000, ecn 1/0, state cocok),
+  default /proc graceful (rc=1/0 tanpa crash), literal /proc 95→73.
+  Sisa ±73 di 14 file (detector/capability/action/imgtec/governor/
+  backup/dll) → batch berikut per area.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
@@ -292,3 +314,7 @@
 - Threshold thermal: high < critical, jangan samakan.
 - Fungsi set-global + `$( )` = hasil hilang 2x (tangkapan kosong + induk
   basi). Panggil langsung lalu baca global (pelajaran fix #7).
+- Var shell tak ter-export tak terlihat di `sh -c` (harness sempat salah
+  baca, kode benar) — export dulu atau hardcode path di uji sandbox.
+- Cek warning shellcheck file ASLI via `git show HEAD:f` (tanpa stash —
+  stash-pop pernah lepas staging).
