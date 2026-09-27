@@ -135,3 +135,13 @@
   scan mati di ZIP release), 6f494f6 refresh_hz salah baca bentuk `=`,
   30c1fbb cache KOSONG diterima sah -> thermal/safety buta (paling serius).
   Semua push DONE. Antrean: L2 HP + rencana app (Tahap 3).
+
+- APP-SCAFFOLD (2026-09-27, leader inline): app/ Gradle+Kotlin scaffold
+  (7a0402a, 52 file). RootExec (su -c + stdout capture + timeout + safe
+  quoting), HsinRepository (knobs/status/device/apply/config-set/logs),
+  MainActivity 3-tab (Status/Knobs/Logs), KnobsFragment (dynamic
+  RecyclerView dari `action.sh knobs` + draft + Apply), StatusFragment
+  (pull-to-refresh live status + device info), LogsFragment (spinner
+  log type). Material 3 theme, viewBinding, kotlinx.serialization, icon
+  dari branding/logo.png. Push DONE. Antrean: Extreme opt-in UI + game
+  list UI + Backup/Restore UI + polish + L2 HP.
