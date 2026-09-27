@@ -88,7 +88,7 @@ object KnobsRowBuilder {
             out += KnobRow.Choice(
                 id = "tcp_cc",
                 title = "TCP congestion control",
-                options = r.network.tcp_cc,
+                options = r.network.tcpCc,
                 selectedIndex = 0
             )
             val tfo = r.network.tfo
@@ -105,12 +105,12 @@ object KnobsRowBuilder {
 
         if (r.display.supported) {
             out += KnobRow.Header("Layar")
-            if (r.display.modes_hz.isNotEmpty()) {
+            if (r.display.modesHz.isNotEmpty()) {
                 out += KnobRow.Choice(
                     id = "REFRESH_LOCK_HZ",
                     title = "Kunci refresh rate",
-                    options = r.display.modes_hz.map { "$it Hz" },
-                    selectedIndex = r.display.modes_hz.indexOfFirst { "$it Hz" == "${r.display.cur_hz} Hz" }
+                    options = r.display.modesHz.map { "$it Hz" },
+                    selectedIndex = r.display.modesHz.indexOfFirst { "$it Hz" == "${r.display.curHz} Hz" }
                         .coerceAtLeast(0),
                     sink = KnobRow.Sink.CONFIG
                 )
@@ -120,7 +120,7 @@ object KnobsRowBuilder {
                     id = "RENDERER",
                     title = "Renderer HWUI",
                     options = r.display.renderers,
-                    selectedIndex = r.display.renderers.indexOf(r.display.cur_renderer).coerceAtLeast(0),
+                    selectedIndex = r.display.renderers.indexOf(r.display.curRenderer).coerceAtLeast(0),
                     sink = KnobRow.Sink.CONFIG
                 )
             }

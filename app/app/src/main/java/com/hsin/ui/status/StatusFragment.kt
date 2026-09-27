@@ -47,7 +47,8 @@ class StatusFragment : Fragment() {
                     tvDeviceId.text = "ID: ${d.deviceId.ifBlank { "?" }}"
 
                     tvCpuTemp.text = "CPU: ${s.cpuTemp / 1000}°C"
-                    tvGpuTemp.text = "GPU: ${s.gpuTemp / 1000}°C"                    tvCpuFreq.text = "CPU now: ${s.cpuFreq / 1000} MHz (plafon ${s.cpuMaxKhz / 1000} MHz)"
+                    tvGpuTemp.text = "GPU: ${s.gpuTemp / 1000}°C"
+                    tvCpuFreq.text = "CPU now: ${s.cpuFreq / 1000} MHz (plafon ${s.cpuMaxKhz / 1000} MHz)"
                     tvCpuFreqBig.text = "Big: ${s.cpuFreqBig / 1000} MHz"
                     tvCpuFreqLittle.text = "Little: ${s.cpuFreqLittle / 1000} MHz"
                     tvGpuFreq.text = "GPU: ${s.gpuFreq / 1000} MHz (plafon ${s.gpuMaxKhz / 1000} MHz)"
