@@ -79,10 +79,11 @@ _clean_stage() {
     _runtime="$_stage/core/runtime.sh"
     : > "$_runtime"
     for _src in \
-        core/sysfs.sh core/logger.sh core/validator.sh core/profile_loader.sh \
+        core/sysfs.sh core/scan_cache.sh core/logger.sh core/validator.sh core/profile_loader.sh \
         core/state_manager.sh core/protect.sh core/backup.sh core/policy_engine.sh \
         core/detector.sh core/hardware.sh core/capability.sh core/capability_scan.sh \
         core/root_check.sh core/rollback.sh core/doctor.sh core/export.sh \
+        core/knobs.sh \
         engine/cpu/detect.sh engine/cpu/governor.sh engine/cpu/frequency.sh \
         engine/cpu/scheduler.sh engine/cpu/safety.sh engine/cpu/apply.sh \
         engine/gpu/detector.sh engine/gpu/generic.sh \
