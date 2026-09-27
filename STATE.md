@@ -92,3 +92,8 @@
   BIG pakai $HSIN_CPU_BIG bukan $_cpus basi (3034cf4, 1+-1-).
   Bukti: bash-n OK, shellcheck 0, demo red-green. IO scheduler
   bersih. Antrean: #9 dead-code/no-op.
+
+- FIX9-DEADCODE (2026-09-27, leader langsung): HAPUS devfreq.sh
+  (0 pemanggil, diganti generic.sh) + stub hsin_thermal_apply_sched
+  no-op (e8864a1, -158/+1). Bukti: bash-n OK, grep sisa 0,
+  SC2115 pre-existing di luar scope. Antrean: #10 generic-msg.
