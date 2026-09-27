@@ -67,12 +67,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hsin-${{ inputs.variant }}-apk
-          path: app/build/outputs/apk/*/*.apk
+          path: app/app/build/outputs/apk/*/*.apk
           if-no-files-found: error
 
       - name: Ringkasan
         run: |
           {
             echo "### APK Output"
-            ls -la app/build/outputs/apk/*/*.apk || true
+            ls -la app/app/build/outputs/apk/*/*.apk || true
           } >> "$GITHUB_STEP_SUMMARY"
