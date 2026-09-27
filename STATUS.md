@@ -69,13 +69,13 @@ PHASE 5: QA, Release & Maintenance         [░░░░░░░░░░] 0% �
   - Status: PENDING
   - Commit: `refactor: comprehensive device detection`
 
-- [x] **Task 1.2.2** — Create `capability/device_overrides.json`
+- [ ] **Task 1.2.2** — Create `capability/device_overrides.json`
   - Structure: unisoc_t615, snapdragon_888, dimensity_9200, exynos_1280
   - Per-device: gpu_freq_max_percent (battery/balanced/performance/extreme)
   - Per-device: thermal_safe_mode flag
   - Acceptance: Valid JSON, 4+ device profiles
-  - Status: DONE (2026-09-27; 6 entries incl. powervr/xclipse fallback; json.tool + assertion 4 profil/4 field/headroom 70-95 OK)
-  - Commit: `feat: device-specific override profiles`
+  - Status: PENDING (direvert 2026-09-27 via 36d2256 — device_overrides.json keyed by nama chipset, diganti jadi capability-signature-based)
+  - Commit: `feat: device-specific override profiles` (direvert)
 
 - [ ] **Task 1.2.3** — Create `capability/thermal_safety.json`
   - Structure: gpu, cpu, soc zones
