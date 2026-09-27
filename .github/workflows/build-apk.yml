@@ -36,8 +36,11 @@ jobs:
       # dan pasang paket yang memangNeeded secara eksplisit.
       - name: Setup Android SDK
         run: |
+          # sdkmanager tidak ada di PATH default runner; ada di cmdline-tools.
+          for _d in "$ANDROID_HOME"/cmdline-tools/*/bin; do
+            [ -d "$_d" ] && echo "$_d" >> "$GITHUB_PATH"
+          done
           echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME" || true
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
