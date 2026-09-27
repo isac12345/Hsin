@@ -255,6 +255,12 @@
   (loop /proc/*/sched kosong, hot/nothing) → hapus 19 baris.
 - Isi (e8864a1, -158/+1): git rm devfreq.sh + 1 baris daftar kemas +
   hapus stub.
+- Koreksi proses (jujur): siklus `stash`/`pop` saat cek SC2115
+  melepas staging hapusan devfreq.sh → e8864a1 hanya berisi 2 file,
+  devfreq.sh baru ter-commit di susulan 157be9a (-136). PELAJARAN:
+  habis stash-pop WAJIB cek `git status` + isi commit (`show
+  --stat`) sebelum push; `git add <file>` eksplisit bisa
+  meninggalkan hapusan tak ter-stage (pakai `git add -A` + verifikasi).
 - Bukti: bash-n policy+build OK; grep sisa (devfreq_apply/freq/state,
   apply_sched, gpu/devfreq.sh) = 0 di luar NOTES; satu-satunya
   shellcheck warning (SC2115 rm -rf:115) pre-existing di file asli,
