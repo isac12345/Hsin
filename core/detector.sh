@@ -8,6 +8,8 @@ HSIN_DATA_DEVICE="$HSIN_DATA/device.json"
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
 # /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
 [ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
+[ -n "$HSIN_SYSFS_CPU" ] || HSIN_SYSFS_CPU="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
+[ -n "$HSIN_SYSFS_THERMAL" ] || HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 HSIN_DATA_DEVICE_TXT="$HSIN_DATA/device.txt"
 
 # Helper: cek file exist + readable + writable
@@ -112,12 +114,22 @@ detect_gpu_vendor() {
             esac
         done 2>/dev/null
     fi
+    # 7. Xclipse via device-tree compatible (STEP4)
+    if [ -z "$_gpu" ]; then
+        if [ -f "$HSIN_PROC/device-tree/compatible" ]; then
+            _compat=$(tr -d '\0' < "$HSIN_PROC/device-tree/compatible" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+            case "$_compat" in
+                *xclipse*) _gpu="xclipse" ;;
+            esac
+        fi
+    fi
     [ -z "$_gpu" ] && _gpu="unknown"
     # Normalize vendor
     case "$(echo "$_gpu" | tr '[:upper:]' '[:lower:]')" in
         *mali*) echo "mali" ;;
         *adreno*) echo "adreno" ;;
         *powervr*) echo "powervr" ;;
+        *xclipse*) echo "xclipse" ;;
         *tegra*) echo "tegra" ;;
         *) echo "$_gpu" ;;
     esac
@@ -190,19 +202,195 @@ detect_zram() {
 }
 
 # Thermal zones
+# STEP4: set global THERMAL_PATH (sandboxable via HSIN_SYSFS_THERMAL)
 detect_thermal_zones() {
     _count=0
     _writable=0
-    for z in /sys/class/thermal/thermal_zone*; do
+    THERMAL_PATH=""
+    _thermal_base="${HSIN_SYSFS_THERMAL:-/sys/class/thermal}"
+    _first_zone_path=""
+    for z in $_thermal_base/thermal_zone*; do
         [ -d "$z" ] || continue
+        [ -n "$_first_zone_path" ] || _first_zone_path="$z/temp"
         _count=$((_count + 1)) 2>/dev/null
         _m=$(cat "$z/mode" 2>/dev/null)
         # enabled mode = writable override
         if [ "$_m" = "enabled" ]; then
             _writable=$((_writable + 1)) 2>/dev/null
         fi
+        # Cari zone pertama yang tipenya cocok
+        if [ -z "$THERMAL_PATH" ]; then
+            _type_str=""
+            [ -f "$z/type" ] && _type_str=$(cat "$z/type" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+            case "$_type_str" in
+                *gpu*|*soc*|*tsens*|*cpu*)
+                    THERMAL_PATH="$z/temp"
+                    ;;
+            esac
+        fi
     done 2>/dev/null
+    # Fallback: zone pertama yang ada
+    if [ -z "$THERMAL_PATH" ] && [ -n "$_first_zone_path" ]; then
+        THERMAL_PATH="$_first_zone_path"
+    fi
     echo "$_count|$_writable"
+    # Global tetap tersedia di luar fungsi (shell non-local)
+}
+
+# STEP4: Vendor-specific SoC detection (sandboxable getprop)
+# Helper getprop aman (hasil kosong, rc 0 bila perintah hilang)
+_getprop_safe() {
+    getprop "$1" 2>/dev/null || echo ""
+}
+
+# 1. Qualcomm
+detect_qualcomm() {
+    _model=$(getprop ro.soc.model 2>/dev/null || echo "")
+    case "$_model" in
+        *[Ss][Mm]*|*[Ss][Dd]*|*[Mm][Ss][Mm]*)
+            [ -n "$_model" ] || _model=$(getprop ro.board.platform 2>/dev/null || echo "")
+            ;;
+    esac
+    if [ -z "$_model" ]; then
+        _model=$(getprop ro.board.platform 2>/dev/null || echo "")
+    fi
+    case "$_model" in
+        *[Ss][Mm][0-9]*|*[Ss][Dd][0-9]*|*[Mm][Ss][Mm]*|*[Qq][Cc][Oo][Mm]*|*snapdragon*)
+            SOC_VENDOR="QUALCOMM"
+            SOC_MODEL="$_model"
+            GPU_VENDOR="ADRENO"
+            return 0
+            ;;
+    esac
+    _bp=$(getprop ro.board.platform 2>/dev/null || echo "")
+    case "$_bp" in
+        *[Qq][Cc][Oo][Mm]*|*msm*|*snapdragon*)
+            SOC_VENDOR="QUALCOMM"
+            SOC_MODEL="$_bp"
+            GPU_VENDOR="ADRENO"
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 2. MediaTek
+detect_mediatek() {
+    _model=$(getprop ro.soc.model 2>/dev/null || echo "")
+    _platform=$(getprop ro.vendor.mediatek.platform 2>/dev/null || echo "")
+    _lib=$(getprop ro.vendor.extension_library 2>/dev/null || echo "")
+    # Urutan model: ro.soc.model → ro.vendor.mediatek.platform → lib (terakhir)
+    SOC_MODEL="$_model"
+    [ -n "$SOC_MODEL" ] || SOC_MODEL="$_platform"
+    [ -n "$SOC_MODEL" ] || SOC_MODEL="$_lib"
+    case "$_model$_platform$_lib" in
+        *[Mm][Tt][Kk]*|*[Ll][Ii][Bb][Mm][Tt]*|*mediatek*|*mt[0-9]*)
+            SOC_VENDOR="MEDIATEK"
+            [ -n "$SOC_MODEL" ] || SOC_MODEL="$_lib"
+            GPU_VENDOR="MALI"
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 3. Exynos
+detect_exynos() {
+    _fp=$(getprop ro.vendor.fingerprint 2>/dev/null || echo "")
+    _model=$(getprop ro.soc.model 2>/dev/null || echo "")
+    _bp=$(getprop ro.board.platform 2>/dev/null || echo "")
+    case "$_fp$_model$_bp" in
+        *[Ss][Aa][Mm][Ss][Uu][Nn][Gg]*|*[Ee][Xx][Yy][Nn][Oo][Ss]*|*[Ee][Rr][Dd]*|*[Ss]5[Ee]*|*[Uu][Nn][Ii][Vv][Ee][Rr][Ss][Aa][Ll]*|*samsung*)
+            SOC_VENDOR="EXYNOS"
+            SOC_MODEL="$_model"
+            [ -n "$SOC_MODEL" ] || SOC_MODEL="$_bp"
+            [ -n "$SOC_MODEL" ] || SOC_MODEL="$_fp"
+            # Cek Xclipse via compatible
+            if [ -f "$HSIN_PROC/device-tree/compatible" ]; then
+                _compat=$(tr -d '\0' < "$HSIN_PROC/device-tree/compatible" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+                case "$_compat" in
+                    *xclipse*) GPU_VENDOR="XCLIPSE" ;;
+                    *) GPU_VENDOR="MALI" ;;
+                esac
+            else
+                GPU_VENDOR="MALI"
+            fi
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 4. Unisoc
+detect_unisoc() {
+    _bp=$(getprop ro.board.platform 2>/dev/null || echo "")
+    case "$_bp" in
+        *[Uu][Mm][Ss]*|*[Uu][Nn][Ii][Ss][Oo][Cc]*|*[Ss][Pp][Rr][Dd]*|*spreadtrum*)
+            SOC_VENDOR="UNISOC"
+            SOC_MODEL="$_bp"
+            GPU_VENDOR="MALI"
+            return 0
+            ;;
+    esac
+    _model=$(getprop ro.soc.model 2>/dev/null || echo "")
+    case "$_model" in
+        *[Uu][Mm][Ss]*|*[Tt]6*|*[Tt]7*|*[Tt]8*|*unisoc*|*sprd*)
+            SOC_VENDOR="UNISOC"
+            SOC_MODEL="$_model"
+            GPU_VENDOR="MALI"
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+# 5. Apple
+detect_apple() {
+    if [ -f "$HSIN_PROC/device-tree/compatible" ]; then
+        _compat=$(tr -d '\0' < "$HSIN_PROC/device-tree/compatible" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        case "$_compat" in
+            *apple*)
+                SOC_VENDOR="APPLE"
+                SOC_MODEL="apple"
+                GPU_VENDOR="APPLE"
+                return 0
+                ;;
+        esac
+    fi
+    return 1
+}
+
+# 6. CPU policies
+detect_cpu_policies() {
+    CPU_POLICIES=""
+    _cpu_base="${HSIN_SYSFS_CPU:-/sys/devices/system/cpu}"
+    _policies=""
+    for p in $_cpu_base/cpufreq/policy*; do
+        [ -d "$p" ] || continue
+        _name=$(basename "$p")
+        case " $_policies " in
+            *" $_name "*) ;;
+            *) _policies="$_policies $_name" ;;
+        esac
+    done
+    # Trim leading space
+    CPU_POLICIES=$(echo "$_policies" | sed 's/^ *//')
+    if [ -z "$CPU_POLICIES" ]; then
+        CPU_POLICIES="policy0"
+    fi
+    echo "$CPU_POLICIES"
+}
+
+# 7. Cache detection
+cache_detection() {
+    mkdir -p "$HSIN_DATA" 2>/dev/null
+    {
+        echo "SOC_VENDOR=${SOC_VENDOR:-}"
+        echo "SOC_MODEL=${SOC_MODEL:-}"
+        echo "GPU_VENDOR=${GPU_VENDOR:-}"
+        echo "CPU_POLICIES=${CPU_POLICIES:-}"
+        echo "THERMAL_PATH=${THERMAL_PATH:-}"
+    } > "$HSIN_DATA/detected.conf"
 }
 
 # Block devices (storage) detection
@@ -283,10 +471,61 @@ hsin_detect_all() {
 
     _ram=$(detect_ram)
     _zram=$(detect_zram)
-    _thermal=$(detect_thermal_zones)
+    # Panggil thermal tanpa $(...) agar THERMAL_PATH global tetap
+    _thermal_tmp="${HSIN_DATA}/.thermal_tmp"
+    detect_thermal_zones > "$_thermal_tmp"
+    _thermal=$(cat "$_thermal_tmp" 2>/dev/null)
+    rm -f "$_thermal_tmp"
     _storage=$(detect_storage)
     _net=$(detect_network)
     _gpu_nodes=$(detect_gpu_nodes)
+
+    # STEP4: Deteksi vendor komprehensif (berhenti saat cocok)
+    # Tidak reset SOC_VENDOR/SOC_MODEL/GPU_VENDOR agar hasil vendor baru tetap
+    if detect_qualcomm; then
+        : # SOC_VENDOR/SOC_MODEL/GPU_VENDOR sudah ter-set
+    elif detect_mediatek; then
+        : # sudah ter-set
+    elif detect_exynos; then
+        : # sudah ter-set
+    elif detect_unisoc; then
+        : # sudah ter-set
+    elif detect_apple; then
+        : # sudah ter-set
+    fi
+    if [ -n "$SOC_VENDOR" ]; then
+        # Gunakan hasil vendor baru
+        case "$SOC_VENDOR" in
+            QUALCOMM) _vendor="qualcomm" ;;
+            MEDIATEK) _vendor="mediatek" ;;
+            EXYNOS) _vendor="exynos" ;;
+            UNISOC) _vendor="unisoc" ;;
+            APPLE) _vendor="apple" ;;
+            *) _vendor="unknown" ;;
+        esac
+        if [ -n "$SOC_MODEL" ]; then
+            _soc="$SOC_MODEL"
+        fi
+        if [ -n "$GPU_VENDOR" ]; then
+            _gpu="$GPU_VENDOR"
+        fi
+        hsin_log_info "detect" "STEP4 vendor: $SOC_VENDOR model=$SOC_MODEL gpu=$GPU_VENDOR"
+    else
+        # Fallback ke existing (tidak ubah baris existing)
+        # _soc, _vendor, _gpu sudah ada dari detect_soc/classify/gpu
+        SOC_MODEL="$_soc"
+        hsin_log_info "detect" "STEP4 fallback existing: vendor=$_vendor soc=$_soc"
+    fi
+
+    # STEP4: CPU policies + thermal path global
+    CPU_POLICIES=$(detect_cpu_policies)
+    # THERMAL_PATH sudah di-set oleh detect_thermal_zones() (dipanggil sebelumnya)
+    # Tapi kita pastikan ada fallback jika belum
+    [ -z "$THERMAL_PATH" ] && THERMAL_PATH=""
+
+    # STEP4: Cache detection
+    cache_detection
+    hsin_log_info "detect" "STEP4 detected.conf cached"
 
     # Tulis JSON sederhana (no escapes, semua string adalah identifier-safe)
     {
