@@ -1,70 +1,83 @@
-# PLAN.md — HSIN manual (modul dulu, tanpa build)
+# PLAN.md — HSIN manual (modul dulu, app)
 
 ## RENCANA BUAT USER (baca ini aja, bahasa simpel)
-- Target: HSIN manual/bebas setting, apply CEPAT (sekarang >15 dtk),
-  scan SEKALI-simpan (ganti setting tinggal cek cache, ga scan ulang).
-- Status: basis v5-beta1 sudah masuk repo (private). Belum ada yang
-  diubah isinya. Tanpa build/zip dulu.
-- Yang jalan otomatis (ga perlu kamu): implementasi cache + fix error
-  per tweak, kecil per commit, diverifikasi statis dulu (L1).
-- TUGAS KAMU (cuma 3, sesuai urutan):
-  1. [x] SELESAI (2026-09-26, leader cek su izin user): `date +%s%3N`
-     → 13 digit bersih, marker ms DIPERCAYA. HP Android 14, T615.
-  2. NANTI tiap fix L1 selesai: flash zip uji + apply manual 1x + kirim
-     baris `APPLY-TIME` dari `/data/adb/hsin/logs/debug.log` (itu bukti
-     cepat/lambatnya, bukan rasa).
-  3. PALING AKHIR: tes rasa (game adem/kenceng) = L2, bilang OK bila enak.
-- Urutan kerja saya: cache scan (1) → backup ganda→1 + safety/IO ramping
-  (2) → tulis+verify 1x (3) → error per tweak (4) → baru build bila kamu OK.
+- Target: HSIN manual/bebas setting, apply CEPAT (dulu >15 dtk), scan
+  SEKALI-simpan. Sekarang semua tweak/setting pindah ke APLICASI (webui
+  sudah dihapus).
+- Status: modul sudah dibetulkan TOTAL di sisi kode (14 temuan audit +
+  3 bug bonus review), semua L1. Aplikasi sudah ada skeletonnya (3 tab).
+  BELUM ada yang dijalankan di HP dan BELUM ada yang dikompilasi.
+- Yang jalan otomatis (ga perlu kamu): perbaikan kode modul + app,
+  kecil per commit, diverifikasi statis dulu (L1).
+- TUGAS KAMU (urutan):
+  1. [x] SELESAI (2026-09-26): `date +%s%3N` → 13 digit, marker ms
+     DIPERCAYA. HP Android 14, T615.
+  2. [ ] BUILD ZIP modul + APK lewat GitHub Actions (satu-satunya cara;
+     Termux ga bisa). Bilang "build" → saya trigger.
+  3. [ ] L2: flash zip, apply manual 1x, kirim baris `APPLY-TIME` dari
+     `/data/adb/hsin/logs/debug.log` (bukti cepat/lambat, bukan rasa).
+  4. [ ] L2.app: pasang APK, cek tiap tweak bisa dipilih + Apply berhasil.
+  5. [ ] PALING AKHIR: tes rasa (game adem/kenceng) = L2, bilang OK.
 
-## Tahap 0 — Inventarisasi + basis rakit (JALAN)
-- [x] Repo GitHub isac12345/Hsin dibuat + proyek lokal ~/Hsin.
-- [x] Kerangka AGENTS/NOTES/PLAN/STATE ditulis.
-- [x] Audit tiap varian di /sdcard/hsin (dev-modul, TERIMA L1 statis:
-  v4.2.5-consolidated + v4.2.6-fixed TERKONTAMINASI 9Router;
-  v4.2.7 bersih tapi Extreme no-op; v4_0 metadata salah v3.0).
-- [x] Pilih 1 basis rakit = hsin-dev v5.0.0-beta1 (0 dangling,
-  0 kontaminasi, shellcheck 0, vCode 5001).
-- [x] Impor basis ke repo sebagai commit awal rakit (c6e6957, 110 file,
-  tanpa build/, secret bersih, push DONE).
+## Tahap 0 — Inventarisasi + basis rakit (SELESAI)
+- [x] Repo GitHub isac12345/Hsin (private) + proyek lokal ~/Hsin.
+- [x] Audit 6 varian: v4.2.5-consolidated & v4.2.6-fixed TERKONTAMINASI
+  9Router, v4.2.7 bersih tapi Extreme no-op, v4_0 metadata salah.
+- [x] Basis = hsin-dev v5.0.0-beta1 (c6e6957, 110 file, tanpa build/).
 
-## Tahap 1 — Fix isi modul (BELUM, tanpa build)
-- [ ] Syarat user (2026-09-26, dikunci): apply sekarang >15 dtk → harus
-  singkat. Scan device gampang: scan SEMUA sekali lalu SIMPAN; ganti
-  freq CPU/GPU/gov/tweak lain tinggal cek hasil scan itu (support/ga).
-- [x] Ukur + peta scan (dev-modul, TERIMA: scan ulang tiap apply =
-  biang; desain cache scan_cache.env disetujui arahnya).
-- [x] Implementasi cache scan (langkah-1 DONE: core/scan_cache.sh +
-  thermal cache-first, merge ab92aa3, push, L1).
-- [ ] Langkah-2: fix policy-subshell (throttle no-op) + backup.sh ke
-  cache + engine lain (cpu/gpu/mem/io) ke cache, satu per tugas.
-- [ ] Tugas kamu-2 (L2): flash + apply + kirim APPLY-TIME (bukti cepat).
-- [ ] Daftar error per tweak + code + kompatibilitas device.
-- [ ] Fix satu per satu, kecil per commit (satu tujuan per tugas).
-- [ ] Verifikasi statis tiap fix (L1). Tanpa flash/build dulu.
+## Tahap 1 — Fix isi modul (KODE SELESAI, nunggu L2)
+- [x] Audit timing apply: biang = scan ulang tiap apply (>15 dtk).
+- [x] Cache scan `core/scan_cache.sh` (scan sekali, dipakai semua engine).
+- [x] Backup/safety/IO/CPU/GPU/mem/IO/DVFS ke cache-first.
+- [x] 14 temuan audit per tweak SELESAI (thermal-status, sched-log,
+  dead-code, generic-msg, OOM proteksi, zram, dvfs-verify, oom-verify,
+  zram-readback, precheck, kosmetik, /proc→HSIN_PROC 95→0).
+- [x] 3 bug bonus dari review: cache kosong tidak lagi dianggap sah
+  (dulu thermal+CPU safety bisa buta), scan_cache ikut runtime release
+  (dulu cache-scan mati di ZIP release), refresh_hz baca `=`.
+- [x] Kontrak untuk app: `action.sh knobs` (JSON inventaris semua tweak +
+  nilai yang benar-benar ada di device).
+- [x] Jalur tulis pilihan user: `knob-set` / `knob-reset` / `knob-list`
+  (override tervalidasi di $HSIN_DATA/user_knobs.env).
+- [ ] **Integrasi override ke jalur apply** (pilihan user benar-benar dipakai
+  saat apply) — SEDANG DIKERJAKAN, butuh L2 karena mengubah perilaku.
+- [ ] Bump versi: `module.prop` + `bin/hsin HSIN_VERSION` (wajib sebelum build).
+- [ ] L2: flash + apply + kirim APPLY-TIME.
 
-## Tahap 2 — Rakit final modul (BELUM, tunggu perintah build)
-- [ ] Struktur final + versioning (module.prop sumber tunggal).
-- [ ] Build/zip HANYA atas perintah user.
-- [ ] L2 = tes HP user.
+## Tahap 2 — Rakit final modul (menunggu perintah build)
+- [ ] Bump versi ke vCode baru + cek semua lokasi versi.
+- [ ] Build/zip HANYA lewat GitHub Actions (`.github/workflows/build-modul.yml`,
+      manual). Sudah ada; belum pernah dijalankan.
+- [ ] Verifikasi isi ZIP: `core/runtime.sh` punya cache-scan + override
+      (sudah otomatis dicek di workflow).
 
-## Tahap 3 — APK (MULAI 2026-09-27, keputusan user)
-- Keputusan: (a) Gradle sendiri + Kotlin (bukan decompile Alpha); (b) webroot DIHAPUS; (c) paket com.hsin.
-- [x] Sisi-modul kontrak siap: `action.sh knobs` → 1 baris JSON inventaris SEMUA tweak + nilai tersedia di device (bb50517).
-- [x] Webroot dihapus, notif_icon → assets/, branding/logo+bg → branding/ (65c6538).
-- [x] Scaffold Gradle project: app/ (source), branding/ (aset), build.gradle.kts, manifest, Material 3 theme (7a0402a).
-- [x] RootExec layer (su -c, stdout capture, timeout 20s, quoting aman — port Alpha RootExecutor + stdout).
-- [x] Repository: panggil action.sh (knobs/status/device/apply/config-set/logs).
-- [x] Layar 1 (Status live): device info + JSON status, pull-to-refresh.
-- [x] Layar 2 (Knobs): baca `knobs`, render daftar dinamis (CPU gov/freq, GPU gov/OPP, zram algo, IO scheduler, TCP CC, RR Hz, renderer, ds%, game mode, extreme opt-in). Draft lokal, 1 tombol Apply → config-set* lalu apply.
-- [x] Layar 3 (Logs): boot/apply/rollback/error.
-- [ ] Extreme opt-in switch (ALLOW_EXTREME) + game list (game-add/remove) — UI ada, backend repo method siap.
-- [ ] Backup/Restore screen — repo method siap, UI minimal.
-- [ ] CI workflow DISABLED dulu (user: "jangan build") — nanti perintah user.
-- [ ] Bump module.prop versionCode + bin/hsin HSIN_VERSION sebelum build.
-- [ ] Polish UI: warna ekstrakt dari logo, ikon adaptive, animasi, validasi draft.
+## Tahap 3 — Aplikasi (jalan, belum terverifikasi compile)
+- Keputusan user: (a) Gradle+Kotlin sendiri, (b) webui DIHAPUS, (c) paket com.hsin.
+- [x] Webroot dihapus; notif_icon → `assets/`; logo/banner/bg → `branding/`.
+- [x] `app/`: Gradle 8.7 + Kotlin 2.0 + AGP 8.6, Material 3, ViewBinding,
+      kotlinx.serialization, minSdk 26 / target 34.
+- [x] `RootExec`: `su -c` + stdout capture + timeout 20s + quoting POSIX.
+- [x] `HsinRepository`: knobs/status/device/knob-set/config-set/apply/logs/
+      backup/rollback; ambil baris JSON terakhir.
+- [x] 3 tab: Status (live + device), Knobs (dinamis dari `knobs`), Logs.
+- [x] Apply: knob-set* + config-set* → satu `apply <profil>`.
+- [x] Perbaikan scaffold yang tidak akan kompilasi: adapter baris datar,
+      signature ArrayAdapter, import decodeFromString, akses private,
+      manifest, layout, 0 TODO/placeholder, wrapper Gradle palsu dihapus.
+- [ ] **Compile verification** — hanya bisa lewat CI (`.github/workflows/
+      build-apk.yml`, manual). BELUM pernah dijalankan.
+- [ ] Extreme opt-in sudah ada sebagai switch ALLOW_EXTREME; perlu dipastikan
+      apply extreme memakai profil extreme (bukan balanced).
+- [ ] Game list (add/remove) — belum ada UI.
+- [ ] Backup/Rollback button — method sudah ada, UI belum.
+- [ ] Polish: mode gelap (values-night), ikon adaptive, animasi, ringkasan
+      draft sebelum Apply.
 
 ## Aturan
-- Tanpa build/zip/flash sampai user bilang.
-- Satu tugas = satu tujuan. Verifikasi tiap langkah.
+- **Build hanya lewat GitHub Actions** (perintah user 2026-09-27). Termux
+  tidak punya JDK/Android SDK → Termux = tulis source + verifikasi statis.
+- Workflow build MANUAL (workflow_dispatch): tidak ada build otomatis saat push.
+- Tanpa flash/sentuh perangkat tanpa izin.
+- Satu tugas = satu tujuan. Verifikasi tiap langkah (L1 = bukti konkret).
+- L2 wajib sebelum menyebut selesai; tanpa L2 status tetap "tunggu HP test".
 - Tanpa secret di repo. Tanpa force push.
