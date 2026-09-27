@@ -71,7 +71,7 @@ class KnobsAdapter(
         }
     }
 
-    class ChoiceHolder(view: View) : RecyclerView.ViewHolder(view) {
+    inner class ChoiceHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.tvKnobTitle)
         private val hint: TextView = view.findViewById(R.id.tvKnobHint)
         private val spinner: Spinner = view.findViewById(R.id.spnKnobValue)
@@ -110,7 +110,7 @@ class KnobsAdapter(
         }
     }
 
-    class ToggleHolder(view: View) : RecyclerView.ViewHolder(view) {
+    inner class ToggleHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.tvKnobTitle)
         private val hint: TextView = view.findViewById(R.id.tvKnobHint)
         private val toggle: CompoundButton = view.findViewById(R.id.swKnob)
