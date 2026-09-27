@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/safe_apply.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
 # shellcheck disable=SC1091
 . "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
@@ -41,10 +43,13 @@ hsin_io_apply_readahead() {
             loop*|ram*|zram*|dm-*) continue ;;
         esac
 
-        [ -f "$_b/queue/read_ahead_kb" ] || { _skip=$((_skip + 1)); continue; }
-        [ -w "$_b/queue/read_ahead_kb" ] || { _skip=$((_skip + 1)); continue; }
-
-        echo "$_ra" > "$_b/queue/read_ahead_kb" 2>/dev/null && _ok=$((_ok + 1)) || _skip=$((_skip + 1))
+        # Tulis via safe_apply gateway (Step 6): kategorisasi
+        # APPLIED/SKIPPED/FAILED + log per node, bukan echo buta.
+        hsin_safe_apply "$_b/queue/read_ahead_kb" "$_ra" "IO_READAHEAD"
+        case "$?" in
+            0) _ok=$((_ok + 1)) ;;
+            *) _skip=$((_skip + 1)) ;;
+        esac
     done
 
     echo "    Readahead [$_ra KB]: ok=$_ok skip=$_skip"
