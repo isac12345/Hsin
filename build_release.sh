@@ -85,7 +85,7 @@ _clean_stage() {
         core/root_check.sh core/rollback.sh core/doctor.sh core/export.sh \
         engine/cpu/detect.sh engine/cpu/governor.sh engine/cpu/frequency.sh \
         engine/cpu/scheduler.sh engine/cpu/safety.sh engine/cpu/apply.sh \
-        engine/gpu/detector.sh engine/gpu/generic.sh engine/gpu/devfreq.sh \
+        engine/gpu/detector.sh engine/gpu/generic.sh \
         engine/gpu/adreno.sh engine/gpu/mali.sh engine/gpu/imgtec.sh \
         engine/gpu/validator.sh engine/gpu/dvfs.sh engine/gpu/apply.sh \
         engine/thermal/detect.sh engine/thermal/monitor.sh engine/thermal/policy.sh \
