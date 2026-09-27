@@ -96,4 +96,6 @@
 - FIX9-DEADCODE (2026-09-27, leader langsung): HAPUS devfreq.sh
   (0 pemanggil, diganti generic.sh) + stub hsin_thermal_apply_sched
   no-op (e8864a1, -158/+1). Bukti: bash-n OK, grep sisa 0,
-  SC2115 pre-existing di luar scope. Antrean: #10 generic-msg.
+  SC2115 pre-existing di luar scope. Susulan 157be9a: hapusan
+  devfreq.sh lepas dari e8864a1 (staging lepas habis stash-pop),
+  ter-commit susulan, push DONE. Antrean: #10 generic-msg.
