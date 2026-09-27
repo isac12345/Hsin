@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.hsin.databinding.ActivityMainBinding
+import com.hsin.HsinCompat
 
 /**
  * Satu activity, tiga tab (Status / Knobs / Logs). App sengaja tidak
@@ -28,13 +29,11 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         binding.bottomNav.setupWithNavController(navHost.navController)
 
+        HsinCompat.installCrashGuard(this, msg -> showMessage(msg))
+
         viewModel.messages.observe(this) { msg ->
-            if (!msg.isNullOrBlank()) {
-                com.google.android.material.snackbar.Snackbar
-                    .make(binding.root, msg, com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
-                    .show()
-                viewModel.clearMessage()
-            }
+            HsinCompat.safeSnackbarMessage(binding.root, msg)
+            if (!msg.isNullOrBlank()) viewModel.clearMessage()
         }
     }
 
