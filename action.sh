@@ -629,11 +629,19 @@ hsin_action_live_status() {
         _refresh_hz="${_rr_cache_val:-0}"
     else
         _dump="$(dumpsys display 2>/dev/null)"
-        _r=$(printf '%s\n' "$_dump" | grep -o 'renderFrameRate [0-9.]*' | head -n 1 | awk '{print $2}' | cut -d. -f1)
+        # Bentuk field di dumpsys display berubah antar versi: yang dipakai
+        #HW lama "renderFrameRate 60.0", yang sekarang "renderFrameRate=60.0"
+        # (sama untuk refreshRateOverride). Pola lama hanya menerima spasi,
+        # jadi di dump bentuk '=' primary ini gagal dan jatuh ke fallback
+        # fps= yang mengambil mode PERTAMA di daftar, bukan mode aktif
+        # (mis. 60 padahal panel jalan 90). Pola di bawah menerima keduanya;
+        # label tidak mengandung angka, jadi sisanya cukup dibersihkan ke
+        # karakter angka/titik.
+        _r=$(printf '%s\n' "$_dump" | grep -o 'renderFrameRate[= ][0-9.]*' | head -n 1 | tr -cd '0-9.' | cut -d. -f1)
         [ -n "$_r" ] && [ "$_r" -gt 0 ] 2>/dev/null && _refresh_hz="$_r"
         if [ "$_refresh_hz" = "0" ]; then
-            _r=$(printf '%s\n' "$_dump" | grep -o 'refreshRateOverride [0-9.]*' | awk '{print $2}' | cut -d. -f1 | awk '$1>0{print;exit}')
-            [ -n "$_r" ] && _refresh_hz="$_r"
+            _r=$(printf '%s\n' "$_dump" | grep -o 'refreshRateOverride[= ][0-9.]*' | head -n 1 | tr -cd '0-9.' | cut -d. -f1)
+            [ -n "$_r" ] && [ "$_r" -gt 0 ] 2>/dev/null && _refresh_hz="$_r"
         fi
         if [ "$_refresh_hz" = "0" ]; then
             _r=$(printf '%s\n' "$_dump" | grep -o 'fps=[0-9.]*' | head -n 1 | cut -d= -f2 | cut -d. -f1)
