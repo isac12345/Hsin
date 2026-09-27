@@ -217,9 +217,25 @@
 - Bukti: bash-n OK, shellcheck 0, uji 5 kasus (4 readback + balanced
   `[zstd]`→zstd yang dulu jatuh lz4). Push DONE.
 
+## Fix thermal-status #7 (2026-09-27, leader langsung, ≤20 baris)
+- Bug: thermal_manager.sh 2 call site (`hsin_thermal_engine_manage` +
+  `monitor`) pakai `_status=$(hsin_thermal_classify ...)` padahal
+  fungsi itu tak echo apa-apa (hasil via global HSIN_THERMAL_STATE).
+  Akibat ganda: `_status` selalu kosong ("Current: 45°C ()") DAN
+  assignment global hilang di subshell (induk tetap nilai basi).
+  Pola benar (apply.sh/monitor.sh) = panggil lalu baca global.
+- Isi (e20a351, 1 file +4/-2): 2 site jadi `hsin_thermal_classify`
+  lalu `_status="$HSIN_THERMAL_STATE"`.
+- Bukti: bash-n OK, shellcheck 0, uji red-green (lama `[]`+STATE basi,
+  baru `[hot]`; cool→normal, panic→panic).
+- Sisa cabang basi work/zram-precheck (varian helper c78cb22, diganti
+  78742cc saat task cancel) dibersihkan (worktree remove + branch -D).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
 - Pola sed BRE: `\(` = grup, bukan kurung literal; `\n` di pola tak match.
 - Harness sandbox wajib set variabel gate profil atau false-pass.
 - Threshold thermal: high < critical, jangan samakan.
+- Fungsi set-global + `$( )` = hasil hilang 2x (tangkapan kosong + induk
+  basi). Panggil langsung lalu baca global (pelajaran fix #7).
