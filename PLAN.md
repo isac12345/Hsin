@@ -126,3 +126,16 @@
 - Nomor step + status di PLAN.md, STATUS.md, PRIORITY_QUEUE.md,
   ROADMAP_10_10.md harus SELALU sama — bila tidak sama, yang salah adalah
   file yang tidak diupdate, bukan rencana.
+
+## GIT SAFETY RULES (permanen, berlaku semua step — perintah user 2026-09-27)
+
+- DILARANG force-push (`--force`, `--force-with-lease`, atau varian apa pun)
+  atau `git commit --amend` pada commit yang SUDAH di-push, dalam kondisi
+  apa pun — termasuk untuk memperbaiki dokumentasi sendiri.
+  (Preseden pelanggaran: STATUS.md Step 6 diduplikat, diperbaiki via amend +
+  force-with-lease. Isinya benar, caranya salah.)
+- Kalau ada kesalahan di commit yang sudah di-push (typo, duplikat, data
+  salah), perbaiki dengan COMMIT BARU yang korektif (revert atau fix
+  commit), bukan menulis ulang history.
+- Aturan ini permanen untuk semua step selanjutnya, tidak hanya untuk
+  kasus STATUS.md kemarin.
