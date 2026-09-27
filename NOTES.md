@@ -600,3 +600,25 @@
   KOSONG -> combo HSIN-* tidak terhapus. Diperbaiki: pecah JSON per objek
   (`tr "{" "\n"`) lalu ambil id dari objek yang namanya cocok. Diuji dengan
   sample: id terbaca benar.
+
+## CI Build APK & Modul (2026-09-27, leader)
+- APK compile lolos di GitHub Actions (run #36296279179, 3m51s, artifact
+  `hsin-debug-apk`). Masalah compile yang difix:
+  1. Struktur gradle: reposisi `app/src` ke `app/app/src/` (AndroidManifest
+     hilang).
+  2. Resource duplicate: `hsin_surface_tint` didefinisikan 2x di colors.xml.
+  3. Material 3 attrs: `colorBackground` -> `android:colorBackground`,
+     `colorInverseSurface` -> `colorSurfaceInverse`, `colorInverseOnSurface`
+     -> `colorOnSurfaceInverse`, hapus `colorShadow`/`colorScrim`/`colorSurfaceTint`.
+  4. Kotlin type & scope: `KnobsAdapter` ViewHolder holder jadi `inner class`
+     (akses callback outer), camelCase model response `tcpCc`/`modesHz`/
+     `curHz`/`curRenderer`, newline di `StatusFragment.kt:50`, `override val id`
+     di `KnobRow.kt`, `toMutableMap()` di `KnobsFragment.kt`.
+  5. Workflow artifact path: `app/app/build/outputs/apk/*/*.apk`.
+- Modul ZIP build lolos (run #36296491773, 20s, artifact `hsin-modul-dev`).
+  Verifikasi `core/runtime.sh` berisi fungsi cache-scan + user-override
+  lulus otomatis.
+- PELAJARAN: Kompilasi Android via CI runner adalah verifikasi mutlak
+  saat lokal tidak punya SDK. Error compile diselesaikan sistematis dari
+  manifest -> resource -> Kotlin compilation -> packaging.
+

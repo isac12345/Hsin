@@ -12,8 +12,8 @@
 - TUGAS KAMU (urutan):
   1. [x] SELESAI (2026-09-26): `date +%s%3N` → 13 digit, marker ms
      DIPERCAYA. HP Android 14, T615.
-  2. [ ] BUILD ZIP modul + APK lewat GitHub Actions (satu-satunya cara;
-     Termux ga bisa). Bilang "build" → saya trigger.
+  2. [x] SELESAI (2026-09-27): BUILD ZIP modul + APK lewat GitHub Actions
+     berhasil (APK run #36296279179, Modul run #36296491773).
   3. [ ] L2: flash zip, apply manual 1x, kirim baris `APPLY-TIME` dari
      `/data/adb/hsin/logs/debug.log` (bukti cepat/lambat, bukan rasa).
   4. [ ] L2.app: pasang APK, cek tiap tweak bisa dipilih + Apply berhasil.
@@ -46,10 +46,10 @@
 
 ## Tahap 2 — Rakit final modul (menunggu perintah build)
 - [ ] Bump versi ke vCode baru + cek semua lokasi versi.
-- [ ] Build/zip HANYA lewat GitHub Actions (`.github/workflows/build-modul.yml`,
-      manual). Sudah ada; belum pernah dijalankan.
-- [ ] Verifikasi isi ZIP: `core/runtime.sh` punya cache-scan + override
-      (sudah otomatis dicek di workflow).
+- [x] Build/zip HANYA lewat GitHub Actions (`.github/workflows/build-modul.yml`,
+      manual). BERHASIL (run #36296491773, artifact `hsin-modul-dev`).
+- [x] Verifikasi isi ZIP: `core/runtime.sh` punya cache-scan + override
+      (otomatis dicek di workflow, lulus).
 
 ## Tahap 3 — Aplikasi (jalan, belum terverifikasi compile)
 - Keputusan user: (a) Gradle+Kotlin sendiri, (b) webui DIHAPUS, (c) paket com.hsin.
@@ -64,8 +64,8 @@
 - [x] Perbaikan scaffold yang tidak akan kompilasi: adapter baris datar,
       signature ArrayAdapter, import decodeFromString, akses private,
       manifest, layout, 0 TODO/placeholder, wrapper Gradle palsu dihapus.
-- [ ] **Compile verification** — hanya bisa lewat CI (`.github/workflows/
-      build-apk.yml`, manual). BELUM pernah dijalankan.
+- [x] **Compile verification** — lolos via CI (`.github/workflows/build-apk.yml`,
+      run #36296279179, artifact `hsin-debug-apk`). 0 error compile.
 - [ ] Extreme opt-in sudah ada sebagai switch ALLOW_EXTREME; perlu dipastikan
       apply extreme memakai profil extreme (bukan balanced).
 - [ ] Game list (add/remove) — belum ada UI.
