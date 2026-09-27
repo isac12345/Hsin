@@ -4,92 +4,75 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import com.hsin.model.DeviceResponse
+import com.hsin.model.KnobOverrides
+import com.hsin.model.KnobsResponse
+import com.hsin.model.StatusResponse
 
-class HsinRepository {
+/**
+ * Jembatan app -> modul HSIN. Semua komunikasi lewat `su -c` ke
+ * action.sh; tidak ada tuning yang diterapkan dari sisi app (semua
+ * keputusan user disimpan di modul).
+ */
+class HsinRepository(private val modulePath: String = MODULE_PATH) {
+
     companion object {
-        private const val MODULE_PATH = "/data/adb/modules/hsin"
-        private const val TIMEOUT_MS = 20000L
+        const val MODULE_PATH = "/data/adb/modules/hsin"
+        private const val TIMEOUT_MS = 20_000L
         private val json = Json { ignoreUnknownKeys = true }
     }
 
-    private fun runCmd(vararg tokens: String): String = RootExec.execTokens(*tokens, TIMEOUT_MS).let { result ->
-        if (!result.success) throw RuntimeException(result.stdout)
-        result.stdout
-    }
-
-    suspend fun knobs(): KnobsResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "knobs")
-        Json { ignoreUnknownKeys = true }.decodeFromString<KnobsResponse>(out)
-    }
-
-    suspend fun status(): StatusResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "status")
-        Json { ignoreUnknownKeys = true }.decodeFromString<StatusResponse>(out)
-    }
-
-    suspend fun device(): DeviceResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "device")
-        Json { ignoreUnknownKeys = true }.decodeFromString<DeviceResponse>(out)
-    }
-
-    suspend fun apply(profile: String): ApplyResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "apply", profile)
-        try {
-            Json { ignoreUnknownKeys = true }.decodeFromString<ApplyResponse>(out)
-        } catch (_: Exception) {
-            ApplyResponse(success = true, message = "Applied $profile")
+    private suspend fun action(name: String, vararg args: String): String =
+        withContext(Dispatchers.IO) {
+            val tokens = arrayOf("sh", "$modulePath/action.sh", name, *args)
+            val result = RootExec.execTokens(*tokens, timeoutMs = TIMEOUT_MS)
+            if (!result.success) throw HsinException(result.stdout)
+            result.stdout
         }
+
+    /**
+     * `action.sh status` mencetak baris lain sebelum JSON (mis. hasil cek
+     * game boost), jadi ambil baris non-kosong TERAKHIR untuk diparse.
+     */
+    private fun lastJsonLine(stdout: String): String =
+        stdout.lineSequence().map { it.trim() }.lastOrNull { it.startsWith("{") }
+            ?: throw HsinException("tidak ada JSON di output: ${stdout.take(200)}")
+
+    suspend fun knobs(): KnobsResponse = json.decodeFromString(lastJsonLine(action("knobs")))
+
+    suspend fun status(): StatusResponse = json.decodeFromString(lastJsonLine(action("status")))
+
+    suspend fun device(): DeviceResponse = json.decodeFromString(lastJsonLine(action("device")))
+
+    suspend fun knobList(): KnobOverrides = json.decodeFromString(lastJsonLine(action("knob-list")))
+
+    /** Simpan satu override knob. [value] harus sudah diformat (mis. "schedutil"). */
+    suspend fun knobSet(key: String, value: String) {
+        action("knob-set", key, value)
     }
 
-    suspend fun configSet(key: String, value: String): ConfigSetResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "config-set", key, value)
-        try {
-            Json { ignoreUnknownKeys = true }.decodeFromString<ConfigSetResponse>(out)
-        } catch (_: Exception) {
-            ConfigSetResponse(success = true, message = "Set $key=$value")
-        }
+    suspend fun knobReset() {
+        action("knob-reset")
     }
 
-    suspend fun configGet(): Map<String, String> = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "config-get")
-        try {
-            Json { ignoreUnknownKeys = true }.decodeFromString<Map<String, String>>(out)
-        } catch (_: Exception) {
-            emptyMap()
-        }
+    /** Setel salah satu dari 7 kunci yang di-whitelist modul. */
+    suspend fun configSet(key: String, value: String) {
+        action("config-set", key, value)
     }
 
-    suspend fun logs(type: String = "all"): String = withContext(Dispatchers.IO) {
-        runCmd("sh", "$MODULE_PATH/action.sh", "logs", type)
+    suspend fun apply(profile: String) {
+        action("apply", profile)
     }
 
-    suspend fun gameList(): GameListResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "game-list")
-        try {
-            Json { ignoreUnknownKeys = true }.decodeFromString<GameListResponse>(out)
-        } catch (_: Exception) {
-            GameListResponse(emptyList())
-        }
+    suspend fun logs(type: String): String = action("logs", type)
+
+    suspend fun backup() {
+        action("backup")
     }
 
-    suspend fun gameAdd(pkg: String): Boolean = withContext(Dispatchers.IO) {
-        runCmd("sh", "$MODULE_PATH/action.sh", "game-add", pkg).contains("success") || true
-    }
-
-    suspend fun gameRemove(pkg: String): Boolean = withContext(Dispatchers.IO) {
-        runCmd("sh", "$MODULE_PATH/action.sh", "game-remove", pkg).contains("success") || true
-    }
-
-    suspend fun backup(): BackupResponse = withContext(Dispatchers.IO) {
-        val out = runCmd("sh", "$MODULE_PATH/action.sh", "backup")
-        try {
-            Json { ignoreUnknownKeys = true }.decodeFromString<BackupResponse>(out)
-        } catch (_: Exception) {
-            BackupResponse(success = true, path = "backup created")
-        }
-    }
-
-    suspend fun configGetRaw(): String = withContext(Dispatchers.IO) {
-        runCmd("sh", "$MODULE_PATH/action.sh", "config-get")
+    suspend fun rollback() {
+        action("rollback")
     }
 }
+
+class HsinException(message: String) : Exception(message)

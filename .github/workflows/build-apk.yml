@@ -1,0 +1,56 @@
+name: build-apk
+
+# Build APK HSIN. Satu-satunya cara build: Termux tidak punya JDK/Android SDK.
+# Sengaja manual (workflow_dispatch) - tidak ada yang dibangun otomatis saat
+# push, sesuai perintah user "jangan build dulu".
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Variant yang dibangun'
+        required: true
+        default: debug
+        type: choice
+        options: [debug, release]
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        working-directory: app
+        run: gradle :app:assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hsin-${{ inputs.variant }}-apk
+          path: app/build/outputs/apk/*/*.apk
+          if-no-files-found: error
+
+      - name: Ringkasan
+        run: |
+          {
+            echo "### APK Output"
+            ls -la app/build/outputs/apk/*/*.apk || true
+          } >> "$GITHUB_STEP_SUMMARY"

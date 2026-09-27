@@ -6,18 +6,20 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewModels
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.hsin.MainViewModel
 import com.hsin.HsinRepository
+import com.hsin.MainActivity
 import com.hsin.databinding.FragmentStatusBinding
 import kotlinx.coroutines.launch
 
+/**
+ * Status langsung: device + angka runtime. Semua angka datang dari
+ * `action.sh status` / `action.sh device`, tidak ada yang ditebak di app.
+ */
 class StatusFragment : Fragment() {
-    private val viewModel: MainViewModel by viewModels()
-    private val repo = HsinRepository()
+
     private var _binding: FragmentStatusBinding? = null
     private val binding get() = _binding!!
+    private val repo by lazy { HsinRepository() }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentStatusBinding.inflate(inflater, container, false)
@@ -34,40 +36,37 @@ class StatusFragment : Fragment() {
         binding.swipeRefresh.isRefreshing = true
         lifecycleScope.launch {
             try {
-                val status = HsinRepository().status()
-                val device = HsinRepository().device()
-                binding.apply {
-                    tvCpuTemp.text = "${status.cpu_temp / 1000}°C"
-                    tvGpuTemp.text = "${status.gpu_temp / 1000}°C"
-                    tvCpuFreq.text = "${status.cpu_freq / 1000} MHz"
-                    tvCpuFreqBig.text = "${status.cpu_freq_big / 1000} MHz"
-                    tvCpuFreqLittle.text = "${status.cpu_freq_little / 1000} MHz"
-                    tvGpuFreq.text = "${status.gpu_freq / 1000} MHz"
-                    tvRamUsed.text = "${status.ram_used_kb / 1024} MB"
-                    tvRamTotal.text = "${status.ram_total_kb / 1024} MB"
-                    tvBattery.text = "${status.battery_pct}% (${status.battery_status})"
-                    tvBatteryTemp.text = "${status.battery_temp_c}°C"
-                    tvRefreshHz.text = "${status.refresh_hz} Hz"
-                    tvGameFps.text = "${status.game_fps} FPS"
-                    tvUptime.text = formatUptime(status.uptime_sec)
-                    tvProfile.text = status.profile
-                    tvApplyStatus.text = status.apply_status
-                    tvCpuLoad.text = "${status.cpu_load_x100 / 100}.${status.cpu_load_x100 % 100}%"
-                    tvZramPct.text = "${status.zram_pct}%"
-                    tvGlobalRr.text = "${status.global_rr_enabled}/${status.global_rr_reduced} ${status.global_rr_peak_hz}/${status.global_rr_min_hz}Hz"
-                    tvDvfs.text = "${status.dvfs_enabled} CPU:${status.dvfs_cpu_limit}% GPU:${status.dvfs_gpu_limit}%"
-                    tvFrameLimit.text = status.frame_limit_disabled
-                    tvSf.text = status.surfaceflinger_enabled
-                    tvDeviceSoc.text = device.soc
-                    tvDeviceGpu.text = device.gpu
-                    tvDeviceKernel.text = device.kernel
-                    tvDeviceRam.text = "${device.ram_kb} kB"
-                    tvDeviceId.text = device.device_id
+                val s = repo.status()
+                val d = repo.device()
+                if (_binding == null) return@launch
+                with(binding) {
+                    tvDeviceSoc.text = "SoC: ${d.soc.ifBlank { "?" }}"
+                    tvDeviceGpu.text = "GPU: ${d.gpu.ifBlank { "?" }}"
+                    tvDeviceKernel.text = "Kernel: ${d.kernel.ifBlank { "?" }}"
+                    tvDeviceRam.text = "RAM: ${d.ramKb.ifBlank { "?" }} kB"
+                    tvDeviceId.text = "ID: ${d.deviceId.ifBlank { "?" }}"
+
+                    tvCpuTemp.text = "CPU: ${s.cpuTemp / 1000}°C"
+                    tvGpuTemp.text = "GPU: ${s.gpuTemp / 1000}°C"                    tvCpuFreq.text = "CPU now: ${s.cpuFreq / 1000} MHz (plafon ${s.cpuMaxKhz / 1000} MHz)"
+                    tvCpuFreqBig.text = "Big: ${s.cpuFreqBig / 1000} MHz"
+                    tvCpuFreqLittle.text = "Little: ${s.cpuFreqLittle / 1000} MHz"
+                    tvGpuFreq.text = "GPU: ${s.gpuFreq / 1000} MHz (plafon ${s.gpuMaxKhz / 1000} MHz)"
+                    tvRamUsed.text = "RAM: ${s.ramUsedKb / 1024} MB / ${s.ramTotalKb / 1024} MB"
+                    tvBattery.text = "Baterai: ${s.batteryPct}% (${s.batteryStatus})"
+                    tvBatteryTemp.text = "Baterai suhu: ${s.batteryTempC}°C"
+                    tvRefreshHz.text = "Refresh: ${s.refreshHz} Hz"
+                    tvGameFps.text = "Game FPS: ${s.gameFps}"
+                    tvUptime.text = "Uptime: ${formatUptime(s.uptimeSec)}"
+                    tvProfile.text = "Profil: ${s.profile}"
+                    tvApplyStatus.text = "Apply: ${s.applyStatus}"
+                    tvCpuLoad.text = "Beban CPU: ${s.cpuLoadX100 / 100}.${(s.cpuLoadX100 % 100).toString().padStart(2, '0')}"
+                    tvZramPct.text = "zRAM terpakai: ${s.zramPct}%"
+                    tvDvfsLimit.text = "Batas DVFS: CPU ${s.dvfsCpuLimit}% / GPU ${s.dvfsGpuLimit}%"
                 }
-            } catch (e: Exception) {
-                (activity as? MainActivity)?.let { it.mainViewModel.reportError("Status error: ${e.message}") }
+            } catch (t: Throwable) {
+                (activity as? MainActivity)?.showMessage("Status gagal: ${t.message}")
             } finally {
-                binding.swipeRefresh.isRefreshing = false
+                _binding?.swipeRefresh?.isRefreshing = false
             }
         }
     }
@@ -76,7 +75,7 @@ class StatusFragment : Fragment() {
         val h = seconds / 3600
         val m = (seconds % 3600) / 60
         val s = seconds % 60
-        return "${h}h ${m}m ${s}s"
+        return "${h}j ${m}m ${s}d"
     }
 
     override fun onDestroyView() {

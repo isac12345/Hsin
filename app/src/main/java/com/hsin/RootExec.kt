@@ -1,88 +1,75 @@
 package com.hsin
 
-import kotlinx.serialization.Serializable
+import android.util.Log
+import kotlin.concurrent.thread
 
-@Serializable
-data class RootResult(
-    val stdout: String,
-    val exitCode: Int,
-    val success: Boolean
-)
+/**
+ * Eksekusi root lewat `su -c` dengan stdout capture, timeout, dan quoting
+ * POSIX-aman.
+ *
+ * Diwarisi dari RootExecutor Alpha (timeout + exit code + quoting), ditambah
+ * stdout karena HSIN selalu menjawab dengan teks/JSON yang harus dibaca app.
+ */
+object RootExec {
 
-class RootExec {
-    companion object {
-        private const val DEFAULT_TIMEOUT_MS = 20000L
-        private const val TAG = "RootExec"
+    private const val TAG = "RootExec"
+    const val DEFAULT_TIMEOUT_MS = 20_000L
 
-        /**
-         * Quote a single argument for POSIX shell safety.
-         * Alphanumeric + ._/@:=- pass through; everything else wrapped in single quotes with embedded quotes escaped.
-         */
-        fun quoteArg(arg: String): String {
-            if (arg.matches("^[a-zA-Z0-9._/@:=-]+\$".toRegex())) {
-                return arg
+    data class Result(
+        val stdout: String,
+        val exitCode: Int,
+        val success: Boolean
+    )
+
+    /** Token aman dilewati; sisanya dibungkus '...' dengan ' di-escape. */
+    private val SAFE_TOKEN = Regex("^[A-Za-z0-9._/@:=+-]+$")
+
+    fun quoteArg(arg: String): String {
+        if (arg.isEmpty()) return "''"
+        if (SAFE_TOKEN.matches(arg)) return arg
+        return "'" + arg.replace("'", "'\\''") + "'"
+    }
+
+    fun buildCommand(vararg tokens: String): String =
+        tokens.joinToString(" ") { quoteArg(it) }
+
+    fun exec(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): Result {
+        if (command.isEmpty()) return Result("", -1, false)
+        val to = if (timeoutMs > 0) timeoutMs else DEFAULT_TIMEOUT_MS
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+
+            // stdout & stderr HARUS dua thread terpisah; kalau keduanya
+            // ditunggu setelah waitFor(), pipe penuh -> deadlock.
+            val out = StringBuilder()
+            val err = StringBuilder()
+            val outThread = thread { process.inputStream.bufferedReader().use { out.append(it.readText()) } }
+            val errThread = thread { process.errorStream.bufferedReader().use { err.append(it.readText()) } }
+
+            val finished = process.waitFor(to, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (!finished) {
+                process.destroy()
+                runCatching { process.destroyForcibly() }
+                Log.w(TAG, "timeout ${to}ms: $command")
+                outThread.join(500)
+                errThread.join(500)
+                return Result("timeout ${to}ms", -1, false)
             }
-            return "'${arg.replace("'", "'\\\\''")}'"
-        }
+            outThread.join(2_000)
+            errThread.join(2_000)
 
-        /**
-         * Build a shell command from pre-quoted tokens.
-         */
-        fun buildCommand(vararg tokens: String): String {
-            return tokens.joinToString(" ") { quoteArg(it) }
-        }
-
-        /**
-         * Execute a shell command via `su -c` with timeout and stdout capture.
-         */
-        fun exec(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): RootResult {
-            return try {
-                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                var stdout = ""
-                var stderr = ""
-                val stdoutThread = Thread {
-                    process.inputStream.bufferedReader().use { reader ->
-                        stdout = reader.readText()
-                    }
-                }
-                val stderrThread = Thread {
-                    process.errorStream.bufferedReader().use { reader ->
-                        stderr = reader.readText()
-                    }
-                }
-                stdoutThread.start()
-                stderrThread.start()
-                val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                stdoutThread.join(1000)
-                stderrThread.join(1000)
-                if (!finished) {
-                    process.destroy()
-                    try { process.destroyForcibly() } catch (e: Throwable) {}
-                    return RootResult(
-                        stdout = "timeout ${timeoutMs}ms: $command",
-                        exitCode = -1,
-                        success = false
-                    )
-                }
-                val exitCode = process.exitValue()
-                if (exitCode != 0) {
-                    return RootResult(
-                        stdout = "exit $exitCode: $command\nstdout: $stdout\nstderr: $stderr",
-                        exitCode = exitCode,
-                        success = false
-                    )
-                }
-                RootResult(stdout = stdout.trim(), exitCode = exitCode, success = true)
-            } catch (e: Exception) {
-                RootResult(stdout = "${e.javaClass.simpleName}: $command - ${e.message}", exitCode = -1, success = false)
+            val code = process.exitValue()
+            if (code != 0) {
+                Log.w(TAG, "exit=$code cmd=$command err=${err.take(200)}")
+                return Result(out.toString().trim(), code, false)
             }
-        }
-
-        /**
-         * Execute with pre-quoted tokens (safe for user input).
-         */
-        fun execTokens(vararg tokens: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): RootResult {
-            return exec(buildCommand(*tokens), timeoutMs)
+            Result(out.toString().trim(), 0, true)
+        } catch (t: Throwable) {
+            Log.w(TAG, "gagal: $command", t)
+            Result("${t.javaClass.simpleName}: ${t.message}", -1, false)
         }
     }
+
+    fun execTokens(vararg tokens: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): Result =
+        exec(buildCommand(*tokens), timeoutMs)
 }

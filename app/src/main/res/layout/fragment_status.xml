@@ -10,7 +10,9 @@
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:clipToPadding="false"
+        android:paddingBottom="88dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -18,36 +20,33 @@
             android:orientation="vertical"
             android:padding="8dp">
 
-            <TextView android:text="DEVICE" style="@style/SectionHeader" />
-            <TextView android:id="@+id/tvDeviceSoc" tools:text="SOC: Unisoc T615" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvDeviceGpu" tools:text="GPU: Mali-G57" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvDeviceKernel" tools:text="Kernel: 5.15.211" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvDeviceRam" tools:text="RAM: 8000000 kB" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvDeviceId" tools:text="ID: HSIN-DEV-..." style="@style/InfoRow" />
+            <TextView style="@style/SectionHeader" android:text="Perangkat" />
 
-            <TextView android:text="LIVE STATUS" style="@style/SectionHeader" android:layout_marginTop="16dp" />
-            <TextView android:id="@+id/tvCpuTemp" tools:text="CPU: 45°C" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvGpuTemp" tools:text="GPU: 42°C" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvCpuFreq" tools:text="CPU: 1800 MHz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvCpuFreqBig" tools:text="Big: 2200 MHz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvCpuFreqLittle" tools:text="Little: 1600 MHz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvGpuFreq" tools:text="GPU: 800 MHz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvRamUsed" tools:text="RAM Used: 4096 MB" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvRamTotal" tools:text="RAM Total: 8192 MB" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvBattery" tools:text="Battery: 85% (Discharging)" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvBatteryTemp" tools:text="Battery Temp: 32°C" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvRefreshHz" tools:text="Refresh: 90 Hz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvGameFps" tools:text="Game FPS: 60" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvUptime" tools:text="Uptime: 2h 30m" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvProfile" tools:text="Profile: balanced" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvApplyStatus" tools:text="Apply: OK" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvCpuLoad" tools:text="CPU Load: 2.35" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvZramPct" tools:text="ZRAM: 45%" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvGlobalRr" tools:text="Global RR: false/false 90/60Hz" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvDvfs" tools:text="DVFS: false CPU:100% GPU:100%" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvFrameLimit" tools:text="Frame Limit: false" style="@style/InfoRow" />
-            <TextView android:id="@+id/tvSf" tools:text="SF Tweak: false" style="@style/InfoRow" />
+            <TextView android:id="@+id/tvDeviceSoc" style="@style/InfoRow" tools:text="SoC: Unisoc T615" />
+            <TextView android:id="@+id/tvDeviceGpu" style="@style/InfoRow" tools:text="GPU: Mali-G57" />
+            <TextView android:id="@+id/tvDeviceKernel" style="@style/InfoRow" tools:text="Kernel: 5.15.211" />
+            <TextView android:id="@+id/tvDeviceRam" style="@style/InfoRow" tools:text="RAM: 8000000 kB" />
+            <TextView android:id="@+id/tvDeviceId" style="@style/InfoRow" tools:text="ID: HSIN-DEV-..." />
 
+            <TextView style="@style/SectionHeader" android:text="Status langsung" />
+
+            <TextView android:id="@+id/tvCpuTemp" style="@style/InfoRow" tools:text="CPU: 45C" />
+            <TextView android:id="@+id/tvGpuTemp" style="@style/InfoRow" tools:text="GPU: 42C" />
+            <TextView android:id="@+id/tvCpuFreq" style="@style/InfoRow" tools:text="CPU: 1800 MHz" />
+            <TextView android:id="@+id/tvCpuFreqBig" style="@style/InfoRow" tools:text="Big: 2200 MHz" />
+            <TextView android:id="@+id/tvCpuFreqLittle" style="@style/InfoRow" tools:text="Little: 1600 MHz" />
+            <TextView android:id="@+id/tvGpuFreq" style="@style/InfoRow" tools:text="GPU: 800 MHz" />
+            <TextView android:id="@+id/tvRamUsed" style="@style/InfoRow" tools:text="RAM: 4096 / 8192 MB" />
+            <TextView android:id="@+id/tvBattery" style="@style/InfoRow" tools:text="Baterai: 85% (Discharging)" />
+            <TextView android:id="@+id/tvBatteryTemp" style="@style/InfoRow" tools:text="Baterai: 32C" />
+            <TextView android:id="@+id/tvRefreshHz" style="@style/InfoRow" tools:text="Refresh: 90 Hz" />
+            <TextView android:id="@+id/tvGameFps" style="@style/InfoRow" tools:text="Game FPS: 60" />
+            <TextView android:id="@+id/tvUptime" style="@style/InfoRow" tools:text="Uptime: 2j 30m" />
+            <TextView android:id="@+id/tvProfile" style="@style/InfoRow" tools:text="Profil: balanced" />
+            <TextView android:id="@+id/tvApplyStatus" style="@style/InfoRow" tools:text="Apply: OK" />
+            <TextView android:id="@+id/tvCpuLoad" style="@style/InfoRow" tools:text="Beban CPU: 2.35" />
+            <TextView android:id="@+id/tvZramPct" style="@style/InfoRow" tools:text="zRAM: 45%" />
+            <TextView android:id="@+id/tvDvfsLimit" style="@style/InfoRow" tools:text="DVFS: CPU 100% / GPU 100%" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

@@ -4,31 +4,36 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.Spinner
-import android.widget.Switch
-import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.hsin.HsinRepository
-import com.hsin.MainViewModel
 import com.hsin.databinding.FragmentKnobsBinding
-import com.hsin.model.CpuPolicyKnob
 import com.hsin.model.KnobsResponse
 import kotlinx.coroutines.launch
-import java.util.HashMap
 
+/**
+ * Layar Knobs: semua pilihan yang benar-benar bisa ditulis modul, diambil
+ * dari `action.sh knobs` (tidak ada angka tuning yang di-hardcode di app).
+ * User memilih dulu, lalu satu tombol Apply mengirim semuanya sekaligus.
+ */
 class KnobsFragment : Fragment() {
-    private val viewModel: MainViewModel by viewModels()
-    private val repo = HsinRepository()
+
     private var _binding: FragmentKnobsBinding? = null
     private val binding get() = _binding!!
-    private val draft = HashMap<String, Any>()
+    private val repo by lazy { HsinRepository() }
+    private val controller by lazy { ApplyController(repo) }
+
     private var knobs: KnobsResponse? = null
+    private var profile: String = "balanced"
+
+    // Draft: key modul -> nilai yang dipilih user.
+    private val knobDraft = mutableMapOf<String, String>()
+    private val configDraft = mutableMapOf<String, String>()
+    // Simpan state toggle agar tidak ter-reset tiap recycle.
+    private val toggleState = mutableMapOf<String, Boolean>()
+
     private lateinit var adapter: KnobsAdapter
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -38,73 +43,88 @@ class KnobsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        adapter = KnobsAdapter(draft, ::onDraftChange)
+        adapter = KnobsAdapter(::onChoice, ::onToggle)
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
-        binding.btnApply.setOnClickListener { applyDraft() }
-        loadKnobs()
+        binding.btnApply.setOnClickListener { applyNow() }
+        binding.swipeRefresh.setOnRefreshListener { load() }
+        load()
     }
 
-    private fun loadKnobs() {
-        binding.progressBar.visibility = View.VISIBLE
+    private fun load() {
+        binding.swipeRefresh.isRefreshing = true
         binding.btnApply.isEnabled = false
         lifecycleScope.launch {
             try {
-                val response = repo.knobs()
-                knobs = response
-                adapter.submitList(response)
-                binding.btnApply.isEnabled = true
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Failed to load knobs: ${e.message}", Toast.LENGTH_LONG).show()
+                val r = repo.knobs()
+                knobs = r
+                profile = r.profiles.firstOrNull { it == "balanced" } ?: r.profiles.firstOrNull() ?: "balanced"
+                render()
+            } catch (t: Throwable) {
+                toast("Gagal baca knob: ${t.message}")
             } finally {
-                binding.progressBar.visibility = View.GONE
+                binding.swipeRefresh.isRefreshing = false
             }
         }
     }
 
-    private fun onDraftChange(key: String, value: Any) {
-        draft[key] = value
+    private fun render() {
+        val r = knobs ?: return
+        val rows = KnobsRowBuilder.build(r)
+        adapter.submit(rows)
+        binding.btnApply.isEnabled = true
+        binding.btnApply.text = "Apply ($profile)"
     }
 
-    private fun applyDraft() {
+    private fun onChoice(row: KnobRow.Choice, value: String) {
+        if (!row.enabled) return
+        if (row.id == "PROFILE") {
+            profile = value
+            binding.btnApply.text = "Apply ($profile)"
+            return
+        }
+        when (row.sink) {
+            KnobRow.Sink.KNOB -> knobDraft[row.id] = value
+            KnobRow.Sink.CONFIG -> configDraft[row.id] = value
+        }
+    }
+
+    private fun onToggle(row: KnobRow.Toggle, checked: Boolean) {
+        if (!row.enabled) return
+        toggleState[row.id] = checked
+        configDraft[row.id] = checked.toString()
+    }
+
+    private fun applyNow() {
+        val configs = configDraft.toMap()
+        val r = knobs
+        if (r != null && toggleState["ALLOW_EXTREME"] == true) configs["ALLOW_EXTREME"] = "true"
+
         binding.btnApply.isEnabled = false
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
-            var success = true
-            var lastMsg = ""
             try {
-                // Apply config-set for each draft entry
-                for ((key, value) in draft) {
-                    val result = HsinRepository().configSet(key, value.toString())
-                    if (!result.success) {
-                        success = false
-                        lastMsg = "Failed $key: ${result.message}"
-                        break
-                    }
-                }
-                // Then apply profile
-                if (success) {
-                    val profile = "balanced" // TODO: let user pick profile
-                    val applyResult = HsinRepository().apply(profile)
-                    if (!applyResult.success) {
-                        success = false
-                        lastMsg = "Apply failed: ${applyResult.message}"
-                    }
-                }
-            } catch (e: Exception) {
-                success = false
-                lastMsg = e.message ?: "Unknown error"
-            } finally {
-                binding.progressBar.visibility = View.GONE
-                binding.btnApply.isEnabled = true
-                if (success) {
-                    Toast.makeText(requireContext(), "Applied successfully", Toast.LENGTH_SHORT).show()
-                    draft.clear()
+                val result = controller.apply(profile, knobDraft.toMap(), configs)
+                if (result.isSuccess) {
+                    toast("Apply ${profile} selesai (${result.applied.size} tweak)")
+                    knobDraft.clear()
+                    configDraft.clear()
+                    load()
                 } else {
-                    Toast.makeText(requireContext(), "Apply failed: $lastMsg", Toast.LENGTH_LONG).show()
+                    val first = result.failures.first()
+                    toast("Gagal ${result.failures.size}: ${first.first} (${first.second.take(80)})")
                 }
+            } catch (t: Throwable) {
+                toast("Apply gagal: ${t.message}")
+            } finally {
+                binding.progressBar.visibility = View.GONE
+                binding.btnApply.isEnabled = true
             }
         }
+    }
+
+    private fun toast(msg: String) {
+        if (isAdded) Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroyView() {
