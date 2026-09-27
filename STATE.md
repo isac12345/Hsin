@@ -180,3 +180,15 @@
     artifact: `hsin-modul-dev`). Verifikasi `core/runtime.sh` lolos.
   * Siap untuk pengujian HP (L2).
 
+- FIX-RUNTIME-GUARD-P1 (2026-09-27, leader + dev-modul work/guard-runtime):
+  TERIMA L1 + merge b5cbf73, push pending. Guard idempotent di generated
+  runtime.sh via build_release.sh (+3). Verifikasi leader: sh -n OK,
+  shellcheck 0 baru, sim fungsi-ada + re-source murah. L2: flash+reboot.
+
+- AUDIT-BLANK-P2 (2026-09-27, leader + dev-modul work/p2-shell + dev-apk
+  read-only): 2c 3/3 fix ADA (bukan penyebab); 2d komentar diluruskan
+  (merge bbf27ee, push pending); 2e KSU-compat aman (tanpa fix); 2f rantai
+  error app terbukti tampil pesan (timeout→throw→Snackbar/toast), jadi
+  blank-tanpa-error tak terbukti statis → pemisah = Task 2a di HP oleh
+  user. L2: user tes shell manual + konfirmasi berat/blank.
+

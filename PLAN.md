@@ -41,8 +41,13 @@
   (override tervalidasi di $HSIN_DATA/user_knobs.env).
 - [ ] **Integrasi override ke jalur apply** (pilihan user benar-benar dipakai
   saat apply) — SEDANG DIKERJAKAN, butuh L2 karena mengubah perilaku.
+- [x] Guard idempotent runtime P1 (source-ulang 456KB jadi no-op) + luruskan
+  komentar integrity 2d — L1 DONE (b5cbf73, bbf27ee), nunggu L2.
+- [ ] Audit blank P2f: error app terbukti tampil pesan (statis) → tersisa
+  sisi shell/HP, pemisah = Task 2a manual oleh user (lihat NOTES).
 - [ ] Bump versi: `module.prop` + `bin/hsin HSIN_VERSION` (wajib sebelum build).
-- [ ] L2: flash + apply + kirim APPLY-TIME.
+- [ ] L2: flash + reboot (berat?) + `su -c 'sh .../action.sh status/knobs'`
+  (blank?) + kirim APPLY-TIME.
 
 ## Tahap 2 — Rakit final modul (menunggu perintah build)
 - [ ] Bump versi ke vCode baru + cek semua lokasi versi.

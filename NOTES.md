@@ -622,3 +622,49 @@
   saat lokal tidak punya SDK. Error compile diselesaikan sistematis dari
   manifest -> resource -> Kotlin compilation -> packaging.
 
+## Guard runtime idempotent P1 (2026-09-27, leader + dev-modul, TERIMA L1)
+- Akar: `core/runtime.sh` (~457KB di ZIP) GENERATED oleh
+  `build_release.sh::_clean_stage` (gabung ~50 file), lalu `sed` baris 132
+  menulis ulang SEMUA source `core|engine|extreme` di entrypoint menjadi
+  `.../core/runtime.sh` → puluhan source-ulang sekuensial (boot) per proses.
+- Isi (merge b5cbf73, 1 file +3): 2 baris guard sebagai header pertama
+  generated runtime (`return` dini bila `$_HSIN_RUNTIME_LOADED` sudah set).
+  Guard di BUILD SCRIPT, bukan file source (runtime.sh tak ada di tree).
+- Verifikasi leader: diff hanya build_release.sh; sh -n OK; shellcheck 0
+  baru (SC2115 pre-existing); guard lolos filter awk/sed _clean_stage;
+  simulasi: fungsi tetap ada setelah source ulang, 10x re-source ~14ms
+  (file kecil; klaim ~130ms vs ~1000ms pekerja di sim besar konsisten
+  mekanismenya). Subshell `sh -c`/heredoc GUARDEOF tak mewarisi guard var
+  → tetap source normal (benar).
+- KOREKSI PREMIS prompt: (1) runtime.sh generated, bukan source — fix di
+  build script; (2) TIDAK ADA polling ~3 detik di APK Kotlin saat ini
+  (komentar action.sh:15-16 peninggalan WebUI; StatusFragment.refresh
+  jalan 1x saat buka + swipe manual) → narasi "10x tiap 3 detik" tidak
+  berlaku untuk APK; kandidat "HP berat" tersisa = ~31x source sekuensial
+  di window boot (service.sh + post-fs-data.sh). Guard memperbaiki keduanya.
+- Status: L1 DONE, L2 = user flash ulang + reboot + konfirmasi tidak berat.
+
+## Audit blank Status/Knobs P2 (2026-09-27, leader + dev-modul + dev-apk)
+- 2c (shell): 3/3 fix lama ADA di source (scan_cache di daftar runtime
+  build_release.sh:82; `renderFrameRate[= ]` action.sh:641; gerbang tulis
+  scan_cache.sh:318-319 + baca :416-421) → bukan penyebab blank.
+- 2d: komentar "auto-generate baseline" di core/protect.sh menyesatkan
+  (kode cuma `return 1`) → diluruskan jadi "gagal aman" (merge bbf27ee,
+  komentar saja, sh -n OK, shellcheck 0). Perilaku DEV tak berubah
+  (`.devmode` short-circuit). `bin/hsin-verify`/manifest absen di source
+  WAJAR (generated saat build release).
+- 2e (KSU-Next): module.prop `support=magisk,minMagisk=20400`; hardcoded
+  `/data/adb/modules` hanya default `[ -z ] &&` + scan konflik
+  action.sh:1135 (KSU-Next pakai path yang sama → aman); fallback
+  `/data/adb/ksu/bin/busybox` ada di service.sh:461, action.sh:1003,
+  apply_engines.sh:194 → tanpa fix.
+- 2f (APK, read-only, 0 edit): timeout 20s RootExec.kt:16 → destroy +
+  Result(false) (BUKAN silent); repo !success/kosong → throw HsinException
+  (HsinRepository.kt:29/:39); StatusFragment:67-70 catch → Snackbar
+  "Status gagal" + spinner mati; KnobsFragment:63-66 sama via toast.
+  Layout pakai `tools:text` (runtime default KOSONG → blank = state awal).
+  Verdict JUJUR: rantai "blank + loading abadi tanpa error" TIDAK TERBUKTI
+  statis — semua jalur gagal berakhir di pesan + UI reset. Penyebab tersisa
+  di sisi shell/HP → Task 2a (user: `su -c 'sh .../action.sh status/knobs'`
+  manual, lihat JSON/hang/lama) adalah pemisah utama. L2: user tes.
+
