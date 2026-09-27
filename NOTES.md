@@ -306,6 +306,14 @@
   Sisa ±73 di 14 file (detector/capability/action/imgtec/governor/
   backup/dll) → batch berikut per area.
 
+## Proc batch-2 (2026-09-27, leader langsung)
+- Isi (a620ea5, 1 file +20/-18): core/detector.sh 18 literal → guard
+  HSIN_PROC + swap prefix (device-tree, cpuinfo, gpuinfo, driver/gpu,
+  meminfo, tcp_*). /sys literal (soc0, mali) di luar scope #14.
+- Bukti: bash-n OK, shellcheck 0, sandbox prefix palsu (soc Unisoc
+  T615 NUL-strip, vendor unisoc, gpu terbaca, ram 8000000|4000000,
+  net bbr), literal /proc 73→55.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
