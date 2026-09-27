@@ -451,3 +451,23 @@
   python3. Dua bug ketemu saat uji dan sudah difix: key kembar di file
   bikin `count` membesar dan JSON punya kunci kembar (dedupe saat rewrite
   + saat list).
+
+- USER-KNOBS (2026-09-27, dev-modul + review leader): aksi
+  knob-set/knob-reset/knob-list (aaa7a9c) menyimpan override knob
+  per-device di $HSIN_DATA/user_knobs.env, tervalidasi (pola key +
+  rentang nilai, tolak injeksi). Review leader: 10 uji injeksi DITOLAK,
+  readback atomic, escaper punya fallback sendiri (tidak bergantung
+  urutan source), 7 aksi lama rc=0, jalur apply TIDAK tersentuh.
+  PUSH DONE.
+
+- APP-FIX + CI (2026-09-27, leader inline): scaffold saya perbaiki -
+  adapter RecyclerView ditulis ulang jadi model baris datar (versi lama
+  campur tipe dan akan crash), 10x ArrayAdapter.createFromResource dengan
+  signature salah, import decodeFromString hilang, fragment akses
+  mainViewModel private, manifest menunjuk class yang dihapus, layout
+  tidak sinkron dengan Kotlin. Verified: semua R.id/R.layout/@string/
+  @style/@color resolve, 0 TODO/placeholder, wrapper gradle palsu
+  dihapus (stub). Workflow .github/workflows/{build-apk,build-modul}.yml
+  (manual, tidak auto-build)._push DONE. CATATAN JUJUR: Kotlin BELUM
+  pernah dikompilasi (tanpa JDK di Termux) - verifikasi compile hanya
+  bisa lewat CI.
