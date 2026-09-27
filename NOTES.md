@@ -426,3 +426,28 @@
   baca, kode benar) — export dulu atau hardcode path di uji sandbox.
 - Cek warning shellcheck file ASLI via `git show HEAD:f` (tanpa stash —
   stash-pop pernah lepas staging).
+
+## Lapis user override (2026-09-27, dev-modul, TUGAS BERIKUTNYA = apply)
+- `core/user_knobs.sh` (baru) = sisi WRITE knob yang tidak ada: `knobs`
+  cuma read-only, `config-set` cuma 7 key hsin.conf, jadi tidak ada tempat
+  menyimpan pilihan user. File `user_knobs.env` flat KEY=VALUE (pola
+  scan_cache), maks 64 key, atomic (tmp.$$ + mv), chmod 600, readback
+  wajib. Aksi baru: `knob-set <key> <val>`, `knob-reset`, `knob-list`
+  (`{"count":N,"overrides":{...}}`). Ditambah 1 baris source + 3 case di
+  action.sh, dan masuk daftar runtime build_release.sh (wajib: release
+  menghapus core/*.sh selain runtime.sh).
+- Key tertutup: `cpu_policy_<id>_` / `gpu_node_<n>_` / `io_block_<n>_` +
+  `gov|max_khz|min_khz|sched`, atau tetap `zram_algo|swappiness|tcp_cc|tfo`.
+  Nilai numeric wajib dalam rentang (kHz 100000-5000000, swappiness 0-200,
+  tfo 0-3), nilai token 1-32 karakter `[A-Za-z0-9_.-]`. Semua key/nilai
+  tolak karakter di luar `[A-Za-z0-9_.]` → newline/`;`/backtick tidak
+  bisa menyuntik baris config. Pesan error sengaja TIDAK mencetak input
+  yang belum tervalidasi (bisa bikin baris output rusak).
+- SENGAJA belum mengintegrasikan override ke jalur apply — behavior apply
+  sekarang tidak berubah sama sekali. Apply override = tugas berikutnya.
+- Bukti: bash-n 3 file 0, shellcheck -S warning file baru 0, `rg '/sys/|
+  /proc/'` kosong, sandbox 7 skenario (OK/tolak/reset) + file env 4 baris
+  persis, batas 64 key ditolak tanpa menimpa, JSON `knob-list` di-parse
+  python3. Dua bug ketemu saat uji dan sudah difix: key kembar di file
+  bikin `count` membesar dan JSON punya kunci kembar (dedupe saat rewrite
+  + saat list).

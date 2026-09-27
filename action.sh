@@ -25,6 +25,7 @@ exec 2>>"$HSIN_DEBUG_LOG"
 . "$HSIN_MODULE_PATH/core/policy_engine.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/state_manager.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/knobs.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/protect.sh" 2>/dev/null
 if ! command -v hsin_protect_watermark >/dev/null 2>&1; then
     echo "ERROR: core/protect.sh missing or tampered - refusing to run"
@@ -1249,6 +1250,26 @@ _main() {
             ;;
         knobs)
             hsin_knobs_json
+            ;;
+        knob-set)
+            # Simpan satu override knob. Nilai kosong = hapus override itu.
+            # Catatan: jalur ini sengaja TIDAK menerapkan apa pun, hanya
+            # menyimpan. Apply override = langkah terpisah.
+            if [ "$#" -lt 2 ]; then
+                echo "ERROR: usage: knob-set <key> <value>"
+                exit 1
+            fi
+            hsin_uk_set "$1" "$2" || exit 1
+            echo "OK $1=$2"
+            ;;
+        knob-reset)
+            # hsin_uk_reset mencetak jumlah key yang dihapus; pesan ERROR
+            # sudah dicetak fungsi itu kalau file tidak bisa dihapus.
+            _kr_n=$(hsin_uk_reset) || exit 1
+            echo "OK reset (${_kr_n} key dihapus)"
+            ;;
+        knob-list)
+            hsin_uk_list
             ;;
         renderer-apply)
             . "$HSIN_MODULE_PATH/engine/render/renderer.sh" 2>/dev/null
