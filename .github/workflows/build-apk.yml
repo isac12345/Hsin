@@ -29,8 +29,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # CATATAN: android-actions/setup-android@v3 GAGAL di runner ubuntu-latest
+      # sekarang - ia menjalankan `sdkmanager tools` dan paket "tools" sudah
+      # dihapus di cmdline-tools terbaru ("Failed to find package 'tools'").
+      # Runner sudah punya SDK + ANDROID_HOME, jadi kita pakai itu langsung
+      # dan pasang paket yang memangNeeded secara eksplisit.
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" || true
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
