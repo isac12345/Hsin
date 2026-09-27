@@ -1,7 +1,7 @@
 # STATUS.md — HSIN v5.0.0 Real-Time Progress Tracker
 
-**Last Updated:** 2026-09-27  
-**Overall Progress:** Phase 1 — PENDING
+**Last Updated:** 2026-09-27 (Task 1.1.1–1.1.3 DONE, 1.2/1.3 menunggu approve)
+**Overall Progress:** Phase 1 — IN PROGRESS (3/7 tasks 1.1 done)
 
 ---
 
@@ -25,33 +25,33 @@ PHASE 5: QA, Release & Maintenance         [░░░░░░░░░░] 0% �
 **Estimated Effort:** 40% (Weeks 1)  
 **Commits Expected:** 3-4
 
-### 1.1 Create Testing Infrastructure [0/7 tasks]
+### 1.1 Create Testing Infrastructure [3/7 tasks]
 
-- [ ] **Task 1.1.1** — Create `tests/` directory structure
-  - [ ] `tests/TESTING_FRAMEWORK.md` (comprehensive testing guide)
-  - [ ] `tests/device_reports/` (directory for per-device reports)
-  - [ ] `tests/TEMPLATE_DEVICE_REPORT.md` (template for human testers)
+- [x] **Task 1.1.1** — Create `tests/` directory structure
+  - [x] `tests/TESTING_FRAMEWORK.md` (comprehensive testing guide)
+  - [x] `tests/device_reports/` (directory for per-device reports)
+  - [x] `tests/TEMPLATE_DEVICE_REPORT.md` (template for human testers)
   - Acceptance: Files exist, TEMPLATE has all required sections
-  - Status: PENDING
+  - Status: DONE (2026-09-27, merge 7e41841; verifikasi leader: 5 file baru, sh -n OK, shellcheck 0, YAML valid via PyYAML, sim lint lolos, validate positif+negatif OK)
   - Commit: `feat: create testing framework infrastructure`
 
-- [ ] **Task 1.1.2** — Create `.github/workflows/lint-and-test.yml`
-  - ShellCheck all .sh files
+- [x] **Task 1.1.2** — Create `.github/workflows/lint-and-test.yml`
+  - ShellCheck all .sh files (level `-S error`: warning pre-existing SC2115/SC2154 di build_release.sh & action.sh terbukti gagalkan push bila tanpa filter — dibuktikan rc=1)
   - sh -n syntax validation
-  - JSON config validation (python3 -m json.tool)
+  - JSON config validation (python3 -m json.tool, skip-safe bila belum ada JSON)
   - Mandatory file checks
   - module.prop format validation
   - Acceptance: Workflow runs on push, 0 errors
-  - Status: PENDING
+  - Status: DONE (2026-09-27, merge 7e41841; sim lokal LINT-SIM-PASS; runs nyata menunggu push ini)
   - Commit: `ci: add lint and test automation`
 
-- [ ] **Task 1.1.3** — Create build validation script
+- [x] **Task 1.1.3** — Create build validation script
   - `tests/validate_build.sh` — Pre/post-zip validation
   - Check mandatory files present
   - Verify ZIP structure
   - Check hash manifest count
   - Acceptance: Script runs, returns exit 0 on valid ZIP
-  - Status: PENDING
+  - Status: DONE (2026-09-27, merge 7e41841; positif VALID exit 0, negatif ERROR exit 1)
   - Commit: `test: add build validation script`
 
 ### 1.2 Improve Core Device Detection [0/6 tasks]
