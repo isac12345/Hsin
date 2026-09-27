@@ -4,6 +4,8 @@
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 HSIN_BACKUP_ROOT="$HSIN_DATA/backup"
 
 hsin_backup_init() {
@@ -137,12 +139,12 @@ hsin_backup_io() {
 }
 
 hsin_backup_memory() {
-    [ -f /proc/sys/vm/swappiness ] && hsin_backup_node "/proc/sys/vm/swappiness"
+    [ -f "$HSIN_PROC/sys/vm/swappiness" ] && hsin_backup_node "$HSIN_PROC/sys/vm/swappiness"
 }
 
 hsin_backup_network() {
-    [ -f /proc/sys/net/ipv4/tcp_congestion_control ] && hsin_backup_node "/proc/sys/net/ipv4/tcp_congestion_control"
-    [ -f /proc/sys/net/ipv4/tcp_fastopen ] && hsin_backup_node "/proc/sys/net/ipv4/tcp_fastopen"
+    [ -f "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control" ] && hsin_backup_node "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control"
+    [ -f "$HSIN_PROC/sys/net/ipv4/tcp_fastopen" ] && hsin_backup_node "$HSIN_PROC/sys/net/ipv4/tcp_fastopen"
 }
 
 # Backup all (dipakai sebelum apply profile)

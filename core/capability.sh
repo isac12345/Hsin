@@ -6,6 +6,8 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 HSIN_DATA_DEVICE_TXT="$HSIN_DATA/device.txt"
 HSIN_DATA_CAP="$HSIN_DATA/capability.json"
 
@@ -223,9 +225,9 @@ cap_zram() {
 }
 
 cap_vm_swappiness() {
-    if [ -f /proc/sys/vm/swappiness ] && [ -w /proc/sys/vm/swappiness ]; then
+    if [ -f $HSIN_PROC/sys/vm/swappiness ] && [ -w $HSIN_PROC/sys/vm/swappiness ]; then
         cap_set "vm_swappiness" 1 "writable"
-    elif [ -f /proc/sys/vm/swappiness ]; then
+    elif [ -f $HSIN_PROC/sys/vm/swappiness ]; then
         cap_set "vm_swappiness" 2 "readable_not_writable"
     else
         cap_set "vm_swappiness" 0 "no_swappiness"
@@ -234,7 +236,7 @@ cap_vm_swappiness() {
 
 cap_network_tcp() {
     _cur=$(_dev_get "TCP_CUR")
-    if [ -w /proc/sys/net/ipv4/tcp_congestion_control ]; then
+    if [ -w $HSIN_PROC/sys/net/ipv4/tcp_congestion_control ]; then
         cap_set "network_tcp" 1 "current=$_cur"
     else
         cap_set "network_tcp" 0 "no_writable_tcp"
@@ -243,9 +245,9 @@ cap_network_tcp() {
 
 cap_network_sysctl() {
     _w=0
-    for p in /proc/sys/net/ipv4/tcp_fastopen \
-             /proc/sys/net/ipv4/tcp_ecn \
-             /proc/sys/net/core/netdev_max_backlog; do
+    for p in $HSIN_PROC/sys/net/ipv4/tcp_fastopen \
+             $HSIN_PROC/sys/net/ipv4/tcp_ecn \
+             $HSIN_PROC/sys/net/core/netdev_max_backlog; do
         [ -w "$p" ] && _w=$((_w + 1))
     done
     if [ "$_w" -gt 0 ]; then

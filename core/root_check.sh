@@ -2,6 +2,8 @@
 # HSIN - Root Detection
 
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Detect root method
 hsin_detect_root() {
@@ -30,7 +32,7 @@ hsin_detect_root() {
         return 0
     fi
     # Check KernelSU kernel
-    if [ -f /proc/version ] && grep -qi "kernelsu\|ksu" /proc/version 2>/dev/null; then
+    if [ -f "$HSIN_PROC/version" ] && grep -qi "kernelsu\|ksu" "$HSIN_PROC/version" 2>/dev/null; then
         echo "kernelsu"
         return 0
     fi
