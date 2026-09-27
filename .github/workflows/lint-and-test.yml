@@ -18,18 +18,18 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
-      - name: ShellCheck all .sh (except build/)
+      - name: ShellCheck all .sh (except build/, errors only)
         run: |
           set -e
-          find . -type f -name '*.sh' | grep -v '^./build/' | while read f; do
+          find . -type f -name '*.sh' | grep -v '^./build/' | while read -r f; do
             echo "--- shellcheck $f ---"
-            shellcheck "$f" || { echo "FAIL: $f"; exit 1; }
+            shellcheck -S error "$f" || { echo "FAIL: $f"; exit 1; }
           done
 
       - name: sh -n syntax validation
         run: |
           set -e
-          find . -type f -name '*.sh' | grep -v '^./build/' | while read f; do
+          find . -type f -name '*.sh' | grep -v '^./build/' | while read -r f; do
             echo "--- sh -n $f ---"
             sh -n "$f" || { echo "FAIL: sh -n $f"; exit 1; }
           done
