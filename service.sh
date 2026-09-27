@@ -128,10 +128,8 @@ fi
 HSIN_NOTIF_ICON_DST="/storage/emulated/0/Android/media/.hsin/notif_icon.png"
 for _ext in png jpg jpeg; do
     _src=""
-    if [ -f "$MODPATH/webroot/notif_icon.$_ext" ]; then
-        _src="$MODPATH/webroot/notif_icon.$_ext"
-    elif [ -f "$MODPATH/webroot/assets/notif_icon.$_ext" ]; then
-        _src="$MODPATH/webroot/assets/notif_icon.$_ext"
+    if [ -f "$MODPATH/assets/notif_icon.$_ext" ]; then
+        _src="$MODPATH/assets/notif_icon.$_ext"
     fi
     if [ -n "$_src" ]; then
         mkdir -p "$(dirname "$HSIN_NOTIF_ICON_DST")" 2>/dev/null
