@@ -1,0 +1,5 @@
+#!/bin/sh
+# Gradle wrapper script placeholder - run 'gradle wrapper' on a machine with Gradle installed to generate the real wrapper
+# This placeholder allows the structure to be valid for CI
+echo "Gradle wrapper not generated. Run 'gradle wrapper' locally or in CI to generate."
+exit 1
