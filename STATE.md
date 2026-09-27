@@ -145,3 +145,28 @@
   log type). Material 3 theme, viewBinding, kotlinx.serialization, icon
   dari branding/logo.png. Push DONE. Antrean: Extreme opt-in UI + game
   list UI + Backup/Restore UI + polish + L2 HP.
+
+- USER-KNOBS (2026-09-27, dev-modul + review leader): aksi
+  knob-set/knob-reset/knob-list (aaa7a9c) simpan override knob ke
+  $HSIN_DATA/user_knobs.env (atomic + readback, maks 64 key, tervalidasi).
+  Review leader: 10 uji injeksi DITOLAK semua, file berisi 4 baris persis,
+  7 aksi lama rc=0, jalur apply TIDAK tersentuh. Push DONE.
+  PENTING: override belum dipakai apply -> pilihan user BELUM berefek.
+
+- APP-FIX + CI (2026-09-27, leader inline): scaffold 7a0402a diperbaiki -
+  adapter RecyclerView ditulis ulang jadi model baris datar (versi lama
+  campur tipe baris = runtime crash), 10x ArrayAdapter signature salah,
+  import decodeFromString hilang, fragment akses mainViewModel private,
+  manifest menunjuk class terhapus, layout disinkronkan, 0 TODO/placeholder,
+  wrapper Gradle palsu (stub) dihapus. Apply jadi nyata: knob-set* +
+  config-set* lalu satu apply. Fitur tanpa jalur tulis (DVFS/global-RR/
+  frame-limit/SF) ditampilkan read-only, bukan switch palsu (9c8aac3).
+  Workflow .github/workflows/{build-apk,build-modul}.yml MANUAL
+  (workflow_dispatch, tidak auto-build saat push).
+  CATATAN JUJUR: Kotlin BELUM PERNAH dikompilasi (tanpa JDK di Termux);
+  semua R.id/R.layout/@string/@style/@color sudah dicek resolve, tapi
+  error compile baru terlihat setelah CI dijalankan. Push DONE.
+
+- DOKUMEN (2026-09-27, leader): PLAN.md ditulis ulang agar akurat (Tahap 1
+  kode selesai nunggu L2; Tahap 3 app jalan tapi belum terverifikasi
+  compile; build hanya via GitHub Actions). Tidak ada perubahan kode.
