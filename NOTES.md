@@ -594,3 +594,9 @@
   Alpha-code-b) HILANG dari DB saat password di-set/first-run. Tidak ada
   script yang menghapus (POST terbukti additive: dua combo masuk dua-dua),
   jadi penyebabnya kemungkinan inisialisasi 9Router - perlu konfirmasi.
+
+- BUG cleanup script (ketahuan saat cek): parser id combo memakai
+  `grep -A2` padahal field `id` muncul SEBELUM `name` di JSON, jadi id selalu
+  KOSONG -> combo HSIN-* tidak terhapus. Diperbaiki: pecah JSON per objek
+  (`tr "{" "\n"`) lalu ambil id dari objek yang namanya cocok. Diuji dengan
+  sample: id terbaca benar.
