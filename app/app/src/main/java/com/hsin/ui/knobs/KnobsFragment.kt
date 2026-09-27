@@ -96,7 +96,7 @@ class KnobsFragment : Fragment() {
     }
 
     private fun applyNow() {
-        val configs = configDraft.toMap()
+        val configs = configDraft.toMutableMap()
         val r = knobs
         if (r != null && toggleState["ALLOW_EXTREME"] == true) configs["ALLOW_EXTREME"] = "true"
 
