@@ -94,7 +94,7 @@ hsin_cpu_cpuset_apply() {
                     echo "$HSIN_CPU_LITTLE" > "/dev/cpuset/$_grp/cpus" 2>/dev/null
                 }
             done
-            echo "    cpuset: top-app/foreground -> BIG ($_cpus)"
+            echo "    cpuset: top-app/foreground -> BIG ($HSIN_CPU_BIG)"
             ;;
     esac
     return 0
