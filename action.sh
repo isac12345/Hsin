@@ -33,7 +33,7 @@ if ! command -v hsin_protect_watermark >/dev/null 2>&1; then
 fi
 hsin_protect_integrity || { echo "ERROR: Integrity check failed - refusing to run"; exit 1; }
 
-HSIN_CONF="/sdcard/Android/hsin/hsin.conf"
+HSIN_CONF="${HSIN_CONF:-/sdcard/Android/hsin/hsin.conf}"
 HSIN_GAM_BOOST="false"
 # Session-level opt-in: if the caller already exported ALLOW_EXTREME (e.g.
 # the WebUI's confirm-dialog does `ALLOW_EXTREME=true action.sh apply
