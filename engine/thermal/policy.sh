@@ -135,27 +135,6 @@ hsin_thermal_apply_gpu() {
     done
 }
 
-# Apply thermal policy to scheduling
-hsin_thermal_apply_sched() {
-    _policy="$1"
-
-    case "$_policy" in
-        critical)
-            # Reduce uclamp for all tasks
-            for _task in /proc/*/sched; do
-                [ -f "$_task" ] || continue
-                # Only adjust uclamp_max for background tasks
-            done
-            ;;
-        hot)
-            # Moderate reduction
-            ;;
-        *)
-            # No adjustment needed
-            ;;
-    esac
-}
-
 # Full thermal policy application
 hsin_thermal_apply() {
     _profile="$1"
