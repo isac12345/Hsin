@@ -314,6 +314,18 @@
   T615 NUL-strip, vendor unisoc, gpu terbaca, ram 8000000|4000000,
   net bbr), literal /proc 73→55.
 
+## Proc batch-3 (2026-09-27, leader langsung)
+- Isi (f891245, 6 file +35/-23): core/{capability_scan,capability,
+  hardware,backup,root_check,export}.sh → guard HSIN_PROC + swap prefix.
+  Sisa 1 di hardware.sh = komentar "/proc/diskstats" (tak dieksekusi).
+- Bukti: bash-n 6/6, shellcheck 0 (SC2034 HSIN_CAP_DIR pre-existing,
+  dicek via `git show HEAD:f` tanpa stash), sandbox prefix palsu —
+  hardware soc terbaca, root_check deteksi kernelsu, backup node
+  swappiness/tcp/tfo tercatat dari prefix palsu, capability_scan
+  _scan_memory/_scan_network/_scan_thermal probe benar. /proc 55→32.
+- Sisa 32: action.sh 14 (kode ~9), imgtec 6, validator 2, scheduler 2,
+  governor 3, export/scan_cache/detector2 sisanya komentar.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).

@@ -115,3 +115,8 @@
 - PROC-2 (2026-09-27, leader langsung): core/detector.sh via
   $HSIN_PROC (a620ea5, deteksi utuh). Bukti: bash-n OK, shellcheck
   0, sandbox 5 fungsi. /proc 73→55. Antrean: proc batch-3 + L2 HP.
+
+- PROC-3 (2026-09-27, leader langsung): core/* 6 file via $HSIN_PROC
+  (f891245, probe utuh). Bukti: bash-n 6/6, shellcheck 0, sandbox
+  (hardware/root_check/backup/capability_scan). /proc 55→32.
+  Antrean: proc batch-4 (action.sh + engine/*) + L2 HP.
