@@ -25,7 +25,7 @@ unzip -o "$ZIPFILE" 'profiles/*' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'config/*' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'bin/*' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'extreme/*' -d "$MODPATH" >&2
-unzip -o "$ZIPFILE" 'webroot/*' -d "$MODPATH" >&2
+unzip -o "$ZIPFILE" 'assets/*' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'module.prop' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'customize.sh' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'service.sh' -d "$MODPATH" >&2

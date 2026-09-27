@@ -31,9 +31,6 @@ profiles/battery.conf
 profiles/performance.conf
 profiles/extreme.conf
 config/hsin.conf
-webroot/index.html
-webroot/script.js
-webroot/style.css
 "
 
 PROTECTED_FILES_EXTRA="
@@ -63,7 +60,7 @@ _clean_stage() {
     for _entry in "$SRC_DIR"/*; do
         _name=$(basename "$_entry")
         case "$_name" in
-            build|.git) continue ;;
+            build|.git|app|branding) continue ;;
         esac
         cp -r "$_entry" "$_stage/$_name"
     done
