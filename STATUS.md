@@ -1,17 +1,17 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (Step 5 DONE `5f3355c`, NEXT Step 6)
-**Overall Progress:** Phase 1 DONE (4/22) → Phase 2 IN PROGRESS (1/4, Step 5 DONE)
+**Last Updated:** 2026-09-27 (Steps 7-8 DONE `6ea5619` = "Step 6" versi user; Step 6 dokumen DITUNDA, STOP sebelum lanjut)
+**Overall Progress:** Phase 1 DONE (4/22) → Phase 2 IN PROGRESS (Steps 5,7,8 DONE; Step 6 ditunda)
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[█████░░░░░░░░░░░░░░░] 23% (5/22 steps DONE)
+[██████░░░░░░░░░░░░░░] 32% (7/22 steps DONE)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
-PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██░░░░░░░░] 25% — IN PROGRESS (Step 5 DONE)
+PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [███████░░░] 75% — Steps 5,7,8 DONE; Step 6 ditunda
 PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
 PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
 PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
@@ -58,12 +58,27 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   terverifikasi (WARN masuk boot.log). CI push: API GitHub tak terjangkau
   dari Termux (2x coba) — status CI BELUM terkonfirmasi, jujur menunggu.
 - [ ] **Step 6** — integrasi boot guard ke `service.sh` (cek di awal boot,
-  skip tuning + exit bersih bila guard aktif, reset bila boot sukses).
-- [ ] **Step 7** — `core/safe_apply.sh` — cek node exist + writable, write,
-  read-back, verify, kategorikan APPLIED / SKIPPED / FALLBACK / FAILED
-  (referensi `apply_tweak()` Alpha). Tanpa verify = tanpa klaim sukses.
-- [ ] **Step 8** — migrasi `engine/cpu` ke `safe_apply.sh` sebagai bukti
-  pola terpakai (tanpa override: hasil apply IDENTIK vs sebelum migrasi).
+  skip tuning + exit bersih bila guard aktif, reset bila boot sukses) —
+  PENDING / DITUNDA: user memerintahkan safe_apply dulu (Step 6 versi user
+  = Step 7+8 dokumen ini, selesai di bawah). Perlu keputusan user kapan
+  integrasi service.sh dikerjakan.
+- [x] **Step 7** — `core/safe_apply.sh` — DONE 2026-09-27, commit `6ea5619`
+  (`feat: safe sysfs write gateway with 5 result categories` = "Step 6"
+  versi perintah user). Gateway 5 kategori (APPLIED=0 / SKIPPED=2 /
+  UNAVAILABLE=3 / FALLBACK=4 / FAILED=1), referensi `apply_tweak()` Alpha
+  (common/engine.sh) TANPA chmod paksa (read-only = SKIPPED beralasan).
+  Write+verify inti REUSE `hsin_node_write_verify()` existing
+  (core/sysfs.sh, tanpa duplikasi). Bukti L1: sh -n + shellcheck
+  `-S error` 0, sandbox 11/11 (hilang/read-only/ditolak/ngawur
+  ±alternatif/sukses/log/counter/engine-palsu/logger).
+- [x] **Step 8** — migrasi 1 engine sebagai bukti pola — DONE 2026-09-27,
+  commit `6ea5619` (sama). Dipilih `engine/io/readahead.sh` (risiko
+  terkecil: 71 baris, 1 write site, non-kritis) BUKAN engine/cpu
+  (backup/restore path = risiko lebih tinggi; cpu menyusul setelah pola
+  approved). A/B tanpa override IDENTIK (512=512). Plus 1 baris
+  build_release.sh: safe_apply.sh + boot_guard.sh masuk daftar runtime
+  (tanpanya hilang di ZIP release — kelas bug scan_cache dulu; boot_guard
+  ikut diperbaiki karena celah yang sama dari Step 5).
 
 ---
 
@@ -113,10 +128,10 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 | Metric | Value |
 |---|---|
 | **Total Steps** | 22 |
-| **Completed** | 5 (Steps 1-5 baru) |
-| **Next** | Step 6 (integrasi boot guard ke `service.sh`) |
+| **Completed** | 7 (Steps 1-5, 7-8; Step 6 dokumen ditunda) |
+| **Next** | Keputusan user: Step 6 dokumen (integrasi service.sh) atau lanjut Phase 3 |
 | **Reverted** | 1 (Step 5 lama, `36d2256`) |
-| **Pending** | 17 (Steps 6-22 baru) |
+| **Pending** | 15 (Step 6 + Steps 9-22) |
 | **Expected Commits** | ~18 (1 per step, tanpa force push) |
 
 ---
