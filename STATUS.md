@@ -1,17 +1,17 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (realign capability-first: Step 5 lama direvert, antrean 31 → 22 step)
-**Overall Progress:** Phase 1 DONE (4/22) → Phase 2 NEXT (boot_guard.sh)
+**Last Updated:** 2026-09-27 (Step 5 DONE `5f3355c`, NEXT Step 6)
+**Overall Progress:** Phase 1 DONE (4/22) → Phase 2 IN PROGRESS (1/4, Step 5 DONE)
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[████░░░░░░░░░░░░░░░░] 18% (4/22 steps DONE)
+[█████░░░░░░░░░░░░░░░] 23% (5/22 steps DONE)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
-PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [░░░░░░░░░░] 0% — NEXT
+PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██░░░░░░░░] 25% — IN PROGRESS (Step 5 DONE)
 PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
 PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
 PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
@@ -48,12 +48,15 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ## 📋 PHASE 2: Boot Guard & Safe Apply (Steps 5-8) — NEXT
 
-- [ ] **Step 5 (NEXT)** — `core/boot_guard.sh` — hitung boot fail count,
-  auto-disable tuning bila gagal berturut-turut, log jelas kapan guard aktif
-  (referensi pola `service.sh` repo isac12345/Alpha).
-  - Acceptance: 4 fungsi (init/check/increment/reset) jalan; state file
-    format `timestamp:count`; threshold + cooldown 24 jam; shellcheck 0;
-    sh -n lolos; CI hijau; sandbox: 3 gagal → guard aktif, boot sukses → reset.
+- [x] **Step 5** — `core/boot_guard.sh` — DONE 2026-09-27, commit `5f3355c`
+  (`feat: boot guard with fail-count auto-disable (Phase 2, Step 5)`).
+  Threshold >= 2x (perintah user, override PRIORITY_QUEUE yang tulis 3x —
+  perlu sinkronisasi susulan, di luar scope Step 5). Bukti L1: sh -n 2/2,
+  shellcheck -S error 0, sandbox 10/10 (fresh→applied, 1x→belum aktif,
+  2x→AKTIF+skip tuning, counter persisten ts:count, log AKTIF+alasan,
+  boot-ok→reset, korup→sanitasi, threshold-env override), jalur logger
+  terverifikasi (WARN masuk boot.log). CI push: API GitHub tak terjangkau
+  dari Termux (2x coba) — status CI BELUM terkonfirmasi, jujur menunggu.
 - [ ] **Step 6** — integrasi boot guard ke `service.sh` (cek di awal boot,
   skip tuning + exit bersih bila guard aktif, reset bila boot sukses).
 - [ ] **Step 7** — `core/safe_apply.sh` — cek node exist + writable, write,
@@ -110,10 +113,10 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 | Metric | Value |
 |---|---|
 | **Total Steps** | 22 |
-| **Completed** | 4 (Steps 1-4) |
-| **Next** | Step 5 (`core/boot_guard.sh`) |
+| **Completed** | 5 (Steps 1-5 baru) |
+| **Next** | Step 6 (integrasi boot guard ke `service.sh`) |
 | **Reverted** | 1 (Step 5 lama, `36d2256`) |
-| **Pending** | 18 (Steps 5-22 baru) |
+| **Pending** | 17 (Steps 6-22 baru) |
 | **Expected Commits** | ~18 (1 per step, tanpa force push) |
 
 ---
@@ -153,4 +156,4 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
-**Next Step:** Step 5 — `core/boot_guard.sh` (butuh approve user sebelum coding, per perintah 2026-09-27: commit dokumen dulu, implementasi terpisah).
+**Next Step:** Step 6 — integrasi boot guard ke `service.sh` (STOP — butuh approve user sebelum lanjut, per perintah 2026-09-27).
