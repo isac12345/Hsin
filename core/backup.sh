@@ -26,16 +26,16 @@ hsin_backup_init() {
 # Simpan 1 node. Skip kalau file tidak ada.
 hsin_backup_node() {
     # $1=path absolut
-    _p="$1"
+    _bn_p="$1"
     [ -z "$HSIN_BACKUP_CUR" ] && hsin_backup_init
-    [ -f "$_p" ] || return 0
+    [ -f "$_bn_p" ] || return 0
     # PATCH v4.0: baca pakai builtin read (tanpa fork cat), dan BUANG
     # md5sum|awk per node - hasilnya (_h) ternyata TIDAK PERNAH dipakai
     # (dead code) tapi nge-fork 2 proses tiap node. Di low-end, snapshot
     # penuh (~100 node) berarti ~300 fork = 7-15 detik murni sia-sia.
     _v=""
-    IFS= read -r _v < "$_p" 2>/dev/null
-    echo "$_p=$_v" >> "$HSIN_BACKUP_CUR/nodes.list"
+    IFS= read -r _v < "$_bn_p" 2>/dev/null
+    echo "$_bn_p=$_v" >> "$HSIN_BACKUP_CUR/nodes.list"
 }
 
 # Backup banyak node sekaligus (multi-arg)

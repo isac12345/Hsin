@@ -23,12 +23,12 @@
 # ============================================================
 
 hsin_apply_all_engines() {
-    _p="${1:-balanced}"
+    _prof_arg="${1:-balanced}"
     _prev="${2:-none}"
     _src="${4:-manual}"
     _failed=0
 
-    if [ "$_p" = "extreme" ] && [ "${ALLOW_EXTREME:-${HSIN_ALLOW_EXTREME:-false}}" != "true" ]; then
+    if [ "$_prof_arg" = "extreme" ] && [ "${ALLOW_EXTREME:-${HSIN_ALLOW_EXTREME:-false}}" != "true" ]; then
         echo "SKIP: extreme requires explicit ALLOW_EXTREME=true" >> "$HSIN_DATA/logs/debug.log" 2>/dev/null
         return 1
     fi
@@ -58,9 +58,9 @@ hsin_apply_all_engines() {
     # governor & frequency kelihatan "nyangkut" di extreme setiap keluar
     # dari game padahal profil sudah balik ke pilihan manual user.
     # Dengan restore dijalankan lebih dulu, hasil akhir sysfs adalah
-    # output hsin_cpu_apply/hsin_gpu_apply "$_p" (grup A di bawah), yang
+    # output hsin_cpu_apply/hsin_gpu_apply "$_prof_arg" (grup A di bawah), yang
     # memang seharusnya menang.
-    if [ "$_p" != "extreme" ] && [ "$_prev" = "extreme" ]; then
+    if [ "$_prof_arg" != "extreme" ] && [ "$_prev" = "extreme" ]; then
         . "$HSIN_MODULE_PATH/extreme/safety_monitor.sh" 2>/dev/null
         hsin_safety_monitor_stop >> "$HSIN_DATA/logs/debug.log" 2>&1
 
@@ -95,7 +95,7 @@ hsin_apply_all_engines() {
     # pass "safe" (from battery/balanced confs) which matched NO case →
     # thermal protection became a complete no-op.
     if command -v hsin_profile_load >/dev/null 2>&1; then
-        hsin_profile_load "$_p" 2>/dev/null
+        hsin_profile_load "$_prof_arg" 2>/dev/null
     fi
     _dvfs_en="false"; _dvfs_cpu="100"; _dvfs_gpu="100"
     _rr_en="false"; _rr_red="false"; _rr_force="false"
@@ -119,27 +119,27 @@ hsin_apply_all_engines() {
     # sysfs writes, and variable state are all predictable.
 
     . "$HSIN_MODULE_PATH/engine/cpu/apply.sh" 2>/dev/null
-    hsin_cpu_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_cpu_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "cpu-apply"
 
     . "$HSIN_MODULE_PATH/engine/gpu/apply.sh" 2>/dev/null
-    hsin_gpu_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_gpu_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "gpu-apply"
 
     . "$HSIN_MODULE_PATH/engine/thermal/apply.sh" 2>/dev/null
-    hsin_thermal_engine_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_thermal_engine_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "thermal-apply"
 
     . "$HSIN_MODULE_PATH/engine/memory/apply.sh" 2>/dev/null
-    hsin_memory_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_memory_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "memory-apply"
 
     . "$HSIN_MODULE_PATH/engine/io/io_manager.sh" 2>/dev/null
-    hsin_io_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_io_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "io-apply"
 
     . "$HSIN_MODULE_PATH/engine/network/network_manager.sh" 2>/dev/null
-    hsin_network_apply "$_p" 2>/dev/null || _failed=$((_failed + 1))
+    hsin_network_apply "$_prof_arg" 2>/dev/null || _failed=$((_failed + 1))
     _mark "network-apply"
 
     if [ "$_dvfs_en" = "true" ]; then
@@ -170,7 +170,7 @@ hsin_apply_all_engines() {
     _mark "display+render-apply"
 
     # ================= Extreme wiring (sequential, sama seperti semula) ======
-    if [ "$_p" = "extreme" ]; then
+    if [ "$_prof_arg" = "extreme" ]; then
         . "$HSIN_MODULE_PATH/extreme/frequency_unlock.sh" 2>/dev/null
         hsin_extreme_freq_backup >/dev/null 2>&1
         hsin_extreme_freq_apply >> "$HSIN_DATA/logs/debug.log" 2>&1
