@@ -7,9 +7,9 @@
    shell-sandbox, shell-safety, magisk-module-debug,
    android-static-verify (saat APK).
 2. Kepemilikan: dev-modul = core/, engine/, capability/, config/,
-   profiles/, extreme/, bin/, webroot/, skrip modul di root
+   profiles/, extreme/, bin/, assets/, skrip modul di root
    (action/customize/service/uninstall/post-fs-data). dev-apk =
-   (nanti) apk + webroot integrasi. Kerja di cabang work/<id>.
+   app/, branding/ (aset aplikasi). Kerja di cabang work/<id>.
    Master/main tidak disentuh langsung; merge hanya oleh leader.
 3. DILARANG sentuh perangkat: tanpa pm install, menjalankan
    aplikasi, input, screenshot, su, tulis /sys|/proc, reboot,
