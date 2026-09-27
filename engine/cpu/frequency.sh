@@ -8,6 +8,10 @@
 # (scaling_min/max) tetap dibaca live.
 command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
     . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
+# Override knob user per policy (kHz absolut, bukan persen) + logger untuk
+# mencatat override yang dipakai/di-snap.
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 # Diisi hsin_scan_lookup() (core/scan_cache.sh) dan hsin_cpu_policy_hwmax()
 # (engine/cpu/detect.sh).
 _sc_f=""
@@ -141,6 +145,50 @@ hsin_cpu_freq_apply() {
             extreme)     _min="$_stock_max"; _max="$_stock_max" ;;
             *)           _min="$_stock_min"; _max="$_stock_max" ;;
         esac
+        # Override knob user = nilai kHz ABSOLUT untuk policy ini, bukan
+        # persen. Syarat WAJIB: angkanya ada di daftar OPP policy ini -
+        # kernel menolak scaling_max_freq yang bukan OPP dengan diam-diam.
+        # Di luar tabel disnap ke OPP terdekat <= (hsin_opp_cap_pick) dan
+        # dicatat, supaya tidak pernah menulis angka yang tidak ada di
+        # tabel. _avail sudah dipastikan tidak kosong di atas.
+        _uk_max=$(hsin_uk_cpu_field "$_pid" max_khz 2>/dev/null)
+        if [ -n "$_uk_max" ]; then
+            case " $_avail " in
+                *" $_uk_max "*)
+                    _max="$_uk_max"
+                    hsin_uk_used "cpu" "cpu_policy_${_pid}_max_khz" "$_uk_max"
+                    ;;
+                *)
+                    _uk_snap=$(hsin_opp_cap_pick "$_uk_max" "$_avail")
+                    if [ -n "$_uk_snap" ]; then
+                        _max="$_uk_snap"
+                        hsin_log_warn "cpu" "override cpu_policy_${_pid}_max_khz=$_uk_max tidak ada di tabel OPP; snap ke $_uk_snap"
+                    else
+                        hsin_log_warn "cpu" "override cpu_policy_${_pid}_max_khz=$_uk_max ditolak: tabel OPP tidak terbaca (pakai profil)"
+                    fi
+                    ;;
+            esac
+        fi
+        # min_khz: aturan sama (snap ke OPP terdekat <=, dicatat) - hanya
+        # jadi batas bawah yang tidak melewati pilihan user.
+        _uk_min=$(hsin_uk_cpu_field "$_pid" min_khz 2>/dev/null)
+        if [ -n "$_uk_min" ]; then
+            case " $_avail " in
+                *" $_uk_min "*)
+                    _min="$_uk_min"
+                    hsin_uk_used "cpu" "cpu_policy_${_pid}_min_khz" "$_uk_min"
+                    ;;
+                *)
+                    _uk_snap=$(hsin_opp_cap_pick "$_uk_min" "$_avail")
+                    if [ -n "$_uk_snap" ]; then
+                        _min="$_uk_snap"
+                        hsin_log_warn "cpu" "override cpu_policy_${_pid}_min_khz=$_uk_min tidak ada di tabel OPP; snap ke $_uk_snap"
+                    else
+                        hsin_log_warn "cpu" "override cpu_policy_${_pid}_min_khz=$_uk_min ditolak: tabel OPP tidak terbaca (pakai profil)"
+                    fi
+                    ;;
+            esac
+        fi
         if hsin_cpu_freq_apply_one "$_policy" "$_min" "$_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
     done
     echo "    Frequency [$_profile]: ok=$_ok skip=$_skip fail=$_fail"

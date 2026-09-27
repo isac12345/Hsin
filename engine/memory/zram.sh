@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# Override knob user (zram_algo).
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 # shellcheck disable=SC1091
 . "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
 [ -n "$HSIN_SYSFS_BLOCK" ] || HSIN_SYSFS_BLOCK="${SYSFS_BLOCK_PREFIX:-/sys/block}"
@@ -131,6 +133,32 @@ hsin_zram_apply() {
     [ "$_zcount" -gt 0 ] || { echo "    zRAM: not available"; return 0; }
 
     _target_algo=$(hsin_zram_algo "$_profile")
+    # Override knob user (zram_algo) hanya dipakai kalau algo itu ada di
+    # daftar algo yang DIDUKUNG node - dicek sekali di sini supaya keputusan
+    # dipakai/tidak dilaporkan sekali, bukan sekali per device. Cek per
+    # node dan readback ketat hsin_zram_algo_live di loop bawah tetap
+    # berlaku apa pun nilai _algo hasil detect, jadi override tidak
+    # pernah melewati validasi yang sudah ada.
+    _uk_algo=$(hsin_uk_get zram_algo 2>/dev/null)
+    if [ -n "$_uk_algo" ]; then
+        _uk_algo_ok=0
+        hsin_mem_zram_names
+        for _uk_zn in $HSIN_MEM_ZRAM_NAMES; do
+            _uk_zf="$HSIN_SYSFS_BLOCK/$_uk_zn/comp_algorithm"
+            [ -f "$_uk_zf" ] || continue
+            _uk_za=""
+            IFS= read -r _uk_za < "$_uk_zf" 2>/dev/null
+            case " $(printf '%s' "$_uk_za" | tr -d '[]') " in
+                *" $_uk_algo "*) _uk_algo_ok=1; break ;;
+            esac
+        done
+        if [ "$_uk_algo_ok" = "1" ]; then
+            _target_algo="$_uk_algo"
+            hsin_uk_used "memory" "zram_algo" "$_uk_algo"
+        else
+            hsin_log_warn "memory" "override zram_algo=$_uk_algo ditolak: tidak ada di daftar algo comp_algorithm device mana pun (pakai profil)"
+        fi
+    fi
     _ok=0
     _skip=0
 

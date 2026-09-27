@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# Override knob user (swappiness).
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 # shellcheck disable=SC1091
 . "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
 # Path proc dari core/scan_cache.sh (satu-satunya definisi), default sama
@@ -133,6 +135,17 @@ hsin_vm_apply() {
             extreme)     _val="$_def_e" ;;
         esac
 
+        # Override knob user hanya untuk swappiness, dan tetap lewat
+        # hsin_vm_write: rentang 0-200 diambil dari HSIN_VM_SAFE di fungsi
+        # itu, jadi tidak ada rentang kedua yang bisa tidak sinkron dengan
+        # yang sudah ada di file ini.
+        _uk_val=""
+        [ "$_n" = "swappiness" ] && _uk_val=$(hsin_uk_get swappiness 2>/dev/null)
+        if [ -n "$_uk_val" ]; then
+            _val="$_uk_val"
+            hsin_uk_used "vm" "swappiness" "$_val"
+        fi
+
         [ -z "$_val" ] && continue
 
         # Check if already set
@@ -146,6 +159,7 @@ hsin_vm_apply() {
             echo "    vm.$_n = $_val ✓"
         else
             echo "    vm.$_n: skip (not writable or invalid)"
+            [ -n "$_uk_val" ] && hsin_log_warn "vm" "override swappiness=$_uk_val gagal ditulis/tidak valid (pakai nilai profil)"
         fi
     done <<EOF
 $HSIN_VM_SAFE
