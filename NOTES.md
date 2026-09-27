@@ -668,3 +668,30 @@
   di sisi shell/HP → Task 2a (user: `su -c 'sh .../action.sh status/knobs'`
   manual, lihat JSON/hang/lama) adalah pemisah utama. L2: user tes.
 
+## Sweep + sandbox + kontrak (2026-09-27, leader + dev-modul + dev-apk)
+- Sweep shell (merge 3ed645e, action.sh 4+/4-): komentar stale polling
+  ~3s diluruskan; 2 path hardcoded di `hsin_action_live_status` jadi
+  prefix (`HSIN_SYSFS_THERMAL` baris 363, `HSIN_SYSFS_DEVFREQ` baris 463).
+  Tanpa ini status di device baca suhu/GPU dari /sys asli walau prefix
+  diarahkan (dan di HP nyata tetap benar karena default = /sys).
+- Sandbox leader (uji sendiri, bukan klaim pekerja): pohon palsu 2 policy
+  + 2 zone + devfreq + proc → `status` rc=0 ~0.3s, JSON 29 key valid,
+  cpu_temp=45000 gpu_temp=42000 cpu_freq/ram/load/uptime mengalir;
+  `knobs` rc=0 1 baris, 2 policies + govs + OPP terisi; pohon KOSONG →
+  semua aksi rc=0 + JSON valid (tidak crash); output status hanya 1 baris
+  `{` (terakhir = JSON, aman untuk lastJsonLine app). PELAJARAN: harness
+  salah level direktori (`policyN` langsung vs `cpufreq/policyN`)
+  sempat "menemukan" policies=0 — cocokkan nama node dengan kode dulu.
+- Kontrak app↔shell (dev-apk read-only): knobs COCOK (govs/cur_gov/
+  opp_khz/writable_* dua sisi); device COCOK; status ASIMETRIS tapi AMAN
+  (`Json ignoreUnknownKeys=true`, key ekstra shell diabaikan — jangan
+  ubah model); sanitasi node COCOK (`23100000.gpu`→`23100000_gpu`).
+- TEMUAN DITERIMA: Knobs blank-diam TERBUKTI (load sukses + list kosong →
+  submit(empty) tanpa pesan). Fix (merge f5a0e9f, +3 baris): toast
+  "Tidak ada knob terdeteksi (scan kosong)" bila profiles+policies+nodes
+  kosong; render tetap jalan. Field terverifikasi di KnobsResponse.kt
+  (:19/:33/:50).
+- CI sesudah semua fix: build-modul run #36301125635 success,
+  build-apk run #36301127388 success (compile Kotlin lolos termasuk toast
+  baru). L2 tersisa: flash + reboot + tes HP oleh user.
+

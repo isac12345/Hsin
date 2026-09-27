@@ -192,3 +192,13 @@
   blank-tanpa-error tak terbukti statis → pemisah = Task 2a di HP oleh
   user. L2: user tes shell manual + konfirmasi berat/blank.
 
+- SWEEP-SANDBOX-KONTRAK (2026-09-27, leader + dev-modul work/sweep-shell
+  + dev-apk read-only + fix work/knobs-empty): TERIMA + merge 3ed645e
+  (komentar stale + 2 prefix sandbox) + f5a0e9f (toast scan-kosong Knobs),
+  push DONE. Verifikasi leader: sh -n OK, shellcheck 0 baru (SC2154
+  false-positive via eval, SC2115 pre-existing), sandbox sendiri (status
+  0.3s JSON-29-key valid + suhu mengalir, knobs 2 policies, pohon kosong
+  rc=0, 1 baris `{`), kontrak COCOK kecuali status-asimetris-aman
+  (ignoreUnknownKeys). CI: modul #36301125635 + apk #36301127388 success.
+  L2: flash + reboot + tes HP oleh user.
+
