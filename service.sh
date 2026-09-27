@@ -65,6 +65,14 @@ if [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; then
 fi
 sleep 2  # Beri waktu sysfs stabil
 
+# STEP 10 (thermal guardrail): setelah boot guard, SEBELUM apply tuning.
+# Tidak duplikasi boot guard; hanya panggil thermal_check, ekspor state,
+# dan biarkan intervensi terbatas hanya di CRITICAL (via safe_apply).
+if [ -f "$MODPATH/core/thermal_check.sh" ]; then
+    . "$MODPATH/core/thermal_check.sh" 2>/dev/null || true
+    hsin_log_info "thermal" "check_state=$HSIN_THERMAL_CHECK_STATE max=${THERMAL_MAX_TEMP:-0} zones=${THERMAL_ZONE_COUNT:-0}"
+fi
+
 # 2. Load config user
 HSIN_CONF="$HSIN_USER/hsin.conf"
 [ -f "$HSIN_CONF" ] || HSIN_CONF="$MODPATH/config/hsin.conf"
