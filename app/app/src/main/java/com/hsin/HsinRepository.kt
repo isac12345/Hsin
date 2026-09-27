@@ -35,7 +35,7 @@ class HsinRepository(private val modulePath: String = MODULE_PATH) {
      * game boost), jadi ambil baris non-kosong TERAKHIR untuk diparse.
      */
     private fun lastJsonLine(stdout: String): String =
-        stdout.lineSequence().map { it.trim() }.lastOrNull { it.startsWith("{") }
+        HsinNative.lastJsonLineOrNull(stdout)
             ?: throw HsinException("tidak ada JSON di output: ${stdout.take(200)}")
 
     suspend fun knobs(): KnobsResponse = json.decodeFromString(lastJsonLine(action("knobs")))

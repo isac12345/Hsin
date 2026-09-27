@@ -24,13 +24,8 @@ import com.hsin.model.KnobsResponse
 object KnobsRowBuilder {
 
     /** Samakan dengan pola validasi modul: hanya [A-Za-z0-9_]. */
-    fun sanitizeNode(name: String): String {
-        val sb = StringBuilder(name.length)
-        for (ch in name) {
-            sb.append(if (ch.isLetterOrDigit() && ch.code < 128) ch else '_')
-        }
-        return sb.toString().take(40)
-    }
+    fun sanitizeNode(name: String): String =
+        com.hsin.HsinNative.sanitizeNode(name)
 
     fun build(r: KnobsResponse): List<KnobRow> {
         val out = mutableListOf<KnobRow>()
