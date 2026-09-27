@@ -4,12 +4,16 @@
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+# Override knob user per block (pilihan user, bukan nilai profil).
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 # shellcheck disable=SC1091
 . "$HSIN_MODULE_PATH/core/scan_cache.sh" 2>/dev/null
 # Path sysfs dari core/scan_cache.sh (satu-satunya definisi), default sama
 # dengan path yang sebelumnya ditulis langsung di file ini.
 [ -n "$HSIN_SYSFS_BLOCK" ] || HSIN_SYSFS_BLOCK="${SYSFS_BLOCK_PREFIX:-/sys/block}"
-# Diisi hsin_io_block_devs() (di bawah).
+# Diisi _uk_sanitize() (core/user_knobs.sh) dan hsin_io_block_devs() (di
+# bawah) - dideklarasikan di sini supaya jelas file ini memang memakainya.
+_uk_sn=""
 HSIN_IO_BLOCKS=""
 HSIN_IO_BLOCK_SOURCE=""
 HSIN_IO_BLOCKS_READY=""
@@ -114,6 +118,32 @@ hsin_io_apply_scheduler() {
             _target="bfq"
         else
             _target=$(hsin_io_pick_scheduler "$_profile" "$_list")
+        fi
+
+        # Override knob user menang atas pilihan profil (dan atas default
+        # bfq untuk disk rotasional), TAPI hanya kalau scheduler itu ada
+        # di daftar node ini - kernel menolak scheduler tak dikenal dengan
+        # write error, jadi lebih baik SKIP + bilang ke user.
+        # Sama seperti GPU: kunci yang ditulis ke log harus persis sama
+        # dengan yang disimpan di user_knobs.env (nama block bisa mengandung
+        # karakter yang jadi '_').
+        _uk_sanitize "$_name"
+        _uk_ksched="io_block_${_uk_sn}_sched"
+        _uk_sched=$(hsin_uk_io_field "$_name" sched 2>/dev/null)
+        if [ -n "$_uk_sched" ]; then
+            # Node queue/scheduler memakai penanda kurung siku untuk yang
+            # aktif, sama seperti comp_algorithm; kurung hanya dibuang
+            # untuk cek anggota daftar.
+            _uk_slist=$(printf '%s' "$_list" | tr -d '[]')
+            case " $_uk_slist " in
+                *" $_uk_sched "*)
+                    _target="$_uk_sched"
+                    hsin_uk_used "io" "$_uk_ksched" "$_uk_sched"
+                    ;;
+                *)
+                    hsin_log_warn "io" "override ${_uk_ksched}=$_uk_sched ditolak: tidak ada di daftar queue/scheduler node ini (pakai profil)"
+                    ;;
+            esac
         fi
 
         [ -z "$_target" ] && { _skip=$((_skip + 1)); continue; }

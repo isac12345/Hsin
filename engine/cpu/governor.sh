@@ -11,6 +11,11 @@
 # scaling_available_governors tetap dibaca live per policy.
 command -v hsin_cpu_policy_ids >/dev/null 2>&1 || \
     . "$HSIN_MODULE_PATH/engine/cpu/detect.sh" 2>/dev/null
+# Override knob user per policy (pilihan user, bukan nilai profil) + logger
+# untuk mencatat override yang dipakai/ditolak. File override tidak ada =
+# tidak ada override, apply jatuh ke nilai profil seperti sebelumnya.
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 
 # Pick best governor for profile from available list
 hsin_cpu_governor_pick() {
@@ -76,6 +81,24 @@ hsin_cpu_governor_apply() {
         _avail=""
         read -r _avail < "$_policy/scaling_available_governors" 2>/dev/null
         _target=$(hsin_cpu_governor_pick "$_profile" "$_avail")
+
+        # Override knob user menang atas pilihan profil, TAPI hanya kalau
+        # governor itu benar-benar ada di daftar node ini. Governor yang
+        # tidak didukung ditolak kernel dengan diam-diam, jadi menulis
+        # nilai mentah lebih berbahaya daripada mengabaikannya (dan user
+        # harus tahu knob-nya tidak terpakai, bukan mengira terpakai).
+        _uk_gov=$(hsin_uk_cpu_field "$_pid" gov 2>/dev/null)
+        if [ -n "$_uk_gov" ]; then
+            case " $_avail " in
+                *" $_uk_gov "*)
+                    _target="$_uk_gov"
+                    hsin_uk_used "cpu" "cpu_policy_${_pid}_gov" "$_uk_gov"
+                    ;;
+                *)
+                    hsin_log_warn "cpu" "override cpu_policy_${_pid}_gov=$_uk_gov ditolak: tidak ada di scaling_available_governors policy$_pid (pakai profil)"
+                    ;;
+            esac
+        fi
 
         [ -z "$_target" ] && { _skip=$((_skip + 1)); continue; }
 

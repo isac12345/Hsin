@@ -471,3 +471,84 @@
   (manual, tidak auto-build)._push DONE. CATATAN JUJUR: Kotlin BELUM
   pernah dikompilasi (tanpa JDK di Termux) - verifikasi compile hanya
   bisa lewat CI.
+
+- KNOB OVERRIDE -> APPLY (2026-09-27, dev-modul): core/user_knobs.sh kini
+  punya sisi BACA (hsin_uk_get + hsin_uk_cpu_field/hsin_uk_gpu_field/
+  hsin_uk_io_field + hsin_uk_used/hsin_uk_log_summary), file override
+  dibaca SATU kali per proses (cache dipisah spasi, diisi saat file
+  di-source supaya accessor yang dipanggil di dalam $( ) tidak baca ulang
+  file tiap node). Sanitasi nama node WAJIB sama dengan aplikasi
+  (KnobsRowBuilder.sanitizeNode: [A-Za-z0-9] lain '_', maks 40) - kalau
+  beda, kunci yang ditulis aplikasi tidak akan pernah ketemu.
+  Integrasi 7 file: cpu/governor.sh (gov per policy, valid ke
+  scaling_available_governors), cpu/frequency.sh (max_khz + min_khz
+  ABSOLUT, wajib ada di tabel OPP else snap ke OPP terdekat <=),
+  gpu/generic.sh (gov + max_khz per node), io/scheduler.sh (sched per
+  block), network/tcp.sh (tcp_cc hanya kalau ada di
+  tcp_available_congestion_control; tfo 0-3 dicek ulang di engine),
+  memory/vm.sh (swappiness, rentang tetap milik HSIN_VM_SAFE),
+  memory/zram.sh (zram_algo hanya kalau ada di daftar algo node;
+  readback hsin_zram_algo_live TIDAK dilonggarkan). Override yang
+  dipakai -> hsin_uk_used (baris "override: <key>=<nilai> dipakai" di
+  boot.log); yang ditolak -> hsin_log_warn dengan alasannya. Ringkasan
+  "override: N key dipakai" 1 baris ke apply.log, dipanggil dari
+  hsin_network_apply_sysctl (engine terakhir pipeline apply, jadi
+  hitungan sudah final) - apply_engines.sh tidak disentuh.
+- Bukti: bash -n 8 file 0, shellcheck -S warning 1 warning yang sudah
+  ada sebelum perubahan (SC2043 governor.sh:36) dan 0 baru; pencarian
+  literal path sysfs/proc di 8 file itu = kosong. Sandbox sysfs palsu (dash, 2 policy
+  CPU + 1 node GPU "23100000.gpu" + sda + zram0 + vm + tcp): (a) tanpa
+  override hasil apply IDENTIK vs HEAD (diff 13 node kosong); (b) 9
+  override valid -> semua node sesuai override + 9 baris "override" di
+  log; (c) governor/freq/sched/algo/cc ngawur -> TOLAK + WARN, tidak ada
+  nilai ngawur masuk node, APPLY_RC=0; (d) 2 policy -> keduanya dipakai.
+  Side-test: file override berkacau (injeksi, key tak dikenal, kembar)
+  -> hanya 2 key sah yang dipakai, apply tetap rc=0.
+- BUG PRE-EXISTING yang ditemukan (di luar scope, TIDAK diperbaiki):
+  core/backup.sh:29 hsin_backup_node memakai var `_p`, sama dengan `_p`
+  profil di core/apply_engines.sh:26. Jadi setelah hsin_backup_all, semua
+  engine menerima PATH NODE sebagai nama profil, bukan "balanced" dll -
+  setiap engine jatuh ke case `*` (nilai default, bukan nilai profil).
+  Efeknya nyata di HP juga, bukan hanya di sandbox. Perbaikan harus
+  mengganti nama var, jadi TIDAK boleh ikut diff ini.
+- CATATAN JUJUR: (1) override untuk node yang hilang/tidak writable tidak
+  menambah WARN baru - skip-nya sudah dilaporkan jalur lama
+  (hsin_report_skip / hsin_log_warn zram). (2) Verifikasi hanya sandbox
+  + statis di Termux; node kernel sungguhan (reaksi devfreq/comp_algorithm
+  terhadap OPP) belum pernah diuji - butuh L2 di HP.
+
+## Integrasi override knob ke apply (2026-09-27, dev-modul + review leader)
+- 9 file: core/user_knobs.sh (accessor baca + cache per-proses), engine/
+  {cpu/governor,cpu/frequency,gpu/generic,io/scheduler,network/tcp,
+  memory/vm,memory/zram}.sh (override dipakai di titik tulis, snapping OPP,
+  tolak + WARN kalau tidak didukung). Tidak ada apply yang berubah tanpa
+  override.
+- Review leader (sandbox hermitis HSIN_SANDBOX=1 + prefix palsu, A/B):
+  cpu gov OK, cpu max_khz OK, gpu gov OK, gpu max_khz OK, io sched OK,
+  tcp_cc OK, tfo OK, swappiness OK. zram_algo BELUM terverifikasi leader
+  (harness sandbox: num_devices module-param tak resolve) - perlu cek ulang.
+
+## 2 bug "pilihan user tidak dipakai" (2026-09-27, leader)
+- apply_engines.sh: nama profil dipindah ke var privat `_prof_arg` (PFIX
+  dari `hsin_backup_node` yang menimpa `_p` global dengan path node) dan
+  `_p` di hsin_backup_node -> `_bn_p`. A/B: HEAD profil=[] vs fix
+  profil terbaca; battery->powersave, performance->performance. SEBELUM
+  fix `hsin apply <profil>` tidak pernah berlaku. Commit cf20708.
+- engine/thermal/policy.sh: thermal tidak boleh MENAIKAN. Sebelumnya
+  PERF_TARGET=100 saat adem menulis scaling_max_freq/max_freq balik ke
+  hw_max, membatalkan cap profil DAN override user. Sekarang tulis hanya
+  bila target < nilai sekarang (CPU + GPU).
+- engine/gpu/dvfs.sh: tahap DVFS jalan PALING AKHIR dan menimpa semua;
+  sekarang node yang punya override max_khz ekspltit dilewati + log
+  (tanpa override, cap persen profil tetap berlaku - regresi nihil).
+  Ditemukan lewat checkpoint per tahap: profil battery punya [dvfs]
+  enabled=true cpu_limit=65 gpu_limit=80 yang menimpa hasil engine.
+
+## Kebocoran sandbox (2026-09-27, leader, commit e959252)
+- action.sh: HSIN_CONF hardcode /sdcard/... -> jadi ${HSIN_CONF:-...} biar
+  bisa diarahkan uji.
+- core/logger.sh: hsin_notify memanggil `cmd notification post` + `su -lp`
+  (nyata di HP). Gate HSIN_SANDBOX=1 mematikan tanpa mengubah perilaku.
+- Semua uji henceforth WAJIB HSIN_SANDBOX=1 + HSIN_CONF diarahkan.
+- Catatan: `cmd` ADA di Termux; `su` Termux tanpa root. /sdcard/Android/hsin
+  tidak ada di HP jadi config asli tidak pernah tersentuh.

@@ -7,7 +7,14 @@
 # governor TIDAK ada di cache, jadi tetap live.
 command -v hsin_gpu_opp_list >/dev/null 2>&1 || \
     . "$HSIN_MODULE_PATH/engine/gpu/detector.sh" 2>/dev/null
+# Override knob user per node + logger untuk mencatat override yang
+# dipakai/ditolak.
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 _hgo_avail=""
+# Diisi _uk_sanitize() (core/user_knobs.sh) - dideklarasikan di sini
+# seperti _hgo_avail supaya jelas file ini memang memakainya.
+_uk_sn=""
 
 hsin_gpu_generic_pick_gov() {
     _profile="$1"; _avail="$2"
@@ -40,6 +47,37 @@ hsin_gpu_generic_apply() {
     if [ "$_pct" -lt 100 ]; then
         [ -n "$_max" ] && _target_max=$(hsin_opp_cap_pick "$((_max * _pct / 100))" "$_avail")
     fi
+    # Override knob user = kHz absolut untuk node ini, hanya kalau ada di
+    # daftar OPP node; di luar tabel disnap ke OPP terdekat <= dan dicatat
+    # (devfreq menolak max_freq yang bukan OPP dengan diam-diam).
+    # Nama node disanitasi sekali di sini juga supaya kunci yang ditulis ke
+    # log persis sama dengan kunci yang disimpan user_knobs.env (nama node
+    # device bisa mengandung karakter yang jadi '_', mis. "23100000.gpu").
+    _uk_sanitize "${_d##*/}"
+    _uk_kmax="gpu_node_${_uk_sn}_max_khz"
+    _uk_kgov="gpu_node_${_uk_sn}_gov"
+    _uk_gmax=$(hsin_uk_gpu_field "$_d" max_khz 2>/dev/null)
+    if [ -n "$_uk_gmax" ]; then
+        if [ -z "$_avail" ]; then
+            hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax ditolak: node tidak punya daftar available_frequencies (pakai profil)"
+        else
+            case " $_avail " in
+                *" $_uk_gmax "*)
+                    _target_max="$_uk_gmax"
+                    hsin_uk_used "gpu" "$_uk_kmax" "$_uk_gmax"
+                    ;;
+                *)
+                    _uk_snap=$(hsin_opp_cap_pick "$_uk_gmax" "$_avail")
+                    if [ -n "$_uk_snap" ]; then
+                        _target_max="$_uk_snap"
+                        hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax tidak ada di tabel OPP; snap ke $_uk_snap"
+                    else
+                        hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax ditolak: tabel OPP tidak terbaca (pakai profil)"
+                    fi
+                    ;;
+            esac
+        fi
+    fi
     [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati (hasil governor ikut baris hasil di bawah)"
     _ok=0; _fail=0
     if [ -n "$_target_max" ] && [ -w "$_d/max_freq" ]; then
@@ -48,6 +86,25 @@ hsin_gpu_generic_apply() {
         _fail=$((_fail+0))
     fi
     _gov=""; [ -f "$_d/available_governors" ] && _gov=$(hsin_gpu_generic_pick_gov "$_profile" "$(cat "$_d/available_governors" 2>/dev/null)")
+    # Override governor: hanya kalau nama itu ada di available_governors
+    # node ini, kalau tidak SKIP + WARN (jangan tulis governor ngawur).
+    _uk_gov=$(hsin_uk_gpu_field "$_d" gov 2>/dev/null)
+    if [ -n "$_uk_gov" ]; then
+        _uk_govs=$(hsin_node_read "$_d/available_governors" 2>/dev/null)
+        if [ -z "$_uk_govs" ]; then
+            hsin_log_warn "gpu" "override ${_uk_kgov}=$_uk_gov ditolak: available_governors tidak terbaca (pakai profil)"
+        else
+            case " $_uk_govs " in
+                *" $_uk_gov "*)
+                    _gov="$_uk_gov"
+                    hsin_uk_used "gpu" "$_uk_kgov" "$_uk_gov"
+                    ;;
+                *)
+                    hsin_log_warn "gpu" "override ${_uk_kgov}=$_uk_gov ditolak: tidak ada di available_governors node ini (pakai profil)"
+                    ;;
+            esac
+        fi
+    fi
     if [ -n "$_gov" ] && [ -w "$_d/governor" ]; then
         if hsin_node_write_verify "$_d/governor" "$_gov"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
     fi

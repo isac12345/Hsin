@@ -9,9 +9,11 @@
 # adalah sisi tulisnya: apa pun yang lolos validasi di sini dianggap
 # aman disimpan.
 #
-# Sengaja TIDAK mengintegrasikan override ke jalur apply - itu tugas
-# terpisah. Behavior apply sekarang harus tetap sama persis, jadi file ini
-# tidak boleh menyalakan apa pun, hanya menerima dan menyimpan.
+# Tiga aksi di atas murni menyimpan. Bagian BAWAH file ini (hsin_uk_get &
+# aksesornya) adalah sisi bacanya, dipakai engine saat apply supaya pilihan
+# user benar-benar dipakai - apply tanpa override tetap persis sama seperti
+# sebelumnya, karena semua jalur tulis engine masih memakai nilai profil
+# kalau tidak ada override yang cocok (dan yang tidak didukung device).
 #
 # Kontrak:
 #   - Bentuk file: flat KEY=VALUE, satu key per baris, tanpa spasi - pola
@@ -400,5 +402,155 @@ hsin_uk_list() {
     printf '{"count":%s,"overrides":{%s}}\n' "$_uk_n" "$_uk_obj"
     return 0
 }
+
+# ============================================================
+# SISI BACA (dipakai engine saat apply)
+# ============================================================
+# MENGAPA perlu: aksi knob-set/knob-reset/knob-list sudah bisa menyimpan
+# pilihan user, tapi tanpa pembaca di jalur apply pilihan itu tidak
+# berefek sama sekali. Engine TIDAK lewat hsin_profile_get (nilai profil
+# diturunkan dari `case "$_profile"` = nama profil), jadi override harus
+# disisipkan di titik engine menulis tiap node - accessor di bawah
+# hanya provide "ada/tidak + nilai", keputusan tulis tetap milik engine
+# (supaya governor/scheduler/algo tetap divalidasi ke daftar node).
+#
+# Init hanya sekali per proses: file ini di-source oleh beberapa engine
+# dalam satu apply, dan cache harus bertahan di antara source-source itu.
+if [ -z "$_uk_inited" ]; then
+    _uk_inited=1
+    _uk_cache=""
+    _uk_cache_done=""
+    _uk_used_n=0
+    _uk_sum_done=""
+fi
+
+# Cache per-proses: file override dibaca SATU kali, lalu disimpan dipisah
+# spasi ("key=val key=val"). Nilai yang lolos hsin_uk_val_ok tidak pernah
+# mengandung spasi (key angka = digit, key token = [A-Za-z0-9_.-]), jadi
+# pemecahan spasi ini identik dengan isi file dan tidak butuh eval/source.
+# Satu apply menulis puluhan node; satu baca file per node itu biaya
+# yang tidak perlu.
+_uk_load() {
+    [ -n "$_uk_cache_done" ] && return 0
+    _uk_cache_done=1
+    _uk_cache=""
+    [ -f "$_uk_file" ] || return 0
+    while IFS= read -r _uk_l || [ -n "$_uk_l" ]; do
+        case "$_uk_l" in
+            ''|'#'*) continue ;;
+            *=*) ;;
+            *) continue ;;
+        esac
+        _uk_lk="${_uk_l%%=*}"
+        _uk_lv="${_uk_l#*=}"
+        # Baris yang tidak lolos validasi diabaikan, sama seperti di list:
+        # file ini secara teori bisa diisi dari luar modul.
+        hsin_uk_val_ok "$_uk_lk" "$_uk_lv" || continue
+        _uk_cache="${_uk_cache:+$_uk_cache }$_uk_lk=$_uk_lv"
+    done < "$_uk_file"
+    return 0
+}
+
+# $1 = key. Cetak nilai override, atau return 1 kalau key itu tidak ada
+# (tanpa output). Kunci ditulis literal supaya karakter glob di key tidak
+# pernah dicocokkan sebagai pola.
+hsin_uk_get() {
+    [ "$#" -ge 1 ] || return 1
+    _uk_load
+    _uk_ifs="$IFS"
+    IFS=' '
+    for _uk_item in $_uk_cache; do
+        case "$_uk_item" in
+            "$1="*)
+                IFS="$_uk_ifs"
+                printf '%s\n' "${_uk_item#*=}"
+                return 0
+                ;;
+        esac
+    done
+    IFS="$_uk_ifs"
+    return 1
+}
+
+# Nama node (devfreq/block) -> _uk_sn. WAJIB identik dengan sanitizeNode()
+# di aplikasi (app/.../ui/knobs/KnobsRowBuilder.kt): huruf dan angka ASCII
+# dipertahankan, karakter lain jadi '_', maksimum 40 karakter. Kalau
+# berbeda, kunci yang ditulis aplikasi tidak akan pernah ketemu di sini.
+_uk_sanitize() {
+    _uk_sn=""
+    _uk_sr="$1"
+    _uk_si=0
+    while [ -n "$_uk_sr" ] && [ "$_uk_si" -lt 40 ]; do
+        _uk_sc="${_uk_sr%"${_uk_sr#?}"}"
+        _uk_sr="${_uk_sr#?}"
+        case "$_uk_sc" in
+            [A-Za-z0-9]) _uk_sn="${_uk_sn}${_uk_sc}" ;;
+            *)           _uk_sn="${_uk_sn}_" ;;
+        esac
+        _uk_si=$((_uk_si + 1))
+    done
+    return 0
+}
+
+# $1 = id policy CPU, $2 = gov|max_khz|min_khz (daftar tertutup: nama node
+# dari device, jadi field-nya ikut ditutup supaya key tak sengaja tidak
+# mungkin terbentuk).
+hsin_uk_cpu_field() {
+    [ "$#" -ge 2 ] || return 1
+    case "$2" in
+        gov|max_khz|min_khz) ;;
+        *) return 1 ;;
+    esac
+    hsin_uk_get "cpu_policy_$1_$2"
+}
+
+# $1 = node devfreq (path penuh atau basename), $2 = gov|max_khz
+hsin_uk_gpu_field() {
+    [ "$#" -ge 2 ] || return 1
+    case "$2" in
+        gov|max_khz) ;;
+        *) return 1 ;;
+    esac
+    _uk_sanitize "${1##*/}"
+    hsin_uk_get "gpu_node_${_uk_sn}_$2"
+}
+
+# $1 = block device (path penuh atau basename), $2 = sched
+hsin_uk_io_field() {
+    [ "$#" -ge 2 ] || return 1
+    [ "$2" = "sched" ] || return 1
+    _uk_sanitize "${1##*/}"
+    hsin_uk_get "io_block_${_uk_sn}_sched"
+}
+
+# $1 = tag engine, $2 = key, $3 = nilai. Dipanggil engine tepat setelah
+# override diterima dan jadi nilai yang ditulis, jadi ini satu-satunya
+# tempat yang menghitung override "dipakai" (yang ditolak tidak di sini).
+hsin_uk_used() {
+    _uk_used_n=$((_uk_used_n + 1))
+    command -v hsin_log_info >/dev/null 2>&1 && \
+        hsin_log_info "$1" "override: $2=$3 dipakai"
+    return 0
+}
+
+# Ringkasan SATU baris ke apply.log. Dipanggil dari langkah terakhir
+# pipeline apply yang punya-knob (engine network, lihat
+# core/apply_engines.sh) supaya $_uk_used_n sudah final. Kalau apply
+# berhenti sebelum titik itu, tidak ada ringkasan - baris "override:"
+# per engine di boot.log tetap jadi jejaknya, jadi tidak ada yang hilang.
+hsin_uk_log_summary() {
+    [ -n "$_uk_sum_done" ] && return 0
+    _uk_sum_done=1
+    [ "$_uk_used_n" -gt 0 ] 2>/dev/null || return 0
+    command -v hsin_log_apply >/dev/null 2>&1 && \
+        hsin_log_apply "knobs" "override: $_uk_used_n key dipakai"
+    return 0
+}
+
+# Cache diisi di parent saat file ini di-source, bukan lazily di accessor:
+# accessor dipanggil di dalam $( ) (= subshell), jadi cache yang baru
+# dibangun di dalam subshell hilang lagi dan file akan dibaca ulang untuk
+# tiap node.
+_uk_load
 
 return 0 2>/dev/null || true
