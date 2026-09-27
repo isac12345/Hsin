@@ -1,6 +1,6 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (STEP 7 DONE `62ee738` = PQ Step 6; Phase 2 FULL 4/4)
+**Last Updated:** 2026-09-27 (STEP 8 DONE `000c83a`; Phase 2 FULL; STOP sebelum Step 9/Phase 3)
 **Overall Progress:** Phase 1 DONE → Phase 2 DONE (8/22) → Phase 3 NEXT
 
 ---
@@ -128,19 +128,19 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
-## ⚠️ Known Issues (out of scope — dicatat, belum diperbaiki)
+## ✅ Fixed Issues (dulu Known Issues — sudah diperbaiki)
 
-- `core/scan_cache.sh:47` — set `HSIN_SYSFS_BLOCK` TANPA guard
-  `[ -n ... ] ||`, menimpa prefix sandbox yang di-export harness dan
-  bertabrakan dengan reset `HSIN_IO_BLOCKS(_READY)` di
-  `engine/io/scheduler.sh` (baris 17-19, jalan tiap file di-source) —
-  merusak state test sandbox IO (test terpaksa seed `HSIN_IO_BLOCKS`
-  manual pasca-source; terbukti saat Step 6 skenario 10, 2x gagal sebelum
-  ketemu akar).
-- Prioritas: FIX SEBELUM lanjut kerja apa pun di `engine/io/` berikutnya
-  (`readahead.sh` baru dimigrasi ke safe_apply, `scheduler.sh` berbagi
-  source yang sama — risiko test false-positive kalau dibiarkan).
-- Belum fix sekarang karena di luar scope Step 6 (perintah user).
+- `core/scan_cache.sh:47` (guard prefix) — FIXED 2026-09-27, commit
+  `000c83a` (= STEP 8 versi perintah user). Keenam prefix sysfs
+  (CPU/THERMAL/DEVFREQ/GPU/BLOCK/PROC) kini pakai guard `[ -n ... ] ||`
+  (pola scheduler.sh:13 + Step 4); di device vars unset → default identik,
+  perilaku sama persis. Bukti L1: sh -n + shellcheck `-S error` 0,
+  `tests/sandbox_scan_prefix.sh` 5/5 (prefix selamat pasca-source
+  scan_cache + scheduler, discovery IO murni prefix palsu sda+sdb tanpa
+  seed manual, tanpa bocor /sys/block, default tetap /sys/block),
+  regresi hijau semua (safe_apply 11/11, boot_guard 10/10,
+  service_guard 8/8). Item ini Keluar dari antrean Known Issues —
+  `engine/io/` aman dikerjakan lagi.
 
 ---
 
@@ -192,4 +192,4 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
-**Next Step:** Step 6 — integrasi boot guard ke `service.sh` (STOP — butuh approve user sebelum lanjut, per perintah 2026-09-27).
+**Next Step:** STEP 9 (PQ Step 9) — `capability/capability_overrides.json` keyed by capability signature — STOP, TUNGGU APPROVE USER. Jangan mulai sebelum approve.
