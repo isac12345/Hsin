@@ -243,6 +243,26 @@
 - Bukti: bash-n OK, shellcheck 0, demo (basi LITTLE vs BIG benar),
   sisa `$_cpus` di file hanya di dalam topo_detect (sah).
 
+## Putuskan dead-code #9 (2026-09-27, leader langsung)
+- Keputusan: HAPUS keduanya (bukan sambung). Alasan:
+  a) engine/gpu/devfreq.sh (136 baris, 3 fungsi apply/freq/state,
+  0 pemanggil, hanya masuk daftar kemas build_release.sh) — fungsinya
+  SUDAH digantikan engine/gpu/generic.sh (governor pick + max_freq +
+  tulis-verify + hitung ok/fail jujur, dipanggil apply.sh tiap node).
+  Nama mirip `hsin_gpu_devfreq_candidates` beda file (detector.sh,
+  masih dipakai dvfs/detector) → tak tersentuh.
+  b) `hsin_thermal_apply_sched` (policy.sh, 0 pemanggil) — stub no-op
+  (loop /proc/*/sched kosong, hot/nothing) → hapus 19 baris.
+- Isi (e8864a1, -158/+1): git rm devfreq.sh + 1 baris daftar kemas +
+  hapus stub.
+- Bukti: bash-n policy+build OK; grep sisa (devfreq_apply/freq/state,
+  apply_sched, gpu/devfreq.sh) = 0 di luar NOTES; satu-satunya
+  shellcheck warning (SC2115 rm -rf:115) pre-existing di file asli,
+  di luar scope.
+- PELAJARAN: file 500+ baris tak di-source = beban mati (sudah ada di
+  atas) — berlaku juga untuk file kecil 0-pemanggil yang fungsinya
+  sudah digantikan backend lain.
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
