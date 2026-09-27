@@ -33,6 +33,10 @@
         <item name="android:windowLightNavigationBar">true</item>
     </style>
 
+    <style name="Theme.Hsin.AppBarOverlay" parent="ThemeOverlay.Material3.Dark.ActionBar" />
+
+    <style name="Theme.Hsin.PopupOverlay" parent="ThemeOverlay.Material3.Light" />
+
     <style name="SectionHeader">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

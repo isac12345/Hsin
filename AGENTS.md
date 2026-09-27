@@ -15,6 +15,13 @@
    aplikasi, input, screenshot, su, tulis /sys|/proc, reboot,
    flash. Tanpa build/zip di Termux untuk sekarang (perintah user:
    fix isi + rakit dulu, JANGAN build). Hanya edit teks + git + gh.
+   BUILD WAJIB VIA GITHUB ACTIONS (perintah user 2026-09-27):
+   Termux tidak punya JDK/Android SDK, jadi APK (Gradle) dan ZIP modul
+   hanya bisa dibangun di CI. Di Termux: tulis source + verifikasi
+   statis/sandbox saja. Konsekuensi jujur: kode Kotlin TIDAK bisa
+   dikompilasi lokal, jadi build CI adalah satu-satunya verifikasi —
+   cacat compile baru terlihat setelah push. Verifikasi lokal harus
+   ekstra ketat (signature API, tipe, nama view) sebelum push.
 4. Alur leader: brief (tujuan, file, kriteria, bukti) → Task ke
    dev → review diff + verifikasi statis → TERIMA / REVISI
    (maks 2) / KOREKSI ≤20 baris. Gagal 2x → catat di NOTES.md.

@@ -1,18 +1,24 @@
 package com.hsin
 
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
 
+/**
+ * Menyimpan pesan sekali-pakai untuk Snackbar. `postMessage` dipanggil dari
+ * thread mana pun (fragmen memakai lifecycleScope, yaitu Main dispatcher),
+ * `clearMessage` dipakai setelah pesan ditampilkan supaya tidak berulang.
+ */
 class MainViewModel : ViewModel() {
-    val errorMessage = MutableLiveData<String>()
 
-    fun reportError(message: String) {
-        errorMessage.value = message
+    private val _messages = MutableLiveData<String>()
+    val messages: LiveData<String> = _messages
+
+    fun postMessage(text: String) {
+        _messages.value = text
     }
 
-    fun clearError() {
-        errorMessage.value = null
+    fun clearMessage() {
+        _messages.value = null
     }
 }
