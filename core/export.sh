@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Export capability report
 hsin_export_report() {
@@ -16,7 +18,7 @@ hsin_export_report() {
 
     # Get SoC
     _soc="unknown"
-    [ -f /proc/device-tree/compatible ] && _soc=$(cat /proc/device-tree/compatible 2>/dev/null | tr '\0' '\n' | head -1)
+    [ -f "$HSIN_PROC/device-tree/compatible" ] && _soc=$(cat "$HSIN_PROC/device-tree/compatible" 2>/dev/null | tr '\0' '\n' | head -1)
     [ -f /sys/devices/soc0/soc_id ] && _soc="ID$(cat /sys/devices/soc0/soc_id 2>/dev/null)"
 
     # Get GPU

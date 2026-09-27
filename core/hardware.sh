@@ -2,6 +2,8 @@
 # HSIN - Hardware Information (No Root Required)
 
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Read a property with fallback
 _prop() {
@@ -12,7 +14,7 @@ _prop() {
 _detect_soc() {
     # Try from device-tree
     _soc=""
-    for f in /proc/device-tree/compatible /sys/firmware/devicetree/base/compatible; do
+    for f in $HSIN_PROC/device-tree/compatible /sys/firmware/devicetree/base/compatible; do
         [ -f "$f" ] && _soc=$(cat "$f" 2>/dev/null | tr '\0' '\n' | head -1)
         [ -n "$_soc" ] && break
     done
@@ -47,10 +49,10 @@ _detect_vendor() {
 
 # Detect CPU info
 _detect_cpu() {
-    _cores=$(nproc 2>/dev/null || grep -c "^processor" /proc/cpuinfo 2>/dev/null)
+    _cores=$(nproc 2>/dev/null || grep -c "^processor" "$HSIN_PROC/cpuinfo" 2>/dev/null)
     _arch=$(uname -m 2>/dev/null)
     # Try to get CPU model
-    _model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | tr -d ' ')
+    _model=$(grep -m1 "model name" "$HSIN_PROC/cpuinfo" 2>/dev/null | cut -d: -f2 | tr -d ' ')
     [ -z "$_model" ] && _model=$(_prop "ro.soc.model")
     echo "${_model:-unknown}|${_cores:-?}|${_arch:-?}"
 }
@@ -73,7 +75,7 @@ _detect_gpu() {
 
 # Detect RAM
 _detect_ram() {
-    _ram_kb=$(grep "MemTotal" /proc/meminfo 2>/dev/null | awk '{print $2}')
+    _ram_kb=$(grep "MemTotal" "$HSIN_PROC/meminfo" 2>/dev/null | awk '{print $2}')
     [ -z "$_ram_kb" ] && echo "unknown" && return
     _ram_mb=$((_ram_kb / 1024))
     if [ "$_ram_mb" -ge 1024 ]; then

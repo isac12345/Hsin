@@ -4,6 +4,8 @@
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 HSIN_CAP_DIR="$HSIN_MODULE_PATH/capability"
 HSIN_REPORT_DIR="$HSIN_DATA/reports"
 HSIN_CAP_REPORT="$HSIN_REPORT_DIR/capability_report.json"
@@ -188,7 +190,7 @@ _scan_thermal() {
     # Thermal HAL / vendor specific
     [ -d "/sys/devices/virtual/thermal/thermal_message" ] && _hal="true"
     [ -d "/sys/kernel/eara_thermal" ] && _hal="true"
-    [ -d "/proc/mtk_batoc_throttling" ] && _hal="true"
+    [ -d "$HSIN_PROC/mtk_batoc_throttling" ] && _hal="true"
 
     # Safe policy (trip points readable)
     if [ "$_zones" = "true" ]; then
@@ -224,11 +226,11 @@ _scan_memory() {
     [ -b "/dev/block/zram0" ] || [ -d "/sys/block/zram0" ] && _zram="true"
 
     # VM tunables
-    [ -f "/proc/sys/vm/swappiness" ] && _vm="true"
+    [ -f "$HSIN_PROC/sys/vm/swappiness" ] && _vm="true"
 
     # Write support
     _vm_w="false"
-    [ -w "/proc/sys/vm/swappiness" ] && _vm_w="true"
+    [ -w "$HSIN_PROC/sys/vm/swappiness" ] && _vm_w="true"
 
     _score=0
     [ "$_zram" = "true" ] && _score=$((_score + 50))
@@ -292,19 +294,19 @@ _scan_network() {
     _sysctl="false"
 
     # TCP congestion control
-    [ -f "/proc/sys/net/ipv4/tcp_congestion_control" ] && _tcp="true"
+    [ -f "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control" ] && _tcp="true"
 
     # Available congestion algorithms
     _avail_tcp=""
-    [ -f "/proc/sys/net/ipv4/tcp_available_congestion_control" ] && \
-        _avail_tcp=$(cat "/proc/sys/net/ipv4/tcp_available_congestion_control" 2>/dev/null)
+    [ -f "$HSIN_PROC/sys/net/ipv4/tcp_available_congestion_control" ] && \
+        _avail_tcp=$(cat "$HSIN_PROC/sys/net/ipv4/tcp_available_congestion_control" 2>/dev/null)
 
     # sysctl network tunables
-    [ -f "/proc/sys/net/ipv4/tcp_fastopen" ] && _sysctl="true"
+    [ -f "$HSIN_PROC/sys/net/ipv4/tcp_fastopen" ] && _sysctl="true"
 
     # Write support
     _tcp_w="false"
-    [ -w "/proc/sys/net/ipv4/tcp_congestion_control" ] && _tcp_w="true"
+    [ -w "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control" ] && _tcp_w="true"
 
     _score=0
     [ "$_tcp" = "true" ] && _score=$((_score + 50))
