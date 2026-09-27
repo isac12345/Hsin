@@ -728,3 +728,22 @@
 - CI: lint-and-test #36310498729 + #36310518169 success; apk #36303140779
   success (NDK r26 + Java + lambda fix). STATUS.md 1.1.1-1.1.3, 1.2.1, 1.2.2
   DONE. STOP: Step 6+ menunggu approve.
+
+## Verifikasi Step 10 (2026-09-27, leader, TERIMA revisi)
+- Test lama S1-S4 TAK representatif (diakui jujur ke user): S1/S4
+  "via pre-set max" = hardcode var tanpa lewat jalur baca (prefix tak
+  di-export ke `sh -c` + file me-reset var saat source); S2/S3 tautologi
+  (echo lalu grep echo sendiri, file tak di-source); S4 tak pernah panggil
+  safe_apply (kode cuma log+flag).
+- Test menemukan 3 bug implementasi (fix dibenarkan): duplikat blok baca
+  THERMAL_PATH; threshold relatif dihitung tapi tak dipakai (tetap
+  hardcode 95/80/65) -> kini basis trip_point kernel max semua zona
+  (filter <40C/>125C), fallback tercatat; `exit` di file yang di-source
+  membunuh service.sh -> `return-or-exit`; rc state tertimpa rc
+  safe_apply -> var pisah HSIN_THERMAL_SAFE_RC.
+- Sandbox baru gaya boot_guard (pohon palsu, 6/6 PASS): NORMAL/HIGH/
+  VERY HIGH node utuh, CRITICAL APPLIED via hsin_safe_apply (node turun
+  1800000->300000, rc=3), relativitas (85C = VERY HIGH trip95 / HIGH
+  trip105), hilang -> UNKNOWN rc=4. CI lint-and-test success (36328852688).
+- PELAJARAN: test yang mem bypass jalur baca = klaim palsu; grep output
+  sendiri bukan verifikasi; file yang di-source DILARANG `exit`.
