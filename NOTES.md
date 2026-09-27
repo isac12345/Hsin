@@ -577,3 +577,20 @@
   gratis yang sudah diverifikasi ada. Password dibaca interaktif (tidak
   disimpan). DILARANG menulis langsung ke SQLite: server memakai sql.js
   (SQLite in-memory) sehingga write luar bisa ketimpa saat flush.
+
+## Revisi combo 9Router (2026-09-27,Permintaan user)
+- Nama combo: TIDAK lagi HSIN-*. Jadi `leader` (utama) + `agent` (2 subagent:
+  modul + aplikasi).
+- Fallback WAJIB model gratis (permintaan user): setelah model utama
+  antigravity, rantai fallback hanya openrouter `:free` + ollama (lokal).
+  Provider berbayar (nvidia/poolside apikey) tidak dipakai.
+- Codex (cx/*) TIDAK masukkan rantai: kuota habis ~2 minggu + bukan gratis.
+  Cara pakai nanti: tambah id-nya di ujung daftar setelah kuota pulih.
+- BUG script yang ketahuan saat dry-run: `HAVE="$_(_models_json)"`
+  (shellcheck SC3028) membuat pre-flight tidak mengecek apa-apa - semua
+  modelReported HILANG padahal ada. Sudah diganti `$( )` dan sekarang 13/13
+  id terverifikasi OK terhadap /v1/models (114 model terdaftar).
+- Catatan: 5 combo lama (Budak, Alpha-code, Alpha-fast, Alpha-review,
+  Alpha-code-b) HILANG dari DB saat password di-set/first-run. Tidak ada
+  script yang menghapus (POST terbukti additive: dua combo masuk dua-dua),
+  jadi penyebabnya kemungkinan inisialisasi 9Router - perlu konfirmasi.
