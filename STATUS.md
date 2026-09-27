@@ -1,17 +1,18 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (Steps 7-8 DONE `6ea5619` = "Step 6" versi user; Step 6 dokumen DITUNDA, STOP sebelum lanjut)
-**Overall Progress:** Phase 1 DONE (4/22) → Phase 2 IN PROGRESS (Steps 5,7,8 DONE; Step 6 ditunda)
+**Last Updated:** 2026-09-27 (STEP 7 DONE `62ee738` = PQ Step 6; Phase 2 FULL 4/4)
+**Overall Progress:** Phase 1 DONE → Phase 2 DONE (8/22) → Phase 3 NEXT
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[██████░░░░░░░░░░░░░░] 32% (7/22 steps DONE)
+[███████░░░░░░░░░░░░░] 36% (8/22 steps DONE)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
-PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [███████░░░] 75% — Steps 5,7,8 DONE; Step 6 ditunda
+PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██████████] 100% — DONE
+PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — NEXT (butuh approve + Step 8 dulu)
 PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
 PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
 PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
@@ -57,11 +58,15 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   boot-ok→reset, korup→sanitasi, threshold-env override), jalur logger
   terverifikasi (WARN masuk boot.log). CI push: API GitHub tak terjangkau
   dari Termux (2x coba) — status CI BELUM terkonfirmasi, jujur menunggu.
-- [ ] **Step 6** — integrasi boot guard ke `service.sh` (cek di awal boot,
-  skip tuning + exit bersih bila guard aktif, reset bila boot sukses) —
-  PENDING / DITUNDA: user memerintahkan safe_apply dulu (Step 6 versi user
-  = Step 7+8 dokumen ini, selesai di bawah). Perlu keputusan user kapan
-  integrasi service.sh dikerjakan.
+- [x] **Step 6 (dokumen)** — integrasi boot guard ke `service.sh` — DONE
+  2026-09-27, commit `62ee738` (= STEP 7 versi perintah user; penomoran
+  kini sinkron kembali). Check di seksi 1 SEBELUM tuning apa pun (bounded
+  wait 120s ganti infinite loop; timeout = fail → skip SEMUA + exit 0);
+  reset via `on_boot_ok` di seksi 11b setelah `.applied` + service-ready
+  (selesai tanpa crash, bukan cuma start). NOL counter duplikat di
+  service.sh (hanya panggil fungsi). Bukti L1: sh -n + shellcheck
+  `-S error` 0, sandbox 8/8 (wiring statis baris 25/57/59/457 + emulasi
+  skip-total/pulih).
 - [x] **Step 7** — `core/safe_apply.sh` — DONE 2026-09-27, commit `6ea5619`
   (`feat: safe sysfs write gateway with 5 result categories` = "Step 6"
   versi perintah user). Gateway 5 kategori (APPLIED=0 / SKIPPED=2 /
@@ -144,10 +149,10 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 | Metric | Value |
 |---|---|
 | **Total Steps** | 22 |
-| **Completed** | 7 (Steps 1-5, 7-8; Step 6 dokumen ditunda) |
-| **Next** | Keputusan user: Step 6 dokumen (integrasi service.sh) atau lanjut Phase 3 |
+| **Completed** | 8 (Steps 1-8 dokumen; penomoran user↔dokumen sinkron kembali) |
+| **Next** | STEP 8 (fix Known Issue scan_cache:47), lalu Phase 3 butuh approve |
 | **Reverted** | 1 (Step 5 lama, `36d2256`) |
-| **Pending** | 15 (Step 6 + Steps 9-22) |
+| **Pending** | 14 (Steps 9-22) |
 | **Expected Commits** | ~18 (1 per step, tanpa force push) |
 
 ---
