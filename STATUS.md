@@ -145,7 +145,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   guard on/off, 5 kategori safe apply, thermal 4 state, degradasi
   per-engine; stability wajib reboot 3x di HP fisik; template laporan
   berbasis capability (tanpa matriks nama chipset).
-- [ ] **Step 15** — TROUBLESHOOTING.md (masalah umum + langkah debug).
+- [x] **PQ Step 15** — TROUBLESHOOTING.md — DONE 2026-09-27. 6 item
+  (slow boot, guard aktif + cek/baca/reset, thermal UNKNOWN vs
+  CRITICAL, GPU skip = fallback disengaja, rollback/restore,
+  summary degraded); semua perintah + string log diverifikasi silang
+  ke kode (1 koreksi: CLI `restore` bukan `rollback`).
 - [ ] **Step 16** — DEVICE_COMPATIBILITY.md ("TERVALIDASI" vs
   "GRACEFUL DEGRADE" — jangan klaim rata; saat ini tervalidasi:
   Unisoc/Mali milik user).
