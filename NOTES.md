@@ -269,6 +269,21 @@
   atas) — berlaku juga untuk file kecil 0-pemanggil yang fungsinya
   sudah digantikan backend lain.
 
+## Fix generic-msg #10 (2026-09-27, leader langsung, 2 baris pesan)
+- Bug: engine/gpu/generic.sh tanpa OPP (tanpa available_frequencies):
+  a) baris SKIP klaim "...governor tetap" SEBELUM governor dicoba —
+  terbukti salah saat governor juga buntu (baris final justru SKIP
+  total = kontradiksi); b) baris sukses cetak `max=` kosong (ok=1,
+  ambigu apa yang terjadi dengan max_freq).
+- Isi (14bd9fe, 1 file 2+-2-, NOL perilaku): skip jadi netral (hasil
+  governor ikut baris hasil); sukses pakai `max=${_target_max:-unchanged}`.
+- Bukti: bash-n OK, shellcheck 0, sandbox sysfs palsu 3 kasus —
+  A (tanpa OPP+gov ok): SKIP netral + `max=unchanged gov=... ok=1`;
+  B (tanpa OPP+tanpa gov): SKIP netral + SKIP final (konsisten);
+  C (normal ada OPP): `max=800000000 gov=... ok=2`, tulis terverifikasi
+  (regresi nihil). /tmp read-only di Termux ini → scratch pakai
+  /data/data/com.termux/files/usr/tmp/opencode (pelajaran alat).
+
 ## PELAJARAN (warisan Alpha, berlaku di sini)
 - Klaim pekerja tanpa bukti = jangan percaya, cek diff sendiri.
 - Bump versi = cek semua lokasi versi (jangan setengah).
