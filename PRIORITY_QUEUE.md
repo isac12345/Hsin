@@ -405,25 +405,33 @@ thermal features degrade to no-op + log (never crash, never blind throttle).
 - `core/thermal_check.sh`
 
 **Requirements:**
-- [ ] Create `hsin_thermal_classify()` function (panggil langsung lalu
-  baca global — JANGAN dalam `$( )`, pelajaran fix #7: subshell
-  menghilangkan assignment global)
+- [x] Klasifikasi via fungsi internal `_read_thermal_max()` +
+  `_read_thermal_basis()` + `_classify_thermal()` di
+  `core/thermal_check.sh` — file di-source LANGSUNG (panggil langsung
+  lalu baca global `HSIN_THERMAL_CHECK_STATE` / `THERMAL_MAX_TEMP` /
+  `HSIN_THERMAL_CHECK_RC` — JANGAN dalam `$( )`; fix dari bug #7 yang
+  ditemukan saat testing: subshell menghilangkan assignment global)
   - Baca suhu live dari semua thermal zone terdeteksi, ambil max
   - Klasifikasi: NORMAL (full profile) / HIGH (monitor) /
     VERY HIGH (monitor + limited intervention bila beralasan) /
-    CRITICAL (emergency intervention)
-  - Threshold default konservatif + TERDOKUMENTASI sebagai default
-    (bukan tuning per-chipset); boleh di-override via capability entry
-    `thermal_class: managed` (bukan via nama device)
-- [ ] Zona tidak ada → return NORMAL + log `thermal unmanaged (no zones)`
-  (fitur thermal jadi no-op yang jujur)
+    CRITICAL (emergency intervention, satu-satunya yang boleh
+    intervensi via `hsin_safe_apply`)
+  - Threshold dari max `trip_point_*_temp` kernel semua zona yang
+    terdeteksi (basis device-specific, bukan tuning per-chipset);
+    tanpa trip data → fallback konservatif + TERCATAT di
+    `HSIN_THERMAL_CHECK_BASIS`
+  - FOLLOW-UP (belum dikerjakan, bukan blocker): threshold boleh
+    di-override via capability entry `thermal_class: managed`
+    (bukan via nama device) — lihat STATUS.md "Known Follow-ups"
+- [x] Zona tidak ada → return UNKNOWN + log unmanaged (tidak block tuning,
+  tapi tidak diam-diam klaim NORMAL) — fitur thermal jadi no-op yang jujur
 - [ ] Thermal TIDAK BOLEH menaikkan limit di atas profil/override user
   (hanya boleh menahan — pelajaran bug policy.sh: thermal menaikkan =
   membatalkan cap profil)
 
 **Acceptance Criteria:**
-- [ ] Sandbox: tiap kelas terpicu pada rentang yang benar; tanpa zone →
-  NORMAL + log unmanaged; panggilan langsung (bukan subshell) STATE benar
+- [x] Sandbox: tiap kelas terpicu pada rentang yang benar; tanpa zone →
+  UNKNOWN + log unmanaged; panggilan langsung (bukan subshell) STATE benar
 - [ ] Tidak ada penulisan yang menaikkan limit profil; CI passes
 
 **Commit Message:**
