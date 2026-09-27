@@ -552,3 +552,28 @@
 - Semua uji henceforth WAJIB HSIN_SANDBOX=1 + HSIN_CONF diarahkan.
 - Catatan: `cmd` ADA di Termux; `su` Termux tanpa root. /sdcard/Android/hsin
   tidak ada di HP jadi config asli tidak pernah tersentuh.
+
+## 9Router API (2026-09-27, leader, Facts dari HP - bukan dokumentasi)
+- Server: Next.js "9Router - AI Infrastructure Management", jalan di
+  http://localhost:20128, data di ~/.9router, DB SQLite ~/.9router/db/
+  data.sqlite, source ~/.9router/runtime/mitm/server.js (minified).
+- `GET /v1/models` TERBUKA tanpa auth: 117 model, field id/owned_by/
+  capabilities/context_length/max_completion_tokens. 9 provider aktif:
+  antigravity, codex, kiro, xai (oauth) + nvidia, ollama, openrouter,
+  poolside (apikey).
+- `POST /v1/chat/completions` dan semua `/api/*` = 401. Auth dashboard =
+  session PASSWORD (bukan API key): /api/auth/status -> authMode=password,
+  requireLogin=true, hasPassword=FALSE (belum disetup, itu sebabnya 401).
+  API key "Default Key" ( tabel apiKeys)jugak engineering: sudah diuji
+  Bearer + X-API-Key -> tetap 401. auth/cli-secret juga tidak berlaku.
+- Skema combo (SQLite): combos(id PK, name UNIQUE, kind, models TEXT,
+  createdAt, updatedAt); `models` = JSON ARRAY id-model, URUTAN = prioritas
+  fallback; 5 combo lama punya kind=NULL. 5 combo lama memakai id `oc/*`
+  yang TIDAK ada lagi di /v1/models (entri mati).
+- TIDAK ADA data harga di 9Router (katalog: 0 hit pricing/cost). Jadi
+  "gratis" hanya bisa dibaca dari nama id: 15 dari 117 model, SEMUA dari
+  openrouter (suffix :free).
+- tools/9router-combo.sh: buat HSIN-leader + HSIN-subagent dari 10 model
+  gratis yang sudah diverifikasi ada. Password dibaca interaktif (tidak
+  disimpan). DILARANG menulis langsung ke SQLite: server memakai sql.js
+  (SQLite in-memory) sehingga write luar bisa ketimpa saat flush.
