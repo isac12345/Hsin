@@ -3,6 +3,8 @@
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
+# /proc via $HSIN_PROC supaya bisa di-sandbox (prefix palsu), default /proc.
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Scan GPU capabilities
 hsin_gpu_cap_scan() {
@@ -73,10 +75,10 @@ hsin_gpu_cap_scan() {
             [ -d "$HSIN_GPU_GED" ] || return 1
 
             # DVFS
-            [ -f /proc/gpufreq/gpufreq_opp_dump ] && HSIN_GPU_CAP_DVFS="true"
+            [ -f "$HSIN_PROC/gpufreq/gpufreq_opp_dump" ] && HSIN_GPU_CAP_DVFS="true"
 
             # Freq control
-            [ -f /proc/gpufreq/gpufreq_power_limited ] && HSIN_GPU_CAP_FREQ_CONTROL="true"
+            [ -f "$HSIN_PROC/gpufreq/gpufreq_power_limited" ] && HSIN_GPU_CAP_FREQ_CONTROL="true"
 
             # Boost
             [ -f "$HSIN_GPU_GED/ged_dvfs_boost" ] && HSIN_GPU_CAP_BOOST="true"
