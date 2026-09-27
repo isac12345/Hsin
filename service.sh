@@ -328,55 +328,66 @@ fi
 . "$MODPATH/core/backup.sh"
 hsin_backup_all "$(date '+%Y%m%d_%H%M%S')_preapply"
 
-# 7. Apply engine modules
+# 7. Apply engine modules (PQ Step 12: graceful degradation contract —
+# engine gagal != module gagal. Tiap engine dibungkus hsin_engine_run:
+# applied/failed per-engine dari counter safe_apply, partial = rc 0,
+# gagal total = warning + LANJUT engine berikut, tidak abort).
+# shellcheck disable=SC1091
+. "$MODPATH/core/engine_guard.sh" 2>/dev/null
 _apply_failed=0
 
 # CPU
-if . "$MODPATH/engine/cpu/apply.sh" 2>/dev/null && hsin_cpu_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/cpu/apply.sh" 2>/dev/null
+if hsin_engine_run "CPU" hsin_cpu_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "CPU engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "CPU engine failed"
+    hsin_log_warn "main" "CPU engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # GPU
-if . "$MODPATH/engine/gpu/apply.sh" 2>/dev/null && hsin_gpu_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/gpu/apply.sh" 2>/dev/null
+if hsin_engine_run "GPU" hsin_gpu_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "GPU engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "GPU engine failed"
+    hsin_log_warn "main" "GPU engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # Thermal
-if . "$MODPATH/engine/thermal/apply.sh" 2>/dev/null && hsin_thermal_engine_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/thermal/apply.sh" 2>/dev/null
+if hsin_engine_run "Thermal" hsin_thermal_engine_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "Thermal engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "Thermal engine failed"
+    hsin_log_warn "main" "Thermal engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # Memory
-if . "$MODPATH/engine/memory/apply.sh" 2>/dev/null && hsin_memory_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/memory/apply.sh" 2>/dev/null
+if hsin_engine_run "Memory" hsin_memory_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "Memory engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "Memory engine failed"
+    hsin_log_warn "main" "Memory engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # IO
-if . "$MODPATH/engine/io/io_manager.sh" 2>/dev/null && hsin_io_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/io/io_manager.sh" 2>/dev/null
+if hsin_engine_run "IO" hsin_io_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "IO engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "IO engine failed"
+    hsin_log_warn "main" "IO engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # Network
-if . "$MODPATH/engine/network/network_manager.sh" 2>/dev/null && hsin_network_apply "$HSIN_PROFILE"; then
+. "$MODPATH/engine/network/network_manager.sh" 2>/dev/null
+if hsin_engine_run "Network" hsin_network_apply "$HSIN_PROFILE"; then
     hsin_log_ok "main" "Network engine applied"
 else
     _apply_failed=$((_apply_failed + 1))
-    hsin_log_error "main" "Network engine failed"
+    hsin_log_warn "main" "Network engine failed — lanjut engine berikut (module tidak abort)"
 fi
 
 # 7b. Extreme Mode: aggressive overrides (freq unlock / GPU override /
@@ -426,6 +437,10 @@ hsin_log_info "main" "GPU:    $(grep '^GPU=' "$HSIN_DATA/device.txt" | cut -d= -
 hsin_log_info "main" "Kernel: $(grep '^KERNEL=' "$HSIN_DATA/device.txt" | cut -d= -f2-)"
 hsin_log_info "main" "Profile: $HSIN_PROFILE"
 hsin_log_info "main" "Failed engines: $_apply_failed"
+# PQ Step 12: rangkuman status SEMUA engine (bukan cuma yang gagal).
+if command -v hsin_engine_summary >/dev/null 2>&1; then
+    hsin_engine_summary
+fi
 
 # 9. Cleanup self-disable flag (artinya service.sh selesai tanpa crash)
 rm -f "$HSIN_FLAG_DIR/.need_disable"

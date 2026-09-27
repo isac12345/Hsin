@@ -1,18 +1,18 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (STEP 9 DONE `b79763d`; Phase 3 dibuka 1/4; STOP sebelum thermal)
-**Overall Progress:** Phase 1 DONE → Phase 2 DONE → Phase 3 IN PROGRESS (1/4)
+**Last Updated:** 2026-09-27 (PQ Step 12 DONE; Phase 3 SELESAI 4/4; STOP sebelum Phase 4 — tunggu approve user)
+**Overall Progress:** Phase 1 DONE → Phase 2 DONE → Phase 3 DONE → Phase 4 MENUNGGU APPROVE
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[████████░░░░░░░░░░░░] 41% (9/22 steps DONE)
+[███████████░░░░░░░░░] 55% (12/22 steps DONE, penomoran PQ)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
 PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██████████] 100% — DONE
-PHASE 3: Capability Overrides (Steps 9-12)     [██░░░░░░░░] 25% — IN PROGRESS (Step 9 DONE)
+PHASE 3: Capability Overrides (PQ Steps 9-12)  [██████████] 100% — DONE (STOP: Phase 4 tunggu approve user)
 PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
 PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
 PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
@@ -120,8 +120,16 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 - [ ] **Step 11** — `core/thermal_check.sh` — threshold NORMAL / HIGH /
   VERY HIGH / CRITICAL dari thermal_zone TERDETEKSI. Tanpa zone →
   no-op + log (bukan crash, bukan throttle buta).
-- [ ] **Step 12** — graceful degradation formal — engine gagal != module
-  gagal (counter applied/failed, partial success = return 0).
+- [x] **PQ Step 12** — graceful degradation formal (`core/engine_guard.sh`
+  + wiring `service.sh`) — DONE 2026-09-27. Wrapper `hsin_engine_run`
+  (snapshot counter safe_apply -> panggil langsung -> delta per-engine;
+  APPLIED+FALLBACK=applied, FAILED=failed, SKIPPED+UNAVAIL=skipped;
+  rc 0 bila applied>0 else 1; kategori lama tanpa kategori baru).
+  6 engine service.sh via wrapper (gagal -> WARN lanjut, tidak abort) +
+  `hsin_engine_summary` di status report + runtime list. Bukti L1: sh -n +
+  shellcheck `-S error` 0 (sweep semua .sh), sandbox 8/8 kondisi nyata
+  (tanpa preset counter: 1 gagal lanjut, semua gagal sampai END, partial
+  1 engine rc=0, FALLBACK applied, skip beralasan, wiring).
 
 ---
 
