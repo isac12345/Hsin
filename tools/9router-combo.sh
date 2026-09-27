@@ -149,7 +149,9 @@ if [ "$CLEAN" = "1" ]; then
     CUR=$(api "$BASE/api/combos")
     printf '%s' "$CUR" | grep -o '"name":"[^"]*"' | sed 's/"name":"/  - /;s/"$//'
     for _old in $(printf '%s' "$CUR" | grep -o '"name":"HSIN-[^"]*"' | sed 's/"name":"//;s/"$//'); do
-        _oid=$(printf '%s' "$CUR" | tr ',' '\n' | grep -A2 "\"name\":\"$_old\"" | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//;s/"$//')
+        # id muncul SEBELUM name di JSON, jadi jangan pakai grep -A (itu
+        # mencari ke bawah). Pecah per objek dulu, baru ambil id-nya.
+        _oid=$(printf '%s' "$CUR" | tr '{' '\n' | grep "\"name\":\"$_old\"" | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//;s/"$//')
         if [ -n "$_oid" ]; then
             _dc=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -b "$JAR" -X DELETE "$BASE/api/combos/$_oid")
             echo "  hapus '$_old' (id=$_oid) -> HTTP $_dc"
