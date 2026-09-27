@@ -105,3 +105,9 @@
   (14bd9fe, 2+-2-, nol perilaku). Bukti: bash-n OK, shellcheck 0,
   sandbox 3 kasus (A/B/C, C regresi nihil). Antrean: sisa kosmetik
   (DEVFRES/safety-while/disksize) + /proc→$HSIN_PROC bertahap.
+
+- SISA-2F (2026-09-27, leader langsung): DEVFRES/|while benign
+  terkonfirmasi (tanpa fix); disksize-komentar + safety-export-mati
+  (aa719a7); proc langkah-1 network via $HSIN_PROC (f4ac85c, tuning
+  utuh). Bukti: bash-n, shellcheck 0, sandbox (bbr/tfo/sysctl/state),
+  /proc 95→73. Antrean: proc batch-2 per area + L2 HP.
