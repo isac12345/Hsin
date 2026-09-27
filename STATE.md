@@ -170,3 +170,13 @@
 - DOKUMEN (2026-09-27, leader): PLAN.md ditulis ulang agar akurat (Tahap 1
   kode selesai nunggu L2; Tahap 3 app jalan tapi belum terverifikasi
   compile; build hanya via GitHub Actions). Tidak ada perubahan kode.
+
+- CI-BUILD-PASS (2026-09-27, leader):
+  * APK build & compile sukses via GitHub Actions (run #36296279179,
+    artifact: `hsin-debug-apk`). 5 error compile diperbaiki: path
+    AndroidManifest, duplikat warna, attr Material 3, Kotlin scope/model,
+    dan path artifact.
+  * Modul ZIP build sukses via GitHub Actions (run #36296491773,
+    artifact: `hsin-modul-dev`). Verifikasi `core/runtime.sh` lolos.
+  * Siap untuk pengujian HP (L2).
+
