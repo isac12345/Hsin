@@ -150,6 +150,16 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
+## 🔭 Known Follow-ups (bukan blocker rilis)
+
+- PQ Step 11 FOLLOW-UP: threshold thermal boleh di-override via capability
+  entry `thermal_class: managed` (bukan via nama device). Status: BELUM
+  dikerjakan — implementasi aktual pakai max `trip_point_*_temp` kernel
+  semua zona + fallback konservatif tercatat di
+  `HSIN_THERMAL_CHECK_BASIS`. Bukan blocker Phase 3.
+
+---
+
 ## ✅ Fixed Issues (dulu Known Issues — sudah diperbaiki)
 
 - `core/scan_cache.sh:47` (guard prefix) — FIXED 2026-09-27, commit
