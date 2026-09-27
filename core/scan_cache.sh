@@ -40,12 +40,15 @@ HSIN_SCAN_CACHE_FILE="${HSIN_SCAN_CACHE_FILE:-$HSIN_DATA/scan_cache.env}"
 # lama setelah reboot/recovery tidak boleh dipakai untuk keputusan apply.
 HSIN_SCAN_TTL=21600
 
-HSIN_SYSFS_CPU="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
-HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
-HSIN_SYSFS_DEVFREQ="${SYSFS_DEVFREQ_PREFIX:-/sys/class/devfreq}"
-HSIN_SYSFS_GPU="${SYSFS_GPU_PREFIX:-/sys/class/kgsl}"
-HSIN_SYSFS_BLOCK="${SYSFS_BLOCK_PREFIX:-/sys/block}"
-HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
+# STEP 8: guard [ -n ... ] || di semua prefix (dulu assignment polos
+# menimpa prefix sandbox yang di-export harness — Known Issue 2026-09-27).
+# Di device variabel ini unset -> default sama persis, perilaku identik.
+[ -n "$HSIN_SYSFS_CPU" ] || HSIN_SYSFS_CPU="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
+[ -n "$HSIN_SYSFS_THERMAL" ] || HSIN_SYSFS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
+[ -n "$HSIN_SYSFS_DEVFREQ" ] || HSIN_SYSFS_DEVFREQ="${SYSFS_DEVFREQ_PREFIX:-/sys/class/devfreq}"
+[ -n "$HSIN_SYSFS_GPU" ] || HSIN_SYSFS_GPU="${SYSFS_GPU_PREFIX:-/sys/class/kgsl}"
+[ -n "$HSIN_SYSFS_BLOCK" ] || HSIN_SYSFS_BLOCK="${SYSFS_BLOCK_PREFIX:-/sys/block}"
+[ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Hasil scan (diisi oleh hsin_scan_*_live / hsin_scan_cache_load).
 HSIN_SCAN_OK=0
