@@ -29,7 +29,8 @@ hsin_thermal_engine_manage() {
     # Monitor current temperature
     _temp=$(hsin_thermal_max_temp)
     _temp_c=$((_temp / 1000))
-    _status=$(hsin_thermal_classify "$_temp")
+    hsin_thermal_classify "$_temp"
+    _status="$HSIN_THERMAL_STATE"
     echo "  Current: ${_temp_c}°C ($_status)"
     echo ""
 
@@ -59,7 +60,8 @@ hsin_thermal_main() {
         monitor)
             _temp=$(hsin_thermal_max_temp)
             _temp_c=$((_temp / 1000))
-            _status=$(hsin_thermal_classify "$_temp")
+            hsin_thermal_classify "$_temp"
+            _status="$HSIN_THERMAL_STATE"
             echo "Thermal: ${_temp_c}°C ($_status)"
             ;;
         state)
