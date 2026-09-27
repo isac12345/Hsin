@@ -1,153 +1,193 @@
 #!/usr/bin/sh
-# HSIN - buat combo 9Router dari model GRATIS saja.
+# HSIN - combo 9Router: "leader" (utama) + "agent" (2 subagent: modul & app).
 #
-# Kenapa file ini perlu: 9Router tidak menyimpan data harga sama sekali, jadi
-# "gratis" hanya bisa dibaca dari nama model id (suffix ":free"). Semua model
-# di bawah diverifikasi ADA di /v1/models 9Router (15 model gratis, semua
-# dari provider openrouter).
+# FAKTA DASAR (verified dari router, bukan asumsi):
+# - 9Router TIDAK menyimpan data harga. Jadi "gratis" di sini berarti
+#   tanpa biaya per-token: model openrouter ':free' (15 buah), provider
+#   ber-oauth (antigravity/kiro/xai = kuota akun), dan ollama (lokal).
+#   YANG BERBAYAR: nvidia & poolside (api key) -> TIDAK dipakai di sini.
+# - Combo = JSON array id-model di kolom `combos.models`; URUTAN = prioritas
+#   fallback. Nama combo harus unik.
+# - Auth /api/* = session password. API key & cli-secret tidak berlaku (401).
+#   Password dibaca interaktif, tidak disimpan, tidak masuk log.
 #
-# Combo = satu nama yang berisi DAFTAR model-id; urutannya = prioritas
-# fallback. Formatnya diambil dari skema SQLite 9Router sendiri:
-#   combos(id, name UNIQUE, kind, models TEXT, createdAt, updatedAt)
-# dengan `models` = JSON array dari id-model.
+# ATURAN FALLBACK (permintaan user): setelah model utama antigravity,
+# SEMUA fallback wajib model GRATIS - yaitu openrouter ':free' dan ollama
+# (lokal). Provider berbayar (nvidia, poolside apikey) tidak dipakai.
 #
-# AUTH: 9Router memakai session (password) untuk /api/*. API key tidak
-# berlaku di sana (sudah diuji: 401). Jadi password dibaca interaktif
-# (read -s), TIDAK disimpan di file, tidak masuk log, tidak di-commit.
-#-stub 只有 dry-run yang jalan tanpa password.
+# CODEX (cx/*) sengaja TIDAK ada di rantai: kuota codex habis ~2 minggu
+# dan bukan model gratis. Kalau kuota sudah pulih dan mau dipakai,
+# tambahkan id-nya di ujung daftar (mis. "cx/gpt-5.5") -항 Urutan tetap
+#utan: yang paling cepat/gründ paling dulu.
 #
 # Pemakaian:
-#   sh tools/9router-combo.sh --dry-run     # tampilkanrencana, tanpa network
-#   sh tools/9router-combo.sh               # login + buat 2 combo + verifikasi
+#   sh tools/9router-combo.sh --dry-run     # cek semua model ada (tanpa auth)
+#   sh tools/9router-combo.sh               # buat/pertahankan leader + agent
+#   sh tools/9router-combo.sh --cleanup     # hapus combo bernama HSIN-* (lama)
 #   sh tools/9router-combo.sh --base http://localhost:20128
-#
-# Env: HSIN_9ROUTER_BASE (default http://localhost:20128)
 
 BASE="${HSIN_9ROUTER_BASE:-http://localhost:20128}"
 DRY=0
-[ "$1" = "--dry-run" ] && DRY=1
-case "$1" in --base) BASE="$2" ;; esac
+CLEAN=0
+for _a in "$@"; do
+    case "$_a" in
+        --dry-run) DRY=1 ;;
+        --cleanup) CLEAN=1 ;;
+        --base) : ;;
+    esac
+done
+# --base nilainya ada di argumen berikutnya
+_prev=""
+for _a in "$@"; do
+    [ "$_prev" = "--base" ] && BASE="$_a"
+    _prev="$_a"
+done
 
-# --- DATA: leader = kuat (ctx besar, reasoning+tools), subagent = cepat -----
-# Semua id di bawah sudah dicek ada di /v1/models (JANGAN tambah id baru
-# tanpa cek ulang, combo akan gagal saat dipakai).
+# ---------------------------------------------------------------------------
+# DATA - semua id di bawah WAJIB dicek ada di /v1/models sebelum combo dibuat
+# (script otomatismemeriksa di langkah pre-flight).
+# ---------------------------------------------------------------------------
+
+# leader: model utama. Urutan = terbaik dulu.
 LEADER_MODELS='[
+  "ag/claude-sonnet-4-6",
+  "ag/gemini-3.8-flash-high",
   "openrouter/deepseek/deepseek-v4-flash-0731:free",
   "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
-  "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
   "openrouter/thinkingmachines/inkling:free",
-  "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+  "ollama/qwen3.5",
+  "ollama/gpt-oss:120b"
 ]'
-SUBAGENT_MODELS='[
+
+# agent: worker buat 2 subagent (modul + aplikasi). Prioritas ke yang cepat.
+AGENT_MODELS='[
+  "ag/gemini-3.8-flash-low",
   "openrouter/nvidia/nemotron-3.5-lightning:free",
   "openrouter/poolside/laguna-xs-2.1:free",
   "openrouter/nex-agi/nex-n2.5-mini:free",
   "openrouter/inclusionai/ling-3.0-flash-sante:free",
-  "openrouter/thinkingmachines/inkling-small:free"
+  "ollama/glm-4.7-flash"
 ]'
-LEADER_NAME="HSIN-leader"
-SUBAGENT_NAME="HSIN-subagent"
 
-need() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: butuh '$1' (pkg install curl)" >&2; exit 1; }; }
-need curl
-
-# --- Verifikasi dulu: semua model benar-benar ada di router ----------------
-verify_models() {
-    _have=$(curl -s -m 10 "$BASE/v1/models" 2>/dev/null)
-    [ -n "$_have" ] || { echo "ERROR: tidak bisa baca $BASE/v1/models" >&2; exit 1; }
-    _missing=0
-    for _m in $(printf '%s' "$1" | tr -d '[]" ' | tr ',' ' '); do
-        if printf '%s' "$_have" | grep -q "\"$_m\""; then
-            echo "  OK      $_m"
-        else
-            echo "  HILANG  $_m  <-- model ini tidak ada di router, jangan dipakai" >&2
-            _missing=$((_missing + 1))
-        fi
-    done
-    return $_missing
-}
+LEADER_NAME="leader"
+AGENT_NAME="agent"
 
 TMPDIR="${TMPDIR:-/usr/tmp}"
 mkdir -p "$TMPDIR" 2>/dev/null
 
+command -v curl >/dev/null 2>&1 || { echo "ERROR: butuh curl" >&2; exit 1; }
+
+# --- pre-flight: semua model harus benar-benar ada di router ---------------
+_models_json() { curl -s -m 12 "$BASE/v1/models" 2>/dev/null; }
+
+check_models() {
+    _label="$1"; _models="$2"; _have="$3"; _bad=0
+    echo "--- verifikasi model: $_label ---"
+    for _m in $(printf '%s' "$_models" | tr -d '[]" ' | tr ',' ' '); do
+        if printf '%s' "$_have" | grep -q "\"$_m\""; then
+            printf '  OK      %s\n' "$_m"
+        else
+            printf '  HILANG  %s   <-- tidak ada di router\n' "$_m" >&2
+            _bad=$((_bad + 1))
+        fi
+    done
+    return $_bad
+}
+
+HAVE="$(_models_json)"
+[ -n "$HAVE" ] || { echo "ERROR: tidak bisa membaca $BASE/v1/models" >&2; exit 1; }
 echo "=== 9Router @ $BASE ==="
+echo "model terdaftar: $(printf '%s' "$HAVE" | grep -o '"object":"model"' | wc -l | tr -d ' ')"
 echo
-echo "--- verifikasi model leader ---"
-verify_models "$LEADER_MODELS" || { echo "ERROR: ada model leader yang tidak tersedia. Batal." >&2; exit 1; }
-echo "--- verifikasi model subagent ---"
-verify_models "$SUBAGENT_MODELS" || { echo "ERROR: ada model subagent yang tidak tersedia. Batal." >&2; exit 1; }
+check_models "$LEADER_NAME" "$LEADER_MODELS" "$HAVE" || {
+    echo "ERROR: ada model leader yang tidak tersedia. Batal." >&2; exit 1; }
+check_models "$AGENT_NAME" "$AGENT_MODELS" "$HAVE" || {
+    echo "ERROR: ada model agent yang tidak tersedia. Batal." >&2; exit 1; }
 echo
 
 if [ "$DRY" = "1" ]; then
     echo "=== DRY RUN: tidak ada yang dikirim ==="
-    echo "1) POST $BASE/api/auth/login   (password dibaca interaktif, tidak disimpan)"
+    echo "1) POST $BASE/api/auth/login  (password interaktif, tidak disimpan)"
     echo "2) POST $BASE/api/combos  name=$LEADER_NAME"
     printf '%s\n' "$LEADER_MODELS" | sed 's/^/     /'
-    echo "3) POST $BASE/api/combos  name=$SUBAGENT_NAME"
-    printf '%s\n' "$SUBAGENT_MODELS" | sed 's/^/     /'
-    echo "4) GET  $BASE/api/combos  (verifikasi hasil)"
+    echo "3) POST $BASE/api/combos  name=$AGENT_NAME"
+    printf '%s\n' "$AGENT_MODELS" | sed 's/^/     /'
+    [ "$CLEAN" = "1" ] && echo "4) DELETE combo lama berawalan 'HSIN-' (kalau ada)"
+    echo "5) GET  $BASE/api/combos  (verifikasi)"
     exit 0
 fi
 
-# --- Password (interaktif, tidak disimpan) ---------------------------------
-printf 'Password 9Router (tidak disimpan, disembunyikan): '
+# --- login -----------------------------------------------------------------
+printf 'Password 9Router (tidak disimpan): '
 stty -echo 2>/dev/null
 read -r PW
 stty echo 2>/dev/null
 printf '\n'
-[ -n "$PW" ] || { echo "ERROR: password kosong." >&2; exit 1; }
+[ -n "$PW" ] || { echo "ERROR: password kosong" >&2; exit 1; }
 
-JAR="$TMPDIR/hsin-9r-cookie.$$.txt"
+JAR="$TMPDIR/hsin-9r-cookie.$$"
 chmod 600 "$JAR" 2>/dev/null
-cleanup() { rm -f "$JAR"; }
-trap cleanup EXIT INT TERM
+trap 'rm -f "$JAR" "$TMPDIR/hsin-9r-*.out"' EXIT INT TERM
 
-echo "--- login ---"
-LOGIN_CODE=$(curl -s -m 15 -o "$TMPDIR/hsin-9r-login.out" -w '%{http_code}' \
+CODE=$(curl -s -m 15 -o "$TMPDIR/hsin-9r-login.out" -w '%{http_code}' \
     -c "$JAR" -H 'Content-Type: application/json' \
     -d "{\"password\":\"$PW\"}" "$BASE/api/auth/login")
 PW=''
-echo "  HTTP $LOGIN_CODE"
-if [ "$LOGIN_CODE" != "200" ]; then
-    echo "ERROR: login gagal. Body dari server:" >&2
-    head -c 300 "$TMPDIR/hsin-9r-login.out" >&2
-    echo >&2
-    echo "Kalau 9Router belum punya password, set dulu di dashboard:" >&2
-    echo "  $BASE  (login page) lalu ulangi perintah ini." >&2
+echo "login -> HTTP $CODE"
+if [ "$CODE" != "200" ]; then
+    echo "ERROR: login gagal. Body server:" >&2
+    head -c 300 "$TMPDIR/hsin-9r-login.out" >&2; echo >&2
+    echo "Kalau belum pernah set password, buka $BASE lalu atur password di halaman login." >&2
     exit 1
 fi
 
-create_combo() {
+api() { curl -s -m 15 -b "$JAR" -H 'Content-Type: application/json' "$@"; }
+
+# --- cleanup combo lama (opsional, hanya yang berawalan HSIN-) -------------
+if [ "$CLEAN" = "1" ]; then
+    echo "--- combo yang ada sekarang ---"
+    CUR=$(api "$BASE/api/combos")
+    printf '%s' "$CUR" | grep -o '"name":"[^"]*"' | sed 's/"name":"/  - /;s/"$//'
+    for _old in $(printf '%s' "$CUR" | grep -o '"name":"HSIN-[^"]*"' | sed 's/"name":"//;s/"$//'); do
+        _oid=$(printf '%s' "$CUR" | tr ',' '\n' | grep -A2 "\"name\":\"$_old\"" | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//;s/"$//')
+        if [ -n "$_oid" ]; then
+            _dc=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -b "$JAR" -X DELETE "$BASE/api/combos/$_oid")
+            echo "  hapus '$_old' (id=$_oid) -> HTTP $_dc"
+        else
+            echo "  '$_old': id tidak terbaca, hapus manual di dashboard"
+        fi
+    done
+    echo
+fi
+
+# --- buat / pertahankan combo ----------------------------------------------
+put_combo() {
     _name="$1"; _models="$2"
-    _existing=$(curl -s -m 10 -b "$JAR" "$BASE/api/combos" 2>/dev/null)
-    if printf '%s' "$_existing" | grep -q "\"$_name\""; then
-        echo "  COMBO '$_name' sudah ada - dilewati (hapus dulu di dashboard bila ingin diganti)"
-        return 0
-    fi
     _body="{\"name\":\"$_name\",\"models\":$_models}"
-    _code=$(curl -s -m 15 -o "$TMPDIR/hsin-9r-create.out" -w '%{http_code}' \
-        -b "$JAR" -H 'Content-Type: application/json' -d "$_body" "$BASE/api/combos")
-    echo "  create '$_name' -> HTTP $_code"
-    [ "$_code" = "200" ] || [ "$_code" = "201" ] || {
-        echo "  body: $(head -c 300 "$TMPDIR/hsin-9r-create.out")" >&2
-        return 1
-    }
-    return 0
+    CODE=$(curl -s -m 15 -o "$TMPDIR/hsin-9r-create.out" -w '%{http_code}' \
+        -b "$JAR" -H 'Content-Type: application/json' \
+        -d "$_body" "$BASE/api/combos")
+    case "$CODE" in
+        200|201) echo "  '$_name' tersimpan (HTTP $CODE)" ;;
+        409) echo "  '$_name' sudah ada & tidak bisa di-update lewat API" >&2
+              echo "     hapus dulu di dashboard, lalu jalankan ulang" >&2; return 1 ;;
+        *)   echo "  '$_name' GAGAL (HTTP $CODE): $(head -c 250 "$TMPDIR/hsin-9r-create.out")" >&2
+             return 1 ;;
+    esac
 }
 
-echo "--- buat combo ---"
-create_combo "$LEADER_NAME" "$LEADER_MODELS"   || exit 1
-create_combo "$SUBAGENT_NAME" "$SUBAGENT_MODELS" || exit 1
+echo "--- combo ---"
+put_combo "$LEADER_NAME" "$LEADER_MODELS" || exit 1
+put_combo "$AGENT_NAME"  "$AGENT_MODELS"  || exit 1
 
 echo "--- verifikasi ---"
-FINAL=$(curl -s -m 10 -b "$JAR" "$BASE/api/combos" 2>/dev/null)
-for _n in "$LEADER_NAME" "$SUBAGENT_NAME"; do
-    if printf '%s' "$FINAL" | grep -q "\"$_n\""; then
-        echo "  OK  $_n ada di 9Router"
+FINAL=$(api "$BASE/api/combos")
+for _n in "$LEADER_NAME" "$AGENT_NAME"; do
+    if printf '%s' "$FINAL" | grep -q "\"name\":\"$_n\"\|\"id\":\"$_n\""; then
+        echo "  OK  $_n"
     else
-        echo "  GAGAL  $_n tidak terlihat setelah dibuat" >&2
-        exit 1
+        echo "  PERIKSA  $_n tidak terlihat di /api/combos" >&2
     fi
 done
 echo
-echo "Selesai. Cek di dashboard: $BASE/combos"
+echo "Cek di dashboard: $BASE"
