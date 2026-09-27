@@ -695,3 +695,20 @@
   build-apk run #36301127388 success (compile Kotlin lolos termasuk toast
   baru). L2 tersisa: flash + reboot + tes HP oleh user.
 
+
+## Roadmap 10/10 + Phase 1 (2026-09-27, remote roadmap diterima)
+- Remote menambah `ROADMAP_10_10.md` + `STATUS.md` (2 commit, di-merge 259bbb5
+  tanpa force; lokal lambda-fix 735a77d ikut merge).
+- Phase 1 Task 1.1.1-1.1.3 (dev-modul work/phase1-tests, merge 7e41841):
+  tests/{TESTING_FRAMEWORK,TEMPLATE_DEVICE_REPORT,device_reports/.gitkeep,
+  validate_build.sh} + .github/workflows/lint-and-test.yml.
+- Koreksi leader: shellcheck workflow WAJIB `-S error` (warning pre-existing
+  SC2115 build_release.sh + SC2154 action.sh terbukti rc=1 bila tanpa filter)
+  + `read -r`. Bukti: sh -n OK, shellcheck 0, YAML valid (PyYAML), sim lint
+  lolos, validate positif VALID/negatif ERROR.
+- Acceptance nyata: lint-and-test run #36303066269 SUCCESS saat push (27 dtk).
+- APK: 3 run gagal = kode pra-lambda-fix (diharapkan); run #36303140779 di
+  main kini SUCCESS (NDK r26 + HsinCompat Java + lambda Kotlin lolos compile).
+- STATUS.md: 1.1.1-1.1.3 DONE. STOP — Phase 2 menunggu approve user.
+- PELAJARAN: sintaks lambda Java (`msg ->`) bukan Kotlin (`{ msg -> }`) —
+  cek silang CI; Kotlin DSL `path` minta File (`file(...)`), bukan String.
