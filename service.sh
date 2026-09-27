@@ -21,6 +21,13 @@ export HSIN_LOG_LEVEL="${HSIN_LOG_LEVEL:-3}"
 # shellcheck disable=SC1091
 . "$MODPATH/core/logger.sh"
 
+# STEP 7 (PQ Step 6): boot guard — source di paling awal, SEBELUM tuning
+# apa pun. Seluruh logika counter di core/boot_guard.sh (TANPA duplikasi
+# di file ini): service.sh hanya memanggil check / on_boot_failed /
+# on_boot_ok di titik yang tepat.
+# shellcheck disable=SC1091
+. "$MODPATH/core/boot_guard.sh" 2>/dev/null
+
 # PATCH v4.0: bersihkan log tiap boot (permintaan user - debug.log numpuk
 # hampir 1 juta baris karena spam poll). Truncate, bukan rotate: bukti
 # debugging sesi sebelumnya jarang dibutuhkan, dan boot.log ditulis ulang
@@ -32,11 +39,30 @@ for _hsin_boot_log in "$HSIN_DATA"/logs/debug.log "$HSIN_DATA"/logs/monitor.log 
 done
 rm -f "$HSIN_DATA"/logs/*.old 2>/dev/null
 
-# 1. Tunggu boot complete
+# 1. Tunggu boot complete — BOUNDED (pola Alpha: ~120 dtk), bukan selamanya.
+# Timeout = boot DINYATAKAN gagal: catat fail via boot_guard, lalu skip
+# SEMUA tuning boot ini + exit 0 bersih (guard aktif atau belum — sama-sama
+# skip; bedanya hanya di log). Sukses (completed=1) = lanjut normal;
+# counter di-reset di seksi 11b setelah service selesai tanpa crash
+# (consecutive-fail semantics: boot bagus memutus rantai gagal).
 hsin_log_info "main" "Waiting for boot_completed..."
-while [ "$(getprop sys.boot_completed)" != "1" ]; do
-    sleep 1
+HSIN_BOOT_WAIT_TIMEOUT="${HSIN_BOOT_WAIT_TIMEOUT:-120}"
+_hbg_wait=0
+while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
+    [ "$_hbg_wait" -ge "$HSIN_BOOT_WAIT_TIMEOUT" ] && break
+    sleep 3
+    _hbg_wait=$((_hbg_wait + 3))
 done
+if [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; then
+    if command -v hsin_boot_guard_on_boot_failed >/dev/null 2>&1; then
+        hsin_boot_guard_on_boot_failed "sys.boot_completed timeout ${HSIN_BOOT_WAIT_TIMEOUT}s"
+        hsin_boot_guard_check
+    else
+        hsin_log_warn "main" "boot_completed timeout + core/boot_guard.sh tak tersedia — skip tuning (fail-safe)"
+    fi
+    hsin_log_warn "main" "Boot incomplete — SEMUA tuning DILEWATI boot ini (exit 0)"
+    exit 0
+fi
 sleep 2  # Beri waktu sysfs stabil
 
 # 2. Load config user
@@ -423,6 +449,14 @@ fi
 touch "$HSIN_DATA/.applied"
 hsin_protect_harden_data
 hsin_log_ok "main" "HSIN service ready"
+
+# 11b. Boot sukses DAN service selesai tanpa crash (tuning + status +
+# .applied sudah lewat) -> reset guard counter. BUKAN di awal: reset di
+# sini membuktikan "jalan normal", bukan cuma "start".
+# (Guard integration STEP 7 / PQ Step 6.)
+if command -v hsin_boot_guard_on_boot_ok >/dev/null 2>&1; then
+    hsin_boot_guard_on_boot_ok
+fi
 
 # 12. Background integrity guard - re-checks the FULL file set (engine/,
 # extreme/, profiles/, etc) every 3 minutes for as long as the device is
