@@ -1,18 +1,18 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (STEP 8 DONE `000c83a`; Phase 2 FULL; STOP sebelum Step 9/Phase 3)
-**Overall Progress:** Phase 1 DONE → Phase 2 DONE (8/22) → Phase 3 NEXT
+**Last Updated:** 2026-09-27 (STEP 9 DONE `b79763d`; Phase 3 dibuka 1/4; STOP sebelum thermal)
+**Overall Progress:** Phase 1 DONE → Phase 2 DONE → Phase 3 IN PROGRESS (1/4)
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[███████░░░░░░░░░░░░░] 36% (8/22 steps DONE)
+[████████░░░░░░░░░░░░] 41% (9/22 steps DONE)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
 PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██████████] 100% — DONE
-PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — NEXT (butuh approve + Step 8 dulu)
+PHASE 3: Capability Overrides (Steps 9-12)     [██░░░░░░░░] 25% — IN PROGRESS (Step 9 DONE)
 PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
 PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
 PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
@@ -89,9 +89,20 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ## 📋 PHASE 3: Capability-Driven Overrides & Thermal Safety (Steps 9-12) — BLOCKED
 
-- [ ] **Step 9** — `capability/capability_overrides.json` keyed by
-  CAPABILITY SIGNATURE (mis. `cpu2+_gpu-devfreq_thermal2+`) + entry
-  `default` fallback aman. NOL nama chipset sebagai key.
+- [x] **Step 9** — `capability/capability_overrides.json` + `core/load_overrides.sh`
+  — DONE 2026-09-27, commit `b79763d` (= STEP 9 versi perintah user).
+  JSON keyed by capability signature (3 signatures + default_fallback),
+  NOL nama chipset/vendor (grep = 0), valid via `json.tool`. Match fields
+  HANYA dari output detector.sh yang beneran ada (device.txt:
+  CPU_POLICIES/GOVS/THERMAL + cek devfreq-writable live); SOC/VENDOR/GPU
+  tidak pernah dibaca; detector.sh UTUH (git status bersih).
+  Loader: match pertama menang → export hints; no-match/cacat/hilang →
+  default_fallback + log WAJIB "no signature match, using default
+  fallback"; TIDAK PERNAH tulis sysfs (statis + checksum runtime).
+  Hints logis (persen + gov preference + thermal_class), mapping OPP di
+  apply layer. Bukti L1: sh -n + shellcheck `-S error` 0, sandbox 9/9
+  (match/no-match+log/cacat/hilang+log/no-write/detector-utuh).
+  Plus 1 baris build_release.sh: load_overrides.sh masuk daftar runtime.
 - [ ] **Step 10** — `core/load_overrides.sh` — hitung signature dari
   `detected.conf` + writability live, pilih entry cocok, fallback
   `default` + log bila tidak cocok.
