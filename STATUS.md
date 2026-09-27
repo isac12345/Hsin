@@ -113,7 +113,7 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   tidak mati; integrasi service.sh pasca-boot-guard. Bukti L1: sh -n +
   shellcheck `-S error` 0, sandbox 6/6 lewat jalur file asli (NORMAL utuh,
   HIGH/VERY HIGH utuh+log, CRITICAL APPLIED+rc3, relativitas 85C beda
-  device, UNKNOWN). Revisi `0f2dfeb` (2026-09-27, perbaiki test
+  device, UNKNOWN).   Revisi `546f9a5` (2026-09-27, perbaiki test
   tautologi + bug rc/exit/duplikat). CI lint-and-test success.
   `detected.conf` + writability live, pilih entry cocok, fallback
   `default` + log bila tidak cocok.
