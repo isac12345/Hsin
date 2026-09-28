@@ -870,7 +870,7 @@ hsin_action_export_debug() {
 # apply persists PROFILE= into hsin.conf - a boost/revert call must never
 # overwrite the user's actual chosen base profile with a temporary value.
 hsin_action_apply() {
-    _profile="${1:-balanced}"
+    _profile="${1:-manual}"
     _apply_source="${2:-manual}"
 
     # Validate profile exists
@@ -1063,6 +1063,7 @@ hsin_action_config_set() {
         GAM_BOOST_ENABLED|ALLOW_EXTREME|DOWNSCALE_ENABLED|REFRESH_LOCK_ENABLED) : ;;
         RENDERER) : ;;
         DOWNSCALE_PERCENT|REFRESH_LOCK_HZ) : ;;
+        PROFILE) : ;;
         *) echo "ERROR: unknown setting: $_key"; return 1 ;;
     esac
     case "$_key" in
@@ -1084,6 +1085,12 @@ hsin_action_config_set() {
         REFRESH_LOCK_HZ)
             case "$_val" in
                 ''|*[!0-9]*) echo "ERROR: REFRESH_LOCK_HZ must be a number"; return 1 ;;
+            esac
+            ;;
+        PROFILE)
+            case "$_val" in
+                battery|balanced|performance|extreme|manual) : ;;
+                *) echo "ERROR: PROFILE must be battery, balanced, performance, extreme, or manual"; return 1 ;;
             esac
             ;;
         *)

@@ -53,6 +53,14 @@ hsin_network_apply_tcp() {
 
     _target=$(hsin_network_pick_tcp "$_profile" "$_avail")
 
+    # Mode manual: tanpa override, lewati penulisan (tanpa kecuali).
+    _uk_cc=$(hsin_uk_get tcp_cc 2>/dev/null)
+    if [ "$_profile" = "manual" ] && [ -z "$_uk_cc" ]; then
+        hsin_uk_result "tcp_cc" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+        echo "    tcp_congestion: dilewati (mode manual, tanpa override)"
+        return 0
+    fi
+
     # Override knob user: hanya dipakai kalau ada di
     # tcp_available_congestion_control - kernel menolak CC tak dikenal,
     # jadi lebih baik SKIP + bilang ke user daripada menulis terus.
@@ -96,6 +104,13 @@ hsin_network_apply_tfo() {
     [ -f "$_path" ] || return 1
     [ -w "$_path" ] || return 1
 
+    # Mode manual: tanpa override, lewati penulisan.
+    _uk_tfo=$(hsin_uk_get tfo 2>/dev/null)
+    if [ "$_profile" = "manual" ] && [ -z "$_uk_tfo" ]; then
+        hsin_uk_result "tfo" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+        echo "    tfo: dilewati (mode manual, tanpa override)"
+        return 0
+    fi
     case "$_profile" in
         battery)     _v="0" ;;
         balanced)    _v="1" ;;
@@ -130,6 +145,12 @@ hsin_network_apply_tfo() {
 # Apply network sysctl tunables
 hsin_network_apply_sysctl() {
     _profile="$1"
+
+    # Mode manual: dilewati (tanpa override knob, tidak ada penulisan di sini).
+    if [ "$_profile" = "manual" ]; then
+        echo "  Sysctl: dilewati (mode manual)"
+        return 0
+    fi
 
     # netdev_max_backlog
     if [ -w $HSIN_PROC/sys/net/core/netdev_max_backlog ]; then

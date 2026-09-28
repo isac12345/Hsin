@@ -30,6 +30,7 @@ profiles/balanced.conf
 profiles/battery.conf
 profiles/performance.conf
 profiles/extreme.conf
+profiles/manual.conf
 config/hsin.conf
 "
 

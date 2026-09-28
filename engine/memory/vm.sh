@@ -145,24 +145,36 @@ hsin_vm_apply() {
             _val="$_uk_val"
             hsin_uk_used "vm" "swappiness" "$_val"
         fi
-        if [ "$_n" = "swappiness" ] && [ -z "$_uk_val" ]; then
+        if [ "$_n" = "swappiness" ] && [ -z "$_uk_val" ] && [ "$_profile" != "manual" ]; then
             hsin_uk_result "swappiness" "(profil)" "$_val" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
 
-        [ -z "$_val" ] && continue
-
-        # Check if already set
-        _cur=$(hsin_vm_read "$_n")
-        [ "$_cur" = "$_val" ] && {
-            echo "    vm.$_n = $_val (already set)"
+        # Mode manual: tanpa override, dilewati. Hanya swappiness yang
+        # punya knob (baris hasil); knob VM lain echo saja (bukan
+        # namespace knob, tanpa baris hasil).
+        if [ "$_profile" = "manual" ] && [ -z "$_uk_val" ]; then
+            if [ "$_n" = "swappiness" ]; then
+                hsin_uk_result "swappiness" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            else
+                echo "    vm.$_n dilewati (mode manual)"
+            fi
             continue
-        }
+        fi
 
-        if hsin_vm_write "$_n" "$_val"; then
-            echo "    vm.$_n = $_val ✓"
-        else
-            echo "    vm.$_n: skip (not writable or invalid)"
-            [ -n "$_uk_val" ] && hsin_log_warn "vm" "override swappiness=$_uk_val gagal ditulis/tidak valid (pakai nilai profil)"
+        if [ -n "$_val" ]; then
+            # Check if already set
+            _cur=$(hsin_vm_read "$_n")
+            [ "$_cur" = "$_val" ] && {
+                echo "    vm.$_n = $_val (already set)"
+                continue
+            }
+
+            if hsin_vm_write "$_n" "$_val"; then
+                echo "    vm.$_n = $_val ✓"
+            else
+                echo "    vm.$_n: skip (not writable or invalid)"
+                [ -n "$_uk_val" ] && hsin_log_warn "vm" "override swappiness=$_uk_val gagal ditulis/tidak valid (pakai nilai profil)"
+            fi
         fi
     done <<EOF
 $HSIN_VM_SAFE

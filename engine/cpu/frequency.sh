@@ -138,6 +138,17 @@ hsin_cpu_freq_apply() {
         hsin_cpu_policy_hwmax "$_pid"; _stock_max="$_hcpw"
         [ -z "$_stock_max" ] && _stock_max=$(hsin_opp_max "$_avail")
         [ -z "$_stock_min" ] && _stock_min=$(hsin_opp_min "$_avail")
+        # Mode manual: tanpa override, lewati semua penulisan frekuensi.
+        # Fetch DULU sebelum cek (nilai diisi di bawah untuk profil lama).
+        _uk_max=$(hsin_uk_cpu_field "$_pid" max_khz 2>/dev/null)
+        _uk_min=$(hsin_uk_cpu_field "$_pid" min_khz 2>/dev/null)
+        if [ "$_profile" = "manual" ] && [ -z "$_uk_max" ] && [ -z "$_uk_min" ]; then
+            hsin_uk_result "cpu_policy_${_pid}_max_khz" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            hsin_uk_result "cpu_policy_${_pid}_min_khz" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            _skip=$((_skip + 1))
+            continue
+        fi
+
         case "$_profile" in
             battery)     _min="$_stock_min"; _max=$(hsin_cpu_freq_pick cap:80 "$_avail") ;;
             balanced)    _min=$(hsin_cpu_freq_pick floor:15 "$_avail"); _max="$_stock_max" ;;
@@ -172,7 +183,12 @@ hsin_cpu_freq_apply() {
             esac
         fi
         if [ -z "$_uk_max" ]; then
-            hsin_uk_result "cpu_policy_${_pid}_max_khz" "(profil)" "$_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "cpu_policy_${_pid}_max_khz" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+                _max=""
+            else
+                hsin_uk_result "cpu_policy_${_pid}_max_khz" "(profil)" "$_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            fi
         fi
         # min_khz: aturan sama (snap ke OPP terdekat <=, dicatat) - hanya
         # jadi batas bawah yang tidak melewati pilihan user.
@@ -197,7 +213,12 @@ hsin_cpu_freq_apply() {
             esac
         fi
         if [ -z "$_uk_min" ]; then
-            hsin_uk_result "cpu_policy_${_pid}_min_khz" "(profil)" "$_min" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "cpu_policy_${_pid}_min_khz" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+                _min=""
+            else
+                hsin_uk_result "cpu_policy_${_pid}_min_khz" "(profil)" "$_min" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            fi
         fi
         if hsin_cpu_freq_apply_one "$_policy" "$_min" "$_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
     done
