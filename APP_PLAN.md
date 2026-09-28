@@ -121,7 +121,7 @@ dari modul.
 | A1 | Backup dan inventaris app lama | [x] |
 | A2 | Hapus app lama, bersihkan referensi | [x] |
 | A3 | Kontrak app-modul dan laporan gap | [x] |
-| M1 | Mode manual murni di modul | [ ] |
+| M1 | Mode manual murni di modul | [x] |
 | M2 | Command guard-status | [ ] |
 | M3 | Perbarui kontrak app-modul | [ ] |
 | A4 | Scaffold proyek dan CI | [ ] |
