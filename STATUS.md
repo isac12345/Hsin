@@ -178,7 +178,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   + keterbatasan jujur (1 device, butuh L2 + device kedua); tanpa
   kata stable/production-ready; pesan commit dikoreksi tanpa versi
   (aturan Step 18).
-- [ ] **Step 21** — SUPPORT_POLICY.md (SLA, kanal, matriks kompatibilitas).
+- [x] **PQ Step 21** — SUPPORT_POLICY.md — DONE 2026-09-27. SLA
+  best-effort tanpa angka; kanal hanya GitHub Issues repo privat
+  (terverifikasi, tanpa karangan); kompatibilitas rujuk Step 16;
+  section TIDAK didukung (extreme, device lain, mod bypass) +
+  cara melapor.
 - [ ] **Step 22** — final status update + GATE RILIS: versionCode baru HANYA
   bila Phase 2-3 selesai DAN tervalidasi di HP nyata (L2). Tanpa L2 = tanpa
   rilis stabil.
