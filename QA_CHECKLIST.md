@@ -61,6 +61,11 @@ Device Testing).
   Hasil (ms): ___ / ___ / ___.
 - [ ] Rollback: `hsin backup` → ubah 1 knob → `hsin restore` →
   node kembali + baris `ROLLBACK` di `rollback.log`.
+- [ ] Profil `extreme` BELUM pernah dijalankan di HP fisik sama
+  sekali (gate `ALLOW_EXTREME` tidak pernah dibuka; tanpa sandbox
+  khusus) — JANGAN aktifkan di luar pengujian terkontrol. Blocker
+  untuk klaim apa pun soal `extreme` (lihat KETERBATASAN KERAS di
+  `RELEASE_NOTES.md`).
 - [ ] Divalidasi di device kedua (vendor/SoC berbeda) — **BELUM,
   blocker untuk klaim multi-device.** Syarat lolos: report L2 penuh
   (TESTING.md) di `tests/device_reports/` + 7 item di atas hijau di
