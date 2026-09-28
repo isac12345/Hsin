@@ -64,6 +64,7 @@
 ## Fase 2 — Boot Guard & Safe Apply (Step 5-8, BERIKUTNYA)
 
 - [ ] Step 5 (NEXT): `core/boot_guard.sh` — referensi pola dari repo
+  (note: K1-K3 docs inserted in APP_PLAN; execution gated on user approve)
   isac12345/Alpha (`service.sh`): hitung boot fail count, auto-disable
   tuning kalau gagal berturut-turut, log jelas kapan guard aktif.
 - [ ] Step 6: integrasi boot guard ke `service.sh` (cek di awal boot,
