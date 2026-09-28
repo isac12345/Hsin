@@ -604,6 +604,49 @@ versionCode bump before Phase 2-3 DONE **AND** validated on real hardware
 
 ---
 
+## STEP 23: Knob Result Visibility (tambahan, di luar 22 step awal)
+
+**Objective:**
+Jejak diminta X → diterapkan Y → alasan Z jangan hanya di log:
+catat per knob ke SATU state file tiap siklus apply, tampilkan di
+`hsin knob-list` dalam baris key=value (APK akan membacanya nanti).
+
+**Files to modify:**
+- `core/user_knobs.sh` (recorder + reset + output knob-list)
+- Titik keputusan override 7 engine (1 baris record per titik, tanpa
+  ubah jalur apply) + reset di `service.sh` §7 dan
+  `hsin_apply_all_engines`
+
+**Requirements:**
+- [ ] State file `$HSIN_DATA/knob_results.env`, tulis atomik tmp+mv,
+  reset tiap siklus apply; hilang → "belum ada hasil apply"
+- [ ] Record dari titik yang sama dengan `hsin_uk_used` / WARN yang
+  sudah ada; kategori HANYA set safe_apply (tanpa kategori baru)
+- [ ] `knob-list`: baris `key=… requested=… applied=… category=…
+  reason="…"` dulu, JSON lama byte-identik TERAKHIR (parser APK
+  lastJsonLine tidak terganggu)
+- [ ] Tanpa override → tampil nilai profil; tanpa file runtime baru
+  (recorder di `user_knobs.sh` yang sudah di-bundle)
+
+**Acceptance Criteria:**
+- [ ] Sandbox file asli: valid APPLIED, snap FALLBACK + alasan,
+  gov ditolak FALLBACK + alasan, OPP kosong tanpa klaim palsu,
+  state hilang jujur, reset per siklus, profil-only tampil
+- [ ] ShellCheck 0 errors, sh -n pass, CI passes
+
+**Commit Message:**
+```
+feat: knob result visibility per apply cycle (PQ Step 23)
+```
+
+**Go/No-Go Checklist:**
+- [ ] knob sandbox PASS, APK parser unaffected, CI passes
+
+**Estimated Effort:** 2 hours
+**Difficulty:** Medium
+
+---
+
 ## 🎯 EXECUTION SUMMARY
 
 ```

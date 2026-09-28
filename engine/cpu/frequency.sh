@@ -163,11 +163,16 @@ hsin_cpu_freq_apply() {
                     if [ -n "$_uk_snap" ]; then
                         _max="$_uk_snap"
                         hsin_log_warn "cpu" "override cpu_policy_${_pid}_max_khz=$_uk_max tidak ada di tabel OPP; snap ke $_uk_snap"
+                        hsin_uk_result "cpu_policy_${_pid}_max_khz" "$_uk_max" "$_uk_snap" "FALLBACK" "tidak ada di tabel OPP; snap ke $_uk_snap" 2>/dev/null || true
                     else
                         hsin_log_warn "cpu" "override cpu_policy_${_pid}_max_khz=$_uk_max ditolak: tabel OPP tidak terbaca (pakai profil)"
+                        hsin_uk_result "cpu_policy_${_pid}_max_khz" "$_uk_max" "$_max" "FALLBACK" "ditolak: tabel OPP tidak terbaca (pakai profil)" 2>/dev/null || true
                     fi
                     ;;
             esac
+        fi
+        if [ -z "$_uk_max" ]; then
+            hsin_uk_result "cpu_policy_${_pid}_max_khz" "(profil)" "$_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
         # min_khz: aturan sama (snap ke OPP terdekat <=, dicatat) - hanya
         # jadi batas bawah yang tidak melewati pilihan user.
@@ -183,11 +188,16 @@ hsin_cpu_freq_apply() {
                     if [ -n "$_uk_snap" ]; then
                         _min="$_uk_snap"
                         hsin_log_warn "cpu" "override cpu_policy_${_pid}_min_khz=$_uk_min tidak ada di tabel OPP; snap ke $_uk_snap"
+                        hsin_uk_result "cpu_policy_${_pid}_min_khz" "$_uk_min" "$_uk_snap" "FALLBACK" "tidak ada di tabel OPP; snap ke $_uk_snap" 2>/dev/null || true
                     else
                         hsin_log_warn "cpu" "override cpu_policy_${_pid}_min_khz=$_uk_min ditolak: tabel OPP tidak terbaca (pakai profil)"
+                        hsin_uk_result "cpu_policy_${_pid}_min_khz" "$_uk_min" "$_min" "FALLBACK" "ditolak: tabel OPP tidak terbaca (pakai profil)" 2>/dev/null || true
                     fi
                     ;;
             esac
+        fi
+        if [ -z "$_uk_min" ]; then
+            hsin_uk_result "cpu_policy_${_pid}_min_khz" "(profil)" "$_min" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
         if hsin_cpu_freq_apply_one "$_policy" "$_min" "$_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
     done

@@ -60,6 +60,7 @@ hsin_network_apply_tcp() {
     if [ -n "$_uk_cc" ]; then
         if [ -z "$_avail" ]; then
             hsin_log_warn "network" "override tcp_cc=$_uk_cc ditolak: tcp_available_congestion_control tidak terbaca (pakai profil)"
+            hsin_uk_result "tcp_cc" "$_uk_cc" "$_target" "FALLBACK" "ditolak: daftar CC tidak terbaca (pakai profil)" 2>/dev/null || true
         else
             case " $_avail " in
                 *" $_uk_cc "*)
@@ -68,9 +69,13 @@ hsin_network_apply_tcp() {
                     ;;
                 *)
                     hsin_log_warn "network" "override tcp_cc=$_uk_cc ditolak: tidak ada di tcp_available_congestion_control (pakai profil)"
+                    hsin_uk_result "tcp_cc" "$_uk_cc" "$_target" "FALLBACK" "ditolak: tidak ada di daftar CC (pakai profil)" 2>/dev/null || true
                     ;;
             esac
         fi
+    fi
+    if [ -z "$_uk_cc" ]; then
+        hsin_uk_result "tcp_cc" "(profil)" "$_target" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
     fi
 
     _current=$(cat $HSIN_PROC/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
@@ -110,8 +115,12 @@ hsin_network_apply_tfo() {
                 ;;
             *)
                 hsin_log_warn "network" "override tfo=$_uk_tfo ditolak: harus 0-3 (pakai profil)"
+                hsin_uk_result "tfo" "$_uk_tfo" "$_v" "FALLBACK" "ditolak: harus 0-3 (pakai profil)" 2>/dev/null || true
                 ;;
         esac
+    fi
+    if [ -z "$_uk_tfo" ]; then
+        hsin_uk_result "tfo" "(profil)" "$_v" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
     fi
 
     echo "$_v" > "$_path" 2>/dev/null || return 1

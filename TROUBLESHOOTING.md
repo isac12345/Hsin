@@ -157,3 +157,9 @@ device lain), `failed` = tulis ditolak kernel (perlu perhatian).
 **Debug:** `su -c 'grep "WARN.*lanjut engine berikut" /data/adb/hsin/logs/boot.log'`
 dan `su -c 'cat /data/adb/hsin/logs/error.log'` untuk baris error
 per engine.
+
+Untuk pertanyaan "knob saya diminta X, diterapkan Y, kenapa" — jangan
+ubek `boot.log` dulu: `hsin knob-list` merangkumnya per knob
+(`requested` → `applied` + kategori + alasan, dari
+`/data/adb/hsin/knob_results.env` siklus apply terakhir). Detail
+per tulis node tetap di `boot.log` (kategori safe_apply).
