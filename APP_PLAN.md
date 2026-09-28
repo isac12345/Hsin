@@ -120,7 +120,7 @@ dari modul.
 |---|---|---|
 | A1 | Backup dan inventaris app lama | [x] |
 | A2 | Hapus app lama, bersihkan referensi | [x] |
-| A3 | Kontrak app-modul dan laporan gap | [ ] |
+| A3 | Kontrak app-modul dan laporan gap | [x] |
 | A4 | Scaffold proyek dan CI | [ ] |
 | A5 | Tema dan komponen | [ ] |
 | A6 | RootClient dan Repository | [ ] |
