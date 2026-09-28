@@ -123,6 +123,9 @@ dari modul.
 | A3 | Kontrak app-modul dan laporan gap | [x] |
 | M1 | Mode manual murni di modul | [x] |
 | M2 | Command guard-status | [ ] |
+| K1 | Knob engine yang sudah ada | [ ] |
+| K2 | Knob tier-1 dari Alpha | [ ] |
+| K3 | Knob tier-2 berbasis capability | [ ] |
 | M3 | Perbarui kontrak app-modul | [ ] |
 | A4 | Scaffold proyek dan CI | [ ] |
 | A5 | Tema dan komponen | [ ] |
@@ -251,6 +254,42 @@ Acceptance: sandbox untuk guard aktif, tidak aktif, state hilang, state
 rusak; snapshot membuktikan nol penulisan; ShellCheck -S error 0,
 sh -n lulus; daftarkan ke bundle bila ada file baru.
 Commit: feat: guard-status read-only command (M2)
+
+### K1 — Beri knob pada engine HSIN yang sudah ada (IZIN: boleh mengubah kode modul)
+GATE: investigasi pasca-M1 dan M2 selesai dan disetujui user. Kalau investigasi menemukan pelanggaran mode manual murni, perbaikannya (M1b) dikerjakan lebih dulu.
+Objective: penulisan yang selama ini hanya jalan dari profil (dan mati di mode manual) mendapat knob manual.
+Requirements:
+- Cakupan: readahead (I/O), vfs_cache_pressure, dirty_ratio, dirty_background_ratio (VM), sysctl backlog (jaringan), sesuai inventaris M1 baris 10, 13, 15. Baris 16-19 (DVFS, refresh-rate range, frame limit, SurfaceFlinger) TIDAK dikerjakan di sini. Laporkan saja apakah aman dijadikan knob.
+- Ikuti pola knob yang ada persis (pola key, kategori hasil, knob-list, knobs). Rentang atau daftar nilai valid dibaca dari perangkat (node live), bukan hardcode. Kalau tidak bisa dibaca, ajukan batas ke user sebelum mengunci.
+- Node tidak ada atau tidak writable: knob tampil UNAVAILABLE dengan alasan, lewat safe_apply dan engine_guard, tanpa crash.
+- Setiap node baru masuk backup dan rollback. Uji backup lalu rollback per knob.
+- Mode manual tanpa override tetap nol penulisan. Profil lama tidak berubah perilakunya.
+- Perintah knobs mengeluarkan knob baru beserta engine dan kategori supaya app menampilkannya otomatis.
+Acceptance (sandbox file asli, snapshot byte): hanya node yang di-set yang berubah; node hilang jadi UNAVAILABLE; nilai di luar rentang ditolak atau di-snap sesuai pola; backup lalu rollback mengembalikan nilai per knob; semua sandbox test lama lulus; ShellCheck -S error 0 dan sh -n lulus; file runtime baru terdaftar di build_release.sh dan dibuktikan lewat isi ZIP.
+Commit: feat: knobs for existing engine writes (K1)
+
+### K2 — Knob baru tingkat 1 dari Alpha (IZIN: boleh mengubah kode modul)
+GATE: K1 disetujui user.
+Objective: tambah knob yang aman dan universal.
+Requirements:
+- Cakupan: I/O add_random, iostats, nomerges (mengikuti pola engine I/O yang ada, RPMB dan boot dikecualikan seperti di Alpha); VM stat_interval dan page-cluster; schedutil rate_limit_us per policy (hanya bila governor schedutil aktif dan node ada).
+- Semua persyaratan K1 berlaku.
+- Tulis ulang sebagai knob sendiri, jangan salin kode Alpha mentah. Catat asal tiap tweak di dokumen.
+- Untuk rate_limit_us: laporkan default dan rentang nyata di sandbox, ajukan batas ke user sebelum mengunci.
+Acceptance: sama seperti K1.
+Commit: feat: tier-1 knobs from Alpha (K2)
+
+### K3 — Knob tingkat 2 berbasis capability (IZIN: boleh mengubah kode modul)
+GATE: K2 disetujui user.
+Cakupan: sched sysctl (sched_latency_ns, sched_min_granularity_ns, sched_wakeup_granularity_ns, sched_child_runs_first); uclamp cpuctl (cpu.uclamp.min dan max grup foreground); tunables GPU (devfreq polling_interval, up_threshold, down_differential bila governor cocok; mali_kbase boost, polling, upthreshold).
+TIDAK termasuk: sched_migration_cost_ns, cpuset, stune, bus/DRAM, dan semua tweak tingkat 3 (ditunda sampai L2 di HP fisik).
+Requirements:
+- Semua persyaratan K1 berlaku.
+- Deteksi ketat: node ada, writable, dan nilai valid. Kernel tanpa sysctl tertentu jadi UNAVAILABLE, bukan error. Jangan bergantung pada nama SoC atau vendor GPU, deteksi lewat node.
+- Batas rentang tiap knob dijustifikasi (dokumentasi kernel atau nilai relatif Alpha terhadap nilai asli) dan dilaporkan ke user sebelum dikunci. Tidak ada nilai default: knob tidak disentuh sampai user mengubahnya.
+- Uji sandbox dua varian: node lengkap dan node hilang sebagian.
+Acceptance: sama seperti K1.
+Commit: feat: tier-2 capability-gated knobs (K3)
 
 ### M3 — Perbarui kontrak app-modul (dokumen saja)
 Objective: kontrak mencerminkan M1 dan M2.
