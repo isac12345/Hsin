@@ -121,6 +121,9 @@ dari modul.
 | A1 | Backup dan inventaris app lama | [x] |
 | A2 | Hapus app lama, bersihkan referensi | [x] |
 | A3 | Kontrak app-modul dan laporan gap | [x] |
+| M1 | Mode manual murni di modul | [ ] |
+| M2 | Command guard-status | [ ] |
+| M3 | Perbarui kontrak app-modul | [ ] |
 | A4 | Scaffold proyek dan CI | [ ] |
 | A5 | Tema dan komponen | [ ] |
 | A6 | RootClient dan Repository | [ ] |
@@ -199,6 +202,70 @@ keputusan yang dibutuhkan dari user tercantum.
 
 Commit: `docs: app-module contract and gap report (App A3)`
 
+### M1 — Mode manual murni di modul (IZIN: boleh mengubah kode modul)
+Objective: HSIN hanya menulis knob yang di-set user. Knob lain tidak
+disentuh sama sekali.
+Requirements:
+- Tambah profil `manual`. Profil lama (battery/balanced/performance/
+  extreme) tetap ada dan perilakunya TIDAK berubah.
+- Default profil untuk instalasi BARU = manual. Instalasi yang sudah
+  punya config tidak diubah diam-diam.
+- Di mode manual, SEMUA jalur apply (service.sh saat boot,
+  hsin_apply_all_engines, apply via action.sh) hanya menerapkan
+  override dari user_knobs.env. Knob tanpa override tidak ditulis,
+  dicatat SKIPPED dengan alasan "tidak diatur (mode manual)".
+- Inventaris SEMUA penulisan di jalur apply (termasuk nilai tetap di
+  profiles/*.conf dan engine yang menulis tanpa knob: jaringan, zram,
+  VM, display, renderer). Untuk tiap penulisan tunjukkan perilakunya di
+  mode manual: dilewati atau hanya jalan bila ada override. Tabel ini
+  masuk laporan.
+- Boot guard, thermal guard, safe_apply, engine_guard, backup/rollback,
+  dan gate ALLOW_EXTREME tetap berlaku tanpa perubahan.
+- knob-list di mode manual mempertahankan format baris dan JSON
+  terakhir yang sudah ada. Knob tanpa override tampil SKIPPED dengan
+  alasan di atas.
+- Ganti profil ke manual lewat config-set kalau key profil sudah masuk
+  whitelist. Kalau belum, tambahkan seminimal mungkin dan laporkan.
+Acceptance (sandbox dengan file asli, snapshot byte sebelum/sesudah):
+(1) manual + 1 override: hanya node itu berubah, semua node lain
+byte-identik; (2) manual tanpa override: nol penulisan; (3) semua
+sandbox test yang ada lulus (regresi profil lama); (4) jalur boot
+manual hanya menerapkan override tersimpan; (5) backup lalu rollback
+mengembalikan nilai; (6) override valid, invalid, dan snap OPP tetap
+benar; ShellCheck -S error 0, sh -n lulus. File runtime baru wajib
+terdaftar di build_release.sh dan dibuktikan lewat isi ZIP.
+Commit: feat: manual mode applies only user overrides (M1)
+
+### M2 — Command guard-status (IZIN: boleh mengubah kode modul)
+Objective: APK membaca status boot guard tanpa parsing log.
+Requirements:
+- Subcommand read-only `guard-status` di dispatch action.sh yang sama.
+  Output key=value per baris plus satu baris JSON terakhir (ikuti pola
+  knob-list): active (0/1), fail_count, threshold,
+  cooldown_remaining_sec, last_reason. Tidak boleh menulis file apa pun.
+  Data dibaca dari state boot_guard.sh yang sudah ada, tanpa logic
+  guard baru.
+- State hilang atau rusak: active=0, reason "tidak ada state", rc 0,
+  tanpa crash.
+Acceptance: sandbox untuk guard aktif, tidak aktif, state hilang, state
+rusak; snapshot membuktikan nol penulisan; ShellCheck -S error 0,
+sh -n lulus; daftarkan ke bundle bila ada file baru.
+Commit: feat: guard-status read-only command (M2)
+
+### M3 — Perbarui kontrak app-modul (dokumen saja)
+Objective: kontrak mencerminkan M1 dan M2.
+Requirements:
+- Perbarui docs/APP_CONTRACT.md: mode manual, guard-status (output
+  [SANDBOX] nyata), perilaku knob-list di mode manual, dan jawaban ulang
+  gap D1 dan D2 dengan bukti. Cantumkan keterbatasan: perintah tak
+  dikenal mengembalikan Usage dengan rc 0, dan capabilities tidak bisa
+  disandbox.
+- Perbarui README, TROUBLESHOOTING, API.md, TESTING.md HANYA bagian
+  yang jadi salah (verifikasi silang ke kode). Tidak ada perubahan kode.
+Acceptance: semua contoh output di kontrak diambil dari sandbox setelah
+M1 dan M2; CI hijau.
+Commit: docs: update app contract for manual mode and guard-status (M3)
+
 ### A4 — Scaffold proyek dan CI
 
 Requirements:
@@ -272,6 +339,7 @@ Commit: `feat: state holders and capability cache (App A7)`
 Requirements:
 - Bottom nav 4 tab, top bar, navigasi berbasis state, sesuai desain.
 - Beranda sesuai bagian 2. "Pulihkan backup" wajib dialog konfirmasi.
+- status boot guard dibaca lewat guard-status (M2).
 - Semua error tampil sebagai pesan ramah (tanpa exception mentah).
 
 Acceptance: sesuai token desain; state root tidak ada dan modul tidak ada
@@ -298,6 +366,7 @@ Commit: `feat: knob screens (App A9)`
 
 GATE: kerjakan hanya setelah user memutuskan gap A3 (terutama semantik
 manual murni).
+GATE: M1 harus selesai dan disetujui user.
 
 Requirements:
 - "Terapkan (N)" hanya mengirim knob dirty lewat kontrak. State "menerapkan"
@@ -346,6 +415,7 @@ Requirements:
   versi modul tidak cocok, timeout, respons tidak valid, boot guard aktif
   (banner "tuning dilewati"), state degraded, node read-only yang dilaporkan
   modul.
+- status boot guard dibaca lewat guard-status (M2).
 
 Acceptance: setiap state punya tampilan dan unit test.
 
