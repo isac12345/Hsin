@@ -92,6 +92,9 @@ hsin_thermal_apply_cpu() {
             _avail=$(printf '%s' "$_opp_csv" | tr ',' ' ')
             _new_max=$(hsin_opp_cap_pick "$_new_max" "$_avail")
         fi
+# File state minimal untuk restore cap saat suhu turun.
+_thermal_pre_cap_file="$HSIN_DATA/thermal_pre_cap.list"
+
         # Thermal adalah PENAHAM, bukan penguat: kalau targetnya >= nilai
         # yang sekarang, jangan tulis sama sekali. Sebelumnya baris ini
         # menulis apa adanya, dan karena HSIN_THERMAL_PERF_TARGET = 100
@@ -99,15 +102,64 @@ hsin_thermal_apply_cpu() {
         # scaling_max_freq kembali ke hw_max - membatalkan cap frekuensi
         # profil (mis. battery 65-80%) DAN override pilihan user. Itu
         # membuat "HSIN manual" selalu berakhir sama saja.
+        # Minimal mechanism: simpan pre-cap saat cap diterapkan, pulihkan
+        # saat suhu turun (histeresis: hanya bila nilai saat ini masih == cap).
         _cur_max=""
         [ -f "$_dir/scaling_max_freq" ] && \
             IFS= read -r _cur_max < "$_dir/scaling_max_freq" 2>/dev/null
         case "$_cur_max" in
             ''|*[!0-9]*) _cur_max=0 ;;
         esac
+        # Simpan pre-cap saat akan menurunkan (cap diterapkan)
         if [ -n "$_new_max" ] && [ "$_new_max" -lt "$_cur_max" ] 2>/dev/null; then
             [ -w "$_dir/scaling_max_freq" ] && \
                 printf '%s\n' "$_new_max" > "$_dir/scaling_max_freq" 2>/dev/null
+            # Catat pre-cap hanya saat cap baru diterapkan (nilai berubah)
+            # Gunakan file state minimal dengan format node=value_precap
+            _pre_cap_file="$_thermal_pre_cap_file"
+            # Cari apakah sudah ada entri untuk node ini
+            _old_pre=""
+            if [ -f "$_pre_cap_file" ]; then
+                while IFS='=' read -r _n _v; do
+                    [ "$_n" = "$_dir" ] && _old_pre="$_v"
+                done < "$_pre_cap_file"
+            fi
+            # Hanya tulis state jika nilai cap berbeda dari pre-cap yang tersimpan,
+            # atau belum ada entri.
+            if [ -z "$_old_pre" ] || [ "$_old_pre" != "$_cur_max" ]; then
+                mkdir -p "$(dirname "$_pre_cap_file")" 2>/dev/null || true
+                # Tulis ulang file dengan semua entri kecuali node ini, lalu tambah
+                if [ -f "$_pre_cap_file" ]; then
+                    _tmp_pre="${_pre_cap_file}.tmp.$$"
+                    : > "$_tmp_pre"
+                    while IFS='=' read -r _n _v; do
+                        [ -z "$_n" ] && continue
+                        [ "$_n" != "$_dir" ] && printf '%s=%s\n' "$_n" "$_v" >> "$_tmp_pre"
+                    done < "$_pre_cap_file"
+                    printf '%s=%s\n' "$_dir" "$_cur_max" >> "$_tmp_pre"
+                    mv "$_tmp_pre" "$_pre_cap_file" 2>/dev/null || true
+                else
+                    printf '%s=%s\n' "$_dir" "$_cur_max" > "$_pre_cap_file" 2>/dev/null || true
+                fi
+            fi
+        elif [ -n "$_new_max" ]; then
+            # Policy turun (normal/cool/warm) — pulihkan cap hanya bila:
+            # 1. File state pre-cap tersedia.
+            # 2. Nilai saat ini (_cur_max) masih sama dengan nilai cap yang terakhir diterapkan (artinya belum ada override user baru yang mengubah node ini setelah cap).
+            # 3. Pre-cap > cur_max (ada cap yang diterapkan sebelumnya).
+            # Ini memastikan kita tidak menimpa override user baru.
+            if [ -f "$_thermal_pre_cap_file" ]; then
+                _pre_cap=""
+                while IFS='=' read -r _n _v; do
+                    [ "$_n" = "$_dir" ] && _pre_cap="$_v"
+                done < "$_thermal_pre_cap_file"
+                # Hanya restore jika pre_cap tersedia dan pre_cap > cur_max (artinya cur_max masih dalam kondisi cap)
+                # Karena saat cap diterapkan, cur_max (sebelum tulis) = pre_cap, dan setelah cap diterapkan, cur_max = cap (_new_max saat cap).
+                # Saat restore, cur_max seharusnya = cap (lebih rendah dari pre_cap). Jadi jika pre_cap > cur_max, kita restore ke pre_cap.
+                if [ -n "$_pre_cap" ] && [ -n "$_cur_max" ] && [ "$_pre_cap" -gt "$_cur_max" ] 2>/dev/null; then
+                    [ -w "$_dir/scaling_max_freq" ] && printf '%s\n' "$_pre_cap" > "$_dir/scaling_max_freq" 2>/dev/null
+                fi
+            fi
         fi
     done
 }
