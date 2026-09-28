@@ -119,7 +119,7 @@ dari modul.
 | Step | Judul | Status |
 |---|---|---|
 | A1 | Backup dan inventaris app lama | [x] |
-| A2 | Hapus app lama, bersihkan referensi | [ ] |
+| A2 | Hapus app lama, bersihkan referensi | [x] |
 | A3 | Kontrak app-modul dan laporan gap | [ ] |
 | A4 | Scaffold proyek dan CI | [ ] |
 | A5 | Tema dan komponen | [ ] |

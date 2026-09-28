@@ -3,6 +3,8 @@ name: build-apk
 # Build APK HSIN. Satu-satunya cara build: Termux tidak punya JDK/Android SDK.
 # Sengaja manual (workflow_dispatch) - tidak ada yang dibangun otomatis saat
 # push, sesuai perintah user "jangan build dulu".
+# A2: job APK dinonaktifkan sementara sampai A4 (scaffold baru). File ini
+# dipertahankan dan dipakai lagi di A4, jangan dihapus.
 on:
   workflow_dispatch:
     inputs:
