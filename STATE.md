@@ -205,3 +205,14 @@
 
 - STEP4-STEP5 (2026-09-27): Step 4 detector (5b373ea) + Step 5 overrides
   (77b3a2b) + STATUS.md DONE (a65f32c, 3cb91cf). CI hijau semua. STOP.
+
+- SESI 2026-09-27/28 (leader langsung, penomoran PQ): PQ Step 9
+  overrides (b79763d), Step 10/11 thermal_check + verifikasi ulang
+  trip_point + return-or-exit (2a56064, 546f9a5), harmonisasi spec
+  Step 11 (912b3bf), Step 12 engine_guard degradasi (7ae4573), fix
+  bundle thermal_check (ee5f85b, red-green via build release),
+  Phase 4 docs Step 13-18 (a9e4e03, 50bf8e6, ce4dfbd, 1f362e7,
+  b37b0f2, 3c46f66), Phase 5 Step 19-21 + extreme hard-limit
+  (ed5e34e, a7e90e5, 1734654, 15d5770), gate Step 22 BELUM LOLOS
+  (d84bb49), Step 23 knob visibility (05191f1). HEAD main 05191f1,
+  push + CI success semua, repo bersih. STOP: tunggu user (siang).
