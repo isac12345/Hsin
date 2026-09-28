@@ -794,11 +794,17 @@
   knob-list format+JSON utuh, thermal 100C cap 1800000->600000, ZIP staging
   /tmp (manual.conf ada, runtime 28 marker, balanced md5 sama), module.prop
   tetap v5.0.0-beta1/5001, tanpa build/ ter-commit.
-- Pre-existing (di luar scope, TIDAK diubah): backup cpu/gpu/io hardcode
-  /sys (sandbox-blind; di HP benar); restore hitung ok walau tulis ditolak
-  (readback sama = ok); game-boost rank manual=1 (boost bisa map ke
-  performance; revert-ke-manual tak menulis); config korup -> manual
-  (dulu balanced); knob-list pra-apply tetap "belum ada hasil apply".
+- Pre-existing (di luar scope M1, dikoreksi di M1b): backup cpu/gpu/io hardcode
+  /sys (sandbox-blind; di HP benar); core/backup.sh hsin_restore_session
+  memang verifikasi readback (ok hanya bila cat==nilai) — catatan lama
+  "restore hitung ok walau tulis ditolak" keliru untuk fungsi itu; yang
+  benar-benar menghitung ok tanpa readback adalah hsin_cpu_restore
+  (engine/cpu/apply.sh, _ok++ per file) — sudah diperbaiki di M1b jadi
+  ok hanya bila semua tulis terverifikasi; game-boost rank manual=1
+  (boost memetakan manual→performance dan revert tak menulis sehingga
+  nilai performance tertinggal) — sudah diperbaiki di M1b (boost skip di
+  manual); config korup -> manual (dulu balanced); knob-list pra-apply
+  tetap "belum ada hasil apply".
 - PELAJARAN: (1) cek `git diff` file config KECIL sekalipun — pekerja
   menimpa 66 baris jadi 1; (2) var SHELL dibaca sebelum di-set dalam loop
   = override mati diam-diam — fetch SEBELUM cek; (3) partial-override wajib
@@ -807,3 +813,43 @@
   penulisan — else-branch wajib diguard; (5) skip thermal total = matikan
   guard — cerminkan performance (critical-only); (6) harness: path absolut
   ($SB), jangan rm -rf direktori berisi file pembanding.
+
+## M1b kemurnian mode manual (2026-09-28, leader + dev-modul work/m1b-purity, TERIMA L1)
+- Isi (merge ca429a2: afcfc5a + 0e6a7f0 + touch-up 2d1741d, 3 file +210/-7):
+  engine/cpu/apply.sh (Step2 lewati safety remap di manual + hsin_cpu_restore
+  readback ketat per cluster), engine/thermal/policy.sh (thermal cap
+  critical-only di manual seperti M1 + restore pre-cap CPU/GPU saat suhu
+  turun ke cool/normal dengan histeresis, state $HSIN_DATA/
+  thermal_pre_cap.list, tulis terverifikasi + log), engine/game/
+  game_manager.sh (boost skip di manual + log persis "game boost tidak aktif
+  di mode manual" ke stderr, non-manual tidak berubah).
+- Bukti FASE 0 SEBELUM fix (sandbox file asli, harness leader m1b-probe.sh/
+  m1b-apply.sh): safety_effective manual=balanced?=battery (remap aktif);
+  manual+batt 10% tak-mengisi di MAIN menulis 2 node (scaling_max 1800000→
+  1200000); game mapping manual+game→performance (boost pasti menulis);
+  cap 96C→45C tidak pulih (800000/600M permanen) di MAIN maupun draf awal.
+- Bukti SESUDAH (worktree 2d1741d): (a) manual+96C tanpa override hanya 3
+  node cap berubah (policy0/4 scaling_max_freq 1800000→800000, gpu0 max_freq
+  800M→600M), sisanya byte-identik; (b) manual+batt 10% tak-mengisi IDENTIK
+  nol tulis; (c) suhu turun 45C: 1800000/800M kembali; (d) manual+game:
+  eff=manual + log + nol tulis, balanced+game tetap performance;
+  (e) sandbox lama hijau semua (safe_apply 11, scan_prefix 5, overrides 9,
+  thermal 6, boot_guard 10, degrade 8, knob_results 9, service_guard 8),
+  profiles battery/balanced/performance/extreme md5 identik main;
+  sh -n 3/3, shellcheck -S error 0; tanpa file runtime baru
+  (build_release.sh tak perlu; state di HSIN_DATA bukan runtime).
+- Koreksi leader atas diff pekerja (putaran 1→2 + touch-up): restore di
+  dalam hsin_thermal_apply_cpu tidak pernah jalan (cabang manual
+  non-critical return dini) → restore dipindah ke hsin_thermal_apply +
+  GPU simetris; elif menulis pre-cap penuh saat hot (harusnya cap
+  intermediate) → gate cool/normal; boost "nol tulis" terbukti salah
+  (mapping)→skip; cpu_restore var bocor + any-ok longgar + filter '-' →
+  reset per cluster + all-ok + banding langsung.
+- Sisa jujur: performance critical-cap tidak di-restore saat dingin
+  (jalur performance hanya panggil thermal saat critical — perilaku lama
+  dipertahankan, di luar scope M1b); monitor.sh/action.sh tak diubah
+  (skip di hsin_game_effective_profile menutup kedua caller).
+  L2: validasi HP (flash + uji manual/termal/boost).
+- PELAJARAN: (7) restore di fungsi yang tidak dipanggil saat cooldown =
+  dead code — uji cool-down eksplisit, bukan cuma cap; (8) klaim pekerja
+  "nol tulis" wajib dibuktikan mapping + snapshot, bukan dipercaya.

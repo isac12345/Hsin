@@ -222,4 +222,16 @@
   sisanya SKIPPED. 8 koreksi leader atas diff pekerja. Bukti: statis 0,
   sandbox lama 60/60 identik baseline, snapshot 8/8, ZIP staging /tmp OK.
   module.prop tetap v5.0.0-beta1/5001. APP_PLAN M1 [x]. L2: validasi HP.
+- APP-K1-K3 (2026-09-28): dokumen K1/K2/K3 disisipkan APP_PLAN.md (baris
+  258/271/282, tabel 126-128) — belum dieksekusi; hanya rencana.
   Antrean: M2 guard-status (butuh approve user? tidak — M2 sudah di plan).
+- APP-M1B (2026-09-28, leader + dev-modul work/m1b-purity, 2 putaran):
+  TERIMA L1 + merge ca429a2 ke main. Safety remap dilewati di manual
+  (intervensi kritis hanya thermal cap), cap di-restore saat dingin
+  (cool/normal, CPU+GPU, terverifikasi), boost skip di manual + log
+  persis, cpu_restore readback ketat. Bukti: (a) 96C hanya 3 node cap,
+  (b) batt 10% nol tulis, (c) restore 1800000/800M, (d) boost manual nol
+  tulis (balanced tetap performance), (e) 8 suite sandbox lama hijau,
+  profil lama md5 identik; sh -n + shellcheck -S error 0; tanpa runtime
+  baru. Koreksi NOTES M1 (catatan restore keliru) + bagian M1b.
+  APP_PLAN M1b [x]. L2: validasi HP. STOP.

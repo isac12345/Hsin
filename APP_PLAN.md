@@ -122,7 +122,7 @@ dari modul.
 | A2 | Hapus app lama, bersihkan referensi | [x] |
 | A3 | Kontrak app-modul dan laporan gap | [x] |
 | M1 | Mode manual murni di modul | [x] |
-| M1b | Kemurnian mode manual | [ ] |
+| M1b | Kemurnian mode manual | [x] |
 | M2 | Command guard-status | [ ] |
 | K1 | Knob engine yang sudah ada | [ ] |
 | K2 | Knob tier-1 dari Alpha | [ ] |
