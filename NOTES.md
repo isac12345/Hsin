@@ -747,3 +747,14 @@
   trip105), hilang -> UNKNOWN rc=4. CI lint-and-test success (36328852688).
 - PELAJARAN: test yang mem bypass jalur baca = klaim palsu; grep output
   sendiri bukan verifikasi; file yang di-source DILARANG `exit`.
+
+## Checkpoint sesi 2026-09-28 ~01:05 (leader, STOP menunggu user)
+- HEAD main `05191f1` (PQ Step 23 knob visibility), push DONE, CI
+  lint-and-test success run 36364420574. Repo bersih (porcelain kosong).
+- Selesai sesi ini: PQ Step 13-23 + fix bundle thermal_check (ee5f85b)
+  + harmonisasi PQ Step 11 (912b3bf). Semua commit baru, tanpa
+  force/amend. module.prop tetap v5.0.0-beta1/5001.
+- GATE RILIS: BELUM LOLOS (device_reports kosong, QA 0/25, device
+  kedua + extreme belum). Phase 5 berikutnya butuh approve user.
+- Lanjut siang: user bilang lanjutin — mulai dari STATUS.md seksi
+  GATE RILIS / laporan terakhir ini.
