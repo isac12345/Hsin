@@ -169,8 +169,10 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ## 📋 PHASE 5: QA & Release (Steps 19-22) — BLOCKED
 
-- [ ] **Step 19** — QA_CHECKLIST.md (kode, build + validasi zip, device,
-  fungsional, stabilitas, edge case, uninstall).
+- [x] **PQ Step 19** — QA_CHECKLIST.md — DONE 2026-09-27. Checklist
+  berverifikasi (code/build/device/stability/edge/uninstall +
+  anti-klaim-publik); status 1 device eksplisit + item device kedua
+  BELUM (blocker multi-device); stability dinyatakan device-spesifik.
 - [ ] **Step 20** — RELEASE_NOTES.md (fitur + keterbatasan jujur).
 - [ ] **Step 21** — SUPPORT_POLICY.md (SLA, kanal, matriks kompatibilitas).
 - [ ] **Step 22** — final status update + GATE RILIS: versionCode baru HANYA
