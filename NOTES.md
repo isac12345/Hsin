@@ -853,3 +853,7 @@
 - PELAJARAN: (7) restore di fungsi yang tidak dipanggil saat cooldown =
   dead code — uji cool-down eksplisit, bukan cuma cap; (8) klaim pekerja
   "nol tulis" wajib dibuktikan mapping + snapshot, bukan dipercaya.
+- GAYA JELASIN KE USER (2026-09-28, permanen): user lebih paham analogi
+  sederhana bergambaran sehari-hari (tukang/remote/satpam/teman), bukan
+  bahasa teknis kompleks. Setiap laporan/penjelasan wajib ada versi
+  analoginya dulu, baru detail teknisnya.
