@@ -173,7 +173,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   berverifikasi (code/build/device/stability/edge/uninstall +
   anti-klaim-publik); status 1 device eksplisit + item device kedua
   BELUM (blocker multi-device); stability dinyatakan device-spesifik.
-- [ ] **Step 20** — RELEASE_NOTES.md (fitur + keterbatasan jujur).
+- [x] **PQ Step 20** — RELEASE_NOTES.md — DONE 2026-09-27. Draft
+  dengan baris status BELUM DIRILIS di paling atas; fitur Phase 2–3
+  + keterbatasan jujur (1 device, butuh L2 + device kedua); tanpa
+  kata stable/production-ready; pesan commit dikoreksi tanpa versi
+  (aturan Step 18).
 - [ ] **Step 21** — SUPPORT_POLICY.md (SLA, kanal, matriks kompatibilitas).
 - [ ] **Step 22** — final status update + GATE RILIS: versionCode baru HANYA
   bila Phase 2-3 selesai DAN tervalidasi di HP nyata (L2). Tanpa L2 = tanpa
