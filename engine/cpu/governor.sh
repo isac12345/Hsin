@@ -88,6 +88,12 @@ hsin_cpu_governor_apply() {
         # nilai mentah lebih berbahaya daripada mengabaikannya (dan user
         # harus tahu knob-nya tidak terpakai, bukan mengira terpakai).
         _uk_gov=$(hsin_uk_cpu_field "$_pid" gov 2>/dev/null)
+
+        # Mode manual: hanya terapkan override user; tanpa override, lewati.
+        if [ "$_profile" = "manual" ] && [ -z "$_uk_gov" ]; then
+            hsin_uk_result "cpu_policy_${_pid}_gov" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            continue
+        fi
         if [ -n "$_uk_gov" ]; then
             case " $_avail " in
                 *" $_uk_gov "*)

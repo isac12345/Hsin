@@ -77,7 +77,7 @@ fi
 HSIN_CONF="$HSIN_USER/hsin.conf"
 [ -f "$HSIN_CONF" ] || HSIN_CONF="$MODPATH/config/hsin.conf"
 
-HSIN_PROFILE="balanced"
+HSIN_PROFILE="manual"
 HSIN_ALLOW_EXTREME="false"
 HSIN_LOG_LEVEL="3"
 HSIN_MONITOR_INTERVAL="15"
@@ -176,8 +176,8 @@ hsin_protect_watermark
 
 # 3. Validasi profile
 case "$HSIN_PROFILE" in
-    battery|balanced|performance|extreme) ;;
-    *) HSIN_PROFILE="balanced" ;;
+    battery|balanced|performance|extreme|manual) ;;
+    *) HSIN_PROFILE="manual" ;;
 esac
 
 # Extreme is intentionally available on rooted installs. It remains
@@ -234,13 +234,13 @@ if [ "$HSIN_REFRESH_LOCK_ENABLED" = "true" ] && command -v hsin_refresh_lock >/d
 fi
 
 # 3d-3g. Fitur baru (global RR, DVFS limiter, frame limit, SF tweak) otomatis
-# ikut profil aktif ($HSIN_PROFILE) lewat profiles/*.conf - user gak perlu
-# atur manual per fitur. hsin.conf tetap bisa override kalau user memang
-# eksplisit ubah nilainya di sana (beda dari default "false"/"100" bawaan).
-. "$MODPATH/core/profile_loader.sh" 2>/dev/null
-hsin_profile_load "$HSIN_PROFILE" 2>/dev/null
+# ikut profil aktif ($HSIN_PROFILE) lewat profiles/*.conf — TAPI hanya bila
+# profil BUKAN manual (mode manual hanya menerapkan knob user).
+if [ "$HSIN_PROFILE" != "manual" ]; then
+    . "$MODPATH/core/profile_loader.sh" 2>/dev/null
+    hsin_profile_load "$HSIN_PROFILE" 2>/dev/null
 
-# Override check: hsin.conf menang HANYA kalau nilainya beda dari default
+    # Override check: hsin.conf menang HANYA kalau nilainya beda dari default
 # pabrik (artinya user sengaja ngubah). Kalau masih default, pakai punya profil.
 _pf_rr_enabled="$(hsin_profile_get global_rr enabled)"
 _pf_rr_reduced="$(hsin_profile_get global_rr reduced)"
@@ -301,6 +301,7 @@ fi
 if command -v hsin_sf_apply_boot >/dev/null 2>&1; then
     hsin_sf_apply_boot "$_pf_sf_enabled" >> "$HSIN_LOG_FILE" 2>&1
     [ "$_pf_sf_enabled" = "true" ] && hsin_log_ok "main" "SurfaceFlinger tweak applied via profile=$HSIN_PROFILE"
+fi
 fi
 
 # 4. Detect hardware (FULL SCAN, no hardcode)

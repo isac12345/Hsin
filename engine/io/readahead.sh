@@ -18,6 +18,13 @@ command -v hsin_io_block_devs >/dev/null 2>&1 || \
 hsin_io_apply_readahead() {
     _profile="$1"
 
+    # Mode manual: readahead tidak punya knob user (lihat kontrak knob),
+    # jadi selalu dilewati. Tanpa baris hasil (bukan namespace knob).
+    if [ "$_profile" = "manual" ]; then
+        echo "    Readahead [manual]: dilewati (mode manual, tanpa override)"
+        return 0
+    fi
+
     case "$_profile" in
         battery)     _ra="128" ;;
         balanced)    _ra="512" ;;

@@ -174,6 +174,21 @@ hsin_thermal_apply() {
     hsin_thermal_policy_determine "$HSIN_THERMAL_MAX_TEMP"
     _perf="$HSIN_THERMAL_PERF_TARGET"
 
+    # Mode manual: tuning profil dilewati, TAPI guard critical tetap
+    # jalan (cermin perilaku performance: hanya saat critical).
+    if [ "$_profile" = "manual" ]; then
+        if [ "$HSIN_THERMAL_POLICY" = "critical" ]; then
+            hsin_thermal_apply_cpu "$HSIN_THERMAL_POLICY" ""
+            hsin_thermal_apply_gpu "$HSIN_THERMAL_POLICY"
+            echo "    Thermal policy: critical cap diterapkan (mode manual, guard)"
+        else
+            echo "    Thermal policy: dilewati (mode manual)"
+        fi
+        _ts=$(date '+%Y-%m-%d %H:%M:%S')
+        echo "$_ts [THERMAL] Policy=$HSIN_THERMAL_POLICY Perf=$_perf% MaxTemp=$HSIN_THERMAL_MAX_TEMP (manual)" >> "$HSIN_DATA/logs/thermal.log"
+        return 0
+    fi
+
     # Apply based on profile
     case "$_profile" in
         battery|balanced)

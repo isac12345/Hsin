@@ -80,6 +80,10 @@ hsin_cpu_cpuset_apply() {
     fi
 
     case "$_profile" in
+        manual)
+            echo "    cpuset: dilewati (mode manual)"
+            return 0
+            ;;
         battery|balanced)
             # Default: let kernel decide
             echo "    cpuset: default (kernel placement)"
@@ -110,6 +114,10 @@ hsin_cpu_uclamp_apply() {
     [ -d "/dev/cpuctl" ] || return 0
 
     case "$_profile" in
+        manual)
+            echo "    uclamp: dilewati (mode manual)"
+            return 0
+            ;;
         battery)
             _min="0"; _max="50" ;;
         balanced)
@@ -146,6 +154,10 @@ hsin_cpu_stune_apply() {
     [ -d "/dev/stune" ] || return 0
 
     case "$_profile" in
+        manual)
+            echo "    stune: dilewati (mode manual)"
+            return 0
+            ;;
         battery)
             _boost="0" ;;
         balanced)
@@ -320,6 +332,11 @@ hsin_cpu_sched_lat_apply() {
     # this feature exists to fix gaming frame pacing, not to also invent
     # an unrequested battery-saving scheduler behavior.
     case "$_profile" in
+        manual)
+            # Mode manual: hanya terapkan jika ada override (tidak ada override knob untuk sched-lat)
+            echo "    sched-latency: dilewati (mode manual)"
+            return 0
+            ;;
         battery|balanced)
             _lat_pct=100; _mingran_pct=100; _wake_pct=100; _migr_pct=100 ;;
         performance)
