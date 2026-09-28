@@ -160,7 +160,10 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   (4 kunci match capability, larang keyed-chipset), extend detection
   (prefix + sandbox dulu), Safety Warning (no-raise, no-bypass guard,
   daftar runtime); 24 fungsi + 7 env var terverifikasi ke kode.
-- [ ] **Step 18** — CHANGELOG.md.
+- [x] **PQ Step 18** — CHANGELOG.md — DONE 2026-09-27. Format Keep a
+  Changelog, section `## [Unreleased]` (bukan rilis resmi; version
+  bump menunggu Phase 5): Added/Changed/Fixed/Reverted
+  capability-first Step 1–18; `module.prop` tidak tersentuh.
 
 ---
 
