@@ -122,6 +122,7 @@ dari modul.
 | A2 | Hapus app lama, bersihkan referensi | [x] |
 | A3 | Kontrak app-modul dan laporan gap | [x] |
 | M1 | Mode manual murni di modul | [x] |
+| M1b | Kemurnian mode manual | [ ] |
 | M2 | Command guard-status | [ ] |
 | K1 | Knob engine yang sudah ada | [ ] |
 | K2 | Knob tier-1 dari Alpha | [ ] |
@@ -238,6 +239,37 @@ mengembalikan nilai; (6) override valid, invalid, dan snap OPP tetap
 benar; ShellCheck -S error 0, sh -n lulus. File runtime baru wajib
 terdaftar di build_release.sh dan dibuktikan lewat isi ZIP.
 Commit: feat: manual mode applies only user overrides (M1)
+
+### M1b — Kemurnian mode manual (IZIN: boleh mengubah kode modul, seminimal mungkin)
+Objective: di mode manual tidak ada penulisan dari profil dan tidak ada
+nilai yang tertinggal.
+Requirements:
+1. Safety remap (engine/cpu/safety.sh): di mode manual, remap
+   low-battery dan remap critical ke profil battery TIDAK boleh
+   menulis profil. Intervensi termal kritis di manual hanya lewat jalur
+   thermal cap yang sudah ada (thermal/policy.sh dan thermal_check),
+   bukan profil penuh. Profil lain perilakunya tidak berubah.
+2. Thermal cap: buktikan dulu di sandbox apa yang terjadi setelah suhu
+   turun (apakah nilai sebelum cap dipulihkan). Kalau tidak dipulihkan,
+   pulihkan ke nilai yang tercatat sebelum cap saat suhu turun di bawah
+   ambang (dengan histeresis), bukan permanen sampai reboot.
+3. Game boost di mode manual: buktikan dulu dengan sandbox base MANUAL
+   (snapshot byte sebelum, saat, dan sesudah boost). Kalau boost menulis
+   nilai profil dan nilainya tertinggal, nonaktifkan game boost di mode
+   manual (skip + log "game boost tidak aktif di mode manual"). Profil
+   non-manual tidak berubah.
+4. Koreksi NOTES.md dan STATE.md: restore memverifikasi readback dengan
+   benar, catatan "restore hitung ok walau tulis ditolak" keliru.
+Acceptance (sandbox file asli, snapshot byte): (a) manual + suhu 96C
+tanpa override: hanya node thermal cap yang berubah (sebutkan node),
+node lain byte-identik; (b) manual + baterai 10% tidak mengisi: nol
+penulisan; (c) suhu turun: node cap kembali ke nilai sebelum cap;
+(d) manual + game boost aktif: nol penulisan profil; (e) semua sandbox
+test lama dan sandbox M1 lulus, profil lama identik; ShellCheck
+-S error 0, sh -n lulus; file runtime baru (jika ada) terdaftar di
+build_release.sh dan dibuktikan lewat isi ZIP.
+Commit: fix: manual mode purity for safety remap, thermal cap restore
+and game boost (M1b)
 
 ### M2 — Command guard-status (IZIN: boleh mengubah kode modul)
 Objective: APK membaca status boot guard tanpa parsing log.
