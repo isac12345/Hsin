@@ -132,6 +132,16 @@ hsin_zram_apply() {
     fi
     [ "$_zcount" -gt 0 ] || { echo "    zRAM: not available"; return 0; }
 
+    # Mode manual: hanya terapkan override; tanpa override, lewati semua penulisan.
+    if [ "$_profile" = "manual" ]; then
+        _uk_algo=$(hsin_uk_get zram_algo 2>/dev/null)
+        if [ -z "$_uk_algo" ]; then
+            echo "    zRAM: dilewati (mode manual, tanpa override)"
+            hsin_uk_result "zram_algo" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            return 0
+        fi
+    fi
+
     _target_algo=$(hsin_zram_algo "$_profile")
     # Override knob user (zram_algo) hanya dipakai kalau algo itu ada di
     # daftar algo yang DIDUKUNG node - dicek sekali di sini supaya keputusan

@@ -146,6 +146,13 @@ hsin_io_apply_scheduler() {
                     ;;
             esac
         fi
+        # Mode manual: tanpa override, lewati penulisan.
+        if [ "$_profile" = "manual" ] && [ -z "$_uk_sched" ]; then
+            hsin_uk_result "$_uk_ksched" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            _skip=$((_skip + 1))
+            continue
+        fi
+
         if [ -z "$_uk_sched" ]; then
             hsin_uk_result "$_uk_ksched" "(profil)" "$_target" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
