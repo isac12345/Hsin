@@ -165,7 +165,11 @@ hsin_apply_all_engines() {
         fi
     fi
     . "$HSIN_MODULE_PATH/engine/display/frame_limit.sh" 2>/dev/null
-    if [ "$_frl_dis" = "true" ]; then
+    # Mode manual: frame limit tidak punya knob user -> selalu dilewati
+    # (termasuk restore, karena resetprop --delete juga penulisan).
+    if [ "$_prof_arg" = "manual" ]; then
+        echo "frame-limit: dilewati (mode manual)" >> "$HSIN_DATA/logs/debug.log" 2>/dev/null
+    elif [ "$_frl_dis" = "true" ]; then
         hsin_frame_limit_disable >/dev/null 2>&1 || _failed=$((_failed + 1))
     else
         hsin_frame_limit_restore >/dev/null 2>&1 || _failed=$((_failed + 1))

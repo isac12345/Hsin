@@ -53,10 +53,18 @@ hsin_gpu_generic_apply() {
     # Nama node disanitasi sekali di sini juga supaya kunci yang ditulis ke
     # log persis sama dengan kunci yang disimpan user_knobs.env (nama node
     # device bisa mengandung karakter yang jadi '_', mis. "23100000.gpu").
+    # Mode manual: tanpa override, lewati penulisan.
     _uk_sanitize "${_d##*/}"
     _uk_kmax="gpu_node_${_uk_sn}_max_khz"
     _uk_kgov="gpu_node_${_uk_sn}_gov"
     _uk_gmax=$(hsin_uk_gpu_field "$_d" max_khz 2>/dev/null)
+    _uk_gov=$(hsin_uk_gpu_field "$_d" gov 2>/dev/null)
+    if [ "$_profile" = "manual" ] && [ -z "$_uk_gmax" ] && [ -z "$_uk_gov" ]; then
+        hsin_uk_result "$_uk_kmax" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+        hsin_uk_result "$_uk_kgov" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+        echo "    SKIP: GPU node $(basename "$_d") dilewati (mode manual, tanpa override)"
+        return 0
+    fi
     if [ -n "$_uk_gmax" ]; then
         if [ -z "$_avail" ]; then
             hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax ditolak: node tidak punya daftar available_frequencies (pakai profil)"
@@ -82,7 +90,12 @@ hsin_gpu_generic_apply() {
     fi
     [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati (hasil governor ikut baris hasil di bawah)"
     if [ -z "$_uk_gmax" ]; then
-        hsin_uk_result "$_uk_kmax" "(profil)" "$_target_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        if [ "$_profile" = "manual" ]; then
+            hsin_uk_result "$_uk_kmax" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            _target_max=""
+        else
+            hsin_uk_result "$_uk_kmax" "(profil)" "$_target_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        fi
     fi
     _ok=0; _fail=0
     if [ -n "$_target_max" ] && [ -w "$_d/max_freq" ]; then
@@ -113,7 +126,12 @@ hsin_gpu_generic_apply() {
         fi
     fi
     if [ -z "$_uk_gov" ]; then
-        hsin_uk_result "$_uk_kgov" "(profil)" "$_gov" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        if [ "$_profile" = "manual" ]; then
+            hsin_uk_result "$_uk_kgov" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            _gov=""
+        else
+            hsin_uk_result "$_uk_kgov" "(profil)" "$_gov" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        fi
     fi
     if [ -n "$_gov" ] && [ -w "$_d/governor" ]; then
         if hsin_node_write_verify "$_d/governor" "$_gov"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
