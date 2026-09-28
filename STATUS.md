@@ -150,9 +150,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   CRITICAL, GPU skip = fallback disengaja, rollback/restore,
   summary degraded); semua perintah + string log diverifikasi silang
   ke kode (1 koreksi: CLI `restore` bukan `rollback`).
-- [ ] **Step 16** — DEVICE_COMPATIBILITY.md ("TERVALIDASI" vs
-  "GRACEFUL DEGRADE" — jangan klaim rata; saat ini tervalidasi:
-  Unisoc/Mali milik user).
+- [x] **PQ Step 16** — DEVICE_COMPATIBILITY.md — DONE 2026-09-27.
+  Tabel TERVALIDASI (1 device + bukti jujur: report L2 menyusul,
+  dir report masih kosong) vs GRACEFUL DEGRADE (mekanisme fallback,
+  tanpa daftar chipset); tanpa klaim %/optimis (hanya yang tertelusur
+  ke kode).
 - [ ] **Step 17** — API.md (untuk modder).
 - [ ] **Step 18** — CHANGELOG.md.
 
