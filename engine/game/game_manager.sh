@@ -45,6 +45,15 @@ hsin_game_effective_profile() {
     _requested="$1"
     _pkg="${2:-}"
 
+    # Skip manual mode: game boost tidak aktif di mode manual
+    if [ "$_requested" = "manual" ]; then
+        # Log ke stderr (bukan stdout — stdout dipakai command substitution)
+        echo "game boost tidak aktif di mode manual" >&2
+        # Tidak ubah stdout: hanya echo manual untuk command substitution
+        echo "manual"
+        return 0
+    fi
+
     if [ -z "$_pkg" ]; then
         _pkg=$(hsin_game_detect)
     fi

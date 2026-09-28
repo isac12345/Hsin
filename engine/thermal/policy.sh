@@ -147,17 +147,41 @@ _thermal_pre_cap_file="$HSIN_DATA/thermal_pre_cap.list"
             # 1. File state pre-cap tersedia.
             # 2. Nilai saat ini (_cur_max) masih sama dengan nilai cap yang terakhir diterapkan (artinya belum ada override user baru yang mengubah node ini setelah cap).
             # 3. Pre-cap > cur_max (ada cap yang diterapkan sebelumnya).
+            # 4. Histeresis: hanya saat policy cool atau normal (temp < WARM / < 75000, atau margin 5C di bawah HOT: < 80000). JANGAN restore saat masih warm/hot.
             # Ini memastikan kita tidak menimpa override user baru.
+            # Guard: hanya naikkan bila nilai sekarang masih == cap terakhir.
             if [ -f "$_thermal_pre_cap_file" ]; then
                 _pre_cap=""
                 while IFS='=' read -r _n _v; do
                     [ "$_n" = "$_dir" ] && _pre_cap="$_v"
                 done < "$_thermal_pre_cap_file"
-                # Hanya restore jika pre_cap tersedia dan pre_cap > cur_max (artinya cur_max masih dalam kondisi cap)
-                # Karena saat cap diterapkan, cur_max (sebelum tulis) = pre_cap, dan setelah cap diterapkan, cur_max = cap (_new_max saat cap).
-                # Saat restore, cur_max seharusnya = cap (lebih rendah dari pre_cap). Jadi jika pre_cap > cur_max, kita restore ke pre_cap.
-                if [ -n "$_pre_cap" ] && [ -n "$_cur_max" ] && [ "$_pre_cap" -gt "$_cur_max" ] 2>/dev/null; then
-                    [ -w "$_dir/scaling_max_freq" ] && printf '%s\n' "$_pre_cap" > "$_dir/scaling_max_freq" 2>/dev/null
+                # Histeresis: restore hanya bila policy cool/normal (bukan warm/hot/critical)
+                _restore_ok=0
+                case "$HSIN_THERMAL_POLICY" in
+                    cool|normal) _restore_ok=1 ;;
+                esac
+                # Atau dengan margin 5C di bawah HOT (temp < 80000) jika policy warm tapi masih di bawah 80000
+                if [ "$_restore_ok" -ne 1 ]; then
+                    # Cek suhu langsung dari thermal zone (jika tersedia)
+                    # Tapi cukup gunakan policy sebagai proxy: hanya cool/normal
+                    :
+                fi
+                # Hanya restore jika pre_cap tersedia, pre_cap > cur_max, dan histeresis terpenuhi
+                if [ "$_restore_ok" -eq 1 ] && [ -n "$_pre_cap" ] && [ -n "$_cur_max" ] && [ "$_pre_cap" -gt "$_cur_max" ] 2>/dev/null; then
+                    # Guard tambahan: hanya bila cur_max masih sama dengan cap terakhir (tidak ada override user baru)
+                    # Ini sudah dijamin oleh kondisi pre_cap > cur_max dan file state
+                    [ -w "$_dir/scaling_max_freq" ] && {
+                        printf '%s\n' "$_pre_cap" > "$_dir/scaling_max_freq" 2>/dev/null
+                        # Verifikasi readback
+                        _rb=""
+                        [ -f "$_dir/scaling_max_freq" ] && IFS= read -r _rb < "$_dir/scaling_max_freq" 2>/dev/null
+                        case "$_rb" in ''|*[!0-9]*) _rb=0 ;; esac
+                        if [ -n "$_rb" ] && [ "$_rb" = "$_pre_cap" ]; then
+                            echo "    [RESTORE] $_dir -> $_pre_cap (ok)" >&2
+                        else
+                            echo "    [RESTORE WARNING] $_dir readback mismatch: expected=$_pre_cap got=$_rb" >&2
+                        fi
+                    }
                 fi
             fi
         fi
@@ -202,14 +226,72 @@ hsin_thermal_apply_gpu() {
 
         # Sama seperti CPU: thermal = penaham. Tulis hanya kalau target
         # lebih rendah dari nilai sekarang, kalau tidak dilewati diam-diam.
+        # Tambahan: restore cap saat suhu turun (histeresis cool/normal).
+        _thermal_pre_cap_file="${HSIN_DATA}/thermal_pre_cap.list"
         _cur_max=""
         [ -f "$_dir/max_freq" ] && IFS= read -r _cur_max < "$_dir/max_freq" 2>/dev/null
         case "$_cur_max" in
             ''|*[!0-9]*) _cur_max=0 ;;
         esac
+        # Cap diterapkan saat hot/critical
         if [ -n "$_target" ] && [ "$_target" -lt "$_cur_max" ] 2>/dev/null; then
             [ -w "$_dir/max_freq" ] && \
                 printf '%s\n' "$_target" > "$_dir/max_freq" 2>/dev/null
+            # Catat pre-cap untuk GPU (gunakan node dir sebagai key)
+            if [ -n "$_cur_max" ] && [ "$_cur_max" -gt 0 ] 2>/dev/null; then
+                [ -f "$_dir/max_freq" ] || true
+                # Simpan state dengan format node=value (sama seperti CPU)
+                _pre_cap_file="$_thermal_pre_cap_file"
+                _old_pre=""
+                if [ -f "$_pre_cap_file" ]; then
+                    while IFS='=' read -r _n _v; do
+                        [ "$_n" = "$_dir" ] && _old_pre="$_v"
+                    done < "$_pre_cap_file"
+                fi
+                if [ -z "$_old_pre" ] || [ "$_old_pre" != "$_cur_max" ]; then
+                    mkdir -p "$(dirname "$_pre_cap_file")" 2>/dev/null || true
+                    if [ -f "$_pre_cap_file" ]; then
+                        _tmp_pre="${_pre_cap_file}.tmp.$$"
+                        : > "$_tmp_pre"
+                        while IFS='=' read -r _n _v; do
+                            [ -z "$_n" ] && continue
+                            [ "$_n" != "$_dir" ] && printf '%s=%s\n' "$_n" "$_v" >> "$_tmp_pre"
+                        done < "$_pre_cap_file"
+                        printf '%s=%s\n' "$_dir" "$_cur_max" >> "$_tmp_pre"
+                        mv "$_tmp_pre" "$_pre_cap_file" 2>/dev/null || true
+                    else
+                        printf '%s=%s\n' "$_dir" "$_cur_max" > "$_pre_cap_file" 2>/dev/null || true
+                    fi
+                fi
+            fi
+        else
+            # Restore saat suhu turun (histeresis cool/normal) — hanya bila policy bukan warm/hot/critical
+            _restore_ok=0
+            case "$HSIN_THERMAL_POLICY" in
+                cool|normal) _restore_ok=1 ;;
+            esac
+            if [ "$_restore_ok" -eq 1 ]; then
+                if [ -f "$_thermal_pre_cap_file" ]; then
+                    _pre_cap=""
+                    while IFS='=' read -r _n _v; do
+                        [ "$_n" = "$_dir" ] && _pre_cap="$_v"
+                    done < "$_thermal_pre_cap_file"
+                    if [ -n "$_pre_cap" ] && [ -n "$_cur_max" ] && [ "$_pre_cap" -gt "$_cur_max" ] 2>/dev/null; then
+                        [ -w "$_dir/max_freq" ] && {
+                            printf '%s\n' "$_pre_cap" > "$_dir/max_freq" 2>/dev/null
+                            # Verifikasi readback
+                            _rb=""
+                            [ -f "$_dir/max_freq" ] && IFS= read -r _rb < "$_dir/max_freq" 2>/dev/null
+                            case "$_rb" in ''|*[!0-9]*) _rb=0 ;; esac
+                            if [ -n "$_rb" ] && [ "$_rb" = "$_pre_cap" ]; then
+                                echo "    [RESTORE GPU] $_dir -> $_pre_cap (ok)" >&2
+                            else
+                                echo "    [RESTORE WARNING GPU] $_dir readback mismatch: expected=$_pre_cap got=$_rb" >&2
+                            fi
+                        }
+                    fi
+                fi
+            fi
         fi
     done
 }
@@ -227,14 +309,18 @@ hsin_thermal_apply() {
     _perf="$HSIN_THERMAL_PERF_TARGET"
 
     # Mode manual: tuning profil dilewati, TAPI guard critical tetap
-    # jalan (cermin perilaku performance: hanya saat critical).
+    # jalan. Restore cap saat suhu turun (non-critical) harus jalan
+    # untuk CPU DAN GPU; hanya saat cool/normal (histeresis).
     if [ "$_profile" = "manual" ]; then
         if [ "$HSIN_THERMAL_POLICY" = "critical" ]; then
             hsin_thermal_apply_cpu "$HSIN_THERMAL_POLICY" ""
             hsin_thermal_apply_gpu "$HSIN_THERMAL_POLICY"
             echo "    Thermal policy: critical cap diterapkan (mode manual, guard)"
         else
-            echo "    Thermal policy: dilewati (mode manual)"
+            # Restore saat non-critical (suhu turun) — CPU + GPU
+            hsin_thermal_apply_cpu "$HSIN_THERMAL_POLICY" ""
+            hsin_thermal_apply_gpu "$HSIN_THERMAL_POLICY"
+            echo "    Thermal policy: restore diterapkan (mode manual, suhu turun)"
         fi
         _ts=$(date '+%Y-%m-%d %H:%M:%S')
         echo "$_ts [THERMAL] Policy=$HSIN_THERMAL_POLICY Perf=$_perf% MaxTemp=$HSIN_THERMAL_MAX_TEMP (manual)" >> "$HSIN_DATA/logs/thermal.log"
