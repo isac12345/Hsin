@@ -50,25 +50,79 @@ hsin_cpu_restore() {
         _policy="$HSIN_SYSFS_CPU/cpufreq/$_name"
         [ -d "$_policy" ] || continue
 
+        # Reset variabel per cluster — hindari bocor antar cluster
+        _gov_read=""
+        _max_read=""
+        _min_read=""
+        _all_ok=1  # semua operasi yang dilakukan harus berhasil
+        _has_op=0  # apakah ada operasi yang diperlukan
+
         # Restore governor
         _gov=$(grep "^governor=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_gov" ] && [ -w "$_policy/scaling_governor" ] && {
+            _has_op=1
             echo "$_gov" > "$_policy/scaling_governor" 2>/dev/null
+            # Readback: verifikasi nilai yang ditulis
+            _gov_read=""
+            [ -f "$_policy/scaling_governor" ] && IFS= read -r _gov_read < "$_policy/scaling_governor" 2>/dev/null
+            # Bandingkan string langsung (tanpa filter pola).
+            if [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ]; then
+                : # ok
+            else
+                echo "    [RESTORE WARNING] governor readback mismatch: expected=$_gov got=$_gov_read" >&2
+                _all_ok=0
+            fi
+        } || {
+            [ -n "$_gov" ] && echo "    [RESTORE SKIP] governor not writable" >&2
+            # Jika operasi diperlukan tapi tidak bisa dilakukan, gagal
+            if [ -n "$_gov" ]; then
+                _has_op=1
+                _all_ok=0
+            fi
         }
 
         # Restore max freq first
         _max=$(grep "^max_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_max" ] && [ -w "$_policy/scaling_max_freq" ] && {
+            _has_op=1
             echo "$_max" > "$_policy/scaling_max_freq" 2>/dev/null
+            # Readback
+            _max_read=""
+            [ -f "$_policy/scaling_max_freq" ] && IFS= read -r _max_read < "$_policy/scaling_max_freq" 2>/dev/null
+            case "$_max_read" in ''|*[!0-9]*) _max_read=0 ;; esac
+            if [ -n "$_max_read" ] && [ "$_max_read" = "$_max" ]; then
+                : # ok
+            else
+                echo "    [RESTORE WARNING] max_freq readback mismatch: expected=$_max got=$_max_read" >&2
+                _all_ok=0
+            fi
         }
 
         # Restore min freq
         _min=$(grep "^min_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_min" ] && [ -w "$_policy/scaling_min_freq" ] && {
+            _has_op=1
             echo "$_min" > "$_policy/scaling_min_freq" 2>/dev/null
+            # Readback
+            _min_read=""
+            [ -f "$_policy/scaling_min_freq" ] && IFS= read -r _min_read < "$_policy/scaling_min_freq" 2>/dev/null
+            case "$_min_read" in ''|*[!0-9]*) _min_read=0 ;; esac
+            if [ -n "$_min_read" ] && [ "$_min_read" = "$_min" ]; then
+                : # ok
+            else
+                echo "    [RESTORE WARNING] min_freq readback mismatch: expected=$_min got=$_min_read" >&2
+                _all_ok=0
+            fi
         }
 
-        _ok=$((_ok + 1))
+        # Hitung ok: SEMUA operasi yang dilakukan harus berhasil.
+        # Operasi yang tidak diperlukan (kosong) tidak mengubah hasil,
+        # tapi operasi yang dilakukan dan gagal = tidak ok.
+        # Jika tidak ada operasi yang diperlukan tapi file ada = tetap ok.
+        if [ "$_has_op" -eq 0 ]; then
+            _all_ok=1
+        fi
+        [ "$_all_ok" -eq 1 ] && _ok=$((_ok + 1))
     done
 
     echo "    Restored $_ok clusters from backup"
@@ -158,10 +212,18 @@ hsin_cpu_apply() {
     # Step 2: Safety Check
     echo "  Step 2: Safety Check"
     hsin_cpu_safety_print
-    _eff_profile=$(hsin_cpu_safety_effective "$_profile")
-    if [ "$_eff_profile" != "$_profile" ]; then
-        echo "    [SAFETY] $_profile -> $_eff_profile"
-        _profile="$_eff_profile"
+    # Di mode manual: intervensi termal kritis hanya lewat thermal cap (bukan profil penuh).
+    # Remap low-battery/critical ke profil battery TIDAK boleh menulis profil.
+    if [ "$_profile" = "manual" ]; then
+        # Tetap cetak safety status + log alasan, tapi JANGAN assign _eff_profile.
+        echo "    [SAFETY] mode manual: safety remap dilewati (intervensi hanya lewat thermal cap)"
+        # Tidak mengubah _profile; biarkan manual tanpa remap profil.
+    else
+        _eff_profile=$(hsin_cpu_safety_effective "$_profile")
+        if [ "$_eff_profile" != "$_profile" ]; then
+            echo "    [SAFETY] $_profile -> $_eff_profile"
+            _profile="$_eff_profile"
+        fi
     fi
     echo ""
 
