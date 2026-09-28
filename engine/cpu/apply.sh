@@ -54,21 +54,61 @@ hsin_cpu_restore() {
         _gov=$(grep "^governor=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_gov" ] && [ -w "$_policy/scaling_governor" ] && {
             echo "$_gov" > "$_policy/scaling_governor" 2>/dev/null
+            # Readback: verifikasi nilai yang ditulis
+            _gov_read=""
+            [ -f "$_policy/scaling_governor" ] && IFS= read -r _gov_read < "$_policy/scaling_governor" 2>/dev/null
+            case "$_gov_read" in ''|*[!0-9a-zA-Z_]* ) _gov_read="" ;; esac
+            if [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ]; then
+                _ok=$((_ok + 1))
+            else
+                echo "    [RESTORE WARNING] governor readback mismatch: expected=$_gov got=$_gov_read" >&2
+            fi
+        } || {
+            [ -n "$_gov" ] && echo "    [RESTORE SKIP] governor not writable" >&2
         }
 
         # Restore max freq first
         _max=$(grep "^max_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_max" ] && [ -w "$_policy/scaling_max_freq" ] && {
             echo "$_max" > "$_policy/scaling_max_freq" 2>/dev/null
+            # Readback
+            _max_read=""
+            [ -f "$_policy/scaling_max_freq" ] && IFS= read -r _max_read < "$_policy/scaling_max_freq" 2>/dev/null
+            case "$_max_read" in ''|*[!0-9]*) _max_read=0 ;; esac
+            if [ -n "$_max_read" ] && [ "$_max_read" = "$_max" ]; then
+                : # ok sudah dihitung di bawah
+            else
+                echo "    [RESTORE WARNING] max_freq readback mismatch: expected=$_max got=$_max_read" >&2
+            fi
         }
 
         # Restore min freq
         _min=$(grep "^min_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_min" ] && [ -w "$_policy/scaling_min_freq" ] && {
             echo "$_min" > "$_policy/scaling_min_freq" 2>/dev/null
+            # Readback
+            _min_read=""
+            [ -f "$_policy/scaling_min_freq" ] && IFS= read -r _min_read < "$_policy/scaling_min_freq" 2>/dev/null
+            case "$_min_read" in ''|*[!0-9]*) _min_read=0 ;; esac
+            if [ -n "$_min_read" ] && [ "$_min_read" = "$_min" ]; then
+                : # ok
+            else
+                echo "    [RESTORE WARNING] min_freq readback mismatch: expected=$_min got=$_min_read" >&2
+            fi
         }
 
-        _ok=$((_ok + 1))
+        # Hitung ok hanya jika semua operasi pada file ini berhasil (atau tidak diperlukan)
+        # Untuk minimal: jika ada operasi berhasil, anggap ok. Jika semua gagal, tidak tambah ok.
+        # Mari kita hitung ok berdasarkan apakah setidaknya satu operasi berhasil.
+        _any_ok=0
+        [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ] && _any_ok=1
+        [ -n "$_max_read" ] && [ "$_max_read" = "$_max" ] && _any_ok=1
+        [ -n "$_min_read" ] && [ "$_min_read" = "$_min" ] && _any_ok=1
+        # Jika tidak ada operasi yang diperlukan (gov/max/min semua kosong), tetap hitung ok jika file ada.
+        if [ -z "$_gov" ] && [ -z "$_max" ] && [ -z "$_min" ]; then
+            _any_ok=1
+        fi
+        [ "$_any_ok" -eq 1 ] && _ok=$((_ok + 1))
     done
 
     echo "    Restored $_ok clusters from backup"
@@ -158,10 +198,18 @@ hsin_cpu_apply() {
     # Step 2: Safety Check
     echo "  Step 2: Safety Check"
     hsin_cpu_safety_print
-    _eff_profile=$(hsin_cpu_safety_effective "$_profile")
-    if [ "$_eff_profile" != "$_profile" ]; then
-        echo "    [SAFETY] $_profile -> $_eff_profile"
-        _profile="$_eff_profile"
+    # Di mode manual: intervensi termal kritis hanya lewat thermal cap (bukan profil penuh).
+    # Remap low-battery/critical ke profil battery TIDAK boleh menulis profil.
+    if [ "$_profile" = "manual" ]; then
+        # Tetap cetak safety status + log alasan, tapi JANGAN assign _eff_profile.
+        echo "    [SAFETY] mode manual: safety remap dilewati (intervensi hanya lewat thermal cap)"
+        # Tidak mengubah _profile; biarkan manual tanpa remap profil.
+    else
+        _eff_profile=$(hsin_cpu_safety_effective "$_profile")
+        if [ "$_eff_profile" != "$_profile" ]; then
+            echo "    [SAFETY] $_profile -> $_eff_profile"
+            _profile="$_eff_profile"
+        fi
     fi
     echo ""
 
