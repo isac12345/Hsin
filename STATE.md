@@ -216,3 +216,10 @@
   (ed5e34e, a7e90e5, 1734654, 15d5770), gate Step 22 BELUM LOLOS
   (d84bb49), Step 23 knob visibility (05191f1). HEAD main 05191f1,
   push + CI success semua, repo bersih. STOP: tunggu user (siang).
+
+- APP-M1 (2026-09-28, leader + dev-modul work/m1-manual): TERIMA L1 + merge
+  cef5f46 ke main, push DONE. Manual murni: hanya override user ditulis,
+  sisanya SKIPPED. 8 koreksi leader atas diff pekerja. Bukti: statis 0,
+  sandbox lama 60/60 identik baseline, snapshot 8/8, ZIP staging /tmp OK.
+  module.prop tetap v5.0.0-beta1/5001. APP_PLAN M1 [x]. L2: validasi HP.
+  Antrean: M2 guard-status (butuh approve user? tidak — M2 sudah di plan).

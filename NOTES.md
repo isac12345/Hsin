@@ -758,3 +758,52 @@
   kedua + extreme belum). Phase 5 berikutnya butuh approve user.
 - Lanjut siang: user bilang lanjutin — mulai dari STATUS.md seksi
   GATE RILIS / laporan terakhir ini.
+
+## M1 manual murni (2026-09-28, leader + dev-modul work/m1-manual, TERIMA L1)
+- Isi (merge cef5f46, 16 file +223/-30): profiles/manual.conf BARU (komentar
+  jujur + section kosong, tanpa angka tuning); default baru = manual di
+  config/hsin.conf + service.sh + action.sh; config-set whitelist + PROFILE
+  (validasi 5 nama); semua engine skip-tanpa-override di titik tulis yang
+  sama (gov/freq/gpu/io-sched/tcp/tfo/swappiness/zram) + SKIPPED "tidak
+  diatur (mode manual)"; tanpa-knob (cpuset/uclamp/stune/sched-lat/readahead/
+  sysctl/dvfs/RR/frame/SF) selalu skip di manual; thermal critical-cap tetap
+  (cermin performance); oom/adreno-kgsl/extreme tak tersentuh (case profil
+  sudah mengecualikan manual); guard (boot/safe/engine/backup/gate) utuh.
+- Koreksi leader atas diff pekerja (8 file,/*kecil, verifikasi ulang penuh):
+  1) config/hsin.conf pekerja TIMPA jadi 1 baris "Profile=manual" (case
+  salah + 65 baris hilang) -> restore penuh + PROFILE=manual.
+  2) frequency.sh cek $_uk_max/$_uk_min SEBELUM di-fetch (override selalu
+  di-skip) -> fetch dulu; + partial-override bocor (max saja -> min stock
+  ikut ditulis) -> sisi-hilang dikosongkan + SKIPPED (berlaku juga GPU).
+  3) tcp.sh fallthrough bila node hilang (tulis profil saat current kosong)
+  -> return tanpa kecuali. 4) readahead fetch zram_algo + kunci hasil
+  "readahead" di luar namespace knob -> echo saja. 5) vm catat kunci
+  non-knob (vfs_cache_pressure) ke results -> hanya swappiness; guard
+  baris (profil) ke non-manual. 6) frame_limit_restore (resetprop --delete
+  = tulis!) bocor di manual via else-branch -> guard di apply_engines +
+  service (sudah ter-wrap). 7) thermal full-skip mematikan proteksi critical
+  -> cap critical tetap. 8) service.sh `esac` indent.
+- Keputusan desain (dicatat, konsisten legacy): override INVALID di manual
+  -> FALLBACK profil (legacy, "tetap benar" acceptance 6); snap OPP tetap
+  tulis snap; safety critical/low-batt remap ->battery tetap (guard);
+  downscale/refresh-lock/renderer dari hsin.conf = intent user -> tetap jalan.
+- Bukti: sh -n 16/16, shellcheck -S error 0, 7 sandbox LAMA hijau identik
+  baseline (60/60 SEBELUM=SSESUDAH), harness snapshot 8/8 (S1 1 node,
+  S2 nol tulis, S3 balanced identik HEAD, S4 boot, S5 rollback swappiness,
+  S6 invalid/snap, S7 config lama utuh), partial max-only (min byte-identik),
+  knob-list format+JSON utuh, thermal 100C cap 1800000->600000, ZIP staging
+  /tmp (manual.conf ada, runtime 28 marker, balanced md5 sama), module.prop
+  tetap v5.0.0-beta1/5001, tanpa build/ ter-commit.
+- Pre-existing (di luar scope, TIDAK diubah): backup cpu/gpu/io hardcode
+  /sys (sandbox-blind; di HP benar); restore hitung ok walau tulis ditolak
+  (readback sama = ok); game-boost rank manual=1 (boost bisa map ke
+  performance; revert-ke-manual tak menulis); config korup -> manual
+  (dulu balanced); knob-list pra-apply tetap "belum ada hasil apply".
+- PELAJARAN: (1) cek `git diff` file config KECIL sekalipun — pekerja
+  menimpa 66 baris jadi 1; (2) var SHELL dibaca sebelum di-set dalam loop
+  = override mati diam-diam — fetch SEBELUM cek; (3) partial-override wajib
+  diuji eksplisit (sentinel 999999/888888 membuktikan tak-ditulis, bukan
+  sekadar nilai-sama); (4) `resetprop --delete`/restore-default JUGA
+  penulisan — else-branch wajib diguard; (5) skip thermal total = matikan
+  guard — cerminkan performance (critical-only); (6) harness: path absolut
+  ($SB), jangan rm -rf direktori berisi file pembanding.
