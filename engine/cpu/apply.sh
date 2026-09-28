@@ -54,7 +54,6 @@ hsin_cpu_restore() {
         _gov_read=""
         _max_read=""
         _min_read=""
-        _any_ok=0
         _all_ok=1  # semua operasi yang dilakukan harus berhasil
         _has_op=0  # apakah ada operasi yang diperlukan
 
@@ -66,9 +65,7 @@ hsin_cpu_restore() {
             # Readback: verifikasi nilai yang ditulis
             _gov_read=""
             [ -f "$_policy/scaling_governor" ] && IFS= read -r _gov_read < "$_policy/scaling_governor" 2>/dev/null
-            # Bandingkan string langsung (tidak pakai pola regex yang menolak '-')
-            case "$_gov_read" in
-                ''|*[!0-9a-zA-Z_]* ) _gov_read="" ;; esac
+            # Bandingkan string langsung (tanpa filter pola).
             if [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ]; then
                 : # ok
             else

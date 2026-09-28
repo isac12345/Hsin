@@ -92,8 +92,8 @@ hsin_thermal_apply_cpu() {
             _avail=$(printf '%s' "$_opp_csv" | tr ',' ' ')
             _new_max=$(hsin_opp_cap_pick "$_new_max" "$_avail")
         fi
-# File state minimal untuk restore cap saat suhu turun.
-_thermal_pre_cap_file="$HSIN_DATA/thermal_pre_cap.list"
+        # File state minimal untuk restore cap saat suhu turun.
+        _thermal_pre_cap_file="$HSIN_DATA/thermal_pre_cap.list"
 
         # Thermal adalah PENAHAM, bukan penguat: kalau targetnya >= nilai
         # yang sekarang, jangan tulis sama sekali. Sebelumnya baris ini
@@ -155,17 +155,11 @@ _thermal_pre_cap_file="$HSIN_DATA/thermal_pre_cap.list"
                 while IFS='=' read -r _n _v; do
                     [ "$_n" = "$_dir" ] && _pre_cap="$_v"
                 done < "$_thermal_pre_cap_file"
-                # Histeresis: restore hanya bila policy cool/normal (bukan warm/hot/critical)
+                # Histeresis: restore hanya bila policy cool/normal (bukan warm/hot/critical).
                 _restore_ok=0
                 case "$HSIN_THERMAL_POLICY" in
                     cool|normal) _restore_ok=1 ;;
                 esac
-                # Atau dengan margin 5C di bawah HOT (temp < 80000) jika policy warm tapi masih di bawah 80000
-                if [ "$_restore_ok" -ne 1 ]; then
-                    # Cek suhu langsung dari thermal zone (jika tersedia)
-                    # Tapi cukup gunakan policy sebagai proxy: hanya cool/normal
-                    :
-                fi
                 # Hanya restore jika pre_cap tersedia, pre_cap > cur_max, dan histeresis terpenuhi
                 if [ "$_restore_ok" -eq 1 ] && [ -n "$_pre_cap" ] && [ -n "$_cur_max" ] && [ "$_pre_cap" -gt "$_cur_max" ] 2>/dev/null; then
                     # Guard tambahan: hanya bila cur_max masih sama dengan cap terakhir (tidak ada override user baru)
