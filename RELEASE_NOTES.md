@@ -42,3 +42,13 @@ nomor versi definitif hanya ditetapkan di PQ Step 22 bila gate lolos.
   itu terpenuhi, tidak ada klaim kelayakan pakai umum.
 - Profil `extreme` butuh opt-in eksplisit (`ALLOW_EXTREME=true`,
   default `false`) dan belum tes rasa.
+- **KETERBATASAN KERAS — profil `extreme` belum pernah dijalankan di
+  HP fisik sama sekali** (bukan "sudah dites tapi belum ada catatan
+  rasa"): gate-nya tidak pernah dibuka di mana pun — default `false`
+  di semua config, tidak ada sandbox khusus extreme, tidak ada
+  catatan run di HP. Secara desain ini profil paling berisiko
+  (`extreme/frequency_unlock.sh`, `gpu_override.sh`,
+  `thermal_override.sh` + watchdog `safety_monitor.sh`: frequency
+  unlock, GPU override, thermal trip override). Mengaktifkannya =
+  wilayah yang belum teruji; JANGAN aktifkan di luar pengujian
+  terkontrol sampai ada validasi khusus extreme.
