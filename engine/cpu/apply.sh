@@ -50,41 +50,61 @@ hsin_cpu_restore() {
         _policy="$HSIN_SYSFS_CPU/cpufreq/$_name"
         [ -d "$_policy" ] || continue
 
+        # Reset variabel per cluster — hindari bocor antar cluster
+        _gov_read=""
+        _max_read=""
+        _min_read=""
+        _any_ok=0
+        _all_ok=1  # semua operasi yang dilakukan harus berhasil
+        _has_op=0  # apakah ada operasi yang diperlukan
+
         # Restore governor
         _gov=$(grep "^governor=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_gov" ] && [ -w "$_policy/scaling_governor" ] && {
+            _has_op=1
             echo "$_gov" > "$_policy/scaling_governor" 2>/dev/null
             # Readback: verifikasi nilai yang ditulis
             _gov_read=""
             [ -f "$_policy/scaling_governor" ] && IFS= read -r _gov_read < "$_policy/scaling_governor" 2>/dev/null
-            case "$_gov_read" in ''|*[!0-9a-zA-Z_]* ) _gov_read="" ;; esac
+            # Bandingkan string langsung (tidak pakai pola regex yang menolak '-')
+            case "$_gov_read" in
+                ''|*[!0-9a-zA-Z_]* ) _gov_read="" ;; esac
             if [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ]; then
-                _ok=$((_ok + 1))
+                : # ok
             else
                 echo "    [RESTORE WARNING] governor readback mismatch: expected=$_gov got=$_gov_read" >&2
+                _all_ok=0
             fi
         } || {
             [ -n "$_gov" ] && echo "    [RESTORE SKIP] governor not writable" >&2
+            # Jika operasi diperlukan tapi tidak bisa dilakukan, gagal
+            if [ -n "$_gov" ]; then
+                _has_op=1
+                _all_ok=0
+            fi
         }
 
         # Restore max freq first
         _max=$(grep "^max_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_max" ] && [ -w "$_policy/scaling_max_freq" ] && {
+            _has_op=1
             echo "$_max" > "$_policy/scaling_max_freq" 2>/dev/null
             # Readback
             _max_read=""
             [ -f "$_policy/scaling_max_freq" ] && IFS= read -r _max_read < "$_policy/scaling_max_freq" 2>/dev/null
             case "$_max_read" in ''|*[!0-9]*) _max_read=0 ;; esac
             if [ -n "$_max_read" ] && [ "$_max_read" = "$_max" ]; then
-                : # ok sudah dihitung di bawah
+                : # ok
             else
                 echo "    [RESTORE WARNING] max_freq readback mismatch: expected=$_max got=$_max_read" >&2
+                _all_ok=0
             fi
         }
 
         # Restore min freq
         _min=$(grep "^min_freq=" "$_backup_file" 2>/dev/null | cut -d= -f2)
         [ -n "$_min" ] && [ -w "$_policy/scaling_min_freq" ] && {
+            _has_op=1
             echo "$_min" > "$_policy/scaling_min_freq" 2>/dev/null
             # Readback
             _min_read=""
@@ -94,21 +114,18 @@ hsin_cpu_restore() {
                 : # ok
             else
                 echo "    [RESTORE WARNING] min_freq readback mismatch: expected=$_min got=$_min_read" >&2
+                _all_ok=0
             fi
         }
 
-        # Hitung ok hanya jika semua operasi pada file ini berhasil (atau tidak diperlukan)
-        # Untuk minimal: jika ada operasi berhasil, anggap ok. Jika semua gagal, tidak tambah ok.
-        # Mari kita hitung ok berdasarkan apakah setidaknya satu operasi berhasil.
-        _any_ok=0
-        [ -n "$_gov_read" ] && [ "$_gov_read" = "$_gov" ] && _any_ok=1
-        [ -n "$_max_read" ] && [ "$_max_read" = "$_max" ] && _any_ok=1
-        [ -n "$_min_read" ] && [ "$_min_read" = "$_min" ] && _any_ok=1
-        # Jika tidak ada operasi yang diperlukan (gov/max/min semua kosong), tetap hitung ok jika file ada.
-        if [ -z "$_gov" ] && [ -z "$_max" ] && [ -z "$_min" ]; then
-            _any_ok=1
+        # Hitung ok: SEMUA operasi yang dilakukan harus berhasil.
+        # Operasi yang tidak diperlukan (kosong) tidak mengubah hasil,
+        # tapi operasi yang dilakukan dan gagal = tidak ok.
+        # Jika tidak ada operasi yang diperlukan tapi file ada = tetap ok.
+        if [ "$_has_op" -eq 0 ]; then
+            _all_ok=1
         fi
-        [ "$_any_ok" -eq 1 ] && _ok=$((_ok + 1))
+        [ "$_all_ok" -eq 1 ] && _ok=$((_ok + 1))
     done
 
     echo "    Restored $_ok clusters from backup"
