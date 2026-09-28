@@ -155,7 +155,11 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   dir report masih kosong) vs GRACEFUL DEGRADE (mekanisme fallback,
   tanpa daftar chipset); tanpa klaim %/optimis (hanya yang tertelusur
   ke kode).
-- [ ] **Step 17** — API.md (untuk modder).
+- [x] **PQ Step 17** — API.md — DONE 2026-09-27. Panduan modder:
+  tambah tweak (pola safe_apply, tanpa echo mentah), tambah signature
+  (4 kunci match capability, larang keyed-chipset), extend detection
+  (prefix + sandbox dulu), Safety Warning (no-raise, no-bypass guard,
+  daftar runtime); 24 fungsi + 7 env var terverifikasi ke kode.
 - [ ] **Step 18** — CHANGELOG.md.
 
 ---
