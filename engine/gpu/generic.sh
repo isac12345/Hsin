@@ -71,14 +71,19 @@ hsin_gpu_generic_apply() {
                     if [ -n "$_uk_snap" ]; then
                         _target_max="$_uk_snap"
                         hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax tidak ada di tabel OPP; snap ke $_uk_snap"
+                        hsin_uk_result "$_uk_kmax" "$_uk_gmax" "$_uk_snap" "FALLBACK" "tidak ada di tabel OPP; snap ke $_uk_snap" 2>/dev/null || true
                     else
                         hsin_log_warn "gpu" "override ${_uk_kmax}=$_uk_gmax ditolak: tabel OPP tidak terbaca (pakai profil)"
+                        hsin_uk_result "$_uk_kmax" "$_uk_gmax" "$_target_max" "FALLBACK" "ditolak: tabel OPP tidak terbaca (pakai profil)" 2>/dev/null || true
                     fi
                     ;;
             esac
         fi
     fi
     [ -n "$_target_max" ] || hsin_report_skip "GPU node $(basename "$_d") tidak punya available_frequencies - max_freq dilewati (hasil governor ikut baris hasil di bawah)"
+    if [ -z "$_uk_gmax" ]; then
+        hsin_uk_result "$_uk_kmax" "(profil)" "$_target_max" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+    fi
     _ok=0; _fail=0
     if [ -n "$_target_max" ] && [ -w "$_d/max_freq" ]; then
         if hsin_node_write_verify "$_d/max_freq" "$_target_max"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi
@@ -93,6 +98,7 @@ hsin_gpu_generic_apply() {
         _uk_govs=$(hsin_node_read "$_d/available_governors" 2>/dev/null)
         if [ -z "$_uk_govs" ]; then
             hsin_log_warn "gpu" "override ${_uk_kgov}=$_uk_gov ditolak: available_governors tidak terbaca (pakai profil)"
+            hsin_uk_result "$_uk_kgov" "$_uk_gov" "$_gov" "FALLBACK" "ditolak: available_governors tidak terbaca (pakai profil)" 2>/dev/null || true
         else
             case " $_uk_govs " in
                 *" $_uk_gov "*)
@@ -101,9 +107,13 @@ hsin_gpu_generic_apply() {
                     ;;
                 *)
                     hsin_log_warn "gpu" "override ${_uk_kgov}=$_uk_gov ditolak: tidak ada di available_governors node ini (pakai profil)"
+                    hsin_uk_result "$_uk_kgov" "$_uk_gov" "$_gov" "FALLBACK" "ditolak: tidak ada di available_governors (pakai profil)" 2>/dev/null || true
                     ;;
             esac
         fi
+    fi
+    if [ -z "$_uk_gov" ]; then
+        hsin_uk_result "$_uk_kgov" "(profil)" "$_gov" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
     fi
     if [ -n "$_gov" ] && [ -w "$_d/governor" ]; then
         if hsin_node_write_verify "$_d/governor" "$_gov"; then _ok=$((_ok+1)); else _fail=$((_fail+1)); fi

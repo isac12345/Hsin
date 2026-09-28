@@ -28,6 +28,11 @@ hsin_apply_all_engines() {
     _src="${4:-manual}"
     _failed=0
 
+    # PQ Step 23: reset hasil knob siklus lalu (tanpa data basi).
+    # shellcheck disable=SC1091
+    . "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null || true
+    command -v hsin_uk_results_reset >/dev/null 2>&1 && hsin_uk_results_reset
+
     if [ "$_prof_arg" = "extreme" ] && [ "${ALLOW_EXTREME:-${HSIN_ALLOW_EXTREME:-false}}" != "true" ]; then
         echo "SKIP: extreme requires explicit ALLOW_EXTREME=true" >> "$HSIN_DATA/logs/debug.log" 2>/dev/null
         return 1

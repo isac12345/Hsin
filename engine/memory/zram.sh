@@ -157,7 +157,11 @@ hsin_zram_apply() {
             hsin_uk_used "memory" "zram_algo" "$_uk_algo"
         else
             hsin_log_warn "memory" "override zram_algo=$_uk_algo ditolak: tidak ada di daftar algo comp_algorithm device mana pun (pakai profil)"
+            hsin_uk_result "zram_algo" "$_uk_algo" "$_target_algo" "FALLBACK" "ditolak: tidak ada di daftar algo (pakai profil)" 2>/dev/null || true
         fi
+    fi
+    if [ -z "$_uk_algo" ]; then
+        hsin_uk_result "zram_algo" "(profil)" "$_target_algo" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
     fi
     _ok=0
     _skip=0

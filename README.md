@@ -29,6 +29,13 @@ tersedia, thermal zone), bukan dari nama chipset.
    (pilihan: `battery`, `balanced`, `performance`, `extreme`).
 5. Fine-tuning per knob (contoh): `hsin knob-set cpu_policy_0_gov performance`
    Daftar knob yang tersedia di device ini: `hsin knobs`.
+6. Lihat hasil knob siklus apply terakhir (diminta → diterapkan +
+   kategori + alasan): `hsin knob-list`. Contoh baris:
+   `key=cpu_policy_0_max_khz requested=1000000 applied=600000
+   category=FALLBACK reason="tidak ada di tabel OPP; snap ke 600000"`.
+   Disimpan di `/data/adb/hsin/knob_results.env` (direset tiap apply;
+   belum ada hasil = `belum ada hasil apply`). Knob tanpa override
+   tampil sebagai nilai profil.
 
 Profil `extreme` hanya aktif bila `ALLOW_EXTREME=true` ditulis eksplisit
 di `/sdcard/Android/hsin/hsin.conf` (default `false`).

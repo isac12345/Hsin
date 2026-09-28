@@ -189,6 +189,18 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
+## 📋 PHASE 5+: Tambahan di luar 22 step (PQ Step 23)
+
+- [x] **PQ Step 23** — visibilitas hasil knob — DONE 2026-09-27.
+  Recorder `hsin_uk_result` + reset per siklus di `user_knobs.sh`
+  (sudah di-bundle, tanpa file runtime baru); 1-baris record di
+  titik keputusan 7 engine (dipakai/snap/ditolak/profil, kategori
+  safe_apply saja); `knob-list` = baris key=value + JSON lama
+  terakhir (APK aman); sandbox 9/9 file asli; README +
+  TROUBLESHOOTING didokumentasikan.
+
+---
+
 ## 🔭 Known Follow-ups (bukan blocker rilis)
 
 - PQ Step 11 FOLLOW-UP: threshold thermal boleh di-override via capability

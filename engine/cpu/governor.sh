@@ -96,8 +96,12 @@ hsin_cpu_governor_apply() {
                     ;;
                 *)
                     hsin_log_warn "cpu" "override cpu_policy_${_pid}_gov=$_uk_gov ditolak: tidak ada di scaling_available_governors policy$_pid (pakai profil)"
+                    hsin_uk_result "cpu_policy_${_pid}_gov" "$_uk_gov" "$_target" "FALLBACK" "ditolak: tidak ada di scaling_available_governors (pakai profil)" 2>/dev/null || true
                     ;;
             esac
+        fi
+        if [ -z "$_uk_gov" ]; then
+            hsin_uk_result "cpu_policy_${_pid}_gov" "(profil)" "$_target" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
 
         [ -z "$_target" ] && { _skip=$((_skip + 1)); continue; }

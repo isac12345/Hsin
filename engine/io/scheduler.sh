@@ -142,8 +142,12 @@ hsin_io_apply_scheduler() {
                     ;;
                 *)
                     hsin_log_warn "io" "override ${_uk_ksched}=$_uk_sched ditolak: tidak ada di daftar queue/scheduler node ini (pakai profil)"
+                    hsin_uk_result "$_uk_ksched" "$_uk_sched" "$_target" "FALLBACK" "ditolak: tidak ada di daftar scheduler (pakai profil)" 2>/dev/null || true
                     ;;
             esac
+        fi
+        if [ -z "$_uk_sched" ]; then
+            hsin_uk_result "$_uk_ksched" "(profil)" "$_target" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
 
         [ -z "$_target" ] && { _skip=$((_skip + 1)); continue; }

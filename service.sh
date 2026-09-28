@@ -336,6 +336,11 @@ hsin_backup_all "$(date '+%Y%m%d_%H%M%S')_preapply"
 . "$MODPATH/core/engine_guard.sh" 2>/dev/null
 _apply_failed=0
 
+# PQ Step 23: reset hasil knob siklus lalu (tanpa data basi).
+# shellcheck disable=SC1091
+. "$MODPATH/core/user_knobs.sh" 2>/dev/null || true
+command -v hsin_uk_results_reset >/dev/null 2>&1 && hsin_uk_results_reset
+
 # CPU
 . "$MODPATH/engine/cpu/apply.sh" 2>/dev/null
 if hsin_engine_run "CPU" hsin_cpu_apply "$HSIN_PROFILE"; then

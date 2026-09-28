@@ -145,6 +145,9 @@ hsin_vm_apply() {
             _val="$_uk_val"
             hsin_uk_used "vm" "swappiness" "$_val"
         fi
+        if [ "$_n" = "swappiness" ] && [ -z "$_uk_val" ]; then
+            hsin_uk_result "swappiness" "(profil)" "$_val" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        fi
 
         [ -z "$_val" ] && continue
 

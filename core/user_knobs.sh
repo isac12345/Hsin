@@ -399,6 +399,61 @@ hsin_uk_list() {
             _uk_n=$((_uk_n + 1))
         done < "$_uk_file"
     fi
+    # PQ Step 23: baris hasil per knob SEBELUM JSON (key=value per
+    # baris, mudah diparse APK): key=<k> requested=<r> applied=<a>
+    # category=<C> reason="<z>". Union kunci tersimpan + kunci hasil
+    # (knob profil-only ada di hasil tapi tidak di file override).
+    # Tanpa state file -> "belum ada hasil apply", bukan 0/crash.
+    # JSON lama tetap baris TERAKHIR byte-identik (parser APK
+    # lastJsonLine tidak terganggu).
+    if [ ! -f "$HSIN_UK_RESULTS_FILE" ]; then
+        printf 'status=belum ada hasil apply\n'
+    fi
+    _ukr_done=" "
+    for _ukr_sk in $_uk_seen; do
+        _ukr_rq="-"; _ukr_pa="-"; _ukr_pc="-"; _ukr_pw="belum ada hasil apply"
+        if _uk_find "$_ukr_sk" 2>/dev/null && [ -n "$_uk_val" ]; then
+            _ukr_rq="$_uk_val"
+        fi
+        if [ -f "$HSIN_UK_RESULTS_FILE" ]; then
+            while IFS= read -r _ukr_el || [ -n "$_ukr_el" ]; do
+                case "$_ukr_el" in
+                    "$_ukr_sk="*)
+                        _ukr_ev="${_ukr_el#*=}"
+                        _ukr_prq="${_ukr_ev%%|*}"; _ukr_rx="${_ukr_ev#*|}"
+                        _ukr_pap="${_ukr_rx%%|*}"; _ukr_rx="${_ukr_rx#*|}"
+                        _ukr_pct="${_ukr_rx%%|*}"; _ukr_prs="${_ukr_rx#*|}"
+                        case "$_ukr_pct" in
+                            APPLIED|SKIPPED|FALLBACK|UNAVAILABLE|FAILED)
+                                _ukr_rq="$_ukr_prq"; _ukr_pa="$_ukr_pap"
+                                _ukr_pc="$_ukr_pct"; _ukr_pw="$_ukr_prs" ;;
+                        esac
+                        ;;
+                esac
+            done < "$HSIN_UK_RESULTS_FILE"
+        fi
+        printf 'key=%s requested=%s applied=%s category=%s reason="%s"\n' \
+            "$_ukr_sk" "$_ukr_rq" "$_ukr_pa" "$_ukr_pc" "$_ukr_pw"
+        _ukr_done="$_ukr_done$_ukr_sk "
+    done
+    if [ -f "$HSIN_UK_RESULTS_FILE" ]; then
+        while IFS= read -r _ukr_el2 || [ -n "$_ukr_el2" ]; do
+            case "$_ukr_el2" in *=*) ;; *) continue ;; esac
+            _ukr_k2="${_ukr_el2%%=*}"
+            case "$_ukr_done" in *" $_ukr_k2 "*) continue ;; esac
+            _ukr_done="$_ukr_done$_ukr_k2 "
+            _ukr_ev2="${_ukr_el2#*=}"
+            _ukr_prq="${_ukr_ev2%%|*}"; _ukr_rx="${_ukr_ev2#*|}"
+            _ukr_pap="${_ukr_rx%%|*}"; _ukr_rx="${_ukr_rx#*|}"
+            _ukr_pct="${_ukr_rx%%|*}"; _ukr_prs="${_ukr_rx#*|}"
+            case "$_ukr_pct" in
+                APPLIED|SKIPPED|FALLBACK|UNAVAILABLE|FAILED) ;;
+                *) continue ;;
+            esac
+            printf 'key=%s requested=%s applied=%s category=%s reason="%s"\n' \
+                "$_ukr_k2" "$_ukr_prq" "$_ukr_pap" "$_ukr_pct" "$_ukr_prs"
+        done < "$HSIN_UK_RESULTS_FILE"
+    fi
     printf '{"count":%s,"overrides":{%s}}\n' "$_uk_n" "$_uk_obj"
     return 0
 }
@@ -530,6 +585,56 @@ hsin_uk_used() {
     _uk_used_n=$((_uk_used_n + 1))
     command -v hsin_log_info >/dev/null 2>&1 && \
         hsin_log_info "$1" "override: $2=$3 dipakai"
+    hsin_uk_result "$2" "$3" "$3" "APPLIED" "dipakai sesuai permintaan" 2>/dev/null || true
+    return 0
+}
+
+# ============================================================
+# HASIL KNOB per siklus apply (PQ Step 23) — SATU state file.
+# Ditulis dari titik keputusan yang SAMA dengan hsin_uk_used / WARN
+# override yang sudah ada (engine tidak diubah jalurnya): tiap knob
+# dicatat key, requested, applied, kategori, alasan. Format per baris:
+#   key=requested|applied|category|reason
+# Kategori HANYA dari set safe_apply (APPLIED/SKIPPED/FALLBACK/
+# UNAVAILABLE/FAILED) — kategori lain ditolak di sini. Tulis atomik
+# tmp.$$ + mv (pola boot_guard.sh); reset tiap siklus via
+# hsin_uk_results_reset (service.sh §7 + hsin_apply_all_engines).
+# Makna kategori di level knob: APPLIED = dipakai (override maupun
+# profil); FALLBACK = diminta tak tersedia, dipakai alternatif
+# (snap OPP / nilai profil); SKIPPED = knob dilewati. Hasil tulis
+# per node tetap di boot.log (kategori safe_apply per write).
+# ============================================================
+HSIN_UK_RESULTS_FILE="${HSIN_UK_RESULTS_FILE:-$HSIN_DATA/knob_results.env}"
+hsin_uk_result() {
+    _ukr_key="$1"; _ukr_req="$2"; _ukr_app="$3"; _ukr_cat="$4"; _ukr_why="$5"
+    case "$_ukr_cat" in
+        APPLIED|SKIPPED|FALLBACK|UNAVAILABLE|FAILED) ;;
+        *) return 1 ;;
+    esac
+    case "$_ukr_key" in ''|*=*|*'|'*) return 1 ;; esac
+    _ukr_req=$(printf '%s' "$_ukr_req" | tr '\n|' '  /')
+    _ukr_app=$(printf '%s' "$_ukr_app" | tr '\n|' '  /')
+    _ukr_why=$(printf '%s' "$_ukr_why" | tr '\n|' '  /' | tr -d '"')
+    [ -n "$_ukr_key" ] || return 1
+    mkdir -p "$HSIN_DATA" 2>/dev/null
+    _ukr_tmp="$HSIN_UK_RESULTS_FILE.tmp.$$"
+    : > "$_ukr_tmp" 2>/dev/null || return 1
+    if [ -f "$HSIN_UK_RESULTS_FILE" ]; then
+        while IFS= read -r _ukr_l || [ -n "$_ukr_l" ]; do
+            case "$_ukr_l" in
+                "$_ukr_key="*) continue ;;
+                *) printf '%s\n' "$_ukr_l" >> "$_ukr_tmp" ;;
+            esac
+        done < "$HSIN_UK_RESULTS_FILE"
+    fi
+    printf '%s=%s|%s|%s|%s\n' "$_ukr_key" "$_ukr_req" "$_ukr_app" "$_ukr_cat" "$_ukr_why" >> "$_ukr_tmp"
+    mv -f "$_ukr_tmp" "$HSIN_UK_RESULTS_FILE" 2>/dev/null || return 1
+    chmod 600 "$HSIN_UK_RESULTS_FILE" 2>/dev/null
+    return 0
+}
+
+hsin_uk_results_reset() {
+    rm -f "$HSIN_UK_RESULTS_FILE" 2>/dev/null
     return 0
 }
 
