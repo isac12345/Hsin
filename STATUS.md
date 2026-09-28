@@ -199,6 +199,41 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
 
 ---
 
+## 🚦 GATE RILIS (PQ Step 22 — evaluasi 2026-09-27, TANPA bump versi)
+
+Spec gate (`PRIORITY_QUEUE.md` Step 22): 22/22 steps + L2 HP nyata PASS
+(boot guard path + safe apply + signature match, bukti log HP) +
+sandbox capability-hilang PASS → BARU BOLEH bump `version`/
+`versionCode`. Evaluasi per syarat (bukti konkret):
+
+1. Phase 2–3 selesai — **SUDAH**. STATUS ([x] Steps 5–8, PQ 9–12) +
+   commit `5f3355c`, `62ee738`, `6ea5619`, `b79763d`, `2a56064`/
+   `546f9a5`, `912b3bf`, `7ae4573`.
+2. L2 HP nyata (log HP, bukan klaim) — **BELUM**.
+   `tests/device_reports/` masih kosong kecuali `.gitkeep`
+   (terverifikasi `ls -la`); QA_CHECKLIST 0/25 `[x]`.
+3. Sandbox capability-hilang PASS — **SUDAH**
+   (`sandbox_degrade.sh` 8/8, `thermal_sandbox` UNKNOWN no-crash,
+   `sandbox_overrides.sh` fallback + log).
+4. Blocker tercatat — device kedua BELUM; profil `extreme` belum
+   pernah jalan di HP fisik sama sekali (KETERBATASAN KERAS).
+
+**GATE RILIS: BELUM LOLOS.** `module.prop` tetap `v5.0.0-beta1` /
+`versionCode=5001`, tidak disentuh. Pesan commit spec Step 22
+("(gate passed)") TIDAK dipakai — gate tidak lolos.
+
+Langkah berikutnya yang konkret:
+
+1. Jalankan `TESTING.md` tahap 1–5 di HP fisik (baseline → install →
+   functional → stability 3x reboot → cleanup).
+2. Isi report L2 pertama di `tests/device_reports/` (template
+   capability, bukan nama chipset).
+3. Centang `QA_CHECKLIST.md` dengan HASIL (angka/log), bukan klaim.
+4. Setelah 1–3 hijau di device developer + device kedua ada →
+   evaluasi ulang gate ini.
+
+---
+
 ## ✅ Fixed Issues (dulu Known Issues — sudah diperbaiki)
 
 - `core/thermal_check.sh` hilang dari bundle rilis — DITEMUKAN +

@@ -93,24 +93,21 @@
 
 ## Fase 4 — Documentation (Step 13-18)
 
-- [ ] Step 13: README.md (quick start, profil, log, uninstall).
-- [ ] Step 14: TESTING.md (prosedur + template laporan).
-- [ ] Step 15: TROUBLESHOOTING.md (masalah umum + langkah debug).
-- [ ] Step 16: DEVICE_COMPATIBILITY.md — bedakan "TERVALIDASI" (Unisoc/Mali
-  milik user, bukti nyata) vs "GRACEFUL DEGRADE" (device lain, belum ada
-  bukti). Jangan klaim rata.
-- [ ] Step 17: API.md (untuk modder: tambah profil, deteksi, tweak).
-- [ ] Step 18: CHANGELOG.md.
+- [x] Step 13: README.md (DONE `a9e4e03`). Step 14: TESTING.md (DONE
+  `50bf8e6`). Step 15: TROUBLESHOOTING.md (DONE `ce4dfbd`).
+  Step 16: DEVICE_COMPATIBILITY.md (DONE `1f362e7`).
+  Step 17: API.md (DONE `b37b0f2`). Step 18: CHANGELOG.md
+  (`## [Unreleased]`, DONE `3c46f66`).
 
 ## Fase 5 — QA & Release (Step 19-22)
 
-- [ ] Step 19: QA_CHECKLIST.md (kode, build, device, fungsional, stabilitas,
-  edge case, uninstall — termasuk validasi build ala Step 7 lama).
-- [ ] Step 20: RELEASE_NOTES.md (fitur, keterbatasan jujur).
-- [ ] Step 21: SUPPORT_POLICY.md (SLA, kanal, matriks kompatibilitas).
-- [ ] Step 22: final status update + GATE RILIS: versionCode baru HANYA
-  bila Phase 2-3 selesai DAN tervalidasi di HP nyata (L2). Tanpa L2 = tanpa
-  rilis stabil.
+- [x] Step 19: QA_CHECKLIST.md (DONE `ed5e34e`).
+- [x] Step 20: RELEASE_NOTES.md (DONE `a7e90e5`, pesan tanpa versi).
+- [x] Step 21: SUPPORT_POLICY.md (DONE `1734654`).
+- [ ] Step 22: GATE RILIS = BELUM LOLOS (dievaluasi 2026-09-27, lihat
+  STATUS.md "GATE RILIS"): device_reports kosong, QA 0/25, device
+  kedua + extreme belum. `module.prop` tetap v5.0.0-beta1/5001.
+  Berikutnya: TESTING.md di HP fisik + report L2 pertama.
 
 ## Aturan
 
