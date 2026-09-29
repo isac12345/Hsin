@@ -1100,7 +1100,7 @@
     aktif ini tidak mengexpos-nya). -> polling_interval knob, dua lainnya
     UNAVAILABLE di device ini tapi tetap diimplementasikan (node-based
     detection, akan muncul di device yang governor-nya punya node).
-  * Mali KBase (/sys/module/mali_kbase/parameters,存在 & writable):
+  * Mali KBase (/sys/module/mali_kbase/parameters, ada & writable):
     gpu_boost_level2=0, gpu_pollingtime=8, gpu_upthreshold=88.
 - Batas + SUMBER (sesuai requirement K3: justifikasi sebelum dikunci):
   * sched_child_runs_first 0-1: bool kernel (sched-bwc).
@@ -1269,3 +1269,32 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   sebelum push - Termux tidak bisa compile, jadi satu import liar =
   satu siklus CI gagal; (17) BOM hanya mengatur VERSI, bukan
   menyediakan artifact - tiap import compose.* harus dicek ada di katalog.
+
+## A5 build CI (2026-09-29, 2 putaran, leader)
+- Putaran 1 run 36573238729 GAGAL: `@Preview(backgroundColor = Bg.value
+  .toLong())` TIDAK compile - argumen anotasi wajib compile-time constant;
+  `padding` hilang import di BottomNav. Fix: `const val PreviewBg: Long =
+  0xFF121214L` di Color.kt (tetap satu tempat hex) + import `padding`.
+  Putaran 2: run 36574143754 SUCCESS 4m25s, artifact hsin-debug-apk
+  8.758.734 byte (~8,35 MiB; naik dari 6,5 MiB karena material3 masuk).
+- Koreksi leader atas hasil dev-apk (8 file ditulis ulang): `import
+  com.hsin.ui.theme.44.dp` (import tak mungkin) di 4 file, modifier
+  chaining `Modifier.androidx.compose.foundation.layout.padding(...)`
+  tak valid, signature ScreenScaffold tidak cocok dengan pemanggil,
+  SEMUA teks monospace (hanya angka+log yang boleh mono), TopBar
+  mengimpor HsinTheme dua kali, hex/hardcode di luar token.
+- Kontras terukur (WCAG, dihitung dari hex token): text/bg 15,30:1 (AAA),
+  text/surface 13,94:1 (AAA), muted/bg 6,41:1 (AA), accent/bg 8,40:1
+  (AAA), bg/accent 8,40:1 (AAA teks tombol utama), ok/bg 6,10:1 (AA),
+  warn/bg 6,66:1 (AA), error/bg 4,23:1 (AA-large), neutral/bg 3,53:1
+  (AA-large). Catatan jujur: error + neutral DI BAWAH 4,5:1 - keduanya
+  dipakai sebagai GARIS + TEKS status kecil, bukan body text, dan
+  kontrasnya dinaikkan lewat ukuran/weight saat dipakai (A5 selesai untuk
+  token; penyesuaian kontras akhir diperiksa ulang di A14).
+- PELAJARAN: (18) `@Preview(backgroundColor = ...)` tidak bisa memakai
+  token `Color` - harus konstanta compile-time; token warna tidak
+  kompatibel dengan aturan anotasi Kotlin; (19) setelah rewrite
+  massal, cek ulang SEMUA import token satu per satu (hapus import Bg
+  karena `backgroundColor` tidak lagi memakainya, padahal `contentColor`
+  masih butuh) - grep silang "pakai X tapi import X hilang" menangkap
+  ini sebelum CI.
