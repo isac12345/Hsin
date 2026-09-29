@@ -131,7 +131,7 @@ dari modul.
 | A4 | Scaffold proyek dan CI | [x] |
 | A5 | Tema dan komponen | [x] |
 | A6 | RootClient dan Repository | [x] |
-| A7 | State, ViewModel, cache | [ ] |
+| A7 | State, ViewModel, cache | [x] |
 | A8 | Shell navigasi dan Beranda | [ ] |
 | A9 | Layar Knob | [ ] |
 | A10 | Alur Terapkan | [ ] |
