@@ -117,9 +117,29 @@ object HsinRepository {
     }
 
     /** Status sederhana (§3.1). Jika kosong / rusak → kosong, bukan karangan. */
-    fun parseStatus(stdout: String): String? {
-        val trimmed = stdout.trim()
-        return if (trimmed.isNotEmpty()) trimmed else null
+    fun parseStatus(stdout: String): JSONObject? {
+        val jsonLine = stdout.lineSequence()
+            .map { it.trim() }
+            .lastOrNull { it.startsWith("{") }
+            ?: return null
+        return try {
+            JSONObject(jsonLine)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Field status yang boleh di-ekspos ke UI; key lain diabaikan (kontrak §3.1). */
+    fun statusInt(json: JSONObject, key: String): Int? =
+        if (json.has(key) && !json.isNull(key)) json.optInt(key, Int.MIN_VALUE)
+            .let { if (it == Int.MIN_VALUE) null else it } else null
+
+    /** [ok] berarti nilai terbaca dan bermakna. Kontrak §3.1: 0 di sandbox bukan 0
+     * yang valid di HP — mis. `battery_pct=-1`, `refresh_hz=0` tanpa dumpsys,
+     * `game_fps=0` tanpa game. Nilai seperti ini harus dianggap "tidak tersedia". */
+    fun statusReadable(json: JSONObject, key: String): Boolean {
+        val v = statusInt(json, key) ?: return false
+        return v >= 0
     }
 
     private fun extractFrom(s: String, prefix: String, stop: Char): String? {

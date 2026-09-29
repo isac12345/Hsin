@@ -67,4 +67,6 @@ dependencies {
   implementation(libs.compose.material3)
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20240303")
+  // kotlinx-coroutines-test: runTest() sehingga fungsi suspend bisa diuji
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
