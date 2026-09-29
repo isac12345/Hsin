@@ -137,7 +137,7 @@ dari modul.
 | A10 | Alur Terapkan | [x] |
 | A11 | Monitor | [x] |
 | A12 | Log | [x] |
-| A13 | State error dan kasus tepi | [ ] |
+| A13 | State error dan kasus tepi | [x] |
 | A14 | Audit footprint dan kualitas | [ ] |
 | A15 | Dokumen dan QA | [ ] |
 | A16 | Status final | [ ] |
