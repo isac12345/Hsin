@@ -1085,3 +1085,84 @@
   yang tidak punya nilai profil perlu penanda eksplisit di tabel
   (default "-") supaya profil lama tidak ikut menulis node yang tadinya
   tidak pernah ditulis.
+
+## K3 knob tier-2 berbasis capability (2026-09-29, leader langsung, TERIMA L1)
+- LIVE HP T615 (su -c cat, read-only, nol tulis) - inilah yang menentukan
+  mana knob yang bisa muncul di device ini:
+  * sched_latency_ns / sched_min_granularity_ns / sched_wakeup_granularity_ns
+    = TIDAK ADA (/proc/sys/kernel/ tidak punya). -> UNAVAILABLE di sini.
+  * sched_child_runs_first = 0, writable. -> knob 0/1.
+  * uclamp foreground ADA di /dev/cpuctl/foreground/cpu.uclamp.{min,max}
+    (cgroup v1 vendor, BUKAN /sys/fs/cgroup). min live "0.00", max live
+    "max" - format vendor, bukan integer polos. Writable. -> knob 0-1024.
+  * devfreq 23100000.gpu (governor simple_ondemand): polling_interval=50
+    writable (ADA); up_threshold & down_differential TIDAK ADA (governor
+    aktif ini tidak mengexpos-nya). -> polling_interval knob, dua lainnya
+    UNAVAILABLE di device ini tapi tetap diimplementasikan (node-based
+    detection, akan muncul di device yang governor-nya punya node).
+  * Mali KBase (/sys/module/mali_kbase/parameters,存在 & writable):
+    gpu_boost_level2=0, gpu_pollingtime=8, gpu_upthreshold=88.
+- Batas + SUMBER (sesuai requirement K3: justifikasi sebelum dikunci):
+  * sched_child_runs_first 0-1: bool kernel (sched-bwc).
+  * uclamp_min/max 0-1024: SCHED_CAPACITY_SCALE=1024 (dokumentasi kernel
+    sched-util-clamp). 1024 = 100% kapasitas.
+  * polling_interval 1-1000 ms: ABI devfreq (satuan ms; nilai < 1 jiffy
+    dianggap 0 = no polling). Batas atas = batas UI, kernel tidak
+    menetapkan max.
+  * up_threshold 1-100 %: ABI devfreq ondemand (persen busy). 0 ditolak
+    karena governor ondemand mainstream menolaknya.
+  * down_differential 0-100 %: ABI devfreq (persen selisih).
+  * sched_latency_pct / sched_min_granularity_pct /
+    sched_wakeup_granularity_pct 10-200 PERSEN (bukan nanodetik absolut):
+    jalur tulis yang sudah ada & teruji di HP bekerja dalam persen dari
+    nilai native + lantai keras 500000 ns, dan komentar di scheduler.sh
+    membuktikan kernel vendor bisa saling menimpa antar node. Batas 10-200
+    %% menjaga user tetap bisa lebih agresif tanpa mengecilkan absurd.
+  * mali_boost_level2 0-1, mali_pollingtime 1-10, mali_upthreshold 10-100:
+    TIDAK ada dokumentasi kernel (parameter modul vendor). Justifikasi =
+    nilai relatif terhadap nilai live + set yang sudah dipakai engine
+    (engine/gpu/mali.sh: 0/1, 8/4/1, 88/72/55/30). PERLU uji tulis di HP
+    (L2) sebelum dianggap final - kernel/vendor bisa punya clamp sendiri.
+- Isi (10 file +558/-65, 2 baru): engine/gpu/devfreq_tuning.sh BARU (3
+  tunable devfreq, gate = node ADA, terdaftar di build_release.sh +
+  dipanggil engine/gpu/apply.sh); engine/gpu/mali.sh (blok kbase
+  DIPISAH jadi hsin_gpu_kbase_knobs_apply + dipanggil dari pipeline GPU -
+  sebelumnya hsin_gpu_mali_apply 0 pemanggil / dead code, dan gate-nya
+  hanya node kbase, bukan nama vendor); engine/cpu/scheduler.sh (2 knob
+  uclamp + 3 knob persen sched-lat); engine/cpu/governor.sh
+  (sched_child_runs_first jadi knob, sebelumnya tulis profil buta);
+  core/user_knobs.sh (9 kunci fixed + 3 field gpu), core/knobs.sh (JSON
+  sched + gpu_tunables + mali_kbase), core/backup.sh (hsin_backup_sched +
+  hsin_backup_gpu_tuning), tests/sandbox_k3_knobs.sh BARU.
+- Koreksi leader (3, semua kelas yang sudah dicatat sebelumnya):
+  1) uclamp: return dini di profile manual = override user MATI (pola
+     yang sama dengan bug K2). Diperbaiki: manual ditangani di dalam
+     loop (SKIPPED tanpa tulis), bukan di awal fungsi.
+  2) kbase knob bergantung pada HSIN_GPU_KBASE yang hanya di-set detector
+     -> dipanggil dari harness langsung = 0 write. Diperbaiki: fungsi
+     menurunkan sendiri ke HSIN_SYSFS_KBASE bila kosong (tidak bergantung
+     urutan pemanggilan).
+  3) JSON gpu_tunables: tiap entri tidak dibungkus `{}` -> JSON invalid
+     (terbukti: "Expecting ',' delimiter" di char 1693). Diperbaiki;
+     sekarang json.load() lulus di kedua varian.
+- Pelajaran K2 diterapkan eksplisit: SETIAP knob baru diuji bahwa node-nya
+  benar-benar berubah (bukan cuma knob-set diterima) - termasuk yang
+  formatnya aneh (uclamp "0.00"/"max": readback compared longgar + tulis
+  hanya dihitung sukses kalau nilai benar-benar BERUBAH).
+- Bukti L1: sh -n 10/10, shellcheck -S error 0, harness K3 48/48
+  (A snapshot 7 knob satu-per-satu; B manual nol tulis; C knob tanpa
+  nilai profil tidak ditulis + kbase profil 0/4/72 utuh; D varian node
+  hilang sebagian: UNAVAILABLE tanpa crash; E 16 nilai tolak + file cacat;
+  G backup->rollback 7 roundtrip; H 7 pemeriksaan JSON termasuk node
+  hilang; I knob-list 4 knob), suite lama 10/10 hijau (K2 46, K1 36,
+  guard_status 20, boot_guard 10, service_guard 8, safe_apply 11,
+  overrides 9, knob_results 9, scan_prefix 5, degrade 8), runtime ZIP
+  rekonstruksi sh -n OK (15241 baris) + marker K3 + 0 blok if kosong
+  (kelas bug M2 dicek ulang).
+- CATATAN KEPUTUSAN (leader, transparan): 3 sysctl sched tidak ada di HP
+  ini, jadi tidak ada ANGKA LIVE yang bisa diverifikasi untuk batasnya;
+  karena itu batasnya diambil dari JALUR TULIS YANG SUDAH ADA (persen) dan
+  TIDAK dibuat semantik nanodetik absolut yang belum teruji. Node ini akan
+  otomatis UNAVAILABLE di device ini, dan muncul sebagai knob persen di
+  device yang punya node-nya. Bila user mau abolish persennya dan pakai
+  nilai absolut, itu perlu step terpisah + uji HP.

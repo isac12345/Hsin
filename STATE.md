@@ -271,3 +271,17 @@
   + 0 blok if kosong, dispatcher 6/6. Catatan: nomerges live 2 tidak
   bisa dipilih (opsi 0/1 sesuai keputusan user). APP_PLAN K2 [x].
   L2: validasi HP. STOP.
+
+- APP-K3 (2026-09-29, leader langsung): TERIMA L1, commit faf7261. 12 knob
+  tier-2 capability-gated: sched_child_runs_first (0/1), uclamp_min/max
+  (0-1024), gpu_node_*_{polling_interval,up_threshold,down_differential},
+  mali_{boost_level2,pollingtime,upthreshold}, sched_*_pct (10-200 persen).
+  Live HP: 3 sysctl sched TIDAK ADA; up_threshold/down_differential TIDAK
+  ADA (governor simple_ondemand); polling_interval=50; uclamp format
+  vendor ("0.00"/"max"); kbase 0/8/88. Semua UNAVAILABLE = Supported false,
+  bukan error. Batas dari dokumentasi kernel (devfreq ABI, SCHED_
+  CAPACITY_SCALE) atau relatif terhadap nilai live + set engine (3 param
+  kbase, perlu uji tulis L2). 3 koreksi leader (uclamp manual early-return,
+  kbase bergantung detector, JSON tanpa object wrapper). Bukti: harness K3
+  48/48, suite lama 10/10, runtime ZIP sh -n OK + 0 blok if kosong.
+  APP_PLAN K3 [x]. L2: validasi HP. STOP.
