@@ -8,6 +8,7 @@ import com.hsin.data.repository.HsinRepository
 import com.hsin.data.root.RootClient
 import com.hsin.data.root.RootError
 import com.hsin.data.root.RootResult
+import com.hsin.data.state.ApplyFlow
 import com.hsin.data.state.DirtyTracker
 import com.hsin.data.state.GuardState
 import com.hsin.data.state.KnobsMapping
@@ -183,7 +184,7 @@ class HsinViewModel(
     }
 
     // ------------------------------------------------------------------
-    // Aksi edit knob (belum memanggil root — itu urusan A10)
+    // Aksi edit knob + A10 alur Terapkan
     // ------------------------------------------------------------------
     fun setKnobOverride(key: String, value: String) {
         _uiState.update { it.copy(dirty = DirtyTracker.setOverride(it.dirty, key, value)) }
@@ -197,6 +198,60 @@ class HsinViewModel(
     /** Buang semua override; tiap key kembali ke base-nya. */
     fun resetAllKnobs() {
         _uiState.update { it.copy(dirty = DirtyTracker.resetAll(it.dirty)) }
+    }
+
+    /**
+     * Alur Terapkan A10.
+     *
+     * - Hanya knob dirty yang dikirim (via [ApplyFlow], allowlist A6).
+     * - Berjalan di `viewModelScope.launch` sehingga state "menerapkan"
+     *   tidak memblokir UI/main thread (RootClient sudah Dispatchers.IO).
+     * - Hasil PER KNOB dari modul disimpan di [UiState.applyResults];
+     *   sukses parsial = sebagian APPLIED, sebagian FAILED — bukan satu
+     *   status global.
+     * - [DirtyTracker.confirmApplied] me-reset base hanya untuk APPLIED;
+     *   FAILED/SKIPPED/UNAVAILABLE tetap dirty (nilai lama jadi acuan).
+     * - Panggilan ganda saat masih menerapkan diabaikan (guard
+     *   [UiState.isApplying]); tanpa knob dirty = no-op.
+     */
+    fun applyDirtyKnobs(profile: String = "manual") {
+        if (_uiState.value.isApplying) return
+        val snapshot = _uiState.value.dirty
+        if (DirtyTracker.dirtyCount(snapshot) == 0) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isApplying = true, error = null) }
+            when (val out = ApplyFlow.apply(root, snapshot, profile)) {
+                is ApplyFlow.Outcome.Empty ->
+                    _uiState.update { it.copy(isApplying = false) }
+                is ApplyFlow.Outcome.Completed -> {
+                    val newDirty = DirtyTracker.confirmApplied(_uiState.value.dirty, out.results)
+                    _uiState.update {
+                        it.copy(
+                            isApplying = false,
+                            dirty = newDirty,
+                            applyResults = out.results.associateBy { r -> r.key },
+                            error = null,
+                        )
+                    }
+                    refreshUiState()
+                }
+                is ApplyFlow.Outcome.Failed -> {
+                    val newDirty = DirtyTracker.confirmApplied(_uiState.value.dirty, out.partial)
+                    _uiState.update {
+                        it.copy(
+                            isApplying = false,
+                            dirty = newDirty,
+                            applyResults = out.partial.associateBy { r -> r.key },
+                            error = UiError(
+                                kind = out.error.toUiKind(),
+                                detail = out.reason,
+                                retryable = out.error != RootError.MODULE_NOT_FOUND,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     /** Buang cache lalu ambil ulang dari root (aksi "refresh" di UI). */

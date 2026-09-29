@@ -38,6 +38,11 @@ import com.hsin.ui.theme.PreviewBg
  * knob yang ada di capability `knobs` yang ditampilkan — knob yang tidak
  * tersedia TIDAK pernah muncul dengan nilai karangan (aturan A9).
  *
+ * A10: baris hasil per knob dibaca dari [UiState.applyResults] (langsung
+ * dari modul, kontrak §3.11): `diminta X → diterapkan Y (alasan)` dengan
+ * badge APPLIED/FALLBACK/SKIPPED/UNAVAILABLE/FAILED. Sukses parsial =
+ * badge berbeda per knob, bukan satu status global.
+ *
  * Layar ini tidak memanggil root; semua nilai berasal dari [UiState].
  */
 @Composable
@@ -73,10 +78,19 @@ fun KnobScreen(
 
         val dirty = state.dirtyCount
         HButton(
-            label = if (dirty == 0) "Terapkan (0)" else "Terapkan ($dirty)",
-            onClick = onApply,
+            label = when {
+                state.isApplying -> "Menerapkan..."
+                dirty == 0 -> "Terapkan (0)"
+                else -> "Terapkan ($dirty)"
+            },
+            onClick = { if (!state.isApplying && dirty > 0) onApply() },
             primary = true,
         )
+        if (state.isApplying) {
+            HCard {
+                TextLine("Menerapkan knob, UI tetap bisa dipakai...", Caption)
+            }
+        }
 
         val open = openCategory
         if (open == null) {
@@ -93,7 +107,7 @@ fun KnobScreen(
                 }
             } else {
                 catUi.rows.forEach { row ->
-                    KnobControl(row) { value -> onSetOverride(row.key, value) }
+                    KnobControl(row, state.applyResults[row.key]) { value -> onSetOverride(row.key, value) }
                 }
             }
         }
@@ -122,7 +136,11 @@ private fun CategoryRow(cat: KnobCategoryUi, onClick: () -> Unit) {
 }
 
 @Composable
-private fun KnobControl(row: KnobRow, onChange: (String) -> Unit) {
+private fun KnobControl(
+    row: KnobRow,
+    result: com.hsin.data.repository.HsinRepository.KnobResult?,
+    onChange: (String) -> Unit,
+) {
     HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             Row(
@@ -175,7 +193,56 @@ private fun KnobControl(row: KnobRow, onChange: (String) -> Unit) {
             if (row.base.isNotBlank()) {
                 TextLine("Awal: ${row.base}", Caption)
             }
+            ResultLine(row, result)
         }
+    }
+}
+
+/**
+ * Baris hasil per knob (A10, kontrak §3.11).
+ *
+ * - Belum diubah + belum ada hasil: `SAAT INI`.
+ * - Diubah tapi belum apply: `DIUBAH`.
+ * - Sesudah apply: badge kategori modul + `diminta X → diterapkan Y (alasan)`.
+ * Nilai diterapkan HANYA dari modul — tidak pernah dikarang dari rc.
+ */
+@Composable
+private fun ResultLine(
+    row: KnobRow,
+    result: com.hsin.data.repository.HsinRepository.KnobResult?,
+) {
+    if (result == null) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextLine(if (row.dirty) "DIUBAH — belum diterapkan" else "SAAT INI", Caption)
+            HBadge(
+                if (row.dirty) "DIUBAH" else "SAAT INI",
+                if (row.dirty) HStatus.DIUBAH else HStatus.DEFAULT,
+            )
+        }
+        return
+    }
+    val status = when (result.category) {
+        "APPLIED" -> HStatus.APPLIED
+        "FALLBACK" -> HStatus.FALLBACK
+        "FAILED" -> HStatus.FAILED
+        "SKIPPED" -> HStatus.SKIPPED
+        "UNAVAILABLE" -> HStatus.UNAVAILABLE
+        else -> HStatus.DEFAULT
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextLine(
+            "diminta ${result.requested} → diterapkan ${result.applied} (${result.reason})",
+            Caption,
+        )
+        HBadge(result.category.ifBlank { "N/A" }, status)
     }
 }
 
