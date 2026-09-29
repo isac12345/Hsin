@@ -3,8 +3,6 @@ name: build-apk
 # Build APK HSIN. Satu-satunya cara build: Termux tidak punya JDK/Android SDK.
 # Sengaja manual (workflow_dispatch) - tidak ada yang dibangun otomatis saat
 # push, sesuai perintah user "jangan build dulu".
-# A2: job APK dinonaktifkan sementara sampai A4 (scaffold baru). File ini
-# dipertahankan dan dipakai lagi di A4, jangan dihapus.
 on:
   workflow_dispatch:
     inputs:
@@ -55,16 +53,6 @@ jobs:
           echo "sdkmanager di: $(command -v sdkmanager)"
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Setup NDK r26 + CMake
-        run: |
-          for _d in "$ANDROID_HOME"/cmdline-tools/*/bin; do
-            [ -d "$_d" ] && echo "$_d" >> "$GITHUB_PATH"
-          done
-          _sdk_bin="$(echo "$ANDROID_HOME"/cmdline-tools/*/bin | tr ' ' '\n' | grep -m1 . || true)"
-          export PATH="$PATH:$_sdk_bin"
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "ndk;26.3.11579264" "cmake;3.22.1"
 
       - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
