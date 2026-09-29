@@ -1,6 +1,5 @@
 package com.hsin.data.state
 
-import com.hsin.data.cache.CapabilityCachePolicy
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -167,10 +166,4 @@ object KnobsMapping {
         return out
     }
 
-    /** Ambil capability dari cache tanpa memanggil root lagi. */
-    fun fromCacheHit(knobs: JSONObject, allowExtreme: Boolean): KnobCapability =
-        parse(knobs, allowExtreme).capability
 }
-
-/** Dipakai ViewModel untuk membedakan HIT/MISS tanpa Android. */
-typealias CacheDecision = CapabilityCachePolicy.Decision

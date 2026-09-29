@@ -16,6 +16,7 @@ import com.hsin.data.state.UiError
 import com.hsin.data.state.UiErrorKind
 import com.hsin.data.state.UiState
 import com.hsin.data.state.logLinesOf
+import com.hsin.data.state.parseRollbackDetail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -209,6 +210,44 @@ class HsinViewModel(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /**
+     * Pulihkan backup (A8). `rollback` mengembalikan setelan modul ke kondisi
+     * sebelum perubahan terakhir; keluarannya `OK: Rollback complete` +
+     * baris `Restore <nama> done. ok=N fail=M` (kontrak §2).
+     *
+     * Kalau `ok=0` DAN `fail>0`, hasil dianggap gagal walau rc=0 — tidak ada
+     * yang terpulihkan. `ok=0 fail=0` berarti tidak ada yang perlu dipulihkan,
+     * itu sukses yang sah.
+     */
+    fun restoreBackup() {
+        viewModelScope.launch {
+            when (val res = call("rollback")) {
+                is RootResult.Success -> {
+                    val detail = parseRollbackDetail(res.output)
+                    val failed = detail?.second ?: 0
+                    if (failed > 0) {
+                        _uiState.update {
+                            it.copy(
+                                error = UiError(
+                                    UiErrorKind.COMMAND_FAILED,
+                                    "Pemulihan gagal untuk $failed penyesuaian",
+                                    retryable = true,
+                                )
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(error = null) }
+                        refreshUiState()
+                    }
+                    _uiState.update {
+                        it.copy(logLines = logLinesOf(res.output, 200))
+                    }
+                }
+                is RootResult.Error -> fail(Loading.NONE, res)
+            }
+        }
     }
 
     // ------------------------------------------------------------------
