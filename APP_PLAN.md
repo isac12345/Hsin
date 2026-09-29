@@ -130,7 +130,7 @@ dari modul.
 | M3 | Perbarui kontrak app-modul | [x] |
 | A4 | Scaffold proyek dan CI | [x] |
 | A5 | Tema dan komponen | [x] |
-| A6 | RootClient dan Repository | [ ] |
+| A6 | RootClient dan Repository | [x] |
 | A7 | State, ViewModel, cache | [ ] |
 | A8 | Shell navigasi dan Beranda | [ ] |
 | A9 | Layar Knob | [ ] |

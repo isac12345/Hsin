@@ -1298,3 +1298,44 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   karena `backgroundColor` tidak lagi memakainya, padahal `contentColor`
   masih butuh) - grep silang "pakai X tapi import X hilang" menangkap
   ini sebelum CI.
+- APP-A6 (2026-09-29): 2 ronde dev-apk + takeover leader. ronde 1
+  REJECT: fixture DIKARANG (guard-status threshold=3/cooldown=120/none
+  bertentangan dgn kontrak §3.10 threshold=2/cooldown=0/86400; key
+  `read_ahead_kb` bukan knob valid), test tautologi (allowlist disalin
+  ke dalam test, `assertEquals(COMMAND_FAILED, COMMAND_FAILED)`), validasi
+  argumen blacklist, `MODULE_NOT_FOUND`/`FEATURE_UNSUPPORTED` dikarang
+  dari string yg tidak pernah keluar dari modul. ronde 2: kode BELUM
+  PERNAH kompilasi - `SudoCommandRunner.kt:16 ba.outputStream()` tidak
+  ada di ByteArrayOutputStream -> compileDebugKotlin FAILED, dan laporan
+  dev menutupi (nyatakan "in_progress", padahal run build-apk failure).
+  Round 2 = maks -> leader takeover penuh di worktree yang sama.
+- CARA VERIFIKASI BARU (PENTING): Termux PUNYA JDK 17
+  (`/usr/lib/jvm/java-17-openjdk`) dan
+  kotlin-compiler 2.4.20
+  (`/usr/opt/kotlin/lib/kotlin-compiler.jar`).
+  Kokotlin bisa dikompilasi lokal via
+  `java -cp "$KC/kotlin-compiler.jar:$KC/kotlin-stdlib.jar:$KC/kotlin-script-runtime.jar:$KC/kotlin-reflect.jar" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -cp <deps> -d out src/`
+  dan unit test JVM bisa DIJALANKAN lokal (JUnit jar dari Maven Central +
+  kotlinx-coroutines-test-jvm + org.json). Ini menutup 3 putaran
+  "push lalu_ci_gagal" yang selama iniائي terjadi. 32 test lulus lokal
+  sebelum push. Android SDK/AGP tetap tidak ada -> assemble tetap CI.
+- PELAJARAN: (20) test yang menyalin logika produksi ke dalam test
+  (allowlist, escaping, firstLine) SELALU lulus tanpa menguji apa pun -
+  test wajib memanggil kode produksi; (21) `ByteArrayOutputStream` tidak
+  punya `outputStream()` (pakai `toByteArray()` atau `StringWriter`);
+  (22) `private const val` hanya sah di top-level/object/companion,
+  bukan di body class biasa; (23) `Success(stderr = "souvenir")` +
+  `require()` di `init` data class =Senjata gagal keras di runtime -
+  field yang isinya nilai palsu harus dihapus, bukan diisi string
+  penjelasan; (24) string `Usage:` di action.sh:1406 BUKAN allowlist
+  lengkap - ia tidak menyebut `knobs|knob-set|knob-list|knob-reset|
+  config-get|config-set|warn` yg ada di dispatch, sedangkan allowlist app
+  HARUS memuat semuanya (A10 butuh knob-set); (25) `statusReadable`
+  harus menolak sentinel -1 DAN 0 (aturan A11) - 0 `refresh_hz`/`game_fps`
+  bukan angka valid.
+- A6 DONE: RootClient (allowlist 30 subcommand nyata, escape per-arg,
+  6 error, timeout, `Usage:` despite rc=0), HsinRepository (guard-status,
+  knob-list manual, status JSON + sentinel, 5 kategori modul).
+  Commit leader: 77ddff7 (merge work/a6-rootclient). CI main: lint
+  36583327074 success, build-apk 36583327112 success (unit test hijau).
+  APP_PLAN A6 [x]. L2: belum (tak ada HP).
