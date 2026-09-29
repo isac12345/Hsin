@@ -128,7 +128,7 @@ dari modul.
 | K2 | Knob tier-1 dari Alpha | [x] |
 | K3 | Knob tier-2 berbasis capability | [x] |
 | M3 | Perbarui kontrak app-modul | [ ] |
-| A4 | Scaffold proyek dan CI | [ ] |
+| A4 | Scaffold proyek dan CI | [x] |
 | A5 | Tema dan komponen | [ ] |
 | A6 | RootClient dan Repository | [ ] |
 | A7 | State, ViewModel, cache | [ ] |

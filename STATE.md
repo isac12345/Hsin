@@ -303,3 +303,16 @@
   scanner = false positive, diperiksa manual. KOREKSI LAPORAN K3:
   sched_child_runs_first ADA (live 0, writable) dan knob-nya berfungsi;
   yang absen hanya 3 sysctl latency. STOP.
+- APP-A4 (2026-09-29, leader + dev-apk work/app-a4): TERIMA L1 + merge
+  7606df3 ke main. Scaffold Kotlin+Compose satu modul: version catalog
+  (AGP 8.6.0, Kotlin 2.0.20, plugin compose 2.0.20 = versi Kotlin sesuai
+  dokumen resmi, BOM 2024.10.00, activity-compose 1.9.3, lifecycle 2.8.7,
+  coroutines 1.8.1), applicationId com.hsin, minSdk 26/targetSdk 34,
+  keystore debug sementara, manifest NOL permission + tanpa
+  service/receiver/provider, tanpa .java/NDK/Navigation/serialization.
+  Workflow build-apk manual tanpa step NDK. Koreksi leader d2a6b35:
+  MainActivity pakai material3 TANPA dependensi (pasti gagal compile) ->
+  tulis ulang foundation-only; hapus composeOptions ganda (plugin yang
+  mengatur) + testInstrumentationRunner mati. Catatan proses: pekerja
+  checkout cabang di repo utama (langgar AGENTS.md butir 7) -> leader
+  kembalikan ke main setelah merge. APP_PLAN A4 [x]. L2: build CI.
