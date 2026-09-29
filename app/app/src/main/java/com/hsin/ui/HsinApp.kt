@@ -14,6 +14,7 @@ import com.hsin.data.state.UiState
 import com.hsin.ui.components.ScreenScaffold
 import com.hsin.ui.screens.HomeScreen
 import com.hsin.ui.screens.KnobScreen
+import com.hsin.ui.screens.MonitorScreen
 import com.hsin.ui.screens.PlaceholderScreen
 import com.hsin.ui.theme.HsinTheme
 
@@ -67,7 +68,11 @@ fun HsinApp(
                 onSetOverride = viewModel::setKnobOverride,
                 onApply = { viewModel.applyDirtyKnobs() },
             )
-            Tab.MONITOR, Tab.LOG ->
+            Tab.MONITOR -> MonitorScreen(
+                state = state,
+                onTick = viewModel::refreshRealtime,
+            )
+            Tab.LOG ->
                 PlaceholderScreen(tabTitle = Tab.entries[tab].title)
         }
     }
