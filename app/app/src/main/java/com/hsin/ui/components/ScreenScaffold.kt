@@ -8,9 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.hsin.ui.theme.Bg
-import com.hsin.ui.theme.HsinTheme
+import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Pad
+import com.hsin.ui.theme.HsinTheme
+import com.hsin.ui.theme.Bg
 
 // Kerangka layar: bg + TopBar + area konten + BottomNav. Sengaja BUKAN
 // Scaffold Material3 supaya tidak ada warna/inset default Material yang
@@ -41,7 +42,7 @@ fun ScreenScaffold(
     }
 }
 
-@Preview(name = "ScreenScaffold", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "ScreenScaffold", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun ScreenScaffoldPreview() {
     HsinTheme {

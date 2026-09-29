@@ -11,12 +11,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.MonoBody
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.OutlineThick
 import com.hsin.ui.theme.Pad
+import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Radius
 import com.hsin.ui.theme.Shadow
 import com.hsin.ui.theme.ShadowOffset
@@ -49,7 +49,7 @@ fun HCard(
     }
 }
 
-@Preview(name = "HCard", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "HCard", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun HCardPreview() {
     HsinTheme {

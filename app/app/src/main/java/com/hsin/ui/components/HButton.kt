@@ -14,15 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.hsin.ui.theme.Accent
-import com.hsin.ui.theme.Bg
-import com.hsin.ui.theme.Gap
-import com.hsin.ui.theme.HsinTheme
-import com.hsin.ui.theme.Outline
-import com.hsin.ui.theme.Radius
-import com.hsin.ui.theme.Surface
-import com.hsin.ui.theme.Text
 import com.hsin.ui.theme.TouchMin
+import com.hsin.ui.theme.Text
+import com.hsin.ui.theme.Surface
+import com.hsin.ui.theme.Radius
+import com.hsin.ui.theme.PreviewBg
+import com.hsin.ui.theme.Outline
+import com.hsin.ui.theme.HsinTheme
+import com.hsin.ui.theme.Gap
+import com.hsin.ui.theme.Bg
+import com.hsin.ui.theme.Accent
 
 // Tombol utama = fill accent + teks gelap. Sekunder = outline accent, isi
 // surface. Tanpa gradient/blur. Target sentuh >= 44 dp.
@@ -48,7 +49,7 @@ fun HButton(
     }
 }
 
-@Preview(name = "HButton", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "HButton", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun HButtonPreview() {
     HsinTheme {

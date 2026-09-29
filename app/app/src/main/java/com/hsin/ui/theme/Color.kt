@@ -19,3 +19,8 @@ val Neutral = Color(0xFF6B6B70) // SKIPPED, DEFAULT, UNAVAILABLE
 // Bayangan keras HCard. Hitam pekat (bukan abu-abu) supaya bayangan tetap
 // terlihat di atas surface gelap tanpa perlu blur.
 val Shadow = Color(0xFF000000)
+
+// Nilai panjang untuk @Preview(backgroundColor = ...). Argumen anotasi
+// WAJIB compile-time constant, jadi token Color tidak bisa dipakai langsung
+// di sana; konstanta ini tetap di file yang sama supaya tetap satu sumber.
+const val PreviewBg: Long = 0xFF121214L

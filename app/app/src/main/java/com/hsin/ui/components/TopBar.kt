@@ -13,13 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.MonoCaption
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.OutlineThick
 import com.hsin.ui.theme.Pad
+import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.TitleLarge
 
@@ -60,7 +60,7 @@ fun TopBar(
     }
 }
 
-@Preview(name = "TopBar", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "TopBar", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun TopBarPreview() {
     HsinTheme {

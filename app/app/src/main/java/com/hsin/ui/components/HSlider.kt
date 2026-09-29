@@ -14,9 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.ui.theme.Accent
-import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
+import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.MonoBody
 import com.hsin.ui.theme.MonoCaption
 import com.hsin.ui.theme.Outline
@@ -63,7 +63,7 @@ fun HSlider(
     }
 }
 
-@Preview(name = "HSlider", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "HSlider", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun HSliderPreview() {
     HsinTheme {
