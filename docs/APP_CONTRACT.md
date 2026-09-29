@@ -1,7 +1,8 @@
-# APP_CONTRACT.md — Kontrak app ↔ modul HSIN (App A3, fakta terverifikasi)
+# APP_CONTRACT.md — Kontrak app ↔ modul HSIN (A3 facts + revisi M3, fakta terverifikasi)
 
 Label bukti: [SANDBOX] = output eksekusi nyata di harness sandbox leader
-(2026-09-28, `HSIN_SANDBOX=1`, pohon sysfs/proc palsu, repo TIDAK diubah).
+(2026-09-29 untuk bagian M3; 2026-09-28 untuk bagian A3; `HSIN_SANDBOX=1`,
+pohon sysfs/proc palsu, repo TIDAK diubah).
 [KODE] = dibaca dari kode (dengan file:baris). Yang tidak ada ditulis
 "TIDAK ADA". Tanpa klaim stabil; versi beta sampai validasi HP fisik.
 
@@ -22,6 +23,14 @@ Keterbatasan sandbox (jujur, memengaruhi contoh di bawah):
   harness ini); `zram.supported=false`; `device.soc="unknown"`;
   `battery_pct=-1`; `refresh_hz=0` (tanpa dumpsys). BUKAN 0 yang valid —
   APK harus memperlakukannya sebagai tidak tersedia (aturan A11).
+- **Perintah tak dikenal → teks `Usage:` dengan rc=0** ([SANDBOX] §3.8,
+  verifikasi ulang 2026-09-29). APK WAJIB memvalidasi nama command dari
+  allowlist; jangan menganggap rc=0 sebagai "berhasil".
+- **`capabilities` TIDAK bisa di-sandbox** ([KODE] `action.sh:115-145`
+  memakai path `/sys` + `/sys/class/*` literal tanpa prefix): di sandbox
+  melaporkan `false` walau pohon palsu ada. Di HP nilai sebenarnya benar,
+  tapi APK tidak boleh memakainya sebagai sumber kebenaran — sumber
+  kebenaran tetap `knobs`.
 
 ## 1. Cara memanggil (transport, dari app lama — [KODE])
 
@@ -60,6 +69,7 @@ unknown command → teks Usage, rc=0):
 | `knob-set` | `hsin_uk_set` (:1254-1264) | `<key> <val>` (val kosong = hapus override) | 0, `OK key=val` | 1 `ERROR: usage...` (<2 arg); 1 `ERROR: key knob tidak dikenal (pola: ...)`; 1 `ERROR: <key>: nilai harus ...` |
 | `knob-reset` | `hsin_uk_reset` (:1265-1270) | — | 0, `OK reset (N key dihapus)` | 1 bila file tak bisa dihapus |
 | `knob-list` | `hsin_uk_list` (:1271) | — | 0, baris manusia + 1 baris JSON terakhir | — |
+| `guard-status` | `hsin_guard_status` (`core/guard_status.sh`) | — | 0, 5 baris key=value + 1 baris JSON terakhir | — (node hilang/rusak → `active=0`, bukan error) |
 | `renderer-state` | `hsin_render_state` (:1282) | — | 0, teks multi-baris | — |
 | `renderer-apply` | `hsin_render_apply_live` (:1274) | `<renderer>` | 0 (+ persist `RENDERER` via config-set) | gagal apply → tanpa OK |
 | `downscale-status` | `hsin_downscale_status` (:1312) | — | 0, 1 baris JSON | — |
@@ -151,29 +161,117 @@ ditandai di kolom requested (`performance` vs `(profil)`).
 - `info` (teks): `HSIN Universal Engine / Profile aktif: none / CPU: ... / GPU: ...`
 - Error ([SANDBOX]): `knob-set bogus_key value` → `ERROR: key knob tidak dikenal (pola: ...)` rc=1; `knob-set cpu_policy_0_gov "bad;gov"` → `ERROR: cpu_policy_0_gov: nilai harus token ...` rc=1; command tak dikenal → teks Usage rc=0.
 
-## 4. Inventaris knob per engine ([KODE] pola + validasi)
+### 3.9 Batasan yang WAJIB diketahui APK [SANDBOX] (verifikasi ulang 2026-09-29)
+Perintah tak dikenal (`frobnicate`) → rc=**0** + teks `Usage:`:
+```
+Usage: action.sh [info|device|capabilities|status|guard-status|logs|apply|backup|rollback|conflicts|export|renderer-apply|renderer-state|downscale-enable|downscale-disable|downscale-status|refresh-lock-enable|refresh-lock-disable|refresh-lock-status|export-debug|list-apps|game-list|game-add|game-remove]
+```
+Konsekuensi: rc=0 TIDAK berarti "dipahami". APK wajib (1) memakai nama
+command dari allowlist tetap, (2) memeriksa baris pertama output — kalau
+awalan `Usage:` perlakukan sebagai `COMMAND_FAILED`, bukan sukses.
 
-Pola key ([KODE] `core/user_knobs.sh:93-96,134-147`):
-`cpu_policy_<id>_(gov|max_khz|min_khz|sched)`,
-`gpu_node_<nama>_(gov|max_khz|min_khz|sched)` (nama disanitasi
-`[^A-Za-z0-9]`→`_`, maks 40),
-`io_block_<nama>_(gov|max_khz|min_khz|sched)` (hanya `sched` dipakai engine),
-`zram_algo|swappiness|tcp_cc|tfo`.
-Numerik: kHz `100000-5000000`, `swappiness` 0-200, `tfo` 0-3
-(`user_knobs.sh:162-187,298`); token `1-32` karakter `[A-Za-z0-9_.-]`.
+`capabilities` → rc=0 tapi TIDAK bisa di-sandbox (path `/sys` literal,
+[tidak ada `SYSFS_*_PREFIX` di baris 110–145 `action.sh`]):
+```
+{"cpu_tuning":true,"gpu_devfreq":false,"thermal_node":false,"fpsgo":false,"kgsl":false,"sched_lat":false}
+```
+Di sandbox Reporting hanya `cpu_tuning:true` padahal pohon devfreq palsu
+ada → nilainya untuk harness, bukan bukti device nyata. Di HP nilai
+sebenarnya benar, tapi APK tetap tidak boleh memakainya sebagai sumber
+kebenaran (sumber pilihan valid = `knobs`, lihat D3).
 
-| Key | Tipe | Engine (file) | Sumber nilai valid |
+### 3.10 `guard-status` [SANDBOX] (M2), rc=0 — output NYATA
+Tidak aktif (state file `$HSIN_DATA/.boot_fail_count` tidak ada):
+```
+active=0
+fail_count=0
+threshold=2
+cooldown_remaining_sec=0
+last_reason="tidak ada state"
+{"active":0,"fail_count":0,"threshold":2,"cooldown_remaining_sec":0,"last_reason":"tidak ada state"}
+```
+Aktif (state `1790688802:2` = 2 boot gagal berturut, threshold 2):
+```
+active=1
+fail_count=2
+threshold=2
+cooldown_remaining_sec=86400
+last_reason="boot gagal 2 x berturut-turut"
+{"active":1,"fail_count":2,"threshold":2,"cooldown_remaining_sec":86400,"last_reason":"boot gagal 2 x berturut-turut"}
+```
+Kontrak ([KODE] `core/guard_status.sh`): 5 baris `key=value` (`active`,
+`fail_count`, `threshold`, `cooldown_remaining_sec`, `last_reason`) lalu SATU
+baris JSON dengan key yang sama, selalu rc=0. State hilang/rusak/expired →
+`active=0` + `last_reason="tidak ada state"` ([SANDBOX] 4 kondisi: aktif,
+tidak aktif, hilang, rusak — `tests/sandbox_guard_status.sh` 20/20). READ-ONLY:
+nol file tercipta (terbukti: direktori data tetap kosong setelah dipanggil).
+
+### 3.11 `knob-list` di mode manual [SANDBOX] (M1) — output NYATA
+Dua override (`io_block_sda_readahead=2048`, `vfs_cache_pressure=250`) +
+`apply manual`:
+```
+key=io_block_sda_readahead requested=2048 applied=2048 category=APPLIED reason="dipakai sesuai permintaan"
+key=vfs_cache_pressure requested=250 applied=250 category=APPLIED reason="dipakai sesuai permintaan"
+key=cpu_policy_0_gov requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=uclamp_min requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+... (31 knob lain, semuanya SKIPPED "tidak diatur (mode manual)") ...
+key=backlog requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+{"count":2,"overrides":{"io_block_sda_readahead":"2048","vfs_cache_pressure":"250"}}
+```
+Snapshot node SEBELUM → SESUDAH pada siklus yang sama [SANDBOX]:
+`read_ahead_kb 128→2048`, `vfs_cache_pressure 100→250`, sisanya TIDAK
+berubah (`dirty_ratio=20`, `dirty_background_ratio=5`,
+`scaling_governor=schedutil`, `scaling_max_freq=1800000`,
+`netdev_max_backlog=1000`, `add_random=0`, `stat_interval=10`).
+BUKTI mode manual murni: knob yang tidak di-set user tidak ditulis sama
+sekali — bukan ditulis dengan nilai profil. [KODE] default profile =
+`manual` ([KODE] `service.sh:80`, fallback `service.sh:180`, dan
+`service.sh:239` TIDAK memuat `profiles/*.conf` saat mode manual);
+apply dispatcher meneruskan `manual` ke semua engine
+([KODE] `core/apply_engines.sh:25`).
+
+## 4. Inventaris knob per engine (post K1/K2/K3, [KODE] pola + validasi)
+
+Pola key ([KODE] `core/user_knobs.sh` `_uk_class`):
+- per policy CPU: `cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us)`
+- per node devfreq: `gpu_node_<nama>_(gov|max_khz|min_khz|sched|polling_interval|up_threshold|down_differential)`
+- per block: `io_block_<nama>_(gov|max_khz|min_khz|sched|readahead|add_random|iostats|nomerges)`
+- kunci tetap satu-node: `zram_algo|swappiness|tcp_cc|tfo|vfs_cache_pressure|dirty_ratio|dirty_background_ratio|backlog|stat_interval|page_cluster|sched_child_runs_first|sched_latency_pct|sched_min_granularity_pct|sched_wakeup_granularity_pct|uclamp_min|uclamp_max|mali_boost_level2|mali_pollingtime|mali_upthreshold`
+
+Nama node disanitasi `[^A-Za-z0-9]`→`_` maks 40 (WAJIB identik dengan
+sanitize di aplikasi; contoh `23100000.gpu` → `23100000_gpu`).
+
+| Key | Tipe / rentang | Engine (file) | Sumber nilai valid |
 |---|---|---|---|
-| `cpu_policy_<id>_gov` | pilihan | `engine/cpu/governor.sh` | `scaling_available_governors` per policy (:79-82); ditolak → FALLBACK profil (:98-99) |
-| `cpu_policy_<id>_max_khz` | rentang (kHz) | `engine/cpu/frequency.sh` | `scaling_available_frequencies` (snap ke OPP ≤ bila tak ada di tabel) |
-| `cpu_policy_<id>_min_khz` | rentang (kHz) | `engine/cpu/frequency.sh` | sama dengan max |
-| `gpu_node_<n>_gov` | pilihan | `engine/gpu/generic.sh` | `available_governors` node (:93) |
-| `gpu_node_<n>_max_khz` | rentang (kHz) | `engine/gpu/generic.sh` | OPP node |
-| `io_block_<n>_sched` | pilihan | `engine/io/scheduler.sh` | `queue/scheduler` (`[x]` = aktif, :108-134) |
-| `tcp_cc` | pilihan | `engine/network/tcp.sh` | `tcp_available_congestion_control` (:51) |
-| `tfo` | rentang 0-3 | `engine/network/tcp.sh` | node `tcp_fastopen` (:95) |
-| `swappiness` | rentang 0-200 | `engine/memory/vm.sh` | `vm/swappiness` (:347); UI jujur 0-100 (clamp kernel) |
-| `zram_algo` | pilihan | `engine/memory/zram.sh` | `comp_algorithm` node (:37) |
+| `cpu_policy_<id>_gov` | pilihan | `engine/cpu/governor.sh` | `scaling_available_governors` per policy |
+| `cpu_policy_<id>_max_khz` / `_min_khz` | kHz 100000-5000000 | `engine/cpu/frequency.sh` | `scaling_available_frequencies` (snap ke OPP terdekat) |
+| `cpu_policy_<id>_sched` | pilihan | `engine/cpu/scheduler.sh` | `sched_*_cs_flags` |
+| `cpu_policy_<id>_rate_limit_us` | 0-100000 (µs) | `engine/cpu/governor.sh` | node `policy<id>/schedutil/rate_limit_us`; **hanya ada bila governor aktif = `schedutil`** (0 = tanpa rate limit). Batas = batas UI; kernel (`cpufreq_schedutil.c`) hanya `kstrtouint` tanpa clamp |
+| `gpu_node_<n>_gov` | pilihan | `engine/gpu/generic.sh` | `available_governors` node |
+| `gpu_node_<n>_max_khz` | kHz | `engine/gpu/generic.sh` | OPP node |
+| `gpu_node_<n>_polling_interval` | 1-1000 (ms) | `engine/gpu/devfreq_tuning.sh` | ABI devfreq (ms; <1 jiffy = 0 = no polling) |
+| `gpu_node_<n>_up_threshold` | 1-100 (%) | `engine/gpu/devfreq_tuning.sh` | ABI devfreq ondemand |
+| `gpu_node_<n>_down_differential` | 0-100 (%) | `engine/gpu/devfreq_tuning.sh` | ABI devfreq |
+| `io_block_<n>_sched` | pilihan | `engine/io/scheduler.sh` | `queue/scheduler` |
+| `io_block_<n>_readahead` | PRESET 128/256/512/1024/2048/4096/8192 (KB) | `engine/io/readahead.sh` | preset (bukan rentang) |
+| `io_block_<n>_add_random`, `_iostats` | 0/1 | `engine/io/queue_tuning.sh` | boolean queue |
+| `io_block_<n>_nomerges` | 0/1/**2** | `engine/io/queue_tuning.sh` | 0 = semua merge, 1 = simple one-hit saja, 2 = tanpa merge |
+| `swappiness` | 0-200 (UI jujur 0-100) | `engine/memory/vm.sh` | `vm/swappiness` |
+| `vfs_cache_pressure` | 0-1000 | `engine/memory/vm.sh` | `vm/vfs_cache_pressure` |
+| `dirty_ratio` | 1-90 | `engine/memory/vm.sh` | `vm/dirty_ratio` |
+| `dirty_background_ratio` | 1-50 | `engine/memory/vm.sh` | WAJIB < `dirty_ratio` (strict) sebelum apply; langgar → `FALLBACK` + alasan dua angka; di manual tanpa tulis |
+| `page_cluster` | 0-9 | `engine/memory/vm.sh` | `vm/page-cluster` (nama sysctl ber-hypen → kunci knob underscore) |
+| `stat_interval` | 1-60 (detik) | `engine/memory/vm.sh` | `vm/stat_interval` |
+| `backlog` | 128-16384 | `engine/network/tcp.sh` | `net/core/netdev_max_backlog` (satu-satunya sysctl backlog per profil) |
+| `tcp_cc` | pilihan | `engine/network/tcp.sh` | `tcp_available_congestion_control` |
+| `tfo` | 0-3 | `engine/network/tcp.sh` | `tcp_fastopen` |
+| `zram_algo` | pilihan | `engine/memory/zram.sh` | `comp_algorithm` node |
+| `sched_child_runs_first` | 0/1 | `engine/cpu/governor.sh` | sysctl bool |
+| `sched_latency_pct`, `sched_min_granularity_pct`, `sched_wakeup_granularity_pct` | 10-200 (**persen** dari native) | `engine/cpu/scheduler.sh` | persent dari nilai native + lantai keras 500000 ns; node TIDAK ADA di sebagian kernel → UNAVAILABLE |
+| `uclamp_min`, `uclamp_max` | 0-1024 | `engine/cpu/scheduler.sh` | cgroup v1 vendor `/dev/cpuctl/foreground/cpu.uclamp.*` (format nilai bisa "0.00"/"max") |
+| `mali_boost_level2` | 0/1 | `engine/gpu/mali.sh` | `/sys/module/mali_kbase/parameters/gpu_boost_level2` |
+| `mali_pollingtime` | 1-10 | `engine/gpu/mali.sh` | `gpu_pollingtime` |
+| `mali_upthreshold` | 10-100 | `engine/gpu/mali.sh` | `gpu_upthreshold` |
 
 DISPLAY: TIDAK ADA knob user (hanya state di `knobs.display` +
 command `renderer-apply`/`downscale-enable`/`refresh-lock-enable`).
@@ -201,31 +299,25 @@ RENDERER|DOWNSCALE_PERCENT|REFRESH_LOCK_HZ` ([KODE] `action.sh:1061-1064`).
    (`OK: Applying ... (running in background...)` [SANDBOX] §3.4) —
    APK harus polling `knob-list`/`knob_results` untuk hasil, bukan
    menganggap selesai saat rc=0.
-3. **Semantik manual murni**: TIDAK MURNI saat ini — knob yang tidak
-   diatur user DITULIS dari nilai profil dasar. Bukti [SANDBOX] §3.4:
-   hanya `cpu_policy_0_gov=performance` di-set, hasil apply mencatat
-   `cpu_policy_6_gov=(profil)|schedutil`,
-   `cpu_policy_0_max_khz=(profil)|1800000`,
-   `cpu_policy_0_min_khz=(profil)|300000`,
-   `cpu_policy_6_max_khz=(profil)|1800000`,
-   `cpu_policy_6_min_khz=(profil)|300000` — semua `APPLIED` dari profil
-   `balanced` ([KODE] `profiles/balanced.conf`: `governor=schedutil`,
-   `freq_max_percent=100`). Override hanya mengganti per key yang cocok;
-   yang ditolak engine jatuh ke FALLBACK profil ([KODE]
-   `engine/cpu/governor.sh:98-99`). Keputusan user dibutuhkan (lihat §6 D1)
-   — GATE A10.
+3. **Semantik manual murni: SUDAH MURNI (M1 + M1b, 2026-09-28)**. Profil
+   default = `manual`; apply hanya menulis knob yang punya override user.
+   Bukti nyata [SANDBOX] §3.11: 2 override → hanya 2 node berubah
+   (`read_ahead_kb 128→2048`, `vfs_cache_pressure 100→250`), 31 knob lain
+   `SKIPPED "tidak diatur (mode manual)"`, node lain byte-identik.
+   Semua jalur apply menghormati aturan yang sama (cpu/gpu/io/vm/network).
+   Override tidak valid → di manual tidak ditulis sama sekali (nilai
+   sistem tetap), di profil non-manual jatuh ke nilai profil.
+
 4. **Gate `ALLOW_EXTREME` + boot guard**: `ALLOW_EXTREME` dibaca via
    `config-get` (`allow_extreme`, [SANDBOX] §3.5) dan ditulis via
    `config-set` (whitelist, [KODE] `action.sh:1062`); sesi env
    `ALLOW_EXTREME=true` juga dihormati per-invocation ([KODE]
    `action.sh:38-57`); `apply extreme` tanpa opt-in → rc=1 ([KODE]
-   `action.sh:884-887`). Boot guard: TIDAK ADA subcommand yang
-   mengeksposnya (grep `guard` di `action.sh` hanya komentar `:775`).
-   APK hanya bisa membaca via `logs boot` dengan marker
-   `BOOT-GUARD AKTIF: ... semua tuning DILEWATI`
-   ([KODE] `core/boot_guard.sh:99-101`; state file
-   `$HSIN_DATA/.boot_fail_count`, `:19`; threshold 2, cooldown 86400).
-   Command `guard-status`: TIDAK ADA — keputusan user (§6 D2).
+   `action.sh:884-887`). **Boot guard SUDAH punya subcommand `guard-status`
+   (M2)** — read-only, 5 baris key=value + JSON terakhir, rc=0, node
+   hilang/rusak → `active=0` (§3.10). APK TIDAK lagi perlu parse
+   `logs boot` mencari marker `BOOT-GUARD AKTIF` (rapuh bila teks berubah).
+
 5. **Exit code + error untuk APK**: rc=0 = sukses (termasuk command tak
    dikenal → Usage, dan `logs` file hilang → `[]`); rc=1 + baris
    `ERROR: ...` = gagal (key tak dikenal, nilai invalid, profil hilang,
@@ -240,19 +332,18 @@ RENDERER|DOWNSCALE_PERCENT|REFRESH_LOCK_HZ` ([KODE] `action.sh:1061-1064`).
 
 ## 6. Keputusan yang dibutuhkan user (STOP, tanpa workaround)
 
-- **D1 (GATE A10) — semantik apply**: (a) TERIMA perilaku sekarang (apply
-  menulis profil dasar + override per key; "Terapkan (N)" berarti
-  N override di atas profil dasar), atau (b) MINTA mode manual murni di
-  modul (apply hanya menyentuh key dirty — perubahan perilaku modul,
-  di luar scope APK). Tanpa keputusan ini A10 tidak boleh dikerjakan.
-- **D2 — baca boot guard**: (a) tambah command `guard-status` di modul
-  (perubahan kecil, di luar A3), atau (b) APK parse `logs boot` mencari
-  marker `BOOT-GUARD AKTIF` (rapuh bila teks berubah). Rekomendasi
-  leader: (a) saat modul disentuh berikutnya.
+- **D1 (GATE A10) — semantik apply: SUDAH PUTUS (user, 2026-09-28)** →
+  opsi (b) mode manual murni, dikerjakan di M1 + M1b. Konsekuensi untuk A10:
+  "Terapkan (N)" = N knob dirty; modul tidak menulis apa pun yang tidak
+  dirty. Tidak ada lagi ambiguity profil-vs-override.
+- **D2 — baca boot guard: SUDAH PUTUS (user) → opsi (a)** → `guard-status`
+  diimplementasikan di M2 (§3.10). Konsekuensi untuk A8/A13: banner
+  "tuning dilewati" dibaca dari `active=1`, bukan dari parsing `logs boot`.
 - **D3 — `capabilities` vs `knobs`**: APK memakai `knobs` sebagai sumber
   pilihan valid (sudah sandboxable); `capabilities` hanya pelengkap
-  boolean di HP. Tanpa perubahan; dicatat agar A9 tidak bergantung pada
-  `capabilities` untuk daftar governor/OPP.
-- **D4 — A4**: `applicationId=com.hsin`, signing release belum terdefinisi
-  (lihat LAPORAN A2 poin 7), minSdk 26/targetSdk 34 menunggu konfirmasi —
-  dibawa ke A4, bukan diputuskan di sini.
+  boolean di HP dan TIDAK bisa disandbox. Dicatat agar A9 tidak
+  bergantung pada `capabilities` untuk daftar governor/OPP.
+- **D4 — SUDAH PUTUS (user, 2026-09-29)**: `applicationId=com.hsin`,
+  minSdk 26 / targetSdk 34 / compileSdk 34, keystore debug sementara
+  (signing release ditunda), NOL permission, Compose BOM 2024.10.00
+  (selesai di A4).

@@ -11,6 +11,9 @@ Dua lapis verifikasi, peran berbeda:
   `sh tests/sandbox_boot_guard.sh`, `sh tests/sandbox_safe_apply.sh`,
   `sh tests/thermal_sandbox/run.sh`, `sh tests/sandbox_degrade.sh`,
   `sh tests/sandbox_overrides.sh`, `sh tests/sandbox_service_guard.sh`,
+  `sh tests/sandbox_guard_status.sh`, `sh tests/sandbox_knob_results.sh`,
+  `sh tests/sandbox_k1_knobs.sh`, `sh tests/sandbox_k2_knobs.sh`,
+  `sh tests/sandbox_k3_knobs.sh`,
   `sh tests/validate_build.sh` — semua harus exit 0.
 - **L2 HP fisik:** perilaku nyata (sensor, reboot, timing). Sandbox
   hijau TIDAK BOLEH diklaim sebagai "tervalidasi di device".

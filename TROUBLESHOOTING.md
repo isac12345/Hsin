@@ -32,6 +32,9 @@ Log utama: `/data/adb/hsin/logs/boot.log` (boot + engine),
 
 ```sh
 su -c 'cat /data/adb/hsin/.boot_fail_count'
+# Cara langsung (M2): subcommand read-only, rc selalu 0
+su -c 'sh /data/adb/modules/hsin/action.sh guard-status'
+# atau lewat log (untuk melihat alasan per kegagalan)
 su -c 'grep "BOOT-GUARD AKTIF" /data/adb/hsin/logs/boot.log'
 ```
 
