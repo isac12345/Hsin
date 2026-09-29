@@ -133,7 +133,7 @@ dari modul.
 | A6 | RootClient dan Repository | [x] |
 | A7 | State, ViewModel, cache | [x] |
 | A8 | Shell navigasi dan Beranda | [x] |
-| A9 | Layar Knob | [ ] |
+| A9 | Layar Knob | [x] |
 | A10 | Alur Terapkan | [ ] |
 | A11 | Monitor | [ ] |
 | A12 | Log | [ ] |
