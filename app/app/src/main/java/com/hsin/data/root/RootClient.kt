@@ -58,7 +58,7 @@ class RootClient(
     private val KEY_PAT = Regex("^[a-z0-9_]{1,64}$")
 
     /** Panjang maksimum satu argumen (nilai knob terpanjang di kontrak §4 < 64). */
-    private const val MAX_ARG_LEN = 64
+    private val MAX_ARG_LEN = 64
 
     /** Escape argumen dengan single-quote (`'...'`) dan sanitasi `'` → `'\''`. */
     private fun String.quoteShell(): String = "'" + this.replace("'", "'\\''") + "'"

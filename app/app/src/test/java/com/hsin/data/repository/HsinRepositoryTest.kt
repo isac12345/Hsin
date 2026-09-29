@@ -150,11 +150,16 @@ class HsinRepositoryTest {
 
     @Test
     fun status_sentinel_values_not_treated_as_readable() {
-        // Kontrak §3.1: battery_pct=-1 dan refresh_hz=0 di sandbox = tidak tersedia.
-        val json = org.json.JSONObject("{\"battery_pct\":-1,\"refresh_hz\":0,\"cpu_load_x100\":235}")
-        assertFalse(HsinRepository.statusReadable(json, "battery_pct"))
-        assertFalse(HsinRepository.statusReadable(json, "refresh_hz"))
-        assertTrue(HsinRepository.statusReadable(json, "cpu_load_x100"))
+        // Kontrak §3.1 + aturan A11: -1 dan 0 adalah sentinel "tidak tersedia",
+        // bukan angka valid yang boleh ditampilkan apa adanya.
+        val json = org.json.JSONObject(
+            "{\"battery_pct\":-1,\"refresh_hz\":0,\"cpu_load_x100\":235}"
+        )
+        assertFalse("battery_pct=-1 = sentinel", HsinRepository.statusReadable(json, "battery_pct"))
+        assertFalse("refresh_hz=0 = sentinel", HsinRepository.statusReadable(json, "refresh_hz"))
+        assertTrue("235 = nilai asli", HsinRepository.statusReadable(json, "cpu_load_x100"))
+        // Nilai mentah tetap bisa diambil lewat statusInt bila memang dibutuhkan
+        assertEquals(Integer.valueOf(-1), HsinRepository.statusInt(json, "battery_pct"))
     }
 
     @Test
