@@ -66,19 +66,30 @@ _hsin_io_queue_one() {
         [ "$_qt_manual" = "1" ] || _qt_req="(profil)"
 
         # Validasi ulang di engine (pola tfo): file bisa diisi manual.
+        # nomerges punya 3 nilai sah (0/1/2), dua knob lain boolean.
         if [ -n "$_qt_uk" ]; then
+            _qt_bad=1
             case "$_qt_uk" in
-                0|1) ;;
-                *)
-                    hsin_log_warn "io" "override $_qt_key=$_qt_uk ditolak: harus 0 atau 1"
-                    if [ "$_qt_manual" = "1" ]; then
-                        hsin_uk_result "$_qt_key" "$_qt_uk" "-" "SKIPPED" "ditolak: bukan 0/1 (mode manual, tidak ditulis)" 2>/dev/null || true
-                    else
-                        hsin_uk_result "$_qt_key" "$_qt_uk" "-" "FALLBACK" "ditolak: bukan 0/1, tidak ada nilai profil" 2>/dev/null || true
-                    fi
-                    _qt_uk=""
-                ;;
+                0|1) _qt_bad=0 ;;
+                2)
+                    [ "$_qt_f" = "nomerges" ] && _qt_bad=0
+                    ;;
             esac
+            if [ "$_qt_bad" = "1" ]; then
+                if [ "$_qt_f" = "nomerges" ]; then
+                    hsin_log_warn "io" "override $_qt_key=$_qt_uk ditolak: harus 0, 1, atau 2"
+                    _qt_why="ditolak: harus 0/1/2"
+                else
+                    hsin_log_warn "io" "override $_qt_key=$_qt_uk ditolak: harus 0 atau 1"
+                    _qt_why="ditolak: bukan 0/1"
+                fi
+                if [ "$_qt_manual" = "1" ]; then
+                    hsin_uk_result "$_qt_key" "$_qt_uk" "-" "SKIPPED" "$_qt_why (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    hsin_uk_result "$_qt_key" "$_qt_uk" "-" "FALLBACK" "$_qt_why, tidak ada nilai profil" 2>/dev/null || true
+                fi
+                _qt_uk=""
+            fi
         fi
 
         if [ -z "$_qt_uk" ]; then

@@ -161,6 +161,11 @@ _load_all
 _apply_one "io_block_sda_add_random" "1" "$SB_SYS/block/sda/queue/add_random" "1"
 _apply_one "io_block_sda_iostats" "1" "$SB_SYS/block/sda/queue/iostats" "1"
 _apply_one "io_block_sda_nomerges" "1" "$SB_SYS/block/sda/queue/nomerges" "1"
+# nomerges punya 3 nilai sah (0/1/2): uji SEMUA, termasuk 2 = nilai live HP.
+_mknodes 1 1
+_load_all
+_apply_one "io_block_sda_nomerges" "0" "$SB_SYS/block/sda/queue/nomerges" "0"
+_apply_one "io_block_sda_nomerges" "2" "$SB_SYS/block/sda/queue/nomerges" "2"
 _apply_one "stat_interval" "30" "$SB_PROC/sys/vm/stat_interval" "30"
 _apply_one "page_cluster" "4" "$SB_PROC/sys/vm/page-cluster" "4"
 _apply_one "cpu_policy_0_rate_limit_us" "40000" "$SB_SYS/cpu/cpufreq/policy0/schedutil/rate_limit_us" "40000"
@@ -202,6 +207,22 @@ else
     _bad "C2. balanced (page=$(cat "$SB_PROC/sys/vm/page-cluster") stat=$(cat "$SB_PROC/sys/vm/stat_interval") nomerges=$(cat "$SB_SYS/block/sda/queue/nomerges"))"
 fi
 
+# --- C3. nomerges tanpa override: nilai live (2) TAK BERUBAH ---
+_mknodes 1 1
+_load_all
+_reset_state
+hsin_uk_set "stat_interval" "30" >/dev/null 2>&1
+_before=$(_snapshot)
+_apply_all manual
+_after=$(_snapshot)
+_c3=$(_diffnodes "$_before" "$_after")
+if [ "$(cat "$SB_SYS/block/sda/queue/nomerges")" = "2" ] \
+    && ! printf '%s' "$_c3" | grep -q nomerges; then
+    _ok "C3. nomerges tanpa override: tetap 2 (tak tersentuh)"
+else
+    _bad "C3. nomerges tanpa override: tetap 2 (dapat $(cat "$SB_SYS/block/sda/queue/nomerges"))"
+fi
+
 # --- D. node hilang = UNAVAILABLE, tanpa crash ---
 _mknodes 1 2
 rm -f "$SB_PROC/sys/vm/stat_interval" "$SB_SYS/block/sda/queue/iostats"
@@ -228,6 +249,7 @@ fi
 _mknodes 1 1
 _load_all
 for _pair in "io_block_sda_add_random 2" "io_block_sda_iostats abc" "io_block_sda_nomerges 3" \
+    "io_block_sda_nomerges -1" \
     "stat_interval 0" "stat_interval 61" "page_cluster 10" "page_cluster -1" \
     "cpu_policy_0_rate_limit_us 100001" "gpu_node_mali0_add_random 1" \
     "io_block_sda_rate_limit_us 100"; do
@@ -344,8 +366,8 @@ if printf '%s' "$_hj" | grep -q '"add_random":{"options":\[0,1\],"cur":0,"writab
 else
     _bad "H2. JSON queue_tuning (dapat: $(printf '%s' "$_hj" | python3 -c "import sys,json; print(json.load(sys.stdin)['io']['blocks'][0].get('queue_tuning'))" 2>/dev/null))"
 fi
-if printf '%s' "$_hj" | grep -q '"nomerges":{"options":\[0,1\],"cur":2,"writable":true,"supported":true}'; then
-    _ok "H3. JSON nomerges cur=2 (live) dengan options 0/1"
+if printf '%s' "$_hj" | grep -q '"nomerges":{"options":\[0,1,2\],"cur":2,"writable":true,"supported":true}'; then
+    _ok "H3. JSON nomerges cur=2 (live) dengan options 0/1/2"
 else
     _bad "H3. JSON nomerges (dapat: $(printf '%s' "$_hj" | python3 -c "import sys,json; print(json.load(sys.stdin)['io']['blocks'][0]['queue_tuning']['nomerges'])" 2>/dev/null))"
 fi
