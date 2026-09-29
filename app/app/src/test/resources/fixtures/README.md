@@ -1,9 +1,11 @@
-# Fixture asal (kontrak M3, APP_CONTRACT.md)
-- guard-status_inactive.txt / guard-status_active.txt → §3.10 (2026-09-29 M3)
-- knob-list_manual.txt → §3.11 (2026-09-29 M3, mode manual murni)
-- usage_rc0.txt → §2 / §3.9 (unknown command → Usage rc=0)
-- status_ok.txt → §3.1 (`status`)
-
-Fixture ini disalin VERBATIM dari blok output nyata di `docs/APP_CONTRACT.md`.
-Jangan mengarang angka: test mengunci nilai kontrak, jadi angka karangan akan
-membuat test gagal di HP asli.
+# Fixture A7 — disalin VERBATIM dari keluaran sandbox nyata (HSIN_SANDBOX=1)
+# Jangan mengarang angka: parser dan mapping diuji terhadap nilai sebenarnya.
+# Sumber perintah + tanggal: `sh action.sh <cmd>` di repo, 2026-09-29.
+- knobs_sandbox.txt → `action.sh knobs` (satu baris JSON, kontrak §3.2)
+- config_get.txt → `action.sh config-get` (kontrak §3.5)
+- guard-status.txt → `action.sh guard-status` (kontrak §3.10, tidak aktif)
+- guard-status_active.txt → `action.sh guard-status` setelah state file `1790688802:2` (kontrak §3.10, aktif)
+- knob-list_manual.txt → `action.sh knob-list` setelah 2 override (kontrak §3.11)
+- status.txt → `action.sh status`, baris JSON terakhir (kontrak §3.1)
+- status_ok.txt → sama dengan status.txt (dipakai A6)
+- usage_rc0.txt → `action.sh frobnicate` (kontrak §3.9, rc=0)
