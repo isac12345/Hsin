@@ -1392,3 +1392,12 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   diff Compose dengan mata, dan grep pola `modifier = Modifier\n .xxx(...)` ;
   (33) parameter `onClick` yang tidak dipasang ke modifier = UI yang tidak
   merespons sentuhan - selalu cek "apa yang terjadi kalau user mengetuk".
+
+## Ganti model agent ke Gemini (2026-09-30, perintah user)
+- API key Gemini + Groq di-connect user (`opencode auth list` ADA).
+- Test live per model membuktikan katalog `opencode models` BUKAN daftar gratis:
+  yang menentukan adalah paket akun provider. Groq gratis kepentok TPM 8k
+  karena konteks agent ~10k — pelajaran: model cepat tak berguna kalau limit
+  tokennya lebih kecil dari system prompt kita.
+- PELAJARAN: (34) sebelum ganti model, test live dengan prompt trivial dan
+  catat yang respons kosong/error pensiun/limit — jangan percaya katalog.
