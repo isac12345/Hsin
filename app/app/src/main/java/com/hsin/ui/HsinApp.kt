@@ -14,8 +14,8 @@ import com.hsin.data.state.UiState
 import com.hsin.ui.components.ScreenScaffold
 import com.hsin.ui.screens.HomeScreen
 import com.hsin.ui.screens.KnobScreen
+import com.hsin.ui.screens.LogScreen
 import com.hsin.ui.screens.MonitorScreen
-import com.hsin.ui.screens.PlaceholderScreen
 import com.hsin.ui.theme.HsinTheme
 
 /**
@@ -72,8 +72,10 @@ fun HsinApp(
                 state = state,
                 onTick = viewModel::refreshRealtime,
             )
-            Tab.LOG ->
-                PlaceholderScreen(tabTitle = Tab.entries[tab].title)
+            Tab.LOG -> LogScreen(
+                state = state,
+                onRefresh = viewModel::refreshLogs,
+            )
         }
     }
 }
