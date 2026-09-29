@@ -206,9 +206,17 @@ hsin_uk_val_ok() {
             esac
             return 1
             ;;
-        *_add_random|*_iostats|*_nomerges)
+        *_add_random|*_iostats)
             # Boolean queue block: hanya 0 atau 1 (keputusan user K2).
             case "$_uk_v" in 0|1) return 0 ;; esac
+            return 1
+            ;;
+        *_nomerges)
+            # nomerges punya TIGA nilai (dokumentasi kernel block layer):
+            # 0 = semua merge diizinkan, 1 = hanya simple one-hit merge,
+            # 2 = tanpa merge sama sekali. Bukan boolean - nilai 2 adalah
+            # nilai default kernel pada sebagian device.
+            case "$_uk_v" in 0|1|2) return 0 ;; esac
             return 1
             ;;
         *_rate_limit_us)
@@ -370,8 +378,11 @@ hsin_uk_set() {
             *_readahead)
                 echo "ERROR: $_uk_k: nilai harus salah satu preset 128/256/512/1024/2048/4096/8192 (KB)"
                 ;;
-            *_add_random|*_iostats|*_nomerges)
+            *_add_random|*_iostats)
                 echo "ERROR: $_uk_k: nilai harus 0 atau 1 (boolean)"
+                ;;
+            *_nomerges)
+                echo "ERROR: $_uk_k: nilai harus 0, 1, atau 2 (0=all merge, 1=simple merge saja, 2=tanpa merge)"
                 ;;
             *_rate_limit_us)
                 echo "ERROR: $_uk_k: nilai harus angka 0-100000 (mikrodetik, 0 = tanpa rate limit)"

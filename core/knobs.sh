@@ -500,8 +500,16 @@ _kn_io_json() {
                 _kn_qw=false
                 _kn_qsup=false
             fi
+            # nomerges punya 3 nilai sah (dokumentasi kernel block layer);
+            # add_random/iostats boolean 0/1. Daftar WAJIB sama dengan
+            # hsin_uk_val_ok (core/user_knobs.sh) dan cek ulang engine
+            # io/queue_tuning.sh.
+            case "$_kn_qf" in
+                nomerges) _kn_qopts="[0,1,2]" ;;
+                *)        _kn_qopts="[0,1]" ;;
+            esac
             [ -n "$_kn_qt" ] && _kn_qt="${_kn_qt},"
-            _kn_qt="${_kn_qt}\"${_kn_qf}\":{\"options\":[0,1],\"cur\":${_kn_qcur},\"writable\":${_kn_qw},\"supported\":${_kn_qsup}}"
+            _kn_qt="${_kn_qt}\"${_kn_qf}\":{\"options\":${_kn_qopts},\"cur\":${_kn_qcur},\"writable\":${_kn_qw},\"supported\":${_kn_qsup}}"
         done
         _kn_esc "${_kn_b##*/}"
         _kn_nm="$_kn_e"

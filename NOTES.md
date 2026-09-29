@@ -1060,6 +1060,19 @@
   nilai tambahan). Node menerima 0 dan 1 dengan baik, tapi nilai 2 tidak
   bisa dipilih dari UI - perlu keputusan user terpisah bila mau menambah
   opsi 2.
+- KOREKSI USER (2026-09-29, menyusul K2): `nomerges` BUKAN boolean -
+  dokumentasi kernel block layer memberi TIGA nilai: 0 = semua merge
+  diizinkan, 1 = hanya simple one-hit merge, 2 = tanpa merge sama sekali.
+  Kokoh/K1 medio tinha salah baca -> diperbaiki: validasi knob (0|1|2),
+  cek ulang engine queue_tuning.sh per-field (0|1|2 hanya untuk nomerges),
+  JSON io.blocks[].queue_tuning.nomerges.options = [0,1,2], teks pesan
+  knob-set. Bukti: snapshot byte untuk 0, 1, DAN 2 (tiap nilai hanya
+  mengubah node itu), apply 2 (nilai live HP) berhasil, TANPA override
+  node tetap 2 (tak tersentuh), 3 dan -1 ditolak, harness K2 42 -> 46/46,
+  suite lama K1 36 + guard_status 20 + 7 suite lain tetap hijau, dispatcher
+  knob-set 2 diterima / 3 ditolak. Pelajaran: nilai enum dari dokumentasi
+  kernel harus DIBACA, bukan diasumsikan boolean - device live (nomerges=2)
+  adalah bukti paling cepat bahwa asumsi salah.
 - CATATAN LAIN: `add_random`/`iostats` tidak di-backup sebelum K2 dan
   sekarang ikut (backup+rollback terbukti). Tidak ada knob VM
   `page-cluster` yang bisa ditulis di profil non-manual tanpa override -
