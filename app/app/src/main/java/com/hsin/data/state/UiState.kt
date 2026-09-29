@@ -34,6 +34,9 @@ data class UiState(
 
     // --- log ---
     val logLines: List<String> = emptyList(),
+    /** A12: N baris terakhir per file log (kontrak §3.6), dibatasi [LogPresenter.MAX_LINES]. */
+    val logBoot: List<String> = emptyList(),
+    val logApply: List<String> = emptyList(),
 
     // --- status aksi ---
     val loadingUi: Boolean = false,

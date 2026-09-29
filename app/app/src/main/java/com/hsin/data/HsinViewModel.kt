@@ -12,6 +12,7 @@ import com.hsin.data.state.ApplyFlow
 import com.hsin.data.state.DirtyTracker
 import com.hsin.data.state.GuardState
 import com.hsin.data.state.KnobsMapping
+import com.hsin.data.state.LogPresenter
 import com.hsin.data.state.StatusMapping
 import com.hsin.data.state.UiError
 import com.hsin.data.state.UiErrorKind
@@ -171,7 +172,7 @@ class HsinViewModel(
     }
 
     // ------------------------------------------------------------------
-    // Log
+    // Log (A12: tab boot.log + apply.log, tail terbatas via kontrak §3.6)
     // ------------------------------------------------------------------
     fun refreshLog(maxLines: Int = 200) {
         viewModelScope.launch {
@@ -180,6 +181,32 @@ class HsinViewModel(
                     _uiState.update { it.copy(logLines = logLinesOf(res.output, maxLines)) }
                 is RootResult.Error -> fail(Loading.NONE, res)
             }
+        }
+    }
+
+    /**
+     * Ambil N baris terakhir `boot.log` + `apply.log` (satu root call per
+     * file, `logs <type> <lines>`). Parse via [LogPresenter] (array JSON;
+     * baris rusak tidak crash). Dipakai layar Log A12.
+     */
+    fun refreshLogs(maxLines: Int = LogPresenter.MAX_LINES) {
+        viewModelScope.launch {
+            val lines = maxLines.toString()
+            val boot = when (val res = call("logs", "boot", lines)) {
+                is RootResult.Success -> LogPresenter.parseLogOutput(res.output, maxLines)
+                is RootResult.Error -> {
+                    fail(Loading.NONE, res)
+                    return@launch
+                }
+            }
+            val apply = when (val res = call("logs", "apply", lines)) {
+                is RootResult.Success -> LogPresenter.parseLogOutput(res.output, maxLines)
+                is RootResult.Error -> {
+                    fail(Loading.NONE, res)
+                    return@launch
+                }
+            }
+            _uiState.update { it.copy(logBoot = boot, logApply = apply) }
         }
     }
 
