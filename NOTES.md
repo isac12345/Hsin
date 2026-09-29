@@ -1063,7 +1063,7 @@
 - KOREKSI USER (2026-09-29, menyusul K2): `nomerges` BUKAN boolean -
   dokumentasi kernel block layer memberi TIGA nilai: 0 = semua merge
   diizinkan, 1 = hanya simple one-hit merge, 2 = tanpa merge sama sekali.
-  Kokoh/K1 medio tinha salah baca -> diperbaiki: validasi knob (0|1|2),
+  K1 sebelumnya salah baca -> diperbaiki: validasi knob (0|1|2),
   cek ulang engine queue_tuning.sh per-field (0|1|2 hanya untuk nomerges),
   JSON io.blocks[].queue_tuning.nomerges.options = [0,1,2], teks pesan
   knob-set. Bukti: snapshot byte untuk 0, 1, DAN 2 (tiap nilai hanya
