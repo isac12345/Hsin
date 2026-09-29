@@ -20,13 +20,15 @@ tersedia, thermal zone), bukan dari nama chipset.
 
 1. Pasang ZIP modul (`HSIN-v5.0.0-beta1.zip` atau dev build) lewat
    aplikasi root manager, lalu reboot.
-2. Tunggu boot selesai — tuning profil default (`balanced`) diterapkan
-   otomatis oleh `service.sh`.
+2. Tunggu boot selesai — profil default adalah `manual` (M1): `service.sh`
+   TIDAK menulis knob apa pun sampai user menyetelnya. Tidak ada tuning
+   otomatis.
 3. Cek status:
    - CLI (sebagai root): `hsin status`
    - Log boot: `/data/adb/hsin/logs/boot.log`
-4. Ganti profil manual: `hsin apply performance`
-   (pilihan: `battery`, `balanced`, `performance`, `extreme`).
+4. Ganti profil: `hsin apply performance`
+   (pilihan: `manual` (default), `battery`, `balanced`, `performance`,
+   `extreme`).
 5. Fine-tuning per knob (contoh): `hsin knob-set cpu_policy_0_gov performance`
    Daftar knob yang tersedia di device ini: `hsin knobs`.
 6. Lihat hasil knob siklus apply terakhir (diminta → diterapkan +
@@ -45,7 +47,8 @@ di `/sdcard/Android/hsin/hsin.conf` (default `false`).
 | Profil | Cocok untuk |
 |---|---|
 | `battery` | Hemat daya, limit paling agresif |
-| `balanced` | Default harian |
+| `manual` | **Default** — hanya menulis knob yang kamu set |
+| `balanced` | Profil harian (menulis nilai profil) |
 | `performance` | Gaming / beban berat |
 | `extreme` | Maksimal, risiko tinggi, butuh opt-in `ALLOW_EXTREME=true` |
 
