@@ -26,8 +26,15 @@ data class ModuleInfo(
 data class KnobCapability(
     val supportedKeys: List<String>,
     val allowedValues: Map<String, List<String>>,
+    /** min/max yang DILAPORKAN modul untuk knob skalar; disalin apa adanya. */
+    val ranges: Map<String, IntRange> = emptyMap(),
     val allowExtreme: Boolean,
+    /** Fitur bergate dari `knobs.features`; tampil terkunci, tanpa kontrol. */
+    val gated: List<GatedFeature> = emptyList(),
 ) : DataKind
+
+/** Fitur yang dikunci modul. APK tidak pernah membuka gate extreme. */
+data class GatedFeature(val label: String, val available: Boolean, val why: String)
 
 /** Condition boot guard saat ini. */
 data class GuardState(
