@@ -14,14 +14,12 @@ object CapabilityCachePolicy {
     /** Keputusan cache berdasarkan input string + versi. */
     fun evaluate(rawJson: String?, moduleVersion: String): CacheDecision {
         if (rawJson == null || rawJson.isBlank()) return CacheDecision.MISS
-        val expectedKey = buildKey(moduleVersion)
-        // Simulasi: jika versi berbeda dari yang disimpan → MISS
-        // (pada implementasi nyata, versi disimpan dalam JSON)
-        if (!rawJson.contains("\"v\":\"$moduleVersion\"")) return CacheDecision.MISS
         return try {
             val obj = JSONObject(rawJson)
-            val inner = obj.getJSONObject("cap")
-            CacheDecision.HIT(inner.toString())
+            val v = obj.optString("v", "")
+            if (v != moduleVersion) return CacheDecision.MISS
+            val cap = obj.optJSONObject("cap") ?: obj
+            CacheDecision.HIT(cap.toString())
         } catch (_: Exception) {
             CacheDecision.MISS
         }

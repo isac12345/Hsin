@@ -25,6 +25,18 @@ class CapabilityCachePolicyTest {
     }
 
     @Test
+    fun blankString_isMiss() {
+        assertTrue(CapabilityCachePolicy.isCacheMiss(CapabilityCachePolicy.evaluate("", "v1")))
+    }
+
+    @Test
+    fun capMissing_isStillHitIfVersionMatches() {
+        // Cache menyimpan data meski capa tidak lengkap
+        val d = CapabilityCachePolicy.evaluate("{\"v\":\"v1\"}", "v1")
+        assertTrue(d is CapabilityCachePolicy.CacheDecision.HIT)
+    }
+
+    @Test
     fun clearImpliesMiss() {
         // Simulasi: after clear, get returns null → treated as MISS by caller
         assertTrue(CapabilityCachePolicy.isCacheMiss(CapabilityCachePolicy.CacheDecision.MISS))

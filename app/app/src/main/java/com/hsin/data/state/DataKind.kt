@@ -42,15 +42,6 @@ data class KnobCapability(
     val profileList: List<String>
 ) : CapabilityData
 
-/** Hasil guard-status (current state). */
-data class GuardCurrent(
-    val active: Int,
-    val failCount: Int,
-    val threshold: Int,
-    val cooldownRemainingSec: Int,
-    val lastReason: String
-) : CurrentStateData
-
 /** Hasil knob-list (current state per key). */
 data class KnobCurrent(
     val key: String,
@@ -60,10 +51,10 @@ data class KnobCurrent(
     val reason: String
 ) : CurrentStateData
 
-/** Metrik realtime (berubah tiap tick). */
+/** Metrik realtime (berubah tiap tick). Sentinel A11: nilai -1 atau 0 tidak terbaca → null. */
 data class RealtimeMetrics(
-    val temperatureC: Int,
-    val frequencyMhz: Int,
-    val loadPercent: Int,
-    val fps: Int
+    val temperatureC: Int?,
+    val frequencyMhz: Int?,
+    val loadPercent: Int?,
+    val fps: Int?
 ) : RealtimeData

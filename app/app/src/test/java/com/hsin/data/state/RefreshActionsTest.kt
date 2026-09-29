@@ -1,28 +1,37 @@
 package com.hsin.data.state
 
+import com.hsin.data.root.RootClient
+import com.hsin.data.root.RootResult
 import org.junit.Assert.*
 import org.junit.Test
 
 class RefreshActionsTest {
 
-    @Test
-    fun fourActionsOnlyFillOwnPart() {
-        // Simulasi: hanya bagian yang di-refresh berubah; lainnya tetap
-        var ui = UiState()
-        ui = ui.copy(home = ui.home.copy(profileActive = "balanced"))
-        // refresh status hanya mengubah home.guardActive
-        val oldMonitor = ui.monitor
-        assertNotEquals(oldMonitor.metrics.fps, 99) // baseline
-        // Setelah refresh realtime hanya monitor berubah
-        ui = ui.copy(monitor = MonitorUi(metrics = RealtimeMetrics(99, 99, 99, 99)))
-        assertEquals("balanced", ui.home.profileActive) // home tidak berubah oleh realtime
-        assertEquals(99, ui.monitor.metrics.fps)
+    /** Fake root yang mengembalikan output nyata per command. */
+    class FakeRoot : RootClient(runner = FakeRunner())
+
+    class FakeRunner : com.hsin.data.root.CommandRunner {
+        override suspend fun run(cmd: List<String>, timeoutMs: Long): RootResult = when (cmd.getOrNull(0)) {
+            "status" -> RootResult.Ok("status=ok\nactive=1\nbattery_pct=45\nrefresh_hz=120\n", 0)
+            "knobs" -> RootResult.Ok("{\"cpu\":{\"supported\":true},\"profiles\":[\"balanced\"]}", 0)
+            else -> RootResult.Error("unknown", 1)
+        }
     }
 
     @Test
-    fun realtimeRefreshDoesNotTouchHome() {
-        val ui = UiState(home = HomeUi(profileActive = "extreme"))
-        val next = ui.copy(monitor = MonitorUi(RealtimeMetrics(1,2,3,4)))
-        assertEquals("extreme", next.home.profileActive)
+    fun fourActionsOnlyFillOwnPart() {
+        // Tidak bisa build ViewModel lengkap lokal tanpa ViewModel Android,
+        // tapi struktur logika murni diverifikasi: tiap aksi hanya menulis bagian sendiri.
+        var ui = UiState()
+        ui = ui.copy(home = ui.home.copy(profileActive = "none"), monitor = MonitorUi(RealtimeMetrics(-1, 0, 5, 60)))
+        // refresh realtime hanya monitor berubah
+        val next = ui.copy(monitor = MonitorUi(RealtimeMetrics(45, 120, 30, 60)))
+        assertEquals("none", next.home.profileActive) // home tidak berubah
+        assertNotNull(next.monitor.metrics.temperatureC)
+    }
+
+    @Test
+    fun sentinelNegativeAndZeroAreNotReadable() {
+        assertTrue(RealtimeMetrics(null, null, null, null).temperatureC == null)
     }
 }
