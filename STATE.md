@@ -285,3 +285,21 @@
   kbase bergantung detector, JSON tanpa object wrapper). Bukti: harness K3
   48/48, suite lama 10/10, runtime ZIP sh -n OK + 0 blok if kosong.
   APP_PLAN K3 [x]. L2: validasi HP. STOP.
+- APP-K3-FIX (2026-09-29, leader langsung, atas klarifikasi user): 2 bug
+  diperbaiki. (1) hsin_gpu_kbase_knobs_apply baca $_profile bukan
+  $_mk_profile -> nilai KOSONG ditulis ke node kbase saat dipanggil tanpa
+  pemanggil; fix + guard profil tak dikenal. (2) BLOKIRER PRODUKSI: validasi
+  nilai 3 kunci devfreq (polling_interval/up_threshold/down_differential)
+  tersisip di _uk_class (klasifikasi key) bukan hsin_uk_val_ok -> knob-set
+  DITOLAK di proses bersih, jadi 3 dari 12 knob K3 mati di HP; fix dipindah
+  ke fungsi yang benar. Bukti red-green (kode lama vs baru tanpa $_profile:
+  node kosong vs 0/4/72 benar) + uji proses bersih (3 kunci rc=0) +
+  end-to-end dua proses (50->100 APPLIED). Harness K3 diperketat: fungsi
+  _isolate() membatalkan semua variabel global engine per skenario
+  (termasuk guard cache deteksi) TANPA menyentuh variabel konfigurasi
+  (_uk_file, HSIN_SANDBOX_DIR) + 3 skenario regresi fungsi mandiri.
+  Harness 48/48 -> 51/51; seluruh 11 suite regresi hijau. Scan pola serupa
+  (poin c): 0 fungsi lain dengan pola salah-nama-variabel; 11 temuan
+  scanner = false positive, diperiksa manual. KOREKSI LAPORAN K3:
+  sched_child_runs_first ADA (live 0, writable) dan knob-nya berfungsi;
+  yang absen hanya 3 sysctl latency. STOP.

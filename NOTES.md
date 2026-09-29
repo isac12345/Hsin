@@ -1166,3 +1166,59 @@
   otomatis UNAVAILABLE di device ini, dan muncul sebagai knob persen di
   device yang punya node-nya. Bila user mau abolish persennya dan pakai
   nilai absolut, itu perlu step terpisah + uji HP.
+
+## Koreksi K3: 2 bug (1 acnek, 1 MATI di produksi) + harness diperketat (2026-09-29)
+- BUG 1 (minor, ditemukan saat klarifikasi user): `hsin_gpu_kbase_knobs_apply`
+  set `_mk_profile="$1"` tapi badannya baca `$_profile` (nama lama saat
+  bloknya masih di dalam hsin_gpu_mali_apply). Dipanggil tanpa pemanggil
+  yang menyetel `$_profile` -> profil tidak dikenal -> NILAI KOSONG ditulis
+  ke ketiga node kbase. Di pipeline produksi hanya kebetulan benar karena
+  hsin_gpu_apply menyetel `_profile` lebih dulu.
+  Fix: `$_profile` -> `$_mk_profile` (2 tempat) + case `*)` untuk profil
+  tak dikenal = TIDAK menulis (kirim nilai kosong ke node kernel jauh lebih
+  berbahaya daripada dilewati).
+- BUG 2 (SERIUS,production blocker, ditemukan oleh harness yang diperketat):
+  blok validasi nilai untuk `*_polling_interval` / `*_up_threshold` /
+  `*_down_differential` TER-SISIP ke fungsi `_uk_class` (klasifikasi KEY)
+  dan bukan ke `hsin_uk_val_ok` (validasi NILAI). Akibatnya saat key
+  diklasifikasi, validasi dijalankan terhadap `$_uk_v` yang masih kosong ->
+  `return 1` -> ketiga kunci itu DITOLAK saat `knob-set` di proses bersih
+  (persis yang dilakukan aplikasi). Artinya 3 dari 12 knob K3 MATI di HP
+  nyata.。mereka hanya "lolos" di harness lama karena `$_uk_v` bocor dari
+  engine lain kebetulan berisi angka valid - harness-nya bohong, bukan produk.
+  Fix: ketiga blok dipindah ke hsin_uk_val_ok; `_uk_class` sekarang hanya
+  menetapkan nama field (nol sentuhan ke _uk_v).
+- HARNESS K3 DIPERKETAT (alasannya persis bug di atas): fungsi `_isolate()`
+  baru membatalkan SEMUA variabel global/state engine K1-K2-K3 di awal tiap
+  skenario (bukan hanya andalkan subshell), termasuk ikut membatalkan guard
+  cache deteksi (HSIN_GPU_NODES_READY) yang kalau tidak ikut di-unset
+  membuat daftar node devfreq kosong. Karena itu disyaratkan TIDAK meng-unset
+  variabel KONFIGURASI (`_uk_file`, `HSIN_SANDBOX_DIR`) - saat pertama dicoba,
+  harness malah gagal 11 skenario karena `_isolate` ikut menghapus `_uk_file`
+  ( knob-set menulis ke path salah) dan `HSIN_SANDBOX_DIR` (snapshot path
+  hilang) - itu cacat harness, bukan produk, dan sudah dibatasi.
+  Ditambah skenario regresi J (fungsi kbase dipanggil lewat subshell BARU
+  dengan `unset _profile`): balanced->0/4/72, manual->nol tulis, profil
+  ngawur->tidak menulis. Harness K3 48/48 -> 51/51.
+- BUKTI RED-GREEN: kode LAMA (HEAD) dipanggil tanpa `$_profile` ->
+  `boost=[] polling=[] upth=[]` (node dikosongkan). Kode BARU pada skenario
+  sama -> 0/4/72, manual -> 0/4/72 (nol tulis), battery -> 0/8/88, profil
+  ngawur -> 0/8/88 (tidak menulis), manual+override -> 3.
+- UJI PROSES BERSIH (setiap knob-set = proses baru, seperti aplikasi):
+  ketiga kunci devfreq kini `rc=0` dan tersimpan; nilai luar rentang tetap
+  ditolak dengan pesan yang tepat. End-to-end dua proses: knob-set 100 ->
+  apply manual -> node 50 jadi 100 + hasil `APPLIED`.
+- KOREKSI LAPORAN K3 (kalimat sebelumnya SALAH): `sched_child_runs_first`
+  ADA di HP (live 0, writable) dan knob-nya BERFUNGSI (uji dua proses:
+  0 -> 1, hasil APPLIED; tanpa override di manual = nol tulis). Yang tidak
+  ada hanya TIGA sysctl latency (sched_latency_ns/min_granularity_ns/
+  wakeup_granularity_ns). Deteksi capability juga benar (JSON:
+  child_runs_first supported:true; sysctl latency supported:false).
+- SCAN POLA SERUPA (poin c): fungsi yang set var profile dari argumen
+  tapi membaca var profile LAIN = 0 setelah fix. 11 fungsi "baca $_profile
+  tanpa set sendiri" yang ditandai scanner FALSE POSITIVE - diperiksa satu
+  per satu, semuanya benar (pola `_profile="${2:-balanced}"` yang tidak
+  catching regex scanner). Kesimpulan: KONVENSI repo memakai global
+  `_profile` yang di-set ulang tiap fungsi; risikonya fungsi BARU harus
+  meng-set sendiri, dan harness yang tidak meng-isolasi bisa menutupi
+  kesalahan - sudah dikunci lewat _isolate().

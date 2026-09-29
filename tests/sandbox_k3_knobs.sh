@@ -28,6 +28,10 @@ export HSIN_SYSFS_DEVFREQ="$SB_SYS/class/devfreq"
 export HSIN_SYSFS_KBASE="$SB_KB"
 export HSIN_SYSFS_CPU="$SB_SYS/cpu"
 export HSIN_UCLAMP_DIR="$SB_UC"
+# Path absolut dipakai subshell pada skenario J (variabel lokal shell tidak
+# diwarisi ke sh -c).
+HSIN_SYSFS_KBASE_ABS="$SB_KB"
+export HSIN_SYSFS_KBASE_ABS
 export SYSFS_DEVFREQ_PREFIX="$SB_SYS/class/devfreq"
 export SYSFS_KBASE_PREFIX="$SB_KB"
 export SYSFS_CPU_PREFIX="$SB_SYS/cpu"
@@ -114,9 +118,49 @@ _diffnodes() {
     return 0
 }
 
+# Reset TOTAL sebelum tiap skenario. ALASAN (bug nyata K3): variabel shell
+# di dash bersifat global per proses, jadi satu engine yang menyetel
+# _profile bisa "menolong" engine lain yang salah nama variabel dan
+# membuat harness memberi PASS palsu. Fungsi _isolate() di bawah secara
+# membatalkan semua variabel global yang dipakai engine K1/K2/K3, dan
+# dipanggil di awal SETIAP skenario + tiap _apply_one.
 _reset_state() {
     rm -f "$HSIN_DATA/user_knobs.env" "$HSIN_DATA/knob_results.env"
     _uk_inited=""; _uk_cache=""; _uk_cache_done=""; _uk_used_n=0; _uk_sum_done=""
+    return 0
+}
+
+_isolate() {
+    # Override knob: HANYA cache per-proses yang di-unset (agar di-load
+    # ulang dari file). JANGAN unset _uk_file - itu variabel KONFIGURASI
+    # yang di-set saat source; menghapusnya membuat knob-set menulis ke
+    # path salah (harness jadi gagal sendiri, bukan produknya).
+    unset _uk_inited _uk_cache _uk_cache_done _uk_used_n _uk_sum_done
+    unset _uk_sn _uk_kind _uk_num _uk_tk _uk_tfield _uk_tid _uk_v
+    unset _uk_e _uk_kn _uk_ve
+    # Varian + node yang dibaca engine.
+    unset _profile _mk_profile _mk_manual _mk_v _mk_v_bat _mk_v_bal _mk_v_perf _mk_v_ext
+    unset _gt_profile _gt_manual _gt_applied _gt_skipped _gt_spec _gt_uk
+    unset _dl_profile _dl_manual _dl_applied _dl_skipped
+    unset _uc_dir _uc_node _uc_f _uc_uk _uc_prof _uc_req _uc_applied _uc_before _uc_after
+    unset _hl_uk_lat _hl_uk_min _hl_uk_wake _hl_uk _hl_key _hl_var _hl_canon _hl_bad _hl_req
+    unset _scrf_node _scrf_uk _scrf
+    unset _qt_profile _qt_manual _qt_applied _qt_skipped _qt_uk _qt_req _qt_key _qt_node _qt_bad
+    unset _qt_rc _qt_why _HSIN_QT_ONE_OK _HSIN_QT_ONE_SKIP _HSIN_GT_APPLIED _HSIN_GT_SKIP
+    unset _n _val _mn _mx _def_b _def_bal _def_p _def_e _prof_val _bg_rejected _bg_why
+    unset _eff_ratio _cur_bg _uk_key _is_knob
+    # Cache deteksi: HAPUS guard-nya juga. Kalau hanya HSIN_GPU_DEVFRES
+    # yang di-unset sementara guard HSIN_GPU_NODES_READY masih 1, deteksi
+    # tidak pernah jalan ulang dan daftar node jadi kosong (harness sendiri
+    # yang salah, bukan produk).
+    unset HSIN_GPU_KBASE HSIN_SYSFS_KBASE
+    unset HSIN_GPU_NODES_READY
+    unset HSIN_IO_BLOCKS HSIN_IO_BLOCKS_READY HSIN_IO_BLOCK_SOURCE
+    unset HSIN_CPU_POLICY_IDS HSIN_CPU_CLUSTERS HSIN_CPU_POLICY_SOURCE
+    unset HSIN_GPU_DEVFRES HSIN_GPU_DEVFREQ HSIN_GPU_VENDOR HSIN_GPU_NODES
+    unset _fkn_obs
+    # HSIN_SANDBOX_DIR juga KONFIGURASI harness (dipakai _snapshot/
+    # _diffnodes) - tidak boleh di-unset.
     return 0
 }
 
@@ -134,6 +178,9 @@ _load_all() {
 }
 
 _apply_all() {
+    # Set ulang nama variabel yang dibaca tiap engine, lalu panggil dengan
+    # argumen. Engine tidak boleh bergantung pada global pemanggil.
+    _profile="$1"
     hsin_cpu_governor_apply "$1" >/dev/null 2>&1
     hsin_cpu_uclamp_apply "$1" >/dev/null 2>&1
     hsin_cpu_sched_lat_apply "$1" >/dev/null 2>&1
@@ -145,6 +192,7 @@ _apply_all() {
 
 _apply_one() {
     _k="$1"; _v="$2"; _node="$3"; _want="$4"
+    _isolate
     _reset_state
     hsin_uk_set "$_k" "$_v" >/dev/null 2>&1
     _before=$(_snapshot)
@@ -162,6 +210,7 @@ _apply_one() {
 
 # --- A. snapshot byte per knob (varian node lengkap) ---
 _mknodes lengkap
+_isolate
 _load_all
 _apply_one "sched_child_runs_first" "1" "$SB_PROC/sys/kernel/sched_child_runs_first" "1"
 _apply_one "uclamp_min" "512" "$SB_UC/foreground/cpu.uclamp.min" "512"
@@ -173,6 +222,7 @@ _apply_one "mali_upthreshold" "60" "$SB_KB/gpu_upthreshold" "60"
 
 # --- B. manual tanpa override = nol penulisan ---
 _mknodes lengkap
+_isolate
 _load_all
 _reset_state
 _before=$(_snapshot)
@@ -186,6 +236,7 @@ fi
 
 # --- C. profil balanced: knob tanpa nilai profil tidak ditulis ---
 _mknodes lengkap
+_isolate
 _load_all
 _reset_state
 _before=$(_snapshot)
@@ -210,6 +261,7 @@ fi
 
 # --- F+D. VARIAN 2: node hilang sebagian -> UNAVAILABLE tanpa crash ---
 _mknodes sebagian
+_isolate
 _load_all
 _reset_state
 hsin_uk_set "gpu_node_23100000_gpu_up_threshold" "80" >/dev/null 2>&1
@@ -240,6 +292,7 @@ fi
 
 # --- E. nilai di luar rentang ditolak ---
 _mknodes lengkap
+_isolate
 _load_all
 for _pair in "sched_child_runs_first 2" "uclamp_min 1025" "uclamp_max -1" \
     "gpu_node_23100000_gpu_polling_interval 0" "gpu_node_23100000_gpu_polling_interval 1001" \
@@ -271,6 +324,7 @@ fi
 # --- G. backup -> rollback per knob ---
 for _knob in child_runs_first uclamp_min uclamp_max polling_interval mali_boost mali_polling mali_upthreshold; do
     _mknodes lengkap
+    _isolate
     _load_all
     . "$_HSIN_REPO/core/backup.sh" 2>/dev/null
     _oc=$(cat "$SB_PROC/sys/kernel/sched_child_runs_first")
@@ -310,6 +364,7 @@ done
 
 # --- H. knobs JSON field baru ---
 _mknodes lengkap
+_isolate
 _load_all
 _hj=$(hsin_knobs_json 2>/dev/null)
 if printf '%s' "$_hj" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
@@ -350,6 +405,7 @@ fi
 
 # --- I. knob-list kategori benar ---
 _mknodes lengkap
+_isolate
 _load_all
 _reset_state
 hsin_uk_set "sched_child_runs_first" "1" >/dev/null 2>&1
@@ -371,6 +427,79 @@ if printf '%s' "$_i" | tail -n 1 | python3 -c "import sys,json; d=json.load(sys.
     _ok "I5. knob-list JSON count=4"
 else
     _bad "I5. knob-list JSON count=4 (baris: $(printf '%s' "$_i" | tail -n 1))"
+fi
+
+# --- J. REGRESI BUG VARIABEL GLOBAL: fungsi kbase harus mandiri ---
+# Cara lama: harness memanggil beberapa engine dalam satu proses, dan
+# _profile yang bocor dari engine lain menutupi bug salah-nama-variabel
+# (hsin_gpu_kbase_knobs_apply dulu baca $_profile, bukan $_mk_profile).
+# Di sini kebocoran itu sengaja dihilangkan: profil TIDAK pernah di-set
+# sebagai variabel shell, dan tiap panggilan lewat subshell baru.
+_mknodes lengkap
+_isolate
+_reset_state
+_load_all
+unset _profile
+_j_res=$( sh -c '
+    . "'"$_HSIN_REPO"'/core/logger.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/sysfs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/user_knobs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/engine/gpu/mali.sh" 2>/dev/null
+    [ -z "${_profile:-}" ] || echo "LEAK:_profile" >&2
+    hsin_gpu_kbase_knobs_apply balanced >/dev/null 2>&1
+    printf "%s/%s/%s" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_boost_level2")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_pollingtime")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_upthreshold")"
+' 2>&1 )
+if [ "$_j_res" = "0/4/72" ]; then
+    _ok "J. kbase mandiri tanpa global pemanggil: balanced -> 0/4/72"
+else
+    _bad "J. kbase mandiri (dapat: $_j_res)"
+fi
+# manual tanpa override = nol tulis, dalam kondisi terisolasi
+_mknodes lengkap
+_isolate
+_reset_state
+_load_all
+unset _profile
+_j2=$( sh -c '
+    . "'"$_HSIN_REPO"'/core/logger.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/sysfs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/user_knobs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/engine/gpu/mali.sh" 2>/dev/null
+    hsin_gpu_kbase_knobs_apply manual >/dev/null 2>&1
+    printf "%s/%s/%s" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_boost_level2")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_pollingtime")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_upthreshold")"
+' 2>&1 )
+if [ "$_j2" = "0/8/88" ]; then
+    _ok "J2. kbase manual tanpa override: nol tulis (0/8/88 utuh)"
+else
+    _bad "J2. kbase manual tanpa override (dapat: $_j2)"
+fi
+# profil tak dikenal = tidak boleh menulis nilai kosong
+_mknodes lengkap
+_isolate
+_reset_state
+_load_all
+unset _profile
+_j3=$( sh -c '
+    . "'"$_HSIN_REPO"'/core/logger.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/sysfs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/core/user_knobs.sh" 2>/dev/null
+    . "'"$_HSIN_REPO"'/engine/gpu/mali.sh" 2>/dev/null
+    hsin_gpu_kbase_knobs_apply "profil-ngawur" >/dev/null 2>&1
+    printf "%s/%s/%s" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_boost_level2")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_pollingtime")" \
+        "$(cat "$HSIN_SYSFS_KBASE_ABS/gpu_upthreshold")"
+' 2>&1 )
+if [ "$_j3" = "0/8/88" ]; then
+    _ok "J3. profil tak dikenal: tidak menulis (node tak dikosongkan)"
+else
+    _bad "J3. profil tak dikenal: tidak menulis (dapat: $_j3)"
 fi
 
 echo "---"
