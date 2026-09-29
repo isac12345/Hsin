@@ -22,7 +22,7 @@ data class UiState(
 
 data class HomeUi(val profileActive: String = "none", val guardActive: Int = 0)
 data class KnobUi(val dirtyMap: Map<String, DirtyEntry> = emptyMap())
-data class MonitorUi(val metrics: RealtimeMetrics = RealtimeMetrics(0,0,0,0))
+data class MonitorUi(val metrics: RealtimeMetrics = RealtimeMetrics(null, null, null, null))
 data class LogUi(val lines: List<String> = emptyList())
 
 /** Dirty tracking per key: base / current / dirty. */

@@ -10,19 +10,21 @@ import android.content.SharedPreferences
  */
 class CapabilityCache(private val prefs: SharedPreferences) {
 
+    private val KEY = "hsin_capability"
+
     fun put(version: String, jsonPayload: String) {
-        prefs.edit().putString(CapabilityCachePolicy.buildKey(version), jsonPayload).apply()
+        // Satu key tetap; versi disimpan dalam payload. Versi lama otomatis tertimpa.
+        prefs.edit().putString(KEY, "{\"v\":\"$version\",\"cap\":$jsonPayload}").apply()
     }
 
     fun get(version: String): String? {
-        val key = CapabilityCachePolicy.buildKey(version)
-        val raw = prefs.getString(key, null) ?: return null
+        val raw = prefs.getString(KEY, null) ?: return null
         val decision = CapabilityCachePolicy.evaluate(raw, version)
         return if (decision is CapabilityCachePolicy.CacheDecision.HIT) raw else null
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit().remove(KEY).apply()
     }
 
     companion object {

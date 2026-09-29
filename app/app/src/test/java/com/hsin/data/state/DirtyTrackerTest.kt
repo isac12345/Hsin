@@ -16,13 +16,14 @@ class DirtyTrackerTest {
     }
 
     @Test
-    fun resetToBaseMakesClean() {
+    fun resetToBaseMakesCleanButKeepsEntry() {
         val tracker = DirtyTracker(base = mapOf("cpu_gov" to "schedutil"))
         tracker.setOverride("cpu_gov", "performance")
         tracker.resetKey("cpu_gov")
         val s = tracker.state()["cpu_gov"]!!
         assertEquals("schedutil", s.current)
         assertFalse(s.dirty)
+        assertTrue(tracker.state().containsKey("cpu_gov")) // entry tetap ada
     }
 
     @Test
