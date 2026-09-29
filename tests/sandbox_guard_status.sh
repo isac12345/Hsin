@@ -1,94 +1,103 @@
 #!/system/bin/sh
-# Sandbox harness untuk guard-status (M2)
-# Tanpa sentuh /sys atau /proc asli; menggunakan sysfs palsu bila diperlukan.
+# Sandbox test M2: action.sh guard-status — TANPA sentuh device asli.
+# Menguji 4 kondisi (aktif, tidak-aktif, hilang, rusak) lewat dispatcher
+# action.sh yang sama dengan APK, membuktikan rc=0 + JSON valid + NOL
+# penulisan (snapshot HSIN_DATA byte-identik sebelum/sesudah).
+#
+# Cara pakai: sh tests/sandbox_guard_status.sh
+# Keluar 0 = semua PASS, 1 = ada FAIL.
+# Scratch HANYA di $HSIN_SANDBOX_DIR (default usr/tmp/opencode) —
+# tidak pernah menyentuh /data/adb/hsin asli.
 
-set -e
+# Lokasi repo = direktori di atas tests/
+_HSIN_REPO=$(cd "${0%/*}/.." 2>/dev/null && pwd)
+HSIN_SANDBOX_DIR="${HSIN_SANDBOX_DIR:-/data/data/com.termux/files/usr/tmp/opencode/hsin-guard-status-test}"
+export HSIN_MODULE_PATH="$_HSIN_REPO"
+export HSIN_DATA="$HSIN_SANDBOX_DIR/data"
+export HSIN_CONF="$HSIN_DATA/hsin.conf"
+export HSIN_GUARD_FILE="$HSIN_DATA/.boot_fail_count"
+export HSIN_GUARD_THRESHOLD=2
+export HSIN_GUARD_COOLDOWN=86400
+export HSIN_SANDBOX=1
 
-HSIN_MODULE_PATH="${HSIN_MODULE_PATH:-/data/adb/modules/hsin}"
-HSIN_DATA="${HSIN_DATA:-/data/data/com.termux/files/home/Hsin/test_guard_m2}"
+_PASS=0
+_FAIL=0
 
-# Hapus data lama
-rm -rf "$HSIN_DATA"
-mkdir -p "$HSIN_DATA"
+_ok() {
+    _PASS=$((_PASS + 1))
+    echo "PASS: $1"
+}
 
-# Export env untuk file baru
-export HSIN_DATA HSIN_MODULE_PATH HSIN_GUARD_FILE="${HSIN_DATA}/.boot_fail_count"
-export HSIN_GUARD_THRESHOLD="2"
-export HSIN_GUARD_COOLDOWN="86400"
+_bad() {
+    _FAIL=$((_FAIL + 1))
+    echo "FAIL: $1"
+}
 
-# Salin modul ke path sementara jika belum ada
-if [ ! -f "$HSIN_MODULE_PATH/core/guard_status.sh" ]; then
-    # Untuk sandbox, salin file yang baru dibuat
-    cp "/data/data/com.termux/files/home/work/m2-guard/core/guard_status.sh" /tmp/guard_status_tmp.sh 2>/dev/null || true
-fi
-
-# Gunakan file dari worktree
-GUARD_STATUS="/data/data/com.termux/files/home/work/m2-guard/core/guard_status.sh"
-
-# Fungsi snapshot: md5 semua file di HSIN_DATA (kecuali harness)
+# Snapshot: daftar md5 semua file di HSIN_DATA (urut). Kosong = "empty".
 _snapshot() {
-    find "$HSIN_DATA" -type f 2>/dev/null | sort | xargs md5sum 2>/dev/null || echo "empty"
+    find "$HSIN_DATA" -type f 2>/dev/null | sort | xargs -r md5sum 2>/dev/null || echo "empty"
     return 0
 }
 
-# Kondisi 1: AKTIF (count >= threshold)
-echo "=== Kondisi 1: AKTIF ==="
-rm -rf "$HSIN_DATA"
-mkdir -p "$HSIN_DATA"
-export HSIN_GUARD_FILE="$HSIN_DATA/.boot_fail_count"
-echo "$(date +%s):3" > "$HSIN_GUARD_FILE"
-_before=$(_snapshot)
-output=$(bash "$GUARD_STATUS" 2>/dev/null)
-_after=$(_snapshot)
-echo "Output:"
-echo "$output"
-echo "RC: $?"
-echo "JSON valid?"
-echo "$output" | tail -n 1 | python3 -c "import sys, json; json.load(sys.stdin); print('valid')" || echo "invalid"
-if [ "$_before" = "$_after" ]; then echo "Snapshot IDENTIK (tidak ada penulisan)"; else echo "SNAPSHOT BERBEDA"; fi
+# $1 = nama kondisi. Menjalankan guard-status via action.sh, cek rc=0,
+# 6 baris output (5 key=value + 1 JSON), JSON valid, snapshot identik.
+_check() {
+    _name="$1"
+    _before=$(_snapshot)
+    _out=$(sh "$_HSIN_REPO/action.sh" guard-status 2>"$HSIN_SANDBOX_DIR/stderr.txt")
+    _rc=$?
+    _after=$(_snapshot)
+    _lines=$(printf '%s\n' "$_out" | wc -l)
+    if [ "$_rc" -eq 0 ]; then
+        _ok "$_name: rc=0"
+    else
+        _bad "$_name: rc=0 (dapat rc=$_rc, stderr: $(cat "$HSIN_SANDBOX_DIR/stderr.txt" 2>/dev/null))"
+    fi
+    if [ "$_lines" -eq 6 ]; then
+        _ok "$_name: 6 baris (5 key=value + JSON)"
+    else
+        _bad "$_name: 6 baris (dapat $_lines)"
+    fi
+    if printf '%s' "$_out" | tail -n 1 | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+        _ok "$_name: JSON terakhir valid"
+    else
+        _bad "$_name: JSON terakhir valid"
+    fi
+    if [ "$_before" = "$_after" ]; then
+        _ok "$_name: snapshot identik (nol penulisan)"
+    else
+        _bad "$_name: snapshot identik (sebelum: [$_before] sesudah: [$_after])"
+    fi
+    echo "--- output $_name ---"
+    printf '%s\n' "$_out"
+    echo "--- akhir output ---"
+    return 0
+}
 
-# Kondisi 2: TIDAK AKTIF (count < threshold)
-echo "=== Kondisi 2: TIDAK AKTIF ==="
-rm -rf "$HSIN_DATA"
+rm -rf "$HSIN_SANDBOX_DIR"
 mkdir -p "$HSIN_DATA"
-export HSIN_GUARD_FILE="$HSIN_DATA/.boot_fail_count"
-echo "$(date +%s):1" > "$HSIN_GUARD_FILE"
-_before=$(_snapshot)
-output=$(bash "$GUARD_STATUS" 2>/dev/null)
-_after=$(_snapshot)
-echo "Output:"
-echo "$output"
-echo "JSON valid?"
-echo "$output" | tail -n 1 | python3 -c "import sys, json; json.load(sys.stdin); print('valid')" || echo "invalid"
-if [ "$_before" = "$_after" ]; then echo "Snapshot IDENTIK"; else echo "SNAPSHOT BERBEDA"; fi
 
-# Kondisi 3: HILANG (file absen)
-echo "=== Kondisi 3: HILANG ==="
-rm -rf "$HSIN_DATA"
-mkdir -p "$HSIN_DATA"
-export HSIN_GUARD_FILE="$HSIN_DATA/.boot_fail_count"
-_before=$(_snapshot)
-output=$(bash "$GUARD_STATUS" 2>/dev/null)
-_after=$(_snapshot)
-echo "Output:"
-echo "$output"
-echo "JSON valid?"
-echo "$output" | tail -n 1 | python3 -c "import sys, json; json.load(sys.stdin); print('valid')" || echo "invalid"
-if [ "$_before" = "$_after" ]; then echo "Snapshot IDENTIK"; else echo "SNAPSHOT BERBEDA"; fi
+# 1. Aktif (count >= threshold).
+printf '%s:3\n' "$(date +%s)" > "$HSIN_GUARD_FILE"
+_check "1-aktif"
+printf '%s' "$_out" | grep -q '^active=1$' && _ok "1-aktif: active=1" || _bad "1-aktif: active=1"
 
-# Kondisi 4: RUSAK (isi "abc" atau kosong atau ":::")
-echo "=== Kondisi 4: RUSAK ==="
-rm -rf "$HSIN_DATA"
-mkdir -p "$HSIN_DATA"
-export HSIN_GUARD_FILE="$HSIN_DATA/.boot_fail_count"
-echo "abc" > "$HSIN_GUARD_FILE"
-_before=$(_snapshot)
-output=$(bash "$GUARD_STATUS" 2>/dev/null)
-_after=$(_snapshot)
-echo "Output:"
-echo "$output"
-echo "JSON valid?"
-echo "$output" | tail -n 1 | python3 -c "import sys, json; json.load(sys.stdin); print('valid')" || echo "invalid"
-if [ "$_before" = "$_after" ]; then echo "Snapshot IDENTIK"; else echo "SNAPSHOT BERBEDA"; fi
+# 2. Tidak aktif (count < threshold).
+printf '%s:1\n' "$(date +%s)" > "$HSIN_GUARD_FILE"
+_check "2-tidak-aktif"
+printf '%s' "$_out" | grep -q '^active=0$' && _ok "2-tidak-aktif: active=0" || _bad "2-tidak-aktif: active=0"
 
-echo "=== SEMUA KONDISI SELESAI ==="
+# 3. State hilang (file absen).
+rm -f "$HSIN_GUARD_FILE"
+_check "3-hilang"
+printf '%s' "$_out" | grep -q 'tidak ada state' && _ok "3-hilang: reason tidak ada state" || _bad "3-hilang: reason tidak ada state"
+
+# 4. State rusak (isi bukan angka).
+printf 'abc\n' > "$HSIN_GUARD_FILE"
+_check "4-rusak"
+printf '%s' "$_out" | grep -q 'tidak ada state' && _ok "4-rusak: reason tidak ada state" || _bad "4-rusak: reason tidak ada state"
+
+echo "---"
+echo "sandbox_guard_status: PASS=$_PASS FAIL=$_FAIL"
+rm -rf "$HSIN_SANDBOX_DIR"
+[ "$_FAIL" -eq 0 ]

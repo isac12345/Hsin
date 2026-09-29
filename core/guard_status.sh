@@ -141,8 +141,4 @@ hsin_guard_status() {
     return 0
 }
 
-# Panggil saat source atau eksekusi langsung
-case "${1:-}" in
-    "") hsin_guard_status ;;
-    *) hsin_guard_status ;;
-esac
+return 0 2>/dev/null || true

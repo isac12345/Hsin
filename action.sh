@@ -7,15 +7,21 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 [ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # ===== Hidden dev-only debug log =====
+# guard-status murni read-only (M2): tanpa mkdir/log/redirect apa pun.
 HSIN_DEBUG_LOG="$HSIN_DATA/logs/debug.log"
-[ -d "$HSIN_DATA/logs" ] || mkdir -p "$HSIN_DATA/logs" 2>/dev/null
-# Skip debug log write on the hot-path status command
-# (APK refresh saat buka + swipe manual, bukan polling WebUI).
 case "${1:-info}" in
-    status|guard-status) ;;
-    *) echo "----- $(date '+%Y-%m-%d %H:%M:%S') action.sh $* -----" >> "$HSIN_DEBUG_LOG" 2>/dev/null ;;
+    guard-status) ;;
+    *)
+        [ -d "$HSIN_DATA/logs" ] || mkdir -p "$HSIN_DATA/logs" 2>/dev/null
+        # Skip debug log write on the hot-path status command
+        # (APK refresh saat buka + swipe manual, bukan polling WebUI).
+        case "${1:-info}" in
+            status) ;;
+            *) echo "----- $(date '+%Y-%m-%d %H:%M:%S') action.sh $* -----" >> "$HSIN_DEBUG_LOG" 2>/dev/null ;;
+        esac
+        exec 2>>"$HSIN_DEBUG_LOG"
+        ;;
 esac
-exec 2>>"$HSIN_DEBUG_LOG"
 
 # Load core modules
 . "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
