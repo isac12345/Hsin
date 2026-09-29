@@ -350,3 +350,18 @@
 - Koreksi leader: 3 compile error ditemukan (ByteArrayOutputStream
   .outputStream(), private const val di class body, StringWriter(StringBuilder))
   - semuanya dari kode dev-apk yang belum pernah dikompilasi.
+- M3 (2026-09-29, leader): kontrak app-modul diperbarui post M1/M2 (§3.9
+  batasan, §3.10 guard-status nyata, §3.11 knob-list manual, §4 inventaris
+  knob K1-K3, D1/D2 ditutup). Commit 4e19506, CI 36576990605 success. [x]
+- APP-A6 (2026-09-29): RootClient + HsinRepository, 32 unit test. 2 ronde
+  dev-apk + takeover leader. Merge 77ddff7. CI main 36583327074/36583327112
+  success. [x] L2: belum.
+- APP-A7 (2026-09-29): state/ViewModel/cache, 53 unit test. 2 ronde
+  dev-apk + takeover leader (ViewModel di-rewrite penuh). 0b92d41. [x]
+- APP-A8 (2026-09-29): shell navigasi 4 tab + Beranda + dialog restore,
+  24 unit test baru (total 109). CI 36590969683/36590969409 success. [x]
+- Koreksi leader total: 7 compile error ditemukan (ByteArrayOutputStream
+  .outputStream, private const val di class body, StringWriter(StringBuilder),
+  CapabilityCache.put tipe, data object : SealedInterface, Sequence.takeLast,
+  ReadTimeout readText lambda) - semua dari kode yang belum pernah
+  dikompilasi. Verifikasi lokal (K2JVMCompiler + JUnit) menutup kelas bug ini.

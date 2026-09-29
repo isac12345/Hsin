@@ -1339,3 +1339,40 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   Commit leader: 77ddff7 (merge work/a6-rootclient). CI main: lint
   36583327074 success, build-apk 36583327112 success (unit test hijau).
   APP_PLAN A6 [x]. L2: belum (tak ada HP).
+- APP-A7 (2026-09-29): 2 ronde dev-apk + takeover leader (LIHAT catatan
+  panjang A6 untuk pola). ronde 1 REJECT: refresh TIDAK memanggil root
+  (`parseGuardStatus("status=ok\nactive=1")` = string kareta;
+  `RealtimeMetrics(42,1800,30,60)` = angka karangan; cache HIT dihitung
+  lalu dibuang; dirtyMap di-reset tiap capability refresh), `resetKnobKey`
+  menghapus `base` (key hilang dari peta), test menguji `data class copy()`
+  dan ada `assertTrue(true)`. ronde 2 REJECT: memakai API yang TIDAK PERNAH
+  ADA (`RootResult.Ok`, `CommandRunner.run(List)`, `suspend run`) sehingga
+  tidak akan compile; `parseRealtimeFromStatus` masih mengembalikan
+  `else 1800`; `refreshCapability` tetap reset dirtyMap. 2x gagal ->
+  leader TULIS ULANG seluruh A7 (ViewModel, UiState, DirtyTracker,
+  CapabilityCache, KnobsMapping, StatusMapping) + 53 test.
+- PELAJARAN: (26) dev-apk cenderung mengarang API Android yang "kedengarannya
+  benar" (RootResult.Ok, suspend run) - leader WAJIB cross-check signature
+  ke file production sebelum merge; (27) angka hardcoded di ViewModel
+  (`= 42`, `= 1800`, `profileActive = "balanced"`) adalah tanda paling
+  jelas bahwa refresh tidak beneran memanggil root - grep
+  `= 42|= 1800|"balanced"|"unknown"` wajib di review ViewModel; (28)
+  `dirtyMap - key` menghapus base; reset harus `entry.copy(current = base)`;
+  (29) cache yang menaruh versi di NAMA key akan menumpuk entri lama -
+  pakai satu key tetap + versi di payload; (30) `data object X : SealedInterface`
+  = "cannot extend an object" saat kompilasi; (31) `Sequence.takeLast()` tidak
+  ada (pakai `List.takeLast` atau `lines()`).
+- CARA VERIFIKASI KERNEL (inti, pakai untuk A8+): Termux punya JDK 17 +
+  kotlin-compiler, jadi kode Kotlin yang BUKAN butuh Android SDK bisa
+  dikompilasi DAN unit test-nya dijalankan lokal sebelum push.wee ini yang
+  membuat A7/A8 hijau tanpa 2x gagal compile di CI.
+- APP-A8 (2026-09-29, leader langsung): BottomNav 4 tab + ScreenScaffold
+  dipakai apa adanya (A5), navigasi state `mutableIntStateOf` (nol library
+  nav), Beranda = HomePresenter (murni, tanpa androidx) + HomeScreen
+  (Compose). Dialog "Pulihkan backup" WAJIB (AlertDialog) -> ViewModel
+  memanggil `rollback`; `fail>0` dianggap gagal walau rc=0 (parse
+  `Restore <nama> done. ok=N fail=M`, kalau baris tak ada = null, bukan
+  angka karangan). 6 jenis error -> `friendlyError()`; detail modul hanya
+  sebagai info tambahan. PlaceholderScreen untuk Knob/Monitor/Log (A9/A13/A14)
+  - jujur, bukan data palsu. 109 test hijau (A6 32 + A7 53 + A8 24).
+  CI: lint 36590969683 success, build-apk 36590969409 success.
