@@ -132,7 +132,7 @@ dari modul.
 | A5 | Tema dan komponen | [x] |
 | A6 | RootClient dan Repository | [x] |
 | A7 | State, ViewModel, cache | [x] |
-| A8 | Shell navigasi dan Beranda | [ ] |
+| A8 | Shell navigasi dan Beranda | [x] |
 | A9 | Layar Knob | [ ] |
 | A10 | Alur Terapkan | [ ] |
 | A11 | Monitor | [ ] |
