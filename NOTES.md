@@ -922,3 +922,12 @@
 - Tanya user (Q1-Q5): kunci batas = batas engine? readahead preset/rentang
   apa? backlog rentang apa? kirim 5x `su -c cat` dari HP? konfirmasi scope.
   Repo NOL perubahan kode. APP_PLAN K1 tetap [ ].
+
+## K1 live HP (2026-09-29, `su -c cat` read-only + `[ -w ]`, nol tulis)
+- Unisoc T615: vfs_cache_pressure=100, dirty_ratio=20,
+  dirty_background_ratio=5, sda/read_ahead_kb=128,
+  netdev_max_backlog=1000. KELIMA node WRITABLE sebagai root.
+- Artinya Q4 terjawab (node ada + bisa ditulis di HP; `cur` knob bisa
+  dibaca live saat runtime). Q1-Q3 tetap terbuka: kernel TIDAK
+  mengekspos min/max node apa pun, jadi batas knob tetap butuh kunci
+  user. K1 tetap STOP.
