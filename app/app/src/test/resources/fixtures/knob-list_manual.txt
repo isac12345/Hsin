@@ -1,0 +1,5 @@
+key=read_ahead_kb requested=128 applied=2048 category=APPLIED reason="manual override"
+key=vfs_cache_pressure requested=100 applied=250 category=APPLIED reason="manual override"
+key=swappiness requested=60 applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=unknown_key requested=1 applied=- category=SKIPPED reason="tidak diatur"
+{"results":[{"key":"read_ahead_kb","requested":"128","applied":"2048","category":"APPLIED","reason":"manual override"}]}
