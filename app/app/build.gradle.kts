@@ -14,7 +14,6 @@ android {
     targetSdk = 34
     versionCode = 1
     versionName = "1.0.0-beta"
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   buildTypes {
@@ -44,9 +43,9 @@ android {
     compose = true
   }
 
-  composeOptions {
-    kotlinCompilerExtensionVersion = "2.0.20"
-  }
+  // Compiler Compose dikelola plugin org.jetbrains.kotlin.plugin.compose
+  // (versi = versi Kotlin, sesuai panduan migrasi resmi); blok
+  // composeOptions sengaja tidak dipakai agar tidak ganda.
 
   packaging {
     resources {
