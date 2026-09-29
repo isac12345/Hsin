@@ -125,7 +125,7 @@ dari modul.
 | M1b | Kemurnian mode manual | [x] |
 | M2 | Command guard-status | [x] |
 | K1 | Knob engine yang sudah ada | [x] |
-| K2 | Knob tier-1 dari Alpha | [ ] |
+| K2 | Knob tier-1 dari Alpha | [x] |
 | K3 | Knob tier-2 berbasis capability | [ ] |
 | M3 | Perbarui kontrak app-modul | [ ] |
 | A4 | Scaffold proyek dan CI | [ ] |

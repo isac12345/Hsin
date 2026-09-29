@@ -1006,3 +1006,69 @@
   body KOSONG - sisakan `:` atau perintah nyata; (13) hsin_uk_used =
   "override diterima", BUKAN "diterapkan" - kategori final hanya sah
   setelah tulis+verify, jadi jalur gagal harus menulis ulang baris hasil.
+
+## K2 knob tier-1 (2026-09-29, leader langsung, TERIMA L1)
+- Live HP (su -c cat, read-only): add_random=0, iostats=0, nomerges=2,
+  stat_interval=10, page-cluster=0 - kelima node WRITABLE.
+  rate_limit_us: NODE TIDAK ADA (governor aktif = `uscfreq` di policy0
+  dan policy6; `schedutil` ada di scaling_available_governors tapi
+  direktori policy*/schedutil hanya dibuat saat schedutil yang AKTIF).
+  Kedua policygovernor SAMA (uscfreq) -> tidak ada konflik governor yang
+  perlu dilaporkan; knob jadi UNAVAILABLE di device ini, sesuai gate K2.
+- Batas (keputusan user + sumber kernel): queue boolean 0/1; stat_interval
+  1-60 s; page-cluster 0-9; rate_limit_us 0-100000 us. Batas rate_limit_us
+  diverifikasi ke SOURCE kernel (cpufreq_schedutil.c v6.6,
+  rate_limit_us_store: `kstrtouint` TANPA clamp, jadi kernel menerima
+  unsigned int bebas; default = 1.5 x cpuinfo_transition_latency, atau
+  1000 us kalau driver tidak memberi latensi). Artinya batas 0-100000 itu
+  BATAS UI (0 = tanpa rate limit, 100 ms ceiling), bukan batas kernel.
+  BELUM terverifikasi live di HP karena node tidak ada di governor ini -
+  dicatat jujur, butuh L2 (ganti governor ke schedutil lalu baca default).
+- Isi (9 file +248/-40, 2 file baru): engine/io/queue_tuning.sh BARU (3
+  knob boolean per block via hsin_safe_apply, cek ulang 0/1 di engine,
+  UNAVAILABLE/FAILED, HSIN_IO_SKIP_BLOCKS untuk volume eksternal) +
+  didaftarkan di build_release.sh + dipanggil io_manager.sh; core/
+  user_knobs.sh (field io add_random/iostats/nomerges + field cpu
+  rate_limit_us + kunci tetap stat_interval/page_cluster, kind dicek
+  per-field); engine/memory/vm.sh (baris HSIN_VM_SAFE: page-cluster 0-5
+  -> 0-9 + stat_interval 1-60 dengan default "-" = knob tanpa nilai
+  profil); engine/cpu/governor.sh (rate_limit_us per policy, gate
+  governor==schedutil DAN node ada); core/backup.sh (+3 queue +2 VM
+  +rate_limit_us; loop CPU jadi $HSIN_SYSFS_CPU); core/knobs.sh (JSON
+  io.blocks[].queue_tuning, vm.stat_interval, vm.page_cluster,
+  cpu.policies[].rate_limit_us).
+- Koreksi leader saat implementasi: nama sysctl `page-cluster` (hypen)
+  tidak pernah cocok dengan kunci knob `page_cluster` (pola key hanya
+  [A-Za-z0-9_.]) -> override page-cluster diam-diam tidak kepakai
+  (terbukti A: 0 node berubah). Perbaikan: nama node dipetakan ke kunci
+  knob sekali di vm.sh (`tr '-' '_'`) dan SEMUA hsin_uk_result/
+  hsin_uk_used memakai kunci itu, bukan nama node.
+- Bukti L1: sh -n 9/9, shellcheck -S error 0, harness K2 42/42 (A snapshot
+  byte 6 knob satu-per-satu; B manual tanpa override nol tulis; C balanced
+  tidak menulis knob tanpa nilai profil + page-cluster tetap nilai profil;
+  D node hilang UNAVAILABLE tanpa crash; E 10 kasus tolak (boolean
+  non-0/1, luar rentang, >100000, key di kind yang salah); F rate_limit_us
+  schedutil+node=APPLIED, governor lain/node absen=UNAVAILABLE tanpa tulis;
+  G backup->rollback 6 roundtrip; H knobs JSON 7 pemeriksaan termasuk
+  node absen=supported:false; I knob-list kategori benar), suite lama 8/8
+  hijau (K1 36, guard_status 20, boot_guard 10, service_guard 8,
+  safe_apply 11, overrides 9, knob_results 9, scan_prefix 5, degrade 8),
+  runtime ZIP rekonstruksi sh -n OK (14577 baris) + marker K2 ada +
+  0 blok if kosong (kelas bug M2), dispatcher end-to-end knob-set 6/6 OK.
+- CATATAN JUJUR: knob `nomerges` punya options hanya [0,1] sesuai
+  keputusan user, sementara nilai live device ini 2 (kernel modern punya
+  nilai tambahan). Node menerima 0 dan 1 dengan baik, tapi nilai 2 tidak
+  bisa dipilih dari UI - perlu keputusan user terpisah bila mau menambah
+  opsi 2.
+- CATATAN LAIN: `add_random`/`iostats` tidak di-backup sebelum K2 dan
+  sekarang ikut (backup+rollback terbukti). Tidak ada knob VM
+  `page-cluster` yang bisa ditulis di profil non-manual tanpa override -
+  perilakunya sama seperti sebelumnya (halaman lama menulisnya), hanya
+  rentangnya dilebarkan 0-5 -> 0-9 sesuai keputusan user.
+- PELAJARAN: (14) nama sysctl/sisip node yang mengandung karakter di luar
+  pola key knob (hypen) SELALU perlu pemetaan eksplisit di engine, kalau
+  tidak override valid tersimpan tapi tidak pernah dibaca - harus diuji
+  dengan benar-benar cek node berubah, bukan cuma knob-set diterima; (15) knob
+  yang tidak punya nilai profil perlu penanda eksplisit di tabel
+  (default "-") supaya profil lama tidak ikut menulis node yang tadinya
+  tidak pernah ditulis.
