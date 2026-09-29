@@ -1235,3 +1235,37 @@ padahal di pipeline hanya kebetulan benar karena pemanggil menyetel
 `_profile` lebih dulu. Aturan ini juga alasan kenapa harness sandbox harus
 meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
 `_profile`/`$_uk_v` dari engine lain menutupi bug nama variabel.
+
+## A4 scaffold + CI (2026-09-29, leader + dev-apk work/app-a4, TERIMA L1)
+- Keputusan dikunci user: applicationId com.hsin, minSdk 26/targetSdk 34,
+  keystore debug sementara, NOL permission, dep minimal (BOM + activity-
+  compose + lifecycle viewmodel/runtime + coroutines), org.json (tanpa
+  serialization lib), tanpa .java/NDK/Navigation.
+- Isi (merge 7606df3: e8ce6e2 + touch-up d2a6b35, 15 file +233/-12):
+  app/{settings,build}.gradle.kts + gradle.properties + libs.versions.toml
+  (AGP 8.6.0, Kotlin 2.0.20, plugin compose 2.0.20 = versi Kotlin sesuai
+  dokumen resmi, BOM 2024.10.00, activity-compose 1.9.3, lifecycle 2.8.7,
+  coroutines 1.8.1 - tiga terakhir TERBUKTI sukses build di CI ini dari
+  app lama), MainActivity Compose, manifest 1 activity tanpa permission/
+  tanpa service/receiver/provider, icon adaptive XML (tanpa PNG).
+  Workflow build-apk manual: komentar A2 dihapus + step NDK r26/CMake
+  dihapus (tanpa NDK); JDK 17 + platform-34 + Gradle 8.7 tetap.
+- Koreksi leader atas diff pekerja (d2a6b35, 3 file, verifikasi ulang):
+  1) MainActivity import material3 TANPA dependensi (pasti gagal compile)
+  -> tulis ulang foundation-only agar daftar dep persis seperti dikunci;
+  2) blok composeOptions ganda dengan plugin compose (panduan migrasi
+  resmi: plugin yang mengatur) -> hapus, sisakan komentar;
+  3) testInstrumentationRunner tanpa lib runner -> hapus.
+  Koreksi lanjutan 4df9a58: artifact `foundation` (Box/Column/BasicText)
+  tidak ada di katalog -> tambah compose-foundation dari BOM.
+- Bukti: 0 file .java; grep ndk/cmake/externalNativeBuild kosong;
+  grep navigation/serialization/appcompat kosong; semua versi hanya di
+  toml; manifest bersih. Build CI #1 run 36537223562 GAGAL (Unresolved
+  reference 'foundation' - bukti Aturan: kode Kotlin tak bisa dikompilasi
+  lokal, CI adalah verifikator); build CI #2 run 36537576407 SUCCESS
+  3m33s, artifact hsin-debug-apk 6.856.887 byte (~6,5 MiB; dex 17,4 MB
+  tak terkompres = runtime Compose debug, wajar tanpa R8).
+- PELAJARAN: (16) file Kotlin BARU wajib di-review import-vs-katalog
+  sebelum push - Termux tidak bisa compile, jadi satu import liar =
+  satu siklus CI gagal; (17) BOM hanya mengatur VERSI, bukan
+  menyediakan artifact - tiap import compose.* harus dicek ada di katalog.
