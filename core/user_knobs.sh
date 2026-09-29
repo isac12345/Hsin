@@ -91,11 +91,13 @@ _uk_esc() {
 #
 # Bentuk yang sah, semua tertutup:
 #   cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us)
-#   gpu_node_<nama>_(gov|max_khz|min_khz|sched)
+#   gpu_node_<nama>_(gov|max_khz|min_khz|sched|polling_interval|up_threshold|down_differential)
 #   io_block_<nama>_(gov|max_khz|min_khz|sched|readahead|add_random|iostats|nomerges)
 #   zram_algo | swappiness | tcp_cc | tfo | vfs_cache_pressure |
 #   dirty_ratio | dirty_background_ratio | backlog | stat_interval |
-#   page_cluster
+#   page_cluster | sched_child_runs_first | sched_latency_pct |
+#   sched_min_granularity_pct | sched_wakeup_granularity_pct | uclamp_min |
+#   uclamp_max | mali_boost_level2 | mali_pollingtime | mali_upthreshold
 #
 # Field io/cpu punya jenis nilai sendiri: _QUEUE_FIELDS (0/1),
 # _readahead (preset), rate_limit_us (rentang). gpu/gov/sched/algo/CC
@@ -122,6 +124,10 @@ _uk_class() {
             _uk_kind="fixed"
             _uk_num=1
             ;;
+        sched_child_runs_first|uclamp_min|uclamp_max|sched_latency_pct|sched_min_granularity_pct|sched_wakeup_granularity_pct|mali_boost_level2|mali_pollingtime|mali_upthreshold)
+            _uk_kind="fixed"
+            _uk_num=1
+            ;;
     esac
     [ -n "$_uk_kind" ] && return 0
 
@@ -132,7 +138,38 @@ _uk_class() {
         *_min_khz) _uk_tfield="min_khz" ;;
         *_sched) _uk_tfield="sched" ;;
         *_readahead) _uk_tfield="readahead" ;;
+        *_polling_interval)
+            # devfreq ABI: satuan ms, nilai < 1 jiffy dianggap 0 (no
+            # polling). Batas atas = batas UI agar polling tidak dibuat
+            # sangat lambat (1 detik sudah lebih dari cukup).
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 6 ] || return 1
+            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+            [ "$_uk_v" -le 1000 ] 2>/dev/null || return 1
+            return 0
+            ;;
+        *_up_threshold)
+            # devfreq ondemand ABI: persen (0-100), 0 berarti selalu
+            # freak. Batas bawah 1 karena governor ondemand mainstream
+            # menolak 0.
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 3 ] || return 1
+            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
+            return 0
+            ;;
+        *_down_differential)
+            # devfreq ABI: persen selisih yang harus terlampaui sebelum
+            # governor menurunkan frekuensi.
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 3 ] || return 1
+            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
+            return 0
+            ;;
         *_rate_limit_us) _uk_tfield="rate_limit_us" ;;
+        *_polling_interval) _uk_tfield="polling_interval" ;;
+        *_up_threshold) _uk_tfield="up_threshold" ;;
+        *_down_differential) _uk_tfield="down_differential" ;;
         *_add_random) _uk_tfield="add_random" ;;
         *_iostats) _uk_tfield="iostats" ;;
         *_nomerges) _uk_tfield="nomerges" ;;
@@ -265,6 +302,36 @@ hsin_uk_val_ok() {
             page_cluster)
                 [ "$_uk_v" -ge 0 ] 2>/dev/null || return 1
                 [ "$_uk_v" -le 9 ] 2>/dev/null || return 1 ;;
+            sched_child_runs_first)
+                [ "$_uk_v" -ge 0 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 1 ] 2>/dev/null || return 1 ;;
+            uclamp_min|uclamp_max)
+                # Kernel: SCHED_CAPACITY_SCALE = 1024, jadi 0..1024 penuh
+                # (1024 = 100% kapasitas).
+                [ "$_uk_v" -ge 0 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 1024 ] 2>/dev/null || return 1 ;;
+            sched_latency_pct|sched_min_granularity_pct|sched_wakeup_granularity_pct)
+                # Persen dari nilai native (engine scheduler.sh sudah
+                # bekerja dalam persen + lantai 500000 ns). 10-200% supaya
+                # user bisa lebih agresif tanpa bisa mengecilkan di bawah
+                # ambang yang masuk akal.
+                case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+                [ "${#_uk_v}" -le 3 ] || return 1
+                [ "$_uk_v" -ge 10 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 200 ] 2>/dev/null || return 1 ;;
+            mali_boost_level2)
+                [ "$_uk_v" -ge 0 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 1 ] 2>/dev/null || return 1 ;;
+            mali_pollingtime)
+                case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+                [ "${#_uk_v}" -le 3 ] || return 1
+                [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 10 ] 2>/dev/null || return 1 ;;
+            mali_upthreshold)
+                case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+                [ "${#_uk_v}" -le 3 ] || return 1
+                [ "$_uk_v" -ge 10 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 100 ] 2>/dev/null || return 1 ;;
         esac
         return 0
     fi
@@ -366,7 +433,7 @@ hsin_uk_set() {
     if ! hsin_uk_key_ok "$1"; then
         # Key tidak dicetak di pesan error: input ini belum tervalidasi
         # dan bisa saja berisi karakter yang merusak baris output.
-        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us), gpu_node_<nama>_..., io_block_<nama>_(gov|max_khz|min_khz|sched|readahead|add_random|iostats|nomerges), zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog, stat_interval, page_cluster)"
+        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us), gpu_node_<nama>_(gov|max_khz|min_khz|sched|polling_interval|up_threshold|down_differential), io_block_<nama>_..., zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog, stat_interval, page_cluster, sched_child_runs_first, sched_latency_pct, sched_min_granularity_pct, sched_wakeup_granularity_pct, uclamp_min, uclamp_max, mali_boost_level2, mali_pollingtime, mali_upthreshold)"
         return 1
     fi
     _uk_k="$1"
@@ -384,12 +451,21 @@ hsin_uk_set() {
             *_nomerges)
                 echo "ERROR: $_uk_k: nilai harus 0, 1, atau 2 (0=all merge, 1=simple merge saja, 2=tanpa merge)"
                 ;;
+            *_polling_interval)
+                echo "ERROR: $_uk_k: nilai harus angka 1-1000 (ms)"
+                ;;
+            *_up_threshold)
+                echo "ERROR: $_uk_k: nilai harus angka 1-100 (persen)"
+                ;;
+            *_down_differential)
+                echo "ERROR: $_uk_k: nilai harus angka 0-100 (persen)"
+                ;;
             *_rate_limit_us)
                 echo "ERROR: $_uk_k: nilai harus angka 0-100000 (mikrodetik, 0 = tanpa rate limit)"
                 ;;
             *)
                 if [ "$_uk_num" = "1" ]; then
-                    echo "ERROR: $_uk_k: nilai harus angka (kHz 100000-5000000, swappiness 0-200, tfo 0-3, vfs_cache_pressure 0-1000, dirty_ratio 1-90, dirty_background_ratio 1-50, backlog 128-16384, stat_interval 1-60, page_cluster 0-9)"
+                    echo "ERROR: $_uk_k: nilai harus angka (kHz 100000-5000000, swappiness 0-200, tfo 0-3, vfs_cache_pressure 0-1000, dirty_ratio 1-90, dirty_background_ratio 1-50, backlog 128-16384, stat_interval 1-60, page_cluster 0-9, sched_child_runs_first 0-1, uclamp_min/max 0-1024, sched_*_pct 10-200, mali_boost_level2 0-1, mali_pollingtime 1-10, mali_upthreshold 10-100)"
                 else
                     echo "ERROR: $_uk_k: nilai harus token 1-32 karakter huruf/angka"
                 fi
@@ -425,7 +501,7 @@ hsin_uk_set() {
 hsin_uk_del() {
     [ "$#" -ge 1 ] || { echo "ERROR: hsin_uk_del butuh <key>"; return 1; }
     if ! hsin_uk_key_ok "$1"; then
-        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us), gpu_node_<nama>_..., io_block_<nama>_(gov|max_khz|min_khz|sched|readahead|add_random|iostats|nomerges), zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog, stat_interval, page_cluster)"
+        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched|rate_limit_us), gpu_node_<nama>_(gov|max_khz|min_khz|sched|polling_interval|up_threshold|down_differential), io_block_<nama>_..., zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog, stat_interval, page_cluster, sched_child_runs_first, sched_latency_pct, sched_min_granularity_pct, sched_wakeup_granularity_pct, uclamp_min, uclamp_max, mali_boost_level2, mali_pollingtime, mali_upthreshold)"
         return 1
     fi
     _uk_rewrite "drop" "$1" ""
@@ -655,11 +731,13 @@ hsin_uk_cpu_field() {
     hsin_uk_get "cpu_policy_$1_$2"
 }
 
-# $1 = node devfreq (path penuh atau basename), $2 = gov|max_khz
+# $1 = node devfreq (path penuh atau basename), $2 = gov|max_khz|polling_interval|up_threshold|down_differential
+# (daftar tertutup: nama node dari device, jadi field-nya ikut ditutup
+# supaya key tak sengaja tidak mungkin terbentuk).
 hsin_uk_gpu_field() {
     [ "$#" -ge 2 ] || return 1
     case "$2" in
-        gov|max_khz) ;;
+        gov|max_khz|polling_interval|up_threshold|down_differential) ;;
         *) return 1 ;;
     esac
     _uk_sanitize "${1##*/}"

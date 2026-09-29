@@ -528,6 +528,136 @@ _kn_io_json() {
 # network: TCP congestion control + TCP Fast Open. Batas TFO 0..3 = bitmask
 # kernel (1 client, 2 server, 3 keduanya) - nilai yang sama dengan yang
 # ditulis engine/network/tcp.sh.
+# K3: tiga tunable devfreq per node. Batas = devfreq ABI + batas UI
+# (lihat NOTES K3). Node hilang = supported:false, cur 0 (bukan crash).
+_kn_gpu_tunables_json() {
+    _kn_gt=""
+    for _kn_g in $HSIN_GPU_DEVFRES; do
+        [ -d "$_kn_g" ] || continue
+        _kn_esc "${_kn_g##*/}"
+        _kn_gtn="$_kn_e"
+        for _kn_gt_spec in "polling_interval|1|1000" "up_threshold|1|100" "down_differential|0|100"; do
+            _kn_gt_f="${_kn_gt_spec%%|*}"
+            _kn_gt_rest="${_kn_gt_spec#*|}"
+            _kn_gt_min="${_kn_gt_rest%%|*}"
+            _kn_gt_max="${_kn_gt_rest#*|}"
+            _kn_gt_node="$_kn_g/$_kn_gt_f"
+            if [ -r "$_kn_gt_node" ]; then
+                _kn_gt_raw=$(hsin_node_read "$_kn_gt_node" 2>/dev/null)
+                _kn_num "$_kn_gt_raw"
+                _kn_gt_cur="$_kn_n"
+                [ -w "$_kn_gt_node" ] && _kn_gt_w=true || _kn_gt_w=false
+                _kn_gt_sup=true
+            else
+                _kn_gt_cur=0
+                _kn_gt_w=false
+                _kn_gt_sup=false
+            fi
+            _kn_arr_reset
+            _kn_num "$_kn_gt_min"; _kn_arr_add "$_kn_n"
+            _kn_num "$_kn_gt_max"; _kn_arr_add "$_kn_n"
+            _kn_gt_obj="\"min\":${_kn_gt_min},\"max\":${_kn_gt_max},\"cur\":${_kn_gt_cur},\"writable\":${_kn_gt_w},\"supported\":${_kn_gt_sup}"
+            _kn_gt_all="${_kn_gt_all:+${_kn_gt_all},}"
+            _kn_gt_all="${_kn_gt_all}\"${_kn_gt_f}\":{${_kn_gt_obj}}"
+        done
+        _kn_gt_all2="${_kn_gt_all2:+${_kn_gt_all2},}"
+        _kn_gt_all2="${_kn_gt_all2}{\"node\":\"${_kn_gtn}\",\"tunables\":{${_kn_gt_all}}}"
+        _kn_gt_all=""
+    done
+    _kn_out_gt="[${_kn_gt_all2}]"
+    return 0
+}
+
+# K3: node scheduler (sched_child_runs_first + 3 sysctl sched) + uclamp
+# foreground + parameter Mali KBase. Semua live dari node; yang hilang =
+# supported:false, cur 0.
+_kn_sched_json() {
+    _kn_sc_crf_sup=false
+    _kn_sc_crf_cur=0
+    if [ -f "$HSIN_PROC/sys/kernel/sched_child_runs_first" ]; then
+        _kn_sc_crf_raw=$(hsin_node_read "$HSIN_PROC/sys/kernel/sched_child_runs_first" 2>/dev/null)
+        _kn_num "$_kn_sc_crf_raw"
+        _kn_sc_crf_cur="$_kn_n"
+        [ -w "$HSIN_PROC/sys/kernel/sched_child_runs_first" ] && _kn_sc_crf_w=true || _kn_sc_crf_w=false
+        _kn_sc_crf_sup=true
+    else
+        _kn_sc_crf_w=false
+    fi
+    _kn_sc_lat='{"min":10,"max":200,"cur":0,"writable":false,"supported":false}'
+    for _kn_sc_spec in "sched_latency_ns|10|200" "sched_min_granularity_ns|10|200" "sched_wakeup_granularity_ns|10|200"; do
+        _kn_sc_f="${_kn_sc_spec%%|*}"
+        _kn_sc_rest="${_kn_sc_spec#*|}"
+        _kn_sc_min="${_kn_sc_rest%%|*}"
+        _kn_sc_max="${_kn_sc_rest#*|}"
+        _kn_sc_node="$HSIN_PROC/sys/kernel/$_kn_sc_f"
+        if [ -r "$_kn_sc_node" ]; then
+            _kn_sc_raw=$(hsin_node_read "$_kn_sc_node" 2>/dev/null)
+            _kn_num "$_kn_sc_raw"
+            _kn_sc_cur="$_kn_n"
+            [ -w "$_kn_sc_node" ] && _kn_sc_w=true || _kn_sc_w=false
+            _kn_sc_sup=true
+        else
+            _kn_sc_cur=0
+            _kn_sc_w=false
+            _kn_sc_sup=false
+        fi
+        [ -n "$_kn_sc_all" ] && _kn_sc_all="${_kn_sc_all},"
+        _kn_sc_all="${_kn_sc_all}\"${_kn_sc_f}\":{\"min\":${_kn_sc_min},\"max\":${_kn_sc_max},\"cur\":${_kn_sc_cur},\"writable\":${_kn_sc_w},\"supported\":${_kn_sc_sup}}"
+    done
+    # uclamp
+    _kn_uc_dir="${HSIN_UCLAMP_DIR:-/dev/cpuctl}/foreground"
+    _kn_uc_all=""
+    for _kn_uc_spec in "uclamp_min|cpu.uclamp.min" "uclamp_max|cpu.uclamp.max"; do
+        _kn_uc_key="${_kn_uc_spec%%|*}"
+        _kn_uc_file="${_kn_uc_spec#*|}"
+        _kn_uc_node="$_kn_uc_dir/$_kn_uc_file"
+        if [ -r "$_kn_uc_node" ]; then
+            _kn_uc_raw=$(hsin_node_read "$_kn_uc_node" 2>/dev/null)
+            _kn_num "$_kn_uc_raw"
+            _kn_uc_cur="$_kn_n"
+            [ -w "$_kn_uc_node" ] && _kn_uc_w=true || _kn_uc_w=false
+            _kn_uc_sup=true
+        else
+            _kn_uc_cur=0
+            _kn_uc_w=false
+            _kn_uc_sup=false
+        fi
+        [ -n "$_kn_uc_all" ] && _kn_uc_all="${_kn_uc_all},"
+        _kn_uc_all="${_kn_uc_all}\"${_kn_uc_key}\":{\"min\":0,\"max\":1024,\"cur\":${_kn_uc_cur},\"writable\":${_kn_uc_w},\"supported\":${_kn_uc_sup}}"
+    done
+    _kn_out_sched="{\"child_runs_first\":{\"min\":0,\"max\":1,\"cur\":${_kn_sc_crf_cur},\"writable\":${_kn_sc_crf_w},\"supported\":${_kn_sc_crf_sup}},\"sysctl\":{${_kn_sc_all}},\"uclamp\":{${_kn_uc_all}}}"
+    return 0
+}
+
+# K3: parameter Mali KBase (jika device punya).
+_kn_kbase_json() {
+    _kn_kb_all=""
+    for _kn_kb_spec in "mali_boost_level2|gpu_boost_level2|0|1" "mali_pollingtime|gpu_pollingtime|1|10" "mali_upthreshold|gpu_upthreshold|10|100"; do
+        _kn_kb_key="${_kn_kb_spec%%|*}"
+        _kn_kb_rest="${_kn_kb_spec#*|}"
+        _kn_kb_file="${_kn_kb_rest%%|*}"
+        _kn_kb_rest2="${_kn_kb_rest#*|}"
+        _kn_kb_min="${_kn_kb_rest2%%|*}"
+        _kn_kb_max="${_kn_kb_rest2#*|}"
+        _kn_kb_node="${HSIN_SYSFS_KBASE:-/sys/module/mali_kbase/parameters}/$_kn_kb_file"
+        if [ -r "$_kn_kb_node" ]; then
+            _kn_kb_raw=$(hsin_node_read "$_kn_kb_node" 2>/dev/null)
+            _kn_num "$_kn_kb_raw"
+            _kn_kb_cur="$_kn_n"
+            [ -w "$_kn_kb_node" ] && _kn_kb_w=true || _kn_kb_w=false
+            _kn_kb_sup=true
+        else
+            _kn_kb_cur=0
+            _kn_kb_w=false
+            _kn_kb_sup=false
+        fi
+        [ -n "$_kn_kb_all" ] && _kn_kb_all="${_kn_kb_all},"
+        _kn_kb_all="${_kn_kb_all}\"${_kn_kb_key}\":{\"min\":${_kn_kb_min},\"max\":${_kn_kb_max},\"cur\":${_kn_kb_cur},\"writable\":${_kn_kb_w},\"supported\":${_kn_kb_sup}}"
+    done
+    _kn_out_kbase="{${_kn_kb_all}}"
+    return 0
+}
+
 _kn_net_json() {
     _kn_tcp="[]"
     _kn_tcp_sup=false
@@ -735,13 +865,17 @@ hsin_knobs_json() {
     _kn_io_json
     _kn_net_json
     _kn_backlog_json
+    _kn_gpu_tunables_json
+    _kn_sched_json
+    _kn_kbase_json
     _kn_disp_json
     _kn_feat_json
     _kn_caps_json
 
-    printf '{"v":1,"profiles":%s,"cpu":%s,"gpu":%s,"memory":%s,"vm":%s,"io":%s,"network":%s,"backlog":%s,"display":%s,"features":%s,"capabilities":%s}\n' \
+    printf '{"v":1,"profiles":%s,"cpu":%s,"gpu":%s,"memory":%s,"vm":%s,"io":%s,"network":%s,"backlog":%s,"sched":%s,"gpu_tunables":%s,"mali_kbase":%s,"display":%s,"features":%s,"capabilities":%s}\n' \
         "$_kn_out_profiles" "$_kn_out_cpu" "$_kn_out_gpu" "$_kn_out_mem" \
         "$_kn_out_vm" "$_kn_out_io" "$_kn_out_net" "$_kn_out_backlog" \
+        "$_kn_out_sched" "$_kn_out_gt" "$_kn_out_kbase" \
         "$_kn_out_disp" "$_kn_out_feat" "$_kn_out_caps"
     return 0
 }

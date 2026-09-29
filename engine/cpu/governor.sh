@@ -207,14 +207,45 @@ hsin_cpu_governor_apply() {
     # Scheduler: sched_child_runs_first
     # Ensures child processes (like app spawns) run before parents,
     # reducing app launch latency. Enabled on performance/extreme.
-    if [ -w $HSIN_PROC/sys/kernel/sched_child_runs_first ]; then
-        case "$_profile" in
-            performance|extreme) _scrf="1" ;;
-            *)                   _scrf="0" ;;
+    _scrf_node="$HSIN_PROC/sys/kernel/sched_child_runs_first"
+    _scrf_uk=$(hsin_uk_get sched_child_runs_first 2>/dev/null)
+    if [ -n "$_scrf_uk" ]; then
+        # Cek ulang di engine (pola tfo): file override bisa diisi manual.
+        case "$_scrf_uk" in
+            0|1) ;;
+            *)
+                hsin_log_warn "cpu" "override sched_child_runs_first=$_scrf_uk ditolak: harus 0 atau 1"
+                if [ "$_profile" = "manual" ]; then
+                    hsin_uk_result "sched_child_runs_first" "$_scrf_uk" "-" "SKIPPED" "ditolak: bukan 0/1 (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    hsin_uk_result "sched_child_runs_first" "$_scrf_uk" "-" "FALLBACK" "ditolak: bukan 0/1, pakai nilai profil" 2>/dev/null || true
+                fi
+                _scrf_uk=""
+                ;;
         esac
-        _cur_scrf=$(cat $HSIN_PROC/sys/kernel/sched_child_runs_first 2>/dev/null)
-        if [ "$_cur_scrf" != "$_scrf" ]; then
-            echo "$_scrf" > $HSIN_PROC/sys/kernel/sched_child_runs_first 2>/dev/null
+    fi
+    if [ -n "$_scrf_uk" ]; then
+        # Manual tanpa override: nol penulisan.
+        if [ ! -f "$_scrf_node" ] || [ ! -w "$_scrf_node" ]; then
+            hsin_uk_result "sched_child_runs_first" "$_scrf_uk" "-" "UNAVAILABLE" "node hilang atau read-only" 2>/dev/null || true
+        elif hsin_node_write_verify "$_scrf_node" "$_scrf_uk"; then
+            hsin_uk_used "cpu" "sched_child_runs_first" "$_scrf_uk"
+        else
+            hsin_uk_result "sched_child_runs_first" "$_scrf_uk" "-" "FAILED" "tulis/readback gagal" 2>/dev/null || true
+        fi
+    else
+        if [ "$_profile" = "manual" ]; then
+            hsin_uk_result "sched_child_runs_first" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+        elif [ -w "$_scrf_node" ]; then
+            case "$_profile" in
+                performance|extreme) _scrf="1" ;;
+                *)                   _scrf="0" ;;
+            esac
+            _cur_scrf=$(cat "$_scrf_node" 2>/dev/null)
+            if [ "$_cur_scrf" != "$_scrf" ]; then
+                echo "$_scrf" > "$_scrf_node" 2>/dev/null
+            fi
+            hsin_uk_result "sched_child_runs_first" "(profil)" "$_scrf" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
     fi
 

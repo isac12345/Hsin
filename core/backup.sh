@@ -151,6 +151,19 @@ hsin_backup_io() {
     done
 }
 
+# K3: node scheduler/uclamp. cgroup v1 vendor (default /dev/cpuctl) -
+# prefix bisa diarahkan lewat HSIN_UCLAMP_DIR supaya bisa di-sandbox.
+hsin_backup_sched() {
+    [ -f "$HSIN_PROC/sys/kernel/sched_child_runs_first" ] && hsin_backup_node "$HSIN_PROC/sys/kernel/sched_child_runs_first"
+    [ -f "$HSIN_PROC/sys/kernel/sched_latency_ns" ] && hsin_backup_node "$HSIN_PROC/sys/kernel/sched_latency_ns"
+    [ -f "$HSIN_PROC/sys/kernel/sched_min_granularity_ns" ] && hsin_backup_node "$HSIN_PROC/sys/kernel/sched_min_granularity_ns"
+    [ -f "$HSIN_PROC/sys/kernel/sched_wakeup_granularity_ns" ] && hsin_backup_node "$HSIN_PROC/sys/kernel/sched_wakeup_granularity_ns"
+    _uc_dir="${HSIN_UCLAMP_DIR:-/dev/cpuctl}/foreground"
+    [ -f "$_uc_dir/cpu.uclamp.min" ] && hsin_backup_node "$_uc_dir/cpu.uclamp.min"
+    [ -f "$_uc_dir/cpu.uclamp.max" ] && hsin_backup_node "$_uc_dir/cpu.uclamp.max"
+    return 0
+}
+
 hsin_backup_memory() {
     [ -f "$HSIN_PROC/sys/vm/swappiness" ] && hsin_backup_node "$HSIN_PROC/sys/vm/swappiness"
     # K1: 3 knob VM baru ikut backup (restore lewat nodes.list generik).
@@ -160,6 +173,27 @@ hsin_backup_memory() {
     # K2: stat_interval + page-cluster.
     [ -f "$HSIN_PROC/sys/vm/stat_interval" ] && hsin_backup_node "$HSIN_PROC/sys/vm/stat_interval"
     [ -f "$HSIN_PROC/sys/vm/page-cluster" ] && hsin_backup_node "$HSIN_PROC/sys/vm/page-cluster"
+}
+
+# K3: tunable devfreq per node GPU + parameter Mali KBase.
+hsin_backup_gpu_tuning() {
+    for d in "${HSIN_SYSFS_DEVFREQ:-/sys/class/devfreq}"/*; do
+        [ -d "$d" ] || continue
+        hsin_devfreq_gpu_candidate "$d" || continue
+        hsin_backup_node "$d/polling_interval"
+        hsin_backup_node "$d/up_threshold"
+        hsin_backup_node "$d/down_differential"
+    done
+    for m in "${HSIN_SYSFS_KBASE:-/sys/module/mali_kbase/parameters}"/*; do
+        [ -f "$m" ] || continue
+        _kbn="${m##*/}"
+        case "$_kbn" in
+            gpu_boost_level2|gpu_pollingtime|gpu_upthreshold)
+                hsin_backup_node "$m"
+                ;;
+        esac
+    done
+    return 0
 }
 
 hsin_backup_network() {
@@ -178,6 +212,8 @@ hsin_backup_all() {
     hsin_backup_thermal
     hsin_backup_io
     hsin_backup_memory
+    hsin_backup_sched
+    hsin_backup_gpu_tuning
     hsin_backup_network
     _count=$(wc -l < "$HSIN_BACKUP_CUR/nodes.list" 2>/dev/null)
     hsin_log_ok "backup" "Snapshot captured: $_count nodes"

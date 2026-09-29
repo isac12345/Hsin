@@ -113,11 +113,12 @@ hsin_cpu_uclamp_apply() {
     # Check if uclamp is available
     [ -d "/dev/cpuctl" ] || return 0
 
+    # CATATAN (pelajaran K2): profile manual TIDAK boleh return dini di
+    # sini - override user harus tetap berlaku. Mode manual tanpa override
+    # ditangani di dalam loop (SKIPPED, nol tulis), bukan di awal fungsi.
     case "$_profile" in
         manual)
-            echo "    uclamp: dilewati (mode manual)"
-            return 0
-            ;;
+            _min=""; _max="" ;;
         battery)
             _min="0"; _max="50" ;;
         balanced)
@@ -134,15 +135,83 @@ hsin_cpu_uclamp_apply() {
             _min="60"; _max="100" ;;
     esac
 
-    # Apply to foreground
-    if [ -w "/dev/cpuctl/foreground/cpu.uclamp.min" ]; then
-        echo "$_min" > "/dev/cpuctl/foreground/cpu.uclamp.min" 2>/dev/null
-    fi
-    if [ -w "/dev/cpuctl/foreground/cpu.uclamp.max" ]; then
-        echo "$_max" > "/dev/cpuctl/foreground/cpu.uclamp.max" 2>/dev/null
-    fi
+    # K3: knob uclamp grup foreground. Node dipakai persis path yang
+    # dipakai kode lama (/dev/cpuctl = cgroup v1 vendor Unisoc; default
+    # HSIN_UCLAMP_DIR bisa diarahkan untuk device lain). Tanpa override
+    # di mode manual TIDAK menulis apa pun.
+    _uc_dir="${HSIN_UCLAMP_DIR:-/dev/cpuctl}/foreground"
+    _uc_min_node="$_uc_dir/cpu.uclamp.min"
+    _uc_max_node="$_uc_dir/cpu.uclamp.max"
+    _uc_applied=0
+    for _uc_pair in "min|$_uc_min_node|$_min" "max|$_uc_max_node|$_max"; do
+        _uc_f="${_uc_pair%%|*}"
+        _uc_rest="${_uc_pair#*|}"
+        _uc_node="${_uc_rest%%|*}"
+        _uc_prof="${_uc_rest#*|}"
+        _uc_key="uclamp_$_uc_f"
+        _uc_uk=$(hsin_uk_get "$_uc_key" 2>/dev/null)
+        if [ -n "$_uc_uk" ]; then
+            # Cek ulang di engine (pola tfo).
+            case "$_uc_uk" in
+                ''|*[!0-9]*)
+                    hsin_log_warn "cpu" "override $_uc_key=$_uc_uk ditolak: harus angka 0-1024"
+                    if [ "$_profile" = "manual" ]; then
+                        hsin_uk_result "$_uc_key" "$_uc_uk" "-" "SKIPPED" "ditolak: bukan angka (mode manual, tidak ditulis)" 2>/dev/null || true
+                    else
+                        hsin_uk_result "$_uc_key" "$_uc_uk" "$_uc_prof" "FALLBACK" "ditolak: bukan angka, pakai profil" 2>/dev/null || true
+                    fi
+                    continue
+                    ;;
+            esac
+            if [ "$_uc_uk" -gt 1024 ] 2>/dev/null; then
+                hsin_log_warn "cpu" "override $_uc_key=$_uc_uk ditolak: maksimal 1024"
+                if [ "$_profile" = "manual" ]; then
+                    hsin_uk_result "$_uc_key" "$_uc_uk" "-" "SKIPPED" "ditolak: > 1024 (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    hsin_uk_result "$_uc_key" "$_uc_uk" "$_uc_prof" "FALLBACK" "ditolak: > 1024, pakai profil" 2>/dev/null || true
+                fi
+                continue
+            fi
+        fi
+        if [ -z "$_uc_uk" ]; then
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "$_uc_key" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+                continue
+            fi
+            _uc_uk="$_uc_prof"
+            _uc_req="(profil)"
+        else
+            _uc_req="$_uc_uk"
+        fi
+        if [ ! -f "$_uc_node" ] || [ ! -w "$_uc_node" ]; then
+            hsin_uk_result "$_uc_key" "$_uc_req" "-" "UNAVAILABLE" "node uclamp $_uc_f hilang atau read-only" 2>/dev/null || true
+            continue
+        fi
+        # Tulis + readback. PERHATIKAN: beberapa kernel vendor menulis
+        # nilai sebagai pecahan ("0.00") atau string ("max"), jadi
+        # perbandingan readback longgar: yang penting bukan string identik,
+        # tapi node berubah dan tidak kosong.
+        _uc_before=$(cat "$_uc_node" 2>/dev/null)
+        if echo "$_uc_uk" > "$_uc_node" 2>/dev/null; then
+            _uc_after=$(cat "$_uc_node" 2>/dev/null)
+            [ -n "$_uc_after" ] || _uc_after="kosong"
+            if [ "$_uc_before" = "$_uc_after" ]; then
+                hsin_log_warn "cpu" "uclamp $_uc_f: nilai tetap $_uc_after (target $_uc_uk ditolak kernel)"
+                hsin_uk_result "$_uc_key" "$_uc_uk" "$_uc_after" "FAILED" "nilai ditolak kernel / tidak berubah" 2>/dev/null || true
+            else
+                _uc_applied=$((_uc_applied + 1))
+                if [ "$_uc_req" = "(profil)" ]; then
+                    hsin_uk_result "$_uc_key" "(profil)" "$_uc_uk" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+                else
+                    hsin_uk_used "cpu" "$_uc_key" "$_uc_uk"
+                fi
+            fi
+        else
+            hsin_uk_result "$_uc_key" "$_uc_uk" "-" "FAILED" "tulis ditolak" 2>/dev/null || true
+        fi
+    done
 
-    echo "    uclamp: min=$_min max=$_max"
+    echo "    uclamp: min=${_min:-manual} max=${_max:-manual} (knob applied=$_uc_applied)"
     return 0
 }
 
@@ -331,12 +400,21 @@ hsin_cpu_sched_lat_apply() {
     # (native, untouched) rather than a battery-favoring alternate value -
     # this feature exists to fix gaming frame pacing, not to also invent
     # an unrequested battery-saving scheduler behavior.
+    # K3: knob override BERBASIS PERSEN untuk 3 sysctl sched (latency,
+    # min_granularity, wakeup_granularity). Sengaja persen, bukan nanodetik
+    # absolut: jalur tulis yang sudah ada (dan teruji di HP) bekerja dalam
+    # persen-from-native + lantai keras 500000 ns, dan catatan di file ini
+    # bukti kernel vendor bisa saling menimpa nilai antar node - jadi
+    # mengubahnya ke absolut akan jadi semantik baru yang belum teruji.
+    # migration_cost DIKECUALIKAN (di luar cakupan K3).
+    _hl_uk_lat=$(hsin_uk_get sched_latency_pct 2>/dev/null)
+    _hl_uk_min=$(hsin_uk_get sched_min_granularity_pct 2>/dev/null)
+    _hl_uk_wake=$(hsin_uk_get sched_wakeup_granularity_pct 2>/dev/null)
+
     case "$_profile" in
         manual)
-            # Mode manual: hanya terapkan jika ada override (tidak ada override knob untuk sched-lat)
-            echo "    sched-latency: dilewati (mode manual)"
-            return 0
-            ;;
+            # Tanpa override: nol penulisan; tiga knob tetap dicatat.
+            _lat_pct=""; _mingran_pct=""; _wake_pct=""; _migr_pct="" ;;
         battery|balanced)
             _lat_pct=100; _mingran_pct=100; _wake_pct=100; _migr_pct=100 ;;
         performance)
@@ -347,6 +425,57 @@ hsin_cpu_sched_lat_apply() {
             echo "    sched-latency: unknown profile '$_profile', skipped" >&2
             return 1 ;;
     esac
+
+    # Override knob (persen) menang atas nilai profil. Cek ulang di engine
+    # (pola tfo) + hasil dicatat di semua jalur.
+    for _hl_spec in \
+        "sched_latency_pct|$_hl_uk_lat|_lat_pct|sched_latency_ns" \
+        "sched_min_granularity_pct|$_hl_uk_min|_mingran_pct|sched_min_granularity_ns" \
+        "sched_wakeup_granularity_pct|$_hl_uk_wake|_wake_pct|sched_wakeup_granularity_ns"; do
+        _hl_key="${_hl_spec%%|*}"
+        _hl_rest="${_hl_spec#*|}"
+        _hl_uk="${_hl_rest%%|*}"
+        _hl_rest2="${_hl_rest#*|}"
+        # _hl_var diisi lewat eval karena nama variabel profil datang dari
+        # daftar tertutup di atas.
+        eval "_hl_var=\${_hl_rest2%%|*}"
+        _hl_canon="${_hl_rest2#*|}"
+        if [ -n "$_hl_uk" ]; then
+            _hl_bad=0
+            case "$_hl_uk" in
+                ''|*[!0-9]*) _hl_bad=1 ;;
+                *)
+                    [ "$_hl_uk" -lt 10 ] 2>/dev/null && _hl_bad=1
+                    [ "$_hl_uk" -gt 200 ] 2>/dev/null && _hl_bad=1
+                    ;;
+            esac
+            if [ "$_hl_bad" = "1" ]; then
+                hsin_log_warn "cpu" "override $_hl_key=$_hl_uk ditolak: harus 10-200 (persen)"
+                if [ "$_profile" = "manual" ]; then
+                    hsin_uk_result "$_hl_key" "$_hl_uk" "-" "SKIPPED" "ditolak: di luar 10-200 (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    hsin_uk_result "$_hl_key" "$_hl_uk" "-" "FALLBACK" "ditolak: di luar 10-200, pakai profil" 2>/dev/null || true
+                fi
+                _hl_uk=""
+            fi
+        fi
+        if [ -n "$_hl_uk" ]; then
+            eval "$_hl_var=\$_hl_uk"
+            hsin_uk_used "cpu" "$_hl_key" "$_hl_uk"
+        else
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "$_hl_key" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            else
+                eval "_hl_cur=\$$_hl_var"
+                hsin_uk_result "$_hl_key" "(profil)" "$_hl_cur" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            fi
+        fi
+    done
+    # Di mode manual tanpa override semua persen kosong = nol penulisan.
+    if [ -z "$_lat_pct" ]; then
+        echo "    sched-latency: dilewati (mode manual, tanpa override)"
+        return 0
+    fi
 
     # HARD FLOOR: confirmed on real hardware that writing certain vendor
     # kernels' CFS nodes can silently clamp/rewrite EACH OTHER's values

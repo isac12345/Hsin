@@ -3,6 +3,10 @@
 # Credit: logic inspired by GTurbo (GPU governor control)
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
+# shellcheck disable=SC1091
+. "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/logger.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
 
 # Apply Mali tweaks
 hsin_gpu_mali_apply() {
@@ -58,40 +62,11 @@ hsin_gpu_mali_apply() {
         fi
     fi
 
-    # Apply Mali KBase parameters (if available)
-    if [ -n "$HSIN_GPU_KBASE" ] && [ -d "$HSIN_GPU_KBASE" ]; then
-        # gpu_boost_level2: 0=off, 1=on (boost GPU performance)
-        if [ -w "$HSIN_GPU_KBASE/gpu_boost_level2" ]; then
-            case "$_profile" in
-                battery)     _bl="0" ;;
-                balanced)    _bl="0" ;;
-                performance) _bl="1" ;;
-                extreme)     _bl="1" ;;
-            esac
-            echo "$_bl" > "$HSIN_GPU_KBASE/gpu_boost_level2" 2>/dev/null && _applied=$((_applied + 1))
-        fi
-
-        # gpu_pollingtime: lower=more responsive, higher=more battery
-        if [ -w "$HSIN_GPU_KBASE/gpu_pollingtime" ]; then
-            case "$_profile" in
-                battery)     _pt="8" ;;
-                balanced)    _pt="4" ;;
-                performance) _pt="4" ;;
-                extreme)     _pt="1" ;;
-            esac
-            echo "$_pt" > "$HSIN_GPU_KBASE/gpu_pollingtime" 2>/dev/null && _applied=$((_applied + 1))
-        fi
-
-        # gpu_upthreshold: lower=GPU ramps faster, higher=more battery
-        if [ -w "$HSIN_GPU_KBASE/gpu_upthreshold" ]; then
-            case "$_profile" in
-                battery)     _ut="88" ;;
-                balanced)    _ut="72" ;;
-                performance) _ut="55" ;;
-                extreme)     _ut="30" ;;
-            esac
-            echo "$_ut" > "$HSIN_GPU_KBASE/gpu_upthreshold" 2>/dev/null && _applied=$((_applied + 1))
-        fi
+    # Parameter kbase dipindah ke hsin_gpu_kbase_knobs_apply (lihat bawah):
+    # dipanggil dari pipeline GPU dan di-gate HANYA oleh keberadaan node, bukan
+    # nama vendor GPU (syarat deteksi ketat K3).
+    if command -v hsin_gpu_kbase_knobs_apply >/dev/null 2>&1; then
+        hsin_gpu_kbase_knobs_apply "$_profile"
     fi
 
     echo "    Mali: applied=$_applied"
@@ -136,6 +111,102 @@ hsin_gpu_mali_state() {
             printf "    upthreshold:       %s\n" "$_ut"
         }
     fi
+}
+
+# K3: knob parameter Mali KBase (gpu_boost_level2, gpu_pollingtime,
+# gpu_upthreshold). Gate = node ADA + writable (bukan nama vendor/SoC).
+# Tanpa override: profil menulis seperti sebelumnya; mode manual nol tulis.
+hsin_gpu_kbase_knobs_apply() {
+    _mk_profile="$1"
+    _mk_applied=0
+    # Gate = node kbase ADA. Kalau detector belum jalan, turunkan ke path
+    # default yang sama dengan yang dipakai detector (HSIN_SYSFS_KBASE),
+    # jadi fungsi ini tidak bergantung pada urutan pemanggilan.
+    if [ -z "$HSIN_GPU_KBASE" ]; then
+        [ -n "$HSIN_SYSFS_KBASE" ] || HSIN_SYSFS_KBASE="${SYSFS_KBASE_PREFIX:-/sys/module/mali_kbase/parameters}"
+        HSIN_GPU_KBASE="$HSIN_SYSFS_KBASE"
+    fi
+
+    [ -n "$HSIN_GPU_KBASE" ] && [ -d "$HSIN_GPU_KBASE" ] || return 0
+    # K3: ketiganya jadi knob user (kunci global: satu set parameter kbase
+    # per device, bukan per node). Tanpa override, profil tetap menulis
+    # seperti sebelumnya; di mode manual TIDAK menulis apa pun kecuali user
+    # menyetel knob.
+    _mk_manual=0
+    [ "$_profile" = "manual" ] && _mk_manual=1
+    # key|node|min|max|def_battery|def_balanced|def_performance|def_extreme
+    for _mk_spec in \
+        "mali_boost_level2|gpu_boost_level2|0|1|0|0|1|1" \
+        "mali_pollingtime|gpu_pollingtime|1|10|8|4|4|1" \
+        "mali_upthreshold|gpu_upthreshold|10|100|88|72|55|30"; do
+        _mk_key="${_mk_spec%%|*}"
+        _mk_rest="${_mk_spec#*|}"
+        _mk_node="$HSIN_GPU_KBASE/${_mk_rest%%|*}"
+        _mk_rest2="${_mk_rest#*|}"
+        _mk_min="${_mk_rest2%%|*}"
+        _mk_rest3="${_mk_rest2#*|}"
+        _mk_max="${_mk_rest3%%|*}"
+        _mk_defs="${_mk_rest3#*|}"
+        _mk_uk=$(hsin_uk_get "$_mk_key" 2>/dev/null)
+        if [ -n "$_mk_uk" ]; then
+            # Cek ulang di engine (pola tfo): file override bisa manual.
+            _mk_bad=0
+            case "$_mk_uk" in
+                ''|*[!0-9]*) _mk_bad=1 ;;
+                *)
+                    [ "$_mk_uk" -lt "$_mk_min" ] 2>/dev/null && _mk_bad=1
+                    [ "$_mk_uk" -gt "$_mk_max" ] 2>/dev/null && _mk_bad=1
+                    ;;
+            esac
+            if [ "$_mk_bad" = "1" ]; then
+                hsin_log_warn "gpu" "override $_mk_key=$_mk_uk ditolak: harus $_mk_min-$_mk_max"
+                if [ "$_mk_manual" = "1" ]; then
+                    hsin_uk_result "$_mk_key" "$_mk_uk" "-" "SKIPPED" "ditolak: di luar $_mk_min-$_mk_max (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    _mk_uk=""
+                fi
+            fi
+        fi
+        if [ -z "$_mk_uk" ]; then
+            if [ "$_mk_manual" = "1" ]; then
+                hsin_uk_result "$_mk_key" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+                continue
+            fi
+            # Nilai profil persis seperti sebelumnya (perilaku lama).
+            _mk_v_bat=${_mk_defs%%|*}; _mk_rest4="${_mk_defs#*|}"
+            _mk_v_bal=${_mk_rest4%%|*}; _mk_rest5="${_mk_rest4#*|}"
+            _mk_v_perf=${_mk_rest5%%|*}; _mk_v_ext=${_mk_rest5#*|}
+            _mk_req="(profil)"
+            case "$_profile" in
+                battery)     _mk_v="$_mk_v_bat" ;;
+                balanced)    _mk_v="$_mk_v_bal" ;;
+                performance) _mk_v="$_mk_v_perf" ;;
+                extreme)     _mk_v="$_mk_v_ext" ;;
+            esac
+        else
+            _mk_v="$_mk_uk"
+            _mk_req="$_mk_uk"
+        fi
+        if [ ! -f "$_mk_node" ] || [ ! -w "$_mk_node" ]; then
+            hsin_uk_result "$_mk_key" "$_mk_req" "-" "UNAVAILABLE" "node ${_mk_node##*/} hilang atau read-only" 2>/dev/null || true
+            continue
+        fi
+        if hsin_node_write_verify "$_mk_node" "$_mk_v"; then
+            _mk_applied=$((_mk_applied + 1))
+            if [ "$_mk_req" = "(profil)" ]; then
+                hsin_uk_result "$_mk_key" "(profil)" "$_mk_v" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            else
+                hsin_uk_used "gpu" "$_mk_key" "$_mk_v"
+            fi
+        else
+            _mk_now=$(hsin_node_read "$_mk_node" 2>/dev/null)
+            [ -n "$_mk_now" ] || _mk_now="tidak terbaca"
+            hsin_log_warn "gpu" "$_mk_key: tulis $_mk_v gagal (node tetap $_mk_now)"
+            hsin_uk_result "$_mk_key" "$_mk_req" "$_mk_now" "FAILED" "tulis/readback gagal" 2>/dev/null || true
+        fi
+    done
+    [ "$_mk_applied" -gt 0 ] && echo "    Mali kbase knobs: applied=$_mk_applied"
+    return 0
 }
 
 return 0 2>/dev/null || true
