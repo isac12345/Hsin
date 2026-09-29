@@ -93,7 +93,7 @@ class RootClientTest {
     fun knob_key_must_match_pattern() = runTest {
         // Hanya bentuk yang SEDERHANA yang ditolak client. Key yang "terlihat"
         // valid tapi tidak dikenal (mis. "1", "foo") sengaja TIDAK di sini:
-        // wektu modul yang balas rc=1 `ERROR: key knob tidak dikenal`
+        // modul yang menolaknya dengan rc=1 `ERROR: key knob tidak dikenal`
         // (kontrak §2) — validasi semantik milik modul, bukan client.
         val badKeys = listOf("CPU_GOV", "cpu-gov", "a.b", "\$(id)", "", "a b", "k".repeat(65))
         for (k in badKeys) {
