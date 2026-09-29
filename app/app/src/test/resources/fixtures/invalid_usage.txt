@@ -1,0 +1,1 @@
+Usage: action.sh [info|device|capabilities|status|guard-status|logs|apply|backup|rollback|conflicts|export|renderer-apply|renderer-state|downscale-enable|downscale-disable|downscale-status|refresh-lock-enable|refresh-lock-disable|refresh-lock-status|export-debug|list-apps|game-list|game-add|game-remove]

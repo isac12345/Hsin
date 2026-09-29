@@ -4,6 +4,9 @@ name: build-apk
 # Sengaja manual (workflow_dispatch) - tidak ada yang dibangun otomatis saat
 # push, sesuai perintah user "jangan build dulu".
 on:
+  push:
+    paths:
+      - 'app/**'
   workflow_dispatch:
     inputs:
       variant:
@@ -58,6 +61,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
+
+      - name: Unit test (JVM)
+        working-directory: app
+        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Build APK
         working-directory: app

@@ -65,4 +65,6 @@ dependencies {
   implementation(libs.lifecycle.runtime.ktx)
   implementation(libs.coroutines.android)
   implementation(libs.compose.material3)
+  testImplementation("junit:junit:4.13.2")
+  testImplementation("org.json:json:20240303")
 }

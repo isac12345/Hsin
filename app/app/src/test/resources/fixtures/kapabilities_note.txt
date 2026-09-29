@@ -1,0 +1,2 @@
+# CATATAN (§3.9, §3.8): capabilities tidak bisa disandbox (path /sys literal).
+# JANGAN dipakai sumber kebenaran oleh parser; gunakan knobs sebagai sumber.
