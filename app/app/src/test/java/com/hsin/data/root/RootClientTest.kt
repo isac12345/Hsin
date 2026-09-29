@@ -28,8 +28,19 @@ class RootClientTest {
         }
     }
 
+    /**
+     * Path yang dipakai test: bukan path modul asli (tidak ada di mesin CI),
+     * tapi path yang dijamin ada. [RootClient] hanya mengecek `File.exists()`,
+     * jadi isi file tidak pernah dieksekusi — command tetap dijalankan lewat
+     * [CommandRunner] fake.
+     */
+    private val existingModulePath: String =
+        java.io.File(System.getProperty("java.io.tmpdir") ?: "/tmp", "hsin-test-action.sh")
+            .apply { writeText("#!/system/bin/sh\n# stub untuk test\n") }
+            .absolutePath
+
     private fun client(runner: CommandRunner, timeoutMs: Long = 500L) =
-        RootClient(runner = runner, timeoutMs = timeoutMs, modulePath = EXISTING_MODULE_PATH)
+        RootClient(runner = runner, timeoutMs = timeoutMs, modulePath = existingModulePath)
 
     @Test
     fun allowlist_rejects_foreign_command_before_runner() = runTest {
@@ -63,7 +74,7 @@ class RootClientTest {
         val dangerous = listOf(
             "; rm -rf /",
             "\$(rm -rf /)",
-            "\`id\`",
+            "a `id` b",
             "a && b",
             "a | b",
             "perf'ormance",
@@ -80,7 +91,11 @@ class RootClientTest {
 
     @Test
     fun knob_key_must_match_pattern() = runTest {
-        val badKeys = listOf("CPU_GOV", "cpu-gov", "a.b", "\$(id)", "1")
+        // Hanya bentuk yang SEDERHANA yang ditolak client. Key yang "terlihat"
+        // valid tapi tidak dikenal (mis. "1", "foo") sengaja TIDAK di sini:
+        // itu wektu modul yang balas rc=1 `ERROR: key knob tidak dikenal`
+        // (kontrak §2) — validasi semantik milik modul, bukan client.
+        val badKeys = listOf("CPU_GOV", "cpu-gov", "a.b", "\$(id)", "", "a b", "k".repeat(65))
         for (k in badKeys) {
             val fake = FakeRunner(rc = 0)
             val res = client(fake).execute("knob-set", listOf(k, "performance"))
@@ -115,11 +130,11 @@ class RootClientTest {
     }
 
     @Test
-    fun command_string_is_quoted_and_module_path_pinned() = runTest {
+    fun command_string_is_quoted_and_module_path_used() = runTest {
         val fake = FakeRunner(rc = 0, outText = "OK\n")
         client(fake).execute("status")
         val cmd = fake.lastCmd!!
-        assertTrue("path modul harus quoted: $cmd", cmd.contains("'/data/adb/modules/hsin/action.sh'"))
+        assertTrue("path modul harus quoted: $cmd", cmd.contains("'$existingModulePath'"))
         assertTrue("command quoted: $cmd", cmd.contains("'status'"))
     }
 
@@ -195,10 +210,5 @@ class RootClientTest {
             ),
             RootError.values().map { it.name }.toSet()
         )
-    }
-
-    companion object {
-        /** Path yang pasti ada di environment test JVM mana pun. */
-        private const val EXISTING_MODULE_PATH = "/data/adb/modules/hsin/action.sh"
     }
 }
