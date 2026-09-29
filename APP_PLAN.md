@@ -136,7 +136,7 @@ dari modul.
 | A9 | Layar Knob | [x] |
 | A10 | Alur Terapkan | [x] |
 | A11 | Monitor | [x] |
-| A12 | Log | [ ] |
+| A12 | Log | [x] |
 | A13 | State error dan kasus tepi | [ ] |
 | A14 | Audit footprint dan kualitas | [ ] |
 | A15 | Dokumen dan QA | [ ] |
