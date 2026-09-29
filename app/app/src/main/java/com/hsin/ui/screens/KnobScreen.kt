@@ -1,5 +1,6 @@
 package com.hsin.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -80,7 +81,7 @@ fun KnobScreen(
         val open = openCategory
         if (open == null) {
             categories.forEach { cat ->
-                CategoryRow(cat) { openCategory = cat }
+                CategoryRow(cat) { openCategory = cat.category }
             }
             GatedCard(state)
         } else {
@@ -103,7 +104,9 @@ fun KnobScreen(
 private fun CategoryRow(cat: KnobCategoryUi, onClick: () -> Unit) {
     HCard {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
