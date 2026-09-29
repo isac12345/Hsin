@@ -1,0 +1,6 @@
+active=1
+fail_count=2
+threshold=2
+cooldown_remaining_sec=86400
+last_reason="boot gagal 2 x berturut-turut"
+{"active":1,"fail_count":2,"threshold":2,"cooldown_remaining_sec":86400,"last_reason":"boot gagal 2 x berturut-turut"}

@@ -1,0 +1,6 @@
+key=io_block_sda_readahead requested=2048 applied=2048 category=APPLIED reason="dipakai sesuai permintaan"
+key=vfs_cache_pressure requested=250 applied=250 category=APPLIED reason="dipakai sesuai permintaan"
+key=cpu_policy_0_gov requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=uclamp_min requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=backlog requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+{"count":2,"overrides":{"io_block_sda_readahead":"2048","vfs_cache_pressure":"250"}}

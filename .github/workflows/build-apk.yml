@@ -4,6 +4,10 @@ name: build-apk
 # Sengaja manual (workflow_dispatch) - tidak ada yang dibangun otomatis saat
 # push, sesuai perintah user "jangan build dulu".
 on:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
     inputs:
       variant:
@@ -59,11 +63,17 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Unit test (JVM)
+        working-directory: app
+        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+
       - name: Build APK
+        if: github.event_name == 'workflow_dispatch'
         working-directory: app
         run: gradle :app:assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --no-daemon --stacktrace
 
       - name: Upload APK
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: hsin-${{ inputs.variant }}-apk
