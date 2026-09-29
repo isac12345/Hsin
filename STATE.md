@@ -333,3 +333,20 @@
   bisa compile (import com.hsin.ui.theme.44.dp di 4 file, modifier
   chaining salah, signature ScreenScaffold tidak cocok, semua teks mono) ->
   leader menulis ulang 8 komponen + theme. APP_PLAN A5 [x]. L2: build CI.
+- M3 (2026-09-29, leader): docs/APP_CONTRACT.md diperbarui post M1/M2.
+  §3.9 batasan (Usage rc=0 + capabilities tak sandboxable), §3.10
+  guard-status output nyata (aktif & tidak aktif), §3.11 knob-list mode
+  manual (2 APPLIED + 31 SKIPPED, 33 key= terverifikasi hitungan),
+  §4 inventaris knob post K1/K2/K3 (termasuk nomerges=2, preset
+  readahead, rate_limit_us butuh governor schedutil), gap D1+D2 ditutup
+  ("SUDAH PUTUS"), D3+D4 diperbarui. README (default profile manual),
+  TROUBLESHOOTING (guard-status), TESTING (4 suite baru) dikoreksi.
+  Bukti sandbox nyata diambil ulang, bukan dari ingatan. Commit 4e19506,
+  CI lint 36576990605 success. APP_PLAN M3 [x].
+- APP-A6 (2026-09-29): 2 ronde dev-apk + takeover leader (lihat NOTES).
+  Merge 77ddff7, unit test 32 test (16+16) hijau lokal DAN CI.
+  CI main: lint-and-test 36583327074 success, build-apk 36583327112
+  success. APP_PLAN A6 [x]. L2: belum.
+- Koreksi leader: 3 compile error ditemukan (ByteArrayOutputStream
+  .outputStream(), private const val di class body, StringWriter(StringBuilder))
+  - semuanya dari kode dev-apk yang belum pernah dikompilasi.
