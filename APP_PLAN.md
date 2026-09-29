@@ -134,7 +134,7 @@ dari modul.
 | A7 | State, ViewModel, cache | [x] |
 | A8 | Shell navigasi dan Beranda | [x] |
 | A9 | Layar Knob | [x] |
-| A10 | Alur Terapkan | [ ] |
+| A10 | Alur Terapkan | [x] |
 | A11 | Monitor | [ ] |
 | A12 | Log | [ ] |
 | A13 | State error dan kasus tepi | [ ] |
