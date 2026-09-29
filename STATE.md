@@ -368,3 +368,20 @@
 - APP-A9 (2026-09-29): layar Knob (kategori dari capability, kontrol sesuai
   tipe, penanda DIUBAH, baris terkunci). 126 test hijau lokal + CI
   36594161500 success. 9a7d2c1 merge. [x]
+- LAPORAN A6-A9 (2026-09-29, leader): file `/sdcard/HSIN_laporan_A6-A9_2026-09-29.txt`
+  (14.119 byte, 356 baris, terverifikasi bisa dibaca). Isi: status A6-A9 [x],
+  merge hash, file utama, jumlah test (32/53/109/126), CI run ID, koreksi,
+  pelajaran, dan status A10-A16 [ ]. HEAD 3af1716, git bersih.
+- GANTI MODEL AGENT (2026-09-30, perintah user): API key Gemini + Groq sudah
+  di-connect. Test live 13 model (prompt "balas OK tanpa tool"): BISA =
+  gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.1-flash-lite,
+  gemini-flash-lite-latest; SKIP = gemini-2.5-* (pensiun user baru),
+  gemini-3.8/3.5/3.7-flash + flash-latest + gemma-4-31b-it (respons kosong),
+  Groq gpt-oss/qwen3.8 (TPM gratis 8k < konteks ~10k), llama-3.1-8b (tak ada akses).
+  Config opencode.json: semua agen kini `google/gemini-3.5-flash-lite`,
+  fallback flash-lite-latest → 3.1-flash-lite → 3.6-flash. Backup
+  `opencode.json.bak`. Detail di `~/.config/opencode/SETUP.md` §18.
+  DAMPAK: dispatch dev-apk/dev-modul berikutnya jalan di Gemini, bukan
+  openrouter/opencode. Berlaku sesi opencode berikutnya.
+- POSISI: A10 Alur Terapkan [ ] berikutnya. A10-A16 belum dikerjakan. L2 HP
+  untuk A6-A9 belum dilakukan.
