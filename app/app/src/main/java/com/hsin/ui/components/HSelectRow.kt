@@ -16,12 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.hsin.ui.theme.Accent
-import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.BodyLarge
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.MonoBody
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.Pad
+import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.TouchMin
 
 // Baris pilihan dalam daftar opsi/knob. Target sentuh >= 44 dp, nilai
@@ -56,7 +56,7 @@ fun HSelectRow(
     }
 }
 
-@Preview(name = "HSelectRow", showBackground = true, backgroundColor = Bg.value.toLong())
+@Preview(name = "HSelectRow", showBackground = true, backgroundColor = PreviewBg)
 @Composable
 private fun HSelectRowPreview() {
     HsinTheme {
