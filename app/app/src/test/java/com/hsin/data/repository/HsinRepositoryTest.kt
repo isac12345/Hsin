@@ -1,6 +1,5 @@
 package com.hsin.data.repository
 
-import org.json.JSONObject
 import org.junit.Test
 import org.junit.Assert.*
 
@@ -37,7 +36,7 @@ class HsinRepositoryTest {
     }
 
     @Test
-    fun parser_knob_list_manual_2_applied_31_skipped() {
+    fun parser_knob_list_manual_matches_contract_fixture() {
         val text = javaClass.getResourceAsStream("/fixtures/knob-list_manual.txt")?.bufferedReader()?.use { it.readText() } ?: ""
         val res = HsinRepository.parseKnobList(text)
         assertTrue(res is HsinRepository.KnobParseResult.Ok)
@@ -90,16 +89,72 @@ class HsinRepositoryTest {
     }
 
     @Test
-    fun parser_uses_org_json_real() {
-        val obj = JSONObject("{\"key\":\"k\",\"category\":\"APPLIED\"}")
-        assertEquals("k", obj.getString("key"))
+    fun key_equals_inside_log_line_is_not_parsed_as_knob() {
+        // Baris log yang memuat "key=" di tengah TIDAK boleh jadi entri knob
+        // (parser harus anchor di awal baris).
+        val noisy = "INFO apply: wrote key=vfs_cache_pressure to sysfs\n" +
+            "key=io_block_sda_readahead requested=2048 applied=2048 category=APPLIED reason=\"dipakai sesuai permintaan\"\n" +
+            "{\"count\":1,\"overrides\":{\"io_block_sda_readahead\":\"2048\"}}\n"
+        val res = HsinRepository.parseKnobList(noisy)
+        assertTrue(res is HsinRepository.KnobParseResult.Ok)
+        val ok = res as HsinRepository.KnobParseResult.Ok
+        assertEquals("hanya 1 entri knob dari 1 baris key= di awal", 1, ok.items.size)
+        assertEquals("io_block_sda_readahead", ok.items[0].key)
     }
 
     @Test
-    fun capabilities_note_not_source() {
-        val note = javaClass.getResourceAsStream("/fixtures/capabilities_note.txt")?.bufferedReader()?.use { it.readText() } ?: ""
-        assertTrue(note.contains("/sys"))
-        assertTrue(note.contains("TIDAK dipakai"))
+    fun parser_accepts_all_five_module_categories() {
+        // Set kategori dari kode modul (kontrak §4).
+        for (cat in listOf("APPLIED", "SKIPPED", "FALLBACK", "UNAVAILABLE", "FAILED")) {
+            val line = "key=swappiness requested=60 applied=60 category=$cat reason=\"x\"\n"
+            val res = HsinRepository.parseKnobList(line)
+            assertTrue("$cat harus valid, dapat: $res", res is HsinRepository.KnobParseResult.Ok)
+        }
+    }
+
+    @Test
+    fun reason_with_quoted_spaces_is_parsed_fully() {
+        val res = HsinRepository.parseKnobList(
+            "key=sched_child_runs_first requested=(manual) applied=- category=SKIPPED reason=\"tidak diatur (mode manual)\"\n"
+        )
+        val ok = res as HsinRepository.KnobParseResult.Ok
+        assertEquals("tidak diatur (mode manual)", ok.items[0].reason)
+    }
+
+    @Test
+    fun guard_status_reads_json_when_keyvalue_lines_absent() {
+        val jsonOnly = "{\"active\":1,\"fail_count\":2,\"threshold\":2,\"cooldown_remaining_sec\":86400,\"last_reason\":\"boot gagal\"}\n"
+        val gs = HsinRepository.parseGuardStatus(jsonOnly)
+        assertNotNull("JSON saja harus terbaca", gs)
+        assertEquals(1, gs!!.active)
+        assertEquals(86400, gs.cooldownRemainingSec)
+    }
+
+    @Test
+    fun status_json_extracted_and_unknown_keys_ignored() {
+        val text = javaClass.getResourceAsStream("/fixtures/status_ok.txt")
+            ?.bufferedReader()?.use { it.readText() } ?: error("fixture status_ok.txt hilang")
+        val json = HsinRepository.parseStatus(text)
+        assertNotNull("JSON status harus terbaca", json)
+        assertNotNull("battery_pct harus terbaca", HsinRepository.statusInt(json!!, "battery_pct"))
+        // key tak dikenal tidak boleh exception
+        assertNull(HsinRepository.statusInt(json, "field_palsu_yang_tidak_ada"))
+    }
+
+    @Test
+    fun status_broken_or_empty_returns_null() {
+        assertNull(HsinRepository.parseStatus(""))
+        assertNull(HsinRepository.parseStatus("bukan json sama sekali"))
+        assertNull(HsinRepository.parseStatus("{broken"))
+    }
+
+    @Test
+    fun status_sentinel_values_not_treated_as_readable() {
+        // Kontrak §3.1: battery_pct=-1 dan refresh_hz=0 di sandbox = tidak tersedia.
+        val json = org.json.JSONObject("{\"battery_pct\":-1,\"refresh_hz\":0,\"cpu_load_x100\":235}")
+        assertFalse(HsinRepository.statusReadable(json, "battery_pct"))
+        assertFalse(HsinRepository.statusReadable(json, "refresh_hz"))
+        assertTrue(HsinRepository.statusReadable(json, "cpu_load_x100"))
     }
 
     @Test
