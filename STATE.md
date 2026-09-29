@@ -318,3 +318,18 @@
   SUCCESS, APK 6.856.887 byte). Catatan proses: pekerja checkout cabang
   di repo utama (langgar AGENTS.md butir 7) -> leader kembalikan ke main
   setelah merge. APP_PLAN A4 [x]. L2: pasang + tes rasa di HP.
+- APP-A5 (2026-09-29, leader rewrite penuh atas hasil dev-apk): TERIMA L1
+  + merge a419b63. Token 11 warna + Shadow di ui/theme/Color.kt (SATU-SATUNYA
+  tempat hex), Dimens (TouchMin 44/OutlineThick 1.5/ShadowOffset 3/Radius 4/
+  Gap 8/Pad 16), Type (mono HANYA angka+log), Theme (darkColorScheme semua
+  slot terisi, dark-only, tanpa dynamic color). 8 komponen + 8 @Preview:
+  HCard (shadow keras Box hitam offset 3dp, tanpa elevation), HBadge
+  (outline-only, enum HStatus 9 status), HButton (primer fill accent/sekunder
+  outline), HSlider, HSelectRow, TopBar, BottomNav (4 tab state-based tanpa
+  library nav), ScreenScaffold (bukan Scaffold M3 agar token tidak bocor).
+  Dep: +material3 dari BOM. Bukti: 0 hex di luar Color.kt, 0
+  MaterialTheme.colorScheme di komponen, 0 shadowElevation/gradient/blur,
+  semua import terpetakan ke katalog. Koreksi leader: hasil dev-apk tidak
+  bisa compile (import com.hsin.ui.theme.44.dp di 4 file, modifier
+  chaining salah, signature ScreenScaffold tidak cocok, semua teks mono) ->
+  leader menulis ulang 8 komponen + theme. APP_PLAN A5 [x]. L2: build CI.
