@@ -365,3 +365,6 @@
   CapabilityCache.put tipe, data object : SealedInterface, Sequence.takeLast,
   ReadTimeout readText lambda) - semua dari kode yang belum pernah
   dikompilasi. Verifikasi lokal (K2JVMCompiler + JUnit) menutup kelas bug ini.
+- APP-A9 (2026-09-29): layar Knob (kategori dari capability, kontrol sesuai
+  tipe, penanda DIUBAH, baris terkunci). 126 test hijau lokal + CI
+  36594161500 success. 9a7d2c1 merge. [x]

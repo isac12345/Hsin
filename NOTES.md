@@ -1376,3 +1376,19 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   sebagai info tambahan. PlaceholderScreen untuk Knob/Monitor/Log (A9/A13/A14)
   - jujur, bukan data palsu. 109 test hijau (A6 32 + A7 53 + A8 24).
   CI: lint 36590969683 success, build-apk 36590969409 success.
+- APP-A9 (2026-09-29, leader langsung di worktree a8 -> cabang a9-knob):
+  KnobCategoryBuilder murni (key -> kategori, label, jenis kontrol dari
+  bentuk data, requestedValueFor = salin nilai user, TANPA pemetaan OPP /
+  validasi governor). Kategori hanya dibuat kalau punya key dari `knobs`,
+  jadi knob tak tersedia tidak pernah tampil. Fitur bergate pindah ke
+  KnobCapability.gated (dari `knobs.features`), extreme tetap terkunci.
+  126 test hijau lokal. CI build-apk 36594161500 success (2x gagal
+  sebelumnya: `openCategory = cat` salah tipe, lalu koma modifier hilang
+  pada Row - keduanya error Kotlin yang HANYA terlihat di CI karena file
+  Compose butuh Android SDK).
+- PELAJARAN: (32) file Compose TIDAK bisa diverifikasi lokal (butuh
+  android.jar + Compose runtime) - di situ mistake sintaks kecil
+  (koma modifier, tipe state) hanya ketahuan lewat CI. Mitigasi: baca ulang
+  diff Compose dengan mata, dan grep pola `modifier = Modifier\n .xxx(...)` ;
+  (33) parameter `onClick` yang tidak dipasang ke modifier = UI yang tidak
+  merespons sentuhan - selalu cek "apa yang terjadi kalau user mengetuk".
