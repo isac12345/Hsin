@@ -241,3 +241,9 @@
   d547271: auto-exec saat source + preamble tulis + harness path.
   Bukti: harness 20/20, regresi hijau semua, snapshot nol tulis.
   APP_PLAN M2 [x]. L2: validasi HP. STOP.
+- APP-K1 (2026-09-29, leader investigasi pra-kode, STOP): live-read 5 knob
+  GAGAL semua dari Termux (Permission denied, su dilarang tanpa izin).
+  Batas di-tree dicatat (vm.sh HSIN_VM_SAFE, profil) tapi BELUM dikunci.
+  readahead + backlog tanpa batas di-tree -> butuh angka user (Q1-Q5).
+  Penilaian 16-19: DVFS bersyarat-aman, RR bersyarat, frame-limit kurang
+  cocok, SF tidak aman live. NOL kode diubah, K1 tetap [ ]. Menunggu user.
