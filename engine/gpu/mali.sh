@@ -133,7 +133,7 @@ hsin_gpu_kbase_knobs_apply() {
     # seperti sebelumnya; di mode manual TIDAK menulis apa pun kecuali user
     # menyetel knob.
     _mk_manual=0
-    [ "$_profile" = "manual" ] && _mk_manual=1
+    [ "$_mk_profile" = "manual" ] && _mk_manual=1
     # key|node|min|max|def_battery|def_balanced|def_performance|def_extreme
     for _mk_spec in \
         "mali_boost_level2|gpu_boost_level2|0|1|0|0|1|1" \
@@ -177,12 +177,20 @@ hsin_gpu_kbase_knobs_apply() {
             _mk_v_bal=${_mk_rest4%%|*}; _mk_rest5="${_mk_rest4#*|}"
             _mk_v_perf=${_mk_rest5%%|*}; _mk_v_ext=${_mk_rest5#*|}
             _mk_req="(profil)"
-            case "$_profile" in
+            case "$_mk_profile" in
                 battery)     _mk_v="$_mk_v_bat" ;;
                 balanced)    _mk_v="$_mk_v_bal" ;;
                 performance) _mk_v="$_mk_v_perf" ;;
                 extreme)     _mk_v="$_mk_v_ext" ;;
+                *)
+                    # Profil tak dikenal = TIDAK menulis. Tanpa guard ini
+                    # nilai kosong akan ditulis ke node kernel (bukan
+                    # sekadar dilewati) - pelajaran dari bug variabel profil.
+                    hsin_log_warn "gpu" "mali kbase: profile tidak dikenal, dilewati"
+                    _mk_v=""
+                    ;;
             esac
+            [ -n "$_mk_v" ] || continue
         else
             _mk_v="$_mk_uk"
             _mk_req="$_mk_uk"

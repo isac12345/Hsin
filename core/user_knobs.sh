@@ -138,34 +138,6 @@ _uk_class() {
         *_min_khz) _uk_tfield="min_khz" ;;
         *_sched) _uk_tfield="sched" ;;
         *_readahead) _uk_tfield="readahead" ;;
-        *_polling_interval)
-            # devfreq ABI: satuan ms, nilai < 1 jiffy dianggap 0 (no
-            # polling). Batas atas = batas UI agar polling tidak dibuat
-            # sangat lambat (1 detik sudah lebih dari cukup).
-            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
-            [ "${#_uk_v}" -le 6 ] || return 1
-            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
-            [ "$_uk_v" -le 1000 ] 2>/dev/null || return 1
-            return 0
-            ;;
-        *_up_threshold)
-            # devfreq ondemand ABI: persen (0-100), 0 berarti selalu
-            # freak. Batas bawah 1 karena governor ondemand mainstream
-            # menolak 0.
-            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
-            [ "${#_uk_v}" -le 3 ] || return 1
-            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
-            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
-            return 0
-            ;;
-        *_down_differential)
-            # devfreq ABI: persen selisih yang harus terlampaui sebelum
-            # governor menurunkan frekuensi.
-            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
-            [ "${#_uk_v}" -le 3 ] || return 1
-            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
-            return 0
-            ;;
         *_rate_limit_us) _uk_tfield="rate_limit_us" ;;
         *_polling_interval) _uk_tfield="polling_interval" ;;
         *_up_threshold) _uk_tfield="up_threshold" ;;
@@ -242,6 +214,33 @@ hsin_uk_val_ok() {
                 128|256|512|1024|2048|4096|8192) return 0 ;;
             esac
             return 1
+            ;;
+        *_polling_interval)
+            # devfreq ABI: satuan ms, nilai < 1 jiffy dianggap 0 (no
+            # polling). Batas atas = batas UI agar polling tidak dibuat
+            # sangat lambat (1 detik sudah lebih dari cukup).
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 6 ] || return 1
+            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+            [ "$_uk_v" -le 1000 ] 2>/dev/null || return 1
+            return 0
+            ;;
+        *_up_threshold)
+            # devfreq ondemand ABI: persen (0-100). Batas bawah 1 karena
+            # governor ondemand mainstream menolak 0.
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 3 ] || return 1
+            [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
+            return 0
+            ;;
+        *_down_differential)
+            # devfreq ABI: persen selisih yang harus terlampaui sebelum
+            # governor menurunkan frekuensi.
+            case "$_uk_v" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${#_uk_v}" -le 3 ] || return 1
+            [ "$_uk_v" -le 100 ] 2>/dev/null || return 1
+            return 0
             ;;
         *_add_random|*_iostats)
             # Boolean queue block: hanya 0 atau 1 (keputusan user K2).
