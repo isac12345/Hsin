@@ -1,6 +1,0 @@
-active=1
-fail_count=0
-threshold=3
-cooldown_remaining_sec=120
-last_reason=none
-{"active":1,"fail_count":0,"threshold":3,"cooldown_remaining_sec":120,"last_reason":"none"}

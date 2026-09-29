@@ -1,5 +1,6 @@
-key=read_ahead_kb requested=128 applied=2048 category=APPLIED reason="manual override"
-key=vfs_cache_pressure requested=100 applied=250 category=APPLIED reason="manual override"
-key=swappiness requested=60 applied=- category=SKIPPED reason="tidak diatur (mode manual)"
-key=unknown_key requested=1 applied=- category=SKIPPED reason="tidak diatur"
-{"results":[{"key":"read_ahead_kb","requested":"128","applied":"2048","category":"APPLIED","reason":"manual override"}]}
+key=io_block_sda_readahead requested=2048 applied=2048 category=APPLIED reason="dipakai sesuai permintaan"
+key=vfs_cache_pressure requested=250 applied=250 category=APPLIED reason="dipakai sesuai permintaan"
+key=cpu_policy_0_gov requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=uclamp_min requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+key=backlog requested=(manual) applied=- category=SKIPPED reason="tidak diatur (mode manual)"
+{"count":2,"overrides":{"io_block_sda_readahead":"2048","vfs_cache_pressure":"250"}}
