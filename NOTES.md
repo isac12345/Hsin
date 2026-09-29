@@ -1363,8 +1363,8 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   = "cannot extend an object" saat kompilasi; (31) `Sequence.takeLast()` tidak
   ada (pakai `List.takeLast` atau `lines()`).
 - CARA VERIFIKASI KERNEL (inti, pakai untuk A8+): Termux punya JDK 17 +
-  kotlin-compiler, jadi kode Kotlin yang BUKAN butuh Android SDK bisa
-  dikompilasi DAN unit test-nya dijalankan lokal sebelum push.masih satu$
+  kotlin-compiler, jadi kode Kotlin yang tidak butuh Android SDK bisa
+  dikompilasi dan unit test-nya dijalankan lokal sebelum push. Inilah yang
   membuat A7 dan A8 hijau tanpa dua kali gagal compile di CI.
 - APP-A8 (2026-09-29, leader langsung): BottomNav 4 tab + ScreenScaffold
   dipakai apa adanya (A5), navigasi state `mutableIntStateOf` (nol library
