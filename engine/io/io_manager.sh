@@ -9,6 +9,7 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 . "$HSIN_MODULE_PATH/core/validator.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/io/scheduler.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/io/readahead.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/engine/io/queue_tuning.sh" 2>/dev/null
 
 # Main IO engine apply
 hsin_io_apply() {
@@ -28,6 +29,12 @@ hsin_io_apply() {
     # Apply readahead
     hsin_io_apply_readahead "$_profile"
 
+    # K2: knob queue per block (add_random/iostats/nomerges). Tanpa
+    # override user ketiganya tidak menulis apa pun.
+    if command -v hsin_io_apply_queue_tuning >/dev/null 2>&1; then
+        hsin_io_apply_queue_tuning "$_profile"
+    fi
+
     echo ""
     echo "  Status: COMPLETE (unsupported nodes skipped)"
     echo ""
@@ -43,6 +50,7 @@ hsin_io_main() {
         state)
             hsin_io_scheduler_state
             hsin_io_readahead_state
+            command -v hsin_io_queue_state >/dev/null 2>&1 && hsin_io_queue_state
             ;;
         apply)
             hsin_io_apply "$_profile"

@@ -88,13 +88,19 @@ hsin_backup_list() {
 
 # Backup selektif: hanya node yang match pattern tertentu (untuk CPU freq dsb)
 hsin_backup_cpu_freqs() {
-    for p in /sys/devices/system/cpu/cpufreq/policy*; do
+    # Path sysfs dari $HSIN_SYSFS_CPU (default /sys/devices/system/cpu) -
+    # pola sama seperti hsin_backup_io, supaya jalur ini bisa diuji dengan
+    # pohon palsu tanpa mengubah perilaku default di HP.
+    for p in "${HSIN_SYSFS_CPU:-/sys/devices/system/cpu}"/cpufreq/policy*; do
         [ -d "$p" ] || continue
         hsin_backup_node "$p/scaling_governor"
         hsin_backup_node "$p/scaling_min_freq"
         hsin_backup_node "$p/scaling_max_freq"
         # Beberapa SoC punya node boost
         [ -f "$p/scaling_boost_freq" ] && hsin_backup_node "$p/scaling_boost_freq"
+        # K2: node schedutil hanya ada saat schedutil aktif di policy itu,
+        # jadi dicek [ -f ] (node hilang = tidak ada yang perlu disimpan).
+        [ -f "$p/schedutil/rate_limit_us" ] && hsin_backup_node "$p/schedutil/rate_limit_us"
     done
 }
 
@@ -138,6 +144,10 @@ hsin_backup_io() {
         case "$_name" in loop*|ram*|zram*|dm-*) continue ;; esac
         hsin_backup_node "$b/queue/scheduler"
         hsin_backup_node "$b/queue/read_ahead_kb"
+        # K2: knob queue boolean.
+        hsin_backup_node "$b/queue/add_random"
+        hsin_backup_node "$b/queue/iostats"
+        hsin_backup_node "$b/queue/nomerges"
     done
 }
 
@@ -147,6 +157,9 @@ hsin_backup_memory() {
     [ -f "$HSIN_PROC/sys/vm/vfs_cache_pressure" ] && hsin_backup_node "$HSIN_PROC/sys/vm/vfs_cache_pressure"
     [ -f "$HSIN_PROC/sys/vm/dirty_ratio" ] && hsin_backup_node "$HSIN_PROC/sys/vm/dirty_ratio"
     [ -f "$HSIN_PROC/sys/vm/dirty_background_ratio" ] && hsin_backup_node "$HSIN_PROC/sys/vm/dirty_background_ratio"
+    # K2: stat_interval + page-cluster.
+    [ -f "$HSIN_PROC/sys/vm/stat_interval" ] && hsin_backup_node "$HSIN_PROC/sys/vm/stat_interval"
+    [ -f "$HSIN_PROC/sys/vm/page-cluster" ] && hsin_backup_node "$HSIN_PROC/sys/vm/page-cluster"
 }
 
 hsin_backup_network() {

@@ -12,12 +12,16 @@
 [ -n "$HSIN_PROC" ] || HSIN_PROC="${SYSFS_PROC_PREFIX:-/proc}"
 
 # Safe VM tunables with ranges
+# Kolom: nama|min|max|def_battery|def_balanced|def_performance|def_extreme
+# "-" pada keempat default = knob TANPA nilai profil (hanya berlaku lewat
+# override user di mode manual; profil tidak pernah menulisnya).
 HSIN_VM_SAFE="
 swappiness|0|200|120|100|60|40
 vfs_cache_pressure|0|1000|50|100|150|200
 dirty_ratio|1|90|40|30|20|10
 dirty_background_ratio|1|50|10|5|3|1
-page-cluster|0|5|3|3|2|0
+page-cluster|0|9|3|3|2|0
+stat_interval|1|60|-|-|-
 "
 
 # Read VM node
@@ -127,27 +131,41 @@ hsin_vm_apply() {
     while IFS='|' read -r _n _mn _mx _def_b _def_bal _def_p _def_e; do
         [ -z "$_n" ] && continue
 
-        # Knob user (K1): swappiness + 3 VM baru. page-cluster bukan knob
-        # (echo saja, tanpa baris hasil).
+        # Knob user (K1/K2): swappiness + 3 VM + page-cluster + stat_interval.
+        # page-cluster bukan knob (echo saja, tanpa baris hasil).
         _is_knob=0
         case "$_n" in
             swappiness|vfs_cache_pressure|dirty_ratio|dirty_background_ratio)
                 _is_knob=1 ;;
+            page-cluster|stat_interval)
+                _is_knob=1 ;;
+        esac
+        # Default "-" = knob tanpa nilai profil: profil lama TIDAK menulis
+        # node ini, jadi hanya override user di mode manual yang boleh.
+        _prof_val=1
+        case "$_def_b$_def_bal$_def_p$_def_e" in
+            *-*) _prof_val=0 ;;
         esac
 
         _val=""
-        case "$_profile" in
-            battery)     _val="$_def_b" ;;
-            balanced)    _val="$_def_bal" ;;
-            performance) _val="$_def_p" ;;
-            extreme)     _val="$_def_e" ;;
-        esac
+        if [ "$_prof_val" = "1" ]; then
+            case "$_profile" in
+                battery)     _val="$_def_b" ;;
+                balanced)    _val="$_def_bal" ;;
+                performance) _val="$_def_p" ;;
+                extreme)     _val="$_def_e" ;;
+            esac
+        fi
 
         # Override knob user, tetap lewat hsin_vm_write: rentang diambil
         # dari HSIN_VM_SAFE di fungsi itu, jadi tidak ada rentang kedua
         # yang bisa tidak sinkron dengan yang sudah ada di file ini.
+        # Nama node page-cluster memakai hypen (itu nama sysctl kernel),
+        # sedangkan kunci knob memakai underscore (pola key yang hanya
+        # boleh [A-Za-z0-9_.]) - jadi nama node dipetakan ke kunci di sini.
+        _uk_key=$(printf '%s' "$_n" | tr '-' '_')
         _uk_val=""
-        [ "$_is_knob" = "1" ] && _uk_val=$(hsin_uk_get "$_n" 2>/dev/null)
+        [ "$_is_knob" = "1" ] && _uk_val=$(hsin_uk_get "$_uk_key" 2>/dev/null)
         # Validasi silang K1 (keputusan user): dirty_background_ratio
         # WAJIB < dirty_ratio (strict). Langgar = FALLBACK beralasan,
         # bukan tulis buta. Non-manual: pakai nilai profil. Manual:
@@ -183,19 +201,28 @@ hsin_vm_apply() {
         fi
         if [ -n "$_uk_val" ]; then
             _val="$_uk_val"
-            hsin_uk_used "vm" "$_n" "$_val"
+            hsin_uk_used "vm" "$_uk_key" "$_val"
         fi
         if [ "$_is_knob" = "1" ] && [ -z "$_uk_val" ] && [ "$_bg_rejected" -eq 0 ] && [ "$_profile" != "manual" ]; then
-            hsin_uk_result "$_n" "(profil)" "$_val" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+            hsin_uk_result "$_uk_key" "(profil)" "$_val" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
         fi
 
         # Mode manual: tanpa override, dilewati. Knob mencatat SKIPPED
         # (baris hasil); non-knob echo saja (bukan namespace knob).
         if [ "$_profile" = "manual" ] && [ -z "$_uk_val" ]; then
             if [ "$_is_knob" = "1" ]; then
-                [ "$_bg_rejected" -eq 0 ] && hsin_uk_result "$_n" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+                [ "$_bg_rejected" -eq 0 ] && hsin_uk_result "$_uk_key" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
             else
                 echo "    vm.$_n dilewati (mode manual)"
+            fi
+            continue
+        fi
+
+        if [ -z "$_val" ]; then
+            # Knob tanpa nilai profil (default "-") pada profil non-manual:
+            # tidak ada yang ditulis, tapi hasilnya dilaporkan jujur.
+            if [ "$_is_knob" = "1" ] && [ "$_prof_val" = "0" ]; then
+                hsin_uk_result "$_uk_key" "(profil)" "-" "SKIPPED" "tidak ada nilai profil (hanya lewat override)" 2>/dev/null || true
             fi
             continue
         fi
@@ -213,16 +240,16 @@ hsin_vm_apply() {
             else
                 echo "    vm.$_n: skip (not writable or invalid)"
                 if [ -n "$_uk_val" ]; then
-                    hsin_log_warn "vm" "override $_n=$_uk_val gagal ditulis/tidak valid"
+                    hsin_log_warn "vm" "override $_uk_key=$_uk_val gagal ditulis/tidak valid"
                     # Node hilang/tidak writable = UNAVAILABLE; selain itu
                     # (nilai di luar rentang, kernel menolak) = FAILED.
                     # Baris hasil sebelumnya sudah APPLIED dari hsin_uk_used
                     # saat override diterima, jadi ditulis ulang di sini -
                     # hsin_uk_result mengganti baris key yang sama.
                     if [ -f "$HSIN_PROC/sys/vm/$_n" ] && [ -w "$HSIN_PROC/sys/vm/$_n" ]; then
-                        hsin_uk_result "$_n" "$_uk_val" "-" "FAILED" "nilai ditolak kernel / tulis gagal" 2>/dev/null || true
+                        hsin_uk_result "$_uk_key" "$_uk_val" "-" "FAILED" "nilai ditolak kernel / tulis gagal" 2>/dev/null || true
                     else
-                        hsin_uk_result "$_n" "$_uk_val" "-" "UNAVAILABLE" "node hilang atau tidak writable" 2>/dev/null || true
+                        hsin_uk_result "$_uk_key" "$_uk_val" "-" "UNAVAILABLE" "node hilang atau tidak writable" 2>/dev/null || true
                     fi
                 fi
             fi

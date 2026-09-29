@@ -94,7 +94,7 @@ _clean_stage() {
         engine/thermal/backup.sh engine/thermal/apply.sh engine/thermal/thermal_manager.sh \
         engine/memory/detect.sh engine/memory/zram.sh engine/memory/vm.sh \
         engine/memory/oom.sh engine/memory/apply.sh \
-        engine/io/scheduler.sh engine/io/readahead.sh engine/io/io_manager.sh \
+        engine/io/scheduler.sh engine/io/readahead.sh engine/io/queue_tuning.sh engine/io/io_manager.sh \
         engine/network/tcp.sh engine/network/network_manager.sh \
         engine/game/detector.sh engine/game/game_manager.sh \
         engine/display/downscale.sh engine/display/refresh_rate.sh engine/display/frame_limit.sh \
