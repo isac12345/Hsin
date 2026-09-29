@@ -139,7 +139,7 @@ dari modul.
 | A12 | Log | [x] |
 | A13 | State error dan kasus tepi | [x] |
 | A14 | Audit footprint dan kualitas | [x] |
-| A15 | Dokumen dan QA | [ ] |
+| A15 | Dokumen dan QA | [x] |
 | A16 | Status final | [ ] |
 
 ---
