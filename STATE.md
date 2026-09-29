@@ -258,3 +258,16 @@
   suite lama 8/8, runtime sh -n OK, dispatcher end-to-end. Baris 16-19
   dikeluarkan dari K1 (dicatat NOTES sebagai kandidat step terpisah).
   APP_PLAN K1 [x]. L2: validasi HP. STOP.
+- APP-K2 (2026-09-29, leader langsung): TERIMA L1, commit 6a0ac2a. 6 knob
+  tier-1: io_block_{add_random,iostats,nomerges} (0/1), stat_interval
+  (1-60), page_cluster (0-9), cpu_policy_*_rate_limit_us (0-100000 us,
+  gate governor==schedutil + node ada). Live HP: 5 node ada writable;
+  rate_limit_us TIDAK ADA (governor aktif uscfreq) -> UNAVAILABLE di
+  device ini, sesuai gate K2; batas 0-100000 = batas UI (kernel kstrtouint
+  tanpa clamp, diverifikasi ke source kernel v6.6), belum terverifikasi
+  live. File baru engine/io/queue_tuning.sh terdaftar di build_release.sh.
+  Koreksi leader: page-cluster (hypen) vs kunci page_cluster -> pemetaan
+  di vm.sh. Bukti: harness K2 42/42, suite lama 8/8, runtime ZIP sh -n OK
+  + 0 blok if kosong, dispatcher 6/6. Catatan: nomerges live 2 tidak
+  bisa dipilih (opsi 0/1 sesuai keputusan user). APP_PLAN K2 [x].
+  L2: validasi HP. STOP.
