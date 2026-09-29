@@ -53,12 +53,12 @@ class RootClient(
         "knobs","knob-set","knob-list","knob-reset","config-get","config-set"
     )
 
-    private val PROFILES = setOf("manual","battery","balanced","performance","extreme")
+    private val profiles = setOf("manual","battery","balanced","performance","extreme")
     private val SAFE_ARG = Regex("^[A-Za-z0-9_.:@%+=,-]+$")
     private val KEY_PAT = Regex("^[a-z0-9_]{1,64}$")
 
     /** Panjang maksimum satu argumen (nilai knob terpanjang di kontrak §4 < 64). */
-    private val MAX_ARG_LEN = 64
+    private val maxArgLen = 64
 
     /** Escape argumen dengan single-quote (`'...'`) dan sanitasi `'` → `'\''`. */
     private fun String.quoteShell(): String = "'" + this.replace("'", "'\\''") + "'"
@@ -75,7 +75,7 @@ class RootClient(
             if (a.isEmpty()) {
                 return@withContext RootResult.Error(RootError.COMMAND_FAILED, "empty arg")
             }
-            if (a.length > MAX_ARG_LEN) {
+            if (a.length > maxArgLen) {
                 return@withContext RootResult.Error(
                     RootError.COMMAND_FAILED, "arg too long: ${a.length} chars")
             }
@@ -87,7 +87,7 @@ class RootClient(
 
         // Profil valid jika apply
         if (cmd == "apply" && args.isNotEmpty()) {
-            if (args[0] !in PROFILES) {
+            if (args[0] !in profiles) {
                 return@withContext RootResult.Error(
                     RootError.COMMAND_FAILED, "invalid profile: ${args[0]}")
             }
