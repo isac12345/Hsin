@@ -239,6 +239,9 @@ _kn_cpu_json() {
     while IFS='|' read -r _kn_nm _kn_ty _kn_cp _kn_imin _kn_imax _kn_smin _kn_smax \
         _kn_cg _kn_ag _kn_af _kn_wmin _kn_wmax _kn_wgov; do
         [ -n "$_kn_nm" ] || continue
+        # Path policy untuk cek node schedutil (bukan dari cache, tapi
+        # dari id policy yang sudah dibaca di baris HSIN_CPU_CLUSTERS).
+        _kn_path="$HSIN_SYSFS_CPU/cpufreq/$_kn_nm"
 
         _kn_num "$_kn_imax"
         _kn_hw="$_kn_n"
@@ -265,8 +268,23 @@ _kn_cpu_json() {
         _kn_wx="$_kn_b"
         [ "$_kn_wx" = "true" ] && _kn_any_wmax=true
 
+        # K2: schedutil rate_limit_us per policy. Node milik governor
+        # schedutil, jadi hanya "supported" kalau governor aktif itu
+        # schedutil DAN node ada (dicek live, bukan asumsi).
+        _kn_rl_sup=false
+        _kn_rl_w=false
+        _kn_rl_cur=0
+        _kn_rl_node="$_kn_path/schedutil/rate_limit_us"
+        if [ -r "$_kn_rl_node" ]; then
+            _kn_rl_raw=$(hsin_node_read "$_kn_rl_node" 2>/dev/null)
+            _kn_num "$_kn_rl_raw"
+            _kn_rl_cur="$_kn_n"
+            [ -w "$_kn_rl_node" ] && _kn_rl_w=true
+            _kn_rl_sup=true
+        fi
+
         [ "$_kn_cnt" = "0" ] || _kn_items="${_kn_items},"
-        _kn_items="${_kn_items}{\"id\":\"${_kn_id}\",\"hw_max_khz\":${_kn_hw},\"govs\":${_kn_govs},\"cur_gov\":\"${_kn_cgov}\",\"opp_khz\":${_kn_opps},\"writable_min\":${_kn_wm},\"writable_max\":${_kn_wx}}"
+        _kn_items="${_kn_items}{\"id\":\"${_kn_id}\",\"hw_max_khz\":${_kn_hw},\"govs\":${_kn_govs},\"cur_gov\":\"${_kn_cgov}\",\"opp_khz\":${_kn_opps},\"writable_min\":${_kn_wm},\"writable_max\":${_kn_wx},\"rate_limit_us\":{\"min\":0,\"max\":100000,\"cur\":${_kn_rl_cur},\"writable\":${_kn_rl_w},\"supported\":${_kn_rl_sup}}}"
         _kn_cnt=$((_kn_cnt + 1))
     done <<EOF
 $HSIN_CPU_CLUSTERS
@@ -420,7 +438,12 @@ _kn_vm_knobs_json() {
     _kn_dr="$_kn_out_vk"
     _kn_vm_knob dirty_background_ratio 1 50
     _kn_dbr="$_kn_out_vk"
-    _kn_out_vm="{\"vfs_cache_pressure\":${_kn_vfs},\"dirty_ratio\":${_kn_dr},\"dirty_background_ratio\":${_kn_dbr}}"
+    # K2: stat_interval (detik) + page_cluster. Batas = HSIN_VM_SAFE.
+    _kn_vm_knob stat_interval 1 60
+    _kn_si="$_kn_out_vk"
+    _kn_vm_knob page-cluster 0 9
+    _kn_pc="$_kn_out_vk"
+    _kn_out_vm="{\"vfs_cache_pressure\":${_kn_vfs},\"dirty_ratio\":${_kn_dr},\"dirty_background_ratio\":${_kn_dbr},\"stat_interval\":${_kn_si},\"page_cluster\":${_kn_pc}}"
     return 0
 }
 
@@ -461,11 +484,30 @@ _kn_io_json() {
             _kn_ra_sup=true
         fi
         _kn_ra_opts="[128,256,512,1024,2048,4096,8192]"
+        # K2: tiga knob queue boolean. Bentuk {options,cur,writable,
+        # supported}; node hilang = supported:false + cur 0.
+        _kn_qt=""
+        for _kn_qf in add_random iostats nomerges; do
+            _kn_qn="$_kn_b/queue/$_kn_qf"
+            if [ -r "$_kn_qn" ]; then
+                _kn_qr=$(hsin_node_read "$_kn_qn" 2>/dev/null)
+                _kn_num "$_kn_qr"
+                _kn_qcur="$_kn_n"
+                [ -w "$_kn_qn" ] && _kn_qw=true || _kn_qw=false
+                _kn_qsup=true
+            else
+                _kn_qcur=0
+                _kn_qw=false
+                _kn_qsup=false
+            fi
+            [ -n "$_kn_qt" ] && _kn_qt="${_kn_qt},"
+            _kn_qt="${_kn_qt}\"${_kn_qf}\":{\"options\":[0,1],\"cur\":${_kn_qcur},\"writable\":${_kn_qw},\"supported\":${_kn_qsup}}"
+        done
         _kn_esc "${_kn_b##*/}"
         _kn_nm="$_kn_e"
 
         [ "$_kn_cnt" = "0" ] || _kn_items="${_kn_items},"
-        _kn_items="${_kn_items}{\"name\":\"${_kn_nm}\",\"schedulers\":${_kn_sch},\"cur\":\"${_kn_cur}\",\"writable\":${_kn_wr},\"readahead\":{\"options\":${_kn_ra_opts},\"cur\":${_kn_ra_cur},\"writable\":${_kn_ra_w},\"supported\":${_kn_ra_sup}}}"
+        _kn_items="${_kn_items}{\"name\":\"${_kn_nm}\",\"schedulers\":${_kn_sch},\"cur\":\"${_kn_cur}\",\"writable\":${_kn_wr},\"readahead\":{\"options\":${_kn_ra_opts},\"cur\":${_kn_ra_cur},\"writable\":${_kn_ra_w},\"supported\":${_kn_ra_sup}},\"queue_tuning\":{${_kn_qt}}}"
         _kn_cnt=$((_kn_cnt + 1))
     done
 

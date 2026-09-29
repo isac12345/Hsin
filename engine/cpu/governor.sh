@@ -131,6 +131,79 @@ hsin_cpu_governor_apply() {
 
     echo "    Governor [$_profile]: ok=$_ok skip=$_skip fail=$_fail"
 
+    # K2: schedutil rate_limit_us per policy. Node ini milik governor
+    # schedutil (hanya dibuat saat schedutil yang AKTIF di policy itu), jadi
+    # syaratnya: governor aktif = schedutil DAN node ada. Kalau salah satu
+    # tidak terpenuhi, knob dilaporkan UNAVAILABLE - bukan ditulis buta.
+    _rl_ok=0
+    _rl_unavail=0
+    hsin_cpu_policy_ids
+    for _pid in $HSIN_CPU_POLICY_IDS; do
+        _policy="$HSIN_SYSFS_CPU/cpufreq/policy$_pid"
+        [ -d "$_policy" ] || continue
+        _rl_key="cpu_policy_${_pid}_rate_limit_us"
+        _rl_node="$_policy/schedutil/rate_limit_us"
+        _rl_cur_gov=""
+        [ -f "$_policy/scaling_governor" ] && _rl_cur_gov=$(cat "$_policy/scaling_governor" 2>/dev/null)
+
+        # Tanpa override: knob hanya berlaku lewat pilihan user, jadi
+        # profil tidak pernah menulisnya (sama seperti knob queue I/O).
+        _rl_uk=$(hsin_uk_cpu_field "$_pid" rate_limit_us 2>/dev/null)
+        if [ -z "$_rl_uk" ]; then
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "$_rl_key" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            fi
+            continue
+        fi
+        # Cek ulang di engine (pola tfo): file override bisa diisi manual.
+        case "$_rl_uk" in
+            ''|*[!0-9]*)
+                hsin_log_warn "cpu" "override $_rl_key=$_rl_uk ditolak: harus angka 0-100000"
+                if [ "$_profile" = "manual" ]; then
+                    hsin_uk_result "$_rl_key" "$_rl_uk" "-" "SKIPPED" "ditolak: bukan angka (mode manual, tidak ditulis)" 2>/dev/null || true
+                else
+                    hsin_uk_result "$_rl_key" "$_rl_uk" "-" "FALLBACK" "ditolak: bukan angka, tidak ada nilai profil" 2>/dev/null || true
+                fi
+                continue
+                ;;
+        esac
+        if [ "$_rl_uk" -gt 100000 ] 2>/dev/null; then
+            hsin_log_warn "cpu" "override $_rl_key=$_rl_uk ditolak: maksimal 100000"
+            if [ "$_profile" = "manual" ]; then
+                hsin_uk_result "$_rl_key" "$_rl_uk" "-" "SKIPPED" "ditolak: > 100000 (mode manual, tidak ditulis)" 2>/dev/null || true
+            else
+                hsin_uk_result "$_rl_key" "$_rl_uk" "-" "FALLBACK" "ditolak: > 100000, tidak ada nilai profil" 2>/dev/null || true
+            fi
+            continue
+        fi
+
+        # Gate: governor aktif harus schedutil, dan node harus ada.
+        if [ "$_rl_cur_gov" != "schedutil" ] || [ ! -f "$_rl_node" ]; then
+            _rl_unavail=$((_rl_unavail + 1))
+            if [ "$_rl_cur_gov" != "schedutil" ]; then
+                hsin_log_warn "cpu" "$_rl_key: governor aktif ${_rl_cur_gov:-tidak terbaca} (bukan schedutil) - knob tidak dipakai"
+                hsin_uk_result "$_rl_key" "$_rl_uk" "-" "UNAVAILABLE" "governor aktif bukan schedutil (${_rl_cur_gov:-?})" 2>/dev/null || true
+            else
+                hsin_log_warn "cpu" "$_rl_key: node rate_limit_us tidak ada di policy$_pid - knob tidak dipakai"
+                hsin_uk_result "$_rl_key" "$_rl_uk" "-" "UNAVAILABLE" "node schedutil/rate_limit_us tidak ada" 2>/dev/null || true
+            fi
+            continue
+        fi
+
+        if hsin_node_write_verify "$_rl_node" "$_rl_uk"; then
+            _rl_ok=$((_rl_ok + 1))
+            hsin_uk_used "cpu" "$_rl_key" "$_rl_uk"
+        else
+            _rl_unavail=$((_rl_unavail + 1))
+            _rl_now=$(hsin_node_read "$_rl_node" 2>/dev/null)
+            [ -n "$_rl_now" ] || _rl_now="tidak terbaca"
+            hsin_log_warn "cpu" "$_rl_key: tulis $_rl_uk gagal (node tetap $_rl_now)"
+            hsin_uk_result "$_rl_key" "$_rl_uk" "$_rl_now" "FAILED" "tulis/readback gagal" 2>/dev/null || true
+        fi
+    done
+    [ "$_rl_ok" -eq 0 ] && [ "$_rl_unavail" -eq 0 ] || \
+        echo "    Schedutil rate_limit_us: ok=$_rl_ok unavailable=$_rl_unavail"
+
     # Scheduler: sched_child_runs_first
     # Ensures child processes (like app spawns) run before parents,
     # reducing app launch latency. Enabled on performance/extreme.
