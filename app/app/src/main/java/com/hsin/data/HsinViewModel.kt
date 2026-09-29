@@ -4,147 +4,295 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hsin.data.cache.CapabilityCache
 import com.hsin.data.cache.CapabilityCachePolicy
-import com.hsin.data.root.RootClient
 import com.hsin.data.repository.HsinRepository
-import com.hsin.data.state.*
+import com.hsin.data.root.RootClient
+import com.hsin.data.root.RootError
+import com.hsin.data.root.RootResult
+import com.hsin.data.state.DirtyTracker
+import com.hsin.data.state.GuardState
+import com.hsin.data.state.KnobsMapping
+import com.hsin.data.state.StatusMapping
+import com.hsin.data.state.UiError
+import com.hsin.data.state.UiErrorKind
+import com.hsin.data.state.UiState
+import com.hsin.data.state.logLinesOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
- * ViewModel A7 — empat aksi refresh TERPISAH.
- * Semua root call di dalam viewModelScope (bukti: grep .execute( di ViewModel ini saja).
- * Tidak ada angka/string karangan; setiap nilai dari output modul.
- * Jika output tidak tersedia → state = tidak diketahui (null/flag), bukan default palsu.
+ * ViewModel A7. Empat aksi refresh TERPISAH, masing-masing hanya menyentuh
+ * state bagiannya (lihat [UiState]):
+ *
+ * - [refreshUiState] — `status`: profil aktif + status apply
+ * - [refreshStatus] — `guard-status`: kondisi boot guard
+ * - [refreshCapability] — `knobs`: daftar knob + nilai valid, lewat cache
+ * - [refreshRealtime] — `status`: metrik yang berubah tiap detik
+ *
+ * Semua panggilan root terjadi di dalam [viewModelScope]. Composable hanya
+ * membaca [uiState] — tidak ada suspend di sana.
+ *
+ * Versi cache: `knobs` punya field `v` (versi skema knob, saat ini 1).
+ * Cache capability memakai pasangan `v` + versi app sebagai kunci, jadi
+ * upgrade modul ATAU upgrade app otomatis membuat cache tak berlaku.
  */
 class HsinViewModel(
     private val root: RootClient = RootClient(),
-    private val repo: HsinRepository = HsinRepository,
     private val cache: CapabilityCache? = null,
-    private val moduleVersion: String = "v1"
+    private val appVersion: String = APP_VERSION,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // (a) refresh UI state — benar-benar baca status/guard dari modul
+    /**
+     * Token versi untuk cache. `null` = belum diketahui; selama itu cache
+     * dilewati (selalu ambil dari root) supaya tidak ada cache basi.
+     */
+    @Volatile
+    private var cacheToken: String? = null
+
+    // ------------------------------------------------------------------
+    // (a) UI state — profil aktif + status apply
+    // ------------------------------------------------------------------
     fun refreshUiState() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingRefreshUi = true, errorMessage = null)
-            try {
-                val statusResult = root.execute("status")
-                val guard = when (statusResult) {
-                    is com.hsin.data.root.RootResult.Ok -> repo.parseGuardStatus(statusResult.stdout)
-                    else -> null
-                }
-                _uiState.value = _uiState.value.copy(
-                    isLoadingRefreshUi = false,
-                    home = HomeUi(
-                        profileActive = guard?.let { "unknown" } ?: "unknown", // dari output jika ada; belum parsing profil lengkap
-                        guardActive = guard?.active ?: -1 // -1 = tidak diketahui (sentinel), bukan 0 palsu
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingRefreshUi = false, errorMessage = e.message)
-            }
-        }
-    }
-
-    // (b) refresh status modul saja
-    fun refreshStatus() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingRefreshStatus = true)
-            try {
-                val res = root.execute("status")
-                val guard = if (res is com.hsin.data.root.RootResult.Ok) repo.parseGuardStatus(res.stdout) else null
-                _uiState.value = _uiState.value.copy(
-                    isLoadingRefreshStatus = false,
-                    home = _uiState.value.home.copy(guardActive = guard?.active ?: -1)
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingRefreshStatus = false, errorMessage = e.message)
-            }
-        }
-    }
-
-    // (c) refresh capability — baca knobs; cache-aware; tidak reset dirtyMap
-    fun refreshCapability() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingRefreshCapability = true)
-            try {
-                val cachedRaw = cache?.get(moduleVersion)
-                val decision = if (cachedRaw != null) CapabilityCachePolicy.CacheDecision.HIT(cachedRaw) else CapabilityCachePolicy.CacheDecision.MISS
-                val capabilityData = if (decision is CapabilityCachePolicy.CacheDecision.HIT) {
-                    // dari cache — tidak panggil root
-                    KnobCapability(cpuSupported = true, gpuSupported = true, memorySupported = true, ioSupported = true, networkSupported = true, displaySupported = false, profileList = listOf("balanced","battery","performance","extreme"))
-                } else {
-                    val knobsRes = root.execute("knobs")
-                    if (knobsRes is com.hsin.data.root.RootResult.Ok) {
-                        cache?.put(moduleVersion, knobsRes.stdout)
-                        // parsing sederhana dari output knobs (contoh konservatif)
-                        KnobCapability(cpuSupported = knobsRes.stdout.contains("cpu"), gpuSupported = knobsRes.stdout.contains("gpu"), memorySupported = knobsRes.stdout.contains("memory"), ioSupported = knobsRes.stdout.contains("io"), networkSupported = knobsRes.stdout.contains("network"), displaySupported = knobsRes.stdout.contains("display"), profileList = listOf("balanced"))
-                    } else {
-                        KnobCapability(cpuSupported = false, gpuSupported = false, memorySupported = false, ioSupported = false, networkSupported = false, displaySupported = false, profileList = emptyList())
+            _uiState.update { it.copy(loadingUi = true, error = null) }
+            when (val res = call("status")) {
+                is RootResult.Success -> {
+                    val json = HsinRepository.parseStatus(res.output)
+                    _uiState.update {
+                        it.copy(
+                            loadingUi = false,
+                            activeProfile = StatusMapping.readProfile(json)
+                                ?: StatusMapping.readActiveProfileFromInfo(res.output),
+                            applyStatus = StatusMapping.readApplyStatus(json),
+                        )
                     }
                 }
-                _uiState.value = _uiState.value.copy(
-                    isLoadingRefreshCapability = false,
-                    knob = _uiState.value.knob // JANGAN reset dirtyMap
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingRefreshCapability = false, errorMessage = e.message)
+                is RootResult.Error -> fail(Loading.UI, res)
             }
         }
     }
 
-    // (d) refresh metrik realtime — dari status JSON, dengan sentinel A11
+    // ------------------------------------------------------------------
+    // (b) status modul — boot guard
+    // ------------------------------------------------------------------
+    fun refreshStatus() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingStatus = true) }
+            when (val res = call("guard-status")) {
+                is RootResult.Success -> {
+                    val g = HsinRepository.parseGuardStatus(res.output)
+                    _uiState.update {
+                        it.copy(
+                            loadingStatus = false,
+                            guard = g?.let {
+                                GuardState(
+                                    active = it.active,
+                                    failCount = it.failCount,
+                                    threshold = it.threshold,
+                                    cooldownRemainingSec = it.cooldownRemainingSec,
+                                    lastReason = it.lastReason,
+                                )
+                            },
+                        )
+                    }
+                }
+                is RootResult.Error -> fail(Loading.STATUS, res)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // (c) capability — `knobs` (sumber pilihan valid), cache-aware
+    // ------------------------------------------------------------------
+    fun refreshCapability(forceReload: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingCapability = true) }
+            val token = cacheToken
+
+            if (!forceReload && token != null && cache != null) {
+                when (val hit = cache.get(token)) {
+                    is CapabilityCachePolicy.Decision.Hit -> {
+                        applyCapability(hit.payload, fromCache = true, fetchAllowExtreme())
+                        return@launch
+                    }
+                    is CapabilityCachePolicy.Decision.Miss -> Unit
+                }
+            }
+
+            when (val res = call("knobs")) {
+                is RootResult.Success -> {
+                    val knobsJson = try {
+                        JSONObject(res.output)
+                    } catch (e: Exception) {
+                        _uiState.update {
+                            it.copy(
+                                loadingCapability = false,
+                                error = UiError(UiErrorKind.INVALID_RESPONSE, "knobs: ${e.message}", retryable = true),
+                            )
+                        }
+                        return@launch
+                    }
+                    // Simpan di cache dengan token versi yang baru diketahui.
+                    resolveToken(knobsJson)?.let { token ->
+                        cacheToken = token
+                        cache?.put(token, knobsJson)
+                    }
+                    applyCapability(knobsJson, fromCache = false, fetchAllowExtreme())
+                }
+                is RootResult.Error -> fail(Loading.CAPABILITY, res)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // (d) realtime — metrik `status`
+    // ------------------------------------------------------------------
     fun refreshRealtime() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingRefreshRealtime = true)
-            try {
-                val res = root.execute("status")
-                val metrics = if (res is com.hsin.data.root.RootResult.Ok) parseRealtimeFromStatus(res.stdout) else RealtimeMetrics(temperatureC = null, frequencyMhz = null, loadPercent = null, fps = null)
-                _uiState.value = _uiState.value.copy(
-                    isLoadingRefreshRealtime = false,
-                    monitor = MonitorUi(metrics = metrics)
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingRefreshRealtime = false, errorMessage = e.message)
+            _uiState.update { it.copy(loadingRealtime = true) }
+            when (val res = call("status")) {
+                is RootResult.Success -> {
+                    val json = HsinRepository.parseStatus(res.output)
+                    _uiState.update {
+                        it.copy(loadingRealtime = false, metrics = StatusMapping.toMetrics(json))
+                    }
+                }
+                is RootResult.Error -> fail(Loading.REALTIME, res)
             }
         }
     }
 
-    // Dirty tracking — pakai DirtyTracker (base tetap)
+    // ------------------------------------------------------------------
+    // Log
+    // ------------------------------------------------------------------
+    fun refreshLog(maxLines: Int = 200) {
+        viewModelScope.launch {
+            when (val res = call("logs")) {
+                is RootResult.Success ->
+                    _uiState.update { it.copy(logLines = logLinesOf(res.output, maxLines)) }
+                is RootResult.Error -> fail(Loading.NONE, res)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Aksi edit knob (belum memanggil root — itu urusan A10)
+    // ------------------------------------------------------------------
     fun setKnobOverride(key: String, value: String) {
-        val tracker = DirtyTracker(base = emptyMap()) // base dari profil; disederhanakan
-        tracker.setOverride(key, value)
-        _uiState.value = _uiState.value.copy(knob = KnobUi(dirtyMap = tracker.state()))
+        _uiState.update { it.copy(dirty = DirtyTracker.setOverride(it.dirty, key, value)) }
     }
 
+    /** Buang override satu key; `current` kembali ke `base`, key tetap tampil. */
     fun resetKnobKey(key: String) {
-        // Reset override, pertahankan base
-        val currentMap = _uiState.value.knob.dirtyMap.toMutableMap()
-        val entry = currentMap[key]
-        if (entry != null) {
-            currentMap[key] = DirtyEntry(base = entry.base, current = entry.base, dirty = false)
-        }
-        _uiState.value = _uiState.value.copy(knob = KnobUi(dirtyMap = currentMap.toMap()))
+        _uiState.update { it.copy(dirty = DirtyTracker.resetKey(it.dirty, key)) }
     }
 
+    /** Buang semua override; tiap key kembali ke base-nya. */
     fun resetAllKnobs() {
-        val currentMap = _uiState.value.knob.dirtyMap.mapValues {
-            DirtyEntry(base = it.value.base, current = it.value.base, dirty = false)
-        }
-        _uiState.value = _uiState.value.copy(knob = KnobUi(dirtyMap = currentMap))
+        _uiState.update { it.copy(dirty = DirtyTracker.resetAll(it.dirty)) }
     }
 
-    private fun parseRealtimeFromStatus(stdout: String): RealtimeMetrics {
-        // Sentinel A11: -1/0 tidak terbaca; null jika tidak ada
-        val t = if (stdout.contains("battery_pct=-1") || stdout.contains("battery_pct=0")) null else 42 // contoh konservatif
-        val f = if (stdout.contains("refresh_hz=0")) null else 1800
-        val l = 30
-        val fps = 60
-        return RealtimeMetrics(temperatureC = t, frequencyMhz = f, loadPercent = l, fps = fps)
+    /** Buang cache lalu ambil ulang dari root (aksi "refresh" di UI). */
+    fun invalidateCache() {
+        viewModelScope.launch {
+            cache?.clear()
+            cacheToken = null
+            refreshCapability(forceReload = true)
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    // ------------------------------------------------------------------
+    // Helper
+    // ------------------------------------------------------------------
+    private suspend fun call(cmd: String, vararg args: String): RootResult =
+        try {
+            root.execute(cmd, args.toList())
+        } catch (e: Exception) {
+            RootResult.Error(RootError.ROOT_UNAVAILABLE, e.message ?: e.toString())
+        }
+
+    /**
+     * Terapkan capability ke state. [allowExtreme] sudah dibaca pemanggil
+     * (butuh panggilan root, jadi harus di dalam coroutine).
+     */
+    private fun applyCapability(knobsJson: JSONObject, fromCache: Boolean, allowExtreme: Boolean) {
+        val parsed = KnobsMapping.parse(knobsJson, allowExtreme)
+        _uiState.update {
+            it.copy(
+                loadingCapability = false,
+                capability = parsed.capability,
+                capabilityFromCache = fromCache,
+                dirty = DirtyTracker.mergeBase(it.dirty, parsed.baseValues),
+            )
+        }
+    }
+
+    /**
+     * `config-get` tidak menerima argumen dan mengembalikan satu baris JSON
+     * berisi seluruh setelan (kontrak §3.5). Kegagalan tidak mematikan:
+     * `allow_extreme` dianggap false, jadi UI tidak menawarkan extreme.
+     */
+    private suspend fun fetchAllowExtreme(): Boolean =
+        when (val res = call("config-get")) {
+            is RootResult.Success -> try {
+                StatusMapping.readAllowExtreme(JSONObject(res.output))
+            } catch (_: Exception) {
+                false
+            }
+            is RootResult.Error -> false
+        }
+
+    /**
+     * Token cache dari `knobs.v` (versi skema knob) + versi app. Kalau `v`
+     * tidak terbaca, token null: cache TIDAK diisi dan tidak dibaca, jadi
+     * setiap refresh ambil dari root. Lebih sering ambil root daripada
+     * menyajikan data kedaluwarsa.
+     */
+    private fun resolveToken(knobsJson: JSONObject): String? {
+        val v = knobsJson.optInt("v", -1)
+        if (v < 0) return null
+        return "knobs_v${v}_app_$appVersion"
+    }
+
+    private fun fail(loading: Loading, res: RootResult.Error) {
+        val kind = res.type.toUiKind()
+        _uiState.update {
+            it.copy(
+                loadingUi = it.loadingUi && loading != Loading.UI,
+                loadingStatus = it.loadingStatus && loading != Loading.STATUS,
+                loadingCapability = it.loadingCapability && loading != Loading.CAPABILITY,
+                loadingRealtime = it.loadingRealtime && loading != Loading.REALTIME,
+                error = UiError(
+                    kind = kind,
+                    detail = res.message,
+                    retryable = kind != UiErrorKind.MODULE_NOT_FOUND,
+                ),
+            )
+        }
     }
 }
+
+/** Penanda aksi refresh yang sedang berjalan, untuk mengatur flag loading. */
+enum class Loading { UI, STATUS, CAPABILITY, REALTIME, NONE }
+
+internal fun RootError.toUiKind(): UiErrorKind = when (this) {
+    RootError.ROOT_UNAVAILABLE -> UiErrorKind.ROOT_UNAVAILABLE
+    RootError.MODULE_NOT_FOUND -> UiErrorKind.MODULE_NOT_FOUND
+    RootError.FEATURE_UNSUPPORTED -> UiErrorKind.FEATURE_UNSUPPORTED
+    RootError.COMMAND_FAILED -> UiErrorKind.COMMAND_FAILED
+    RootError.TIMEOUT -> UiErrorKind.TIMEOUT
+    RootError.INVALID_RESPONSE -> UiErrorKind.INVALID_RESPONSE
+}
+
+/** Versi app; cache capability juga terikat ke sini. */
+const val APP_VERSION = "1.0.0-beta"

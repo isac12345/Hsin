@@ -3,33 +3,63 @@ package com.hsin.data.cache
 import org.json.JSONObject
 
 /**
- * Logika cache capability — murni JVM, bisa diuji lokal tanpa Android.
- * Aturan: key menyertakan versi modul; JSON rusak / versi beda → MISS;
- * `clear()` eksplisit; tidak menyimpan `capabilities`; serialisasi `org.json`.
+ * Keputusan cache capability — logika murni (tanpa Android) supaya bisa
+ * diuji di JVM biasa.
+ *
+ * Aturan:
+ * - Satu key tetap, versi modul disimpan DI DALAM payload (bukan di nama
+ *   key). Kalau versi disimpan di nama key, setiap upgrade meninggalkan
+ *   entri lama menumpuk tanpa pernah dibersihkan.
+ * - Versi payload ≠ versi sekarang → MISS (cache diabaikan, ditimpa).
+ * - JSON rusak / kosong / tanpa `knobs` → MISS, tidak melempar exception.
+ * - Yang disimpan hanya hasil `knobs`, tidak pernah `capabilities`
+ *   (kontrak §3.9: `capabilities` tidak bisa disandbox dan bukan sumber
+ *   kebenaran).
  */
 object CapabilityCachePolicy {
 
-    fun buildKey(moduleVersion: String): String = "hsin_capability_cache_v$moduleVersion"
+    const val KEY = "hsin_capability"
+    const val FIELD_VERSION = "v"
+    const val FIELD_KNOBS = "knobs"
 
-    /** Keputusan cache berdasarkan input string + versi. */
-    fun evaluate(rawJson: String?, moduleVersion: String): CacheDecision {
-        if (rawJson == null || rawJson.isBlank()) return CacheDecision.MISS
-        return try {
-            val obj = JSONObject(rawJson)
-            val v = obj.optString("v", "")
-            if (v != moduleVersion) return CacheDecision.MISS
-            val cap = obj.optJSONObject("cap") ?: obj
-            CacheDecision.HIT(cap.toString())
-        } catch (_: Exception) {
-            CacheDecision.MISS
-        }
+    sealed class Decision {
+        /** Cache dipakai; [payload] adalah isi `knobs` apa adanya. */
+        data class Hit(val payload: JSONObject) : Decision()
+
+        /** Cache tidak dipakai. [reason] hanya untuk log/diagnostik. */
+        data class Miss(val reason: String) : Decision()
     }
 
-    fun isCacheHit(decision: CacheDecision): Boolean = decision is CacheDecision.HIT
-    fun isCacheMiss(decision: CacheDecision): Boolean = decision is CacheDecision.MISS
+    /** Bentuk payload cache. */
+    fun build(version: String, knobsJson: String): String {
+        val knobs = try {
+            JSONObject(knobsJson)
+        } catch (_: Exception) {
+            // Output `knobs` yang bukan JSON tidak boleh masuk cache; simpan
+            // sebagai objek kosong supaya keputusan jadi MISS, bukan crash.
+            JSONObject()
+        }
+        return JSONObject()
+            .put(FIELD_VERSION, version)
+            .put(FIELD_KNOBS, knobs)
+            .toString()
+    }
 
-    sealed class CacheDecision {
-        data class HIT(val payload: String) : CacheDecision()
-        object MISS : CacheDecision()
+    fun evaluate(raw: String?, currentVersion: String): Decision {
+        if (raw.isNullOrBlank()) return Decision.Miss("kosong")
+        val obj = try {
+            JSONObject(raw)
+        } catch (_: Exception) {
+            return Decision.Miss("json rusak")
+        }
+        val version = obj.optString(FIELD_VERSION)
+        if (version.isBlank()) return Decision.Miss("versi hilang")
+        if (version != currentVersion) {
+            return Decision.Miss("versi beda: cache=$version sekarang=$currentVersion")
+        }
+        if (!obj.has(FIELD_KNOBS)) return Decision.Miss("field knobs hilang")
+        val knobs = obj.optJSONObject(FIELD_KNOBS) ?: return Decision.Miss("knobs bukan objek")
+        if (knobs.length() == 0) return Decision.Miss("knobs kosong")
+        return Decision.Hit(knobs)
     }
 }

@@ -4,31 +4,42 @@ import android.content.Context
 import android.content.SharedPreferences
 
 /**
- * Cache capability lokal — SharedPreferences, TANPA database.
- * Key menyertakan versi modul; `clear()` eksplisit; JSON rusak/versi beda → MISS (bukan crash).
- * Tidak menyimpan `capabilities` (kontrak §3.9); hanya `knobs` hasil.
+ * Cache capability lokal. [SharedPreferences], tanpa database.
+ *
+ * Semua keputusan HIT/MISS ada di [CapabilityCachePolicy] (murni, teruji
+ * lokal); kelas ini hanya menjembatani ke storage Android.
  */
 class CapabilityCache(private val prefs: SharedPreferences) {
 
-    private val KEY = "hsin_capability"
+    fun get(currentVersion: String): CapabilityCachePolicy.Decision =
+        CapabilityCachePolicy.evaluate(prefs.getString(CapabilityCachePolicy.KEY, null), currentVersion)
 
-    fun put(version: String, jsonPayload: String) {
-        // Satu key tetap; versi disimpan dalam payload. Versi lama otomatis tertimpa.
-        prefs.edit().putString(KEY, "{\"v\":\"$version\",\"cap\":$jsonPayload}").apply()
+    /**
+     * Simpan hasil `knobs` untuk versi [moduleVersion]. Tidak menimpa cache
+     * yang lebih baru (kalau ada probe paralel, hasil lama tidak boleh
+     * menimpa hasil baru).
+     */
+    fun put(moduleVersion: String, knobsJson: String) {
+        val existing = CapabilityCachePolicy.evaluate(
+            prefs.getString(CapabilityCachePolicy.KEY, null),
+            moduleVersion
+        )
+        if (existing is CapabilityCachePolicy.Decision.Hit) return
+        prefs.edit()
+            .putString(
+                CapabilityCachePolicy.KEY,
+                CapabilityCachePolicy.build(moduleVersion, knobsJson)
+            )
+            .apply()
     }
 
-    fun get(version: String): String? {
-        val raw = prefs.getString(KEY, null) ?: return null
-        val decision = CapabilityCachePolicy.evaluate(raw, version)
-        return if (decision is CapabilityCachePolicy.CacheDecision.HIT) raw else null
-    }
-
+    /** Buang cache (permintaan refresh user). */
     fun clear() {
-        prefs.edit().remove(KEY).apply()
+        prefs.edit().remove(CapabilityCachePolicy.KEY).apply()
     }
 
     companion object {
         fun create(context: Context): CapabilityCache =
-            CapabilityCache(context.getSharedPreferences("hsin_capability", Context.MODE_PRIVATE))
+            CapabilityCache(context.getSharedPreferences("hsin_cache", Context.MODE_PRIVATE))
     }
 }
