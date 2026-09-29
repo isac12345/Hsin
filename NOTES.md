@@ -857,3 +857,42 @@
   sederhana bergambaran sehari-hari (tukang/remote/satpam/teman), bukan
   bahasa teknis kompleks. Setiap laporan/penjelasan wajib ada versi
   analoginya dulu, baru detail teknisnya.
+
+## M2 guard-status (2026-09-29, leader + dev-modul work/m2-guard, TERIMA L1)
+- Isi (merge dafeb7d: 49f6171 + bce3288 + d547271, 4 file +270/-8):
+  core/guard_status.sh BARU (hsin_guard_status read-only: baca
+  $HSIN_DATA/.boot_fail_count format timestamp:count + legacy angka-polos,
+  threshold via _hbg_threshold, expired via cooldown, tanpa panggil
+  hsin_boot_guard_check yang menulis); action.sh (+source, +case
+  guard-status, Usage, skip debug-log + skip hsin_protect_harden_data);
+  build_release.sh (+guard_status.sh di daftar runtime); tests/
+  sandbox_guard_status.sh BARU (4 kondisi via dispatcher action.sh).
+- Output: 5 baris key=value (active/fail_count/threshold/
+  cooldown_remaining_sec/last_reason) + 1 baris JSON terakhir.
+  Hilang/rusak/expired -> active=0 fail_count=0 cooldown=0
+  reason "tidak ada state", rc 0. Ada isi -> reason
+  "boot gagal <N> x berturut-turut".
+- Koreksi leader atas diff pekerja (d547271): (1) KRITIS — blok auto-exec
+  di akhir guard_status.sh mencetak output setiap kali di-source, mengotori
+  SEMUA command action.sh (double output guard-status, prepend di knobs/
+  logs/device) -> diganti `return 0`; (2) preamble action.sh (mkdir logs +
+  exec 2>>debug.log) tetap membuat file untuk guard-status -> dibungkus
+  case sehingga guard-status nol-file literal (terbukti: kasus hilang =
+  0 file di HSIN_DATA); (3) harness hardcoded path worktree + /tmp
+  (read-only di Termux) + uji exec langsung bukan via action.sh -> tulis
+  ulang repo-relative via dispatcher (pola sandbox_boot_guard.sh).
+  Duplikat case renderer-apply (pekerja) sudah difix pekerja di bce3288.
+- Bukti L1: sh -n 3/3, shellcheck -S error 0, rg /sys|/proc + tulis kosong,
+  harness 20/20, regresi boot_guard 10/10 + service_guard 8/8 +
+  safe_apply 11/11 + overrides 9/9 + knob_results 9/9, knobs/knob-list/
+  info/Usage tak terpengaruh. Sisa jujur: di ZIP release (tanpa .devmode)
+  integrity-cache + debug.log preamble tetap ditulis infra bersama
+  (sama seperti status/knobs) — nol-penulisan literal terbukti di
+  sandbox devmode. APP_PLAN M2 [x]. L2: validasi HP.
+- PELAJARAN: (9) file yang di-source DILARANG mencetak/menjalankan apa pun
+  saat source (dulu: `exit` membunuh pemanggil; kini: auto-exec mengotori
+  semua command) — akhiri dengan `return 0`, tanpa blok eksekusi;
+  (10) harness DILARANG hardcode path worktree/cabang (/tmp read-only,
+  default HSIN_DATA di dalam repo bikin sampah test_guard_m2/ — sudah
+  dibersihkan, repo bersih); uji read-only WAJIB lewat dispatcher asli
+  + snapshot, bukan exec file langsung.

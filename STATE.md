@@ -234,4 +234,10 @@
   tulis (balanced tetap performance), (e) 8 suite sandbox lama hijau,
   profil lama md5 identik; sh -n + shellcheck -S error 0; tanpa runtime
   baru. Koreksi NOTES M1 (catatan restore keliru) + bagian M1b.
-  APP_PLAN M1b [x]. L2: validasi HP. STOP.
+   APP_PLAN M1b [x]. L2: validasi HP. STOP.
+- APP-M2 (2026-09-29, leader + dev-modul work/m2-guard): TERIMA L1 + merge
+  dafeb7d ke main. guard-status read-only (5 baris key=value + JSON
+  terakhir, rc 0; hilang/rusak -> "tidak ada state"). Koreksi leader
+  d547271: auto-exec saat source + preamble tulis + harness path.
+  Bukti: harness 20/20, regresi hijau semua, snapshot nol tulis.
+  APP_PLAN M2 [x]. L2: validasi HP. STOP.
