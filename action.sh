@@ -1283,7 +1283,6 @@ _main() {
             hsin_guard_status
             ;;
         renderer-apply)
-        renderer-apply)
             . "$HSIN_MODULE_PATH/engine/render/renderer.sh" 2>/dev/null
             if hsin_render_apply_live "$1"; then
                 # Persist so post-fs-data.sh re-applies this automatically
