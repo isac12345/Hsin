@@ -931,3 +931,78 @@
   dibaca live saat runtime). Q1-Q3 tetap terbuka: kernel TIDAK
   mengekspos min/max node apa pun, jadi batas knob tetap butuh kunci
   user. K1 tetap STOP.
+
+## K1 knob engine yang sudah ada (2026-09-29, leader langsung, TERIMA L1)
+- Batas dikunci user: vfs_cache_pressure 0-1000 (HSIN_VM_SAFE max
+  500->1000, default profil tetap), dirty_ratio 1-90, dirty_background_
+  ratio 1-50 + validasi bg<ratio, readahead PRESET 128/256/512/1024/
+  2048/4096/8192 per block, backlog 128-16384 (leader verifikasi:
+  netdev_max_backlog = SATU-SATUNYA sysctl di tcp.sh yang bervariasi per
+  profil; sack/window_scaling/ecn konstanta, bukan knob).
+- Isi (7 file +393/-70 + harness baru): core/user_knobs.sh (4 key fixed
+  numeric + field io readahead preset, validasi 3 situs, teks error),
+  core/knobs.sh (JSON memory.vm.* + io.blocks[].readahead + backlog
+  top-level, cur/writable live), engine/memory/vm.sh (3 knob VM, tabel
+  max 1000, validasi silang bg>=ratio -> FALLBACK + alasan dua angka,
+  manual = tanpa tulis), engine/io/readahead.sh (knob per block + cek
+  ulang preset + UNAVAILABLE/FAILED), engine/network/tcp.sh (knob backlog;
+  sack/ecn/scaling dikunci non-manual seperti sebelumnya), core/backup.sh
+  (+3 VM +backlog; loop block jadi $HSIN_SYSFS_BLOCK). TIDAK ada file
+  runtime baru -> build_release.sh tak disentuh.
+- Koreksi leader saat implementasi: (1) hsin_uk_used mencatat APPLIED
+  SEBELUM tulis, jadi node hilang tetap terkategori APPLIED -> jalur gagal
+  tulis sekarang menulis ulang baris hasil UNAVAILABLE (node hilang/
+  read-only) atau FAILED (kernel menolak); (2) hsin_backup_io loop
+  /sys/block hardcode (sandbox-blind, catatan M1) -> $HSIN_SYSFS_BLOCK
+  dengan default sama (dampak HP nol); tanpa ini backup/rollback readahead
+  mustahil dibuktikan; (3) BUG ZIP RUNTIME dari M2 (TERBUKTI di baseline
+  HEAD): guard_status.sh memakai `. boot_guard.sh || { ... }`, sedangkan
+  build_release.sh menghapus baris `. ...core/...` saat menyatukan
+  runtime.sh -> pembuka blok hilang, `}` yatim, runtime gagal parse
+  (sh -n rc=2 pada 14129 baris). Diperbaiki: baris source diawali
+  `command -v _hbg_read || .` (tidak kena pola hapus) + fallback di
+  `if ! command -v` dengan body non-kosong. Runtime rekonstruksi kini
+  sh -n OK.
+- Bukti L1: sh -n 7/7, shellcheck -S error 0, harness K1 36/36 (A snapshot
+  byte per knob satu-per-satu: hanya node itu berubah; B manual tanpa
+  override nol tulis; C balanced identik nilai profil; D node hilang
+  UNAVAILABLE tanpa crash; E 8 nilai luar rentang/preset ditolak knob-set
+  + file cacat ditolak engine; F bg>=ratio FALLBACK + dua angka di manual
+  DAN balanced, manual tanpa tulis bg; G backup->rollback 5 roundtrip per
+  knob; H knobs JSON valid + 5 field baru cur dari node palsu; I
+  knob-list kategori benar), suite lama 8/8 hijau, runtime ZIP
+  rekonstruksi sh -n OK + semua marker fungsi K1 ada. End-to-end
+  dispatcher: knob-set 5/5 OK, knob-list baris+JSON, knobs JSON memuat
+  field baru.
+- Jujur: di Termux /proc/sys + /sys/block tak terbaca, jadi knobs JSON di
+  sini reporting supported:false (pola lama swappiness, bukan angka
+  palsu). Validasi node kernel nyata tetap L2 di HP.
+- BARIS 16-19 (DVFS, refresh-rate range, frame limit, SurfaceFlinger)
+  DIKELUARKAN dari K1 oleh keputusan user, bukan ditunda. Kandidat step
+  terpisah nanti dengan pendekatan BERBEDA:
+  * DVFS (cpu/gpu_limit 0-100): node sysfs, tulis terverifikasi, restore
+    100% sudah ada. Masalahnya SEMANTIK - knob max_khz (kHz absolut) dan
+    cap persen menulis node yang sama; sudah ada aturan "override menang"
+    (dvfs.sh:69-73/:126-130), tapi key absolut + slider persen = dua
+    sumber kebenaran. Step terpisah harus memutuskan mana yang tampil di
+    UI (saran: hanya max_khz; cap persen jadi read-only turunan).
+  * Refresh-rate range (peak/min Hz): bukan sysfs tapi Settings.System
+    (settings/cmd) -> tidak bisa di-sandbox, hanya uji HP; knob ganda
+    (peak+min) tidak cocok pola key tunggal sekarang, dan ROM bisa revert
+    diam-diam (readback mismatch sudah di-log). Perlu mode uji "tahan 60
+    detik" + perbandingan readback.
+  * Frame limit: 3 prop debug.sf on/off. Tidak ada node "nilai valid" yang
+    bisa dibaca, jadi tidak bisa jadi knob angka; kalau tetap dibuat harus
+    switch boolean dengan status dari getprop - tapi efek ke FPS tidak
+    terverifikasi, jadi jangan dijanjikan ke user.
+  * SurfaceFlinger: apply me-RESTART SurfaceFlinger (stop/start, layar
+    blank) - TIDAK boleh jadi knob apply. Kalau nanti dipakai, hanya
+    sebagai intent boot-time seperti downscale/renderer
+    (hsin_sf_apply_boot sudah ada), di luar jalur apply per knob.
+- PELAJARAN: (11) file yang digabung build_release.sh tidak boleh punya
+  baris `. ...core/...` sebagai satu-satunya isi blok if/`|| {` - sed
+  hapus baris itu dan menyisakan blok kosong/yatim; awali dengan
+  `command -v` biar utuh; (12) shell Android/mksh menolak blok `if` dengan
+  body KOSONG - sisakan `:` atau perintah nyata; (13) hsin_uk_used =
+  "override diterima", BUKAN "diterapkan" - kategori final hanya sah
+  setelah tulis+verify, jadi jalur gagal harus menulis ulang baris hasil.

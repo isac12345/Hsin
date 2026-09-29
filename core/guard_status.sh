@@ -8,7 +8,18 @@ HSIN_GUARD_FILE="${HSIN_GUARD_FILE:-$HSIN_DATA/.boot_fail_count}"
 HSIN_GUARD_THRESHOLD="${HSIN_GUARD_THRESHOLD:-2}"
 HSIN_GUARD_COOLDOWN="${HSIN_GUARD_COOLDOWN:-86400}"
 
-. "$HSIN_MODULE_PATH/core/boot_guard.sh" 2>/dev/null || {
+# Fungsi _hbg_* milik core/boot_guard.sh (satu-satunya logic guard; file ini
+# tidak menduplikasi atau mengubahnya).
+# BARIS INI MULAI DENGAN `command`, bukan `. `: build_release.sh menghapus
+# setiap baris `. ...core/engine/extreme...` saat menyatukan runtime.sh, jadi
+# bentuk `. file || { ... }` akan kehilangan pembuka blok dan menyisakan `}`
+# yatim (runtime gagal parse). Baris ini juga tidak pernah jadi blok kosong
+# setelah build, dan di ZIP release _hbg_read sudah ada dari boot_guard.sh
+# sehingga cabang `.` tidak dijalankan sama sekali.
+command -v _hbg_read >/dev/null 2>&1 || . "$HSIN_MODULE_PATH/core/boot_guard.sh" 2>/dev/null
+# Fallback hanya kalau file boot_guard.sh benar-benar absen (tree dev rusak):
+# definisi minimal yang meniru parser state, TIDAK logic guard baru.
+if ! command -v _hbg_read >/dev/null 2>&1; then
     _hbg_read() {
         _HBG_TS=0; _HBG_COUNT=0
         [ -f "$HSIN_GUARD_FILE" ] || return 0
@@ -27,7 +38,7 @@ HSIN_GUARD_COOLDOWN="${HSIN_GUARD_COOLDOWN:-86400}"
         [ "$HSIN_GUARD_THRESHOLD" -ge 1 ] 2>/dev/null && printf '%s\n' "$HSIN_GUARD_THRESHOLD" || printf '2\n'
     }
     _hbg_now() { date +%s 2>/dev/null || printf '0\n'; }
-}
+fi
 
 hsin_guard_status() {
     # Baca state

@@ -92,8 +92,12 @@ _uk_esc() {
 # Bentuk yang sah, semua tertutup:
 #   cpu_policy_<id>_(gov|max_khz|min_khz|sched)
 #   gpu_node_<nama>_(gov|max_khz|min_khz|sched)
-#   io_block_<nama>_(gov|max_khz|min_khz|sched)
-#   zram_algo | swappiness | tcp_cc | tfo
+#   io_block_<nama>_(gov|max_khz|min_khz|sched|readahead)
+#   zram_algo | swappiness | tcp_cc | tfo | vfs_cache_pressure |
+#   dirty_ratio | dirty_background_ratio | backlog
+#
+# readahead HANYA untuk io (bukan cpu/gpu) — dicek di bawah. vfs/dirty/
+# backlog kunci tetap (satu node per key, seperti swappiness/tfo).
 #
 # Field diambil dari BELAKANG key, jadi nama node boleh mengandung '_'
 # (mis. gpu_node_mali0_gov, io_block_sda_sched). Key dan nilainya dinilai
@@ -112,7 +116,7 @@ _uk_class() {
     esac
     case "$_uk_tk" in
         zram_algo|tcp_cc) _uk_kind="fixed" ;;
-        swappiness|tfo)
+        swappiness|tfo|vfs_cache_pressure|dirty_ratio|dirty_background_ratio|backlog)
             _uk_kind="fixed"
             _uk_num=1
             ;;
@@ -125,6 +129,7 @@ _uk_class() {
         *_max_khz) _uk_tfield="max_khz" ;;
         *_min_khz) _uk_tfield="min_khz" ;;
         *_sched) _uk_tfield="sched" ;;
+        *_readahead) _uk_tfield="readahead" ;;
         *) return 1 ;;
     esac
     # _uk_tfield dari daftar tertutup tanpa karakter glob, tapi tetap
@@ -147,6 +152,12 @@ _uk_class() {
             ;;
         *) return 1 ;;
     esac
+    # readahead HANYA knob io (per block device). Kunci cpu/gpu yang
+    # berakhiran _readahead ditolak — engine tidak pernah membacanya.
+    if [ "$_uk_tfield" = "readahead" ] && [ "$_uk_kind" != "io" ]; then
+        _uk_kind=""
+        return 1
+    fi
     case "$_uk_tfield" in
         max_khz|min_khz) _uk_num=1 ;;
     esac
@@ -159,15 +170,25 @@ hsin_uk_key_ok() {
 }
 
 # $1 = key, $2 = value. 0 kalau value cocok dengan TIPE key-nya.
-# Key angka (frekuensi kHz, swappiness, tfo) hanya menerima digit dan
-# harus dalam rentang yang benar-benar diterima kernel, jadi tidak ada
-# angka yang bisa membuat apply nanti gagal atau di-clamp kernel. Key token
+# Key angka (frekuensi kHz, swappiness, tfo, VM, backlog) hanya menerima
+# digit dan harus dalam rentang yang benar-benar dipakai (batas K1 dari
+# user + tabel HSIN_VM_SAFE engine/memory/vm.sh), jadi tidak ada angka
+# yang bisa membuat apply nanti gagal atau di-clamp kernel. Key token
 # (governor, scheduler, algo zram, TCP CC) hanya menerima nama tanpa
-# spasi supaya tidak mungkin menyuntik baris lain ke file.
+# spasi supaya tidak mungkin menyuntik baris lain ke file. readahead
+# = preset (keputusan K1), bukan rentang.
 hsin_uk_val_ok() {
     _uk_v="$2"
     _uk_class "$1" || return 1
     [ -n "$_uk_v" ] || return 1
+    case "$1" in
+        *_readahead)
+            case "$_uk_v" in
+                128|256|512|1024|2048|4096|8192) return 0 ;;
+            esac
+            return 1
+            ;;
+    esac
     if [ "$_uk_num" = "1" ]; then
         case "$_uk_v" in
             *[!0-9]*) return 1 ;;
@@ -185,6 +206,18 @@ hsin_uk_val_ok() {
                 ;;
             swappiness) [ "$_uk_v" -le 200 ] 2>/dev/null || return 1 ;;
             tfo) [ "$_uk_v" -le 3 ] 2>/dev/null || return 1 ;;
+            vfs_cache_pressure)
+                [ "$_uk_v" -ge 0 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 1000 ] 2>/dev/null || return 1 ;;
+            dirty_ratio)
+                [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 90 ] 2>/dev/null || return 1 ;;
+            dirty_background_ratio)
+                [ "$_uk_v" -ge 1 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 50 ] 2>/dev/null || return 1 ;;
+            backlog)
+                [ "$_uk_v" -ge 128 ] 2>/dev/null || return 1
+                [ "$_uk_v" -le 16384 ] 2>/dev/null || return 1 ;;
         esac
         return 0
     fi
@@ -286,7 +319,7 @@ hsin_uk_set() {
     if ! hsin_uk_key_ok "$1"; then
         # Key tidak dicetak di pesan error: input ini belum tervalidasi
         # dan bisa saja berisi karakter yang merusak baris output.
-        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched), gpu_node_<nama>_..., io_block_<nama>_..., zram_algo, swappiness, tcp_cc, tfo)"
+        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched), gpu_node_<nama>_..., io_block_<nama>_(gov|max_khz|min_khz|sched|readahead), zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog)"
         return 1
     fi
     _uk_k="$1"
@@ -294,11 +327,18 @@ hsin_uk_set() {
     if [ -z "$2" ]; then
         _uk_want=0
     elif ! hsin_uk_val_ok "$_uk_k" "$2"; then
-        if [ "$_uk_num" = "1" ]; then
-            echo "ERROR: $_uk_k: nilai harus angka (kHz 100000-5000000, swappiness 0-200, tfo 0-3)"
-        else
-            echo "ERROR: $_uk_k: nilai harus token 1-32 karakter huruf/angka"
-        fi
+        case "$_uk_k" in
+            *_readahead)
+                echo "ERROR: $_uk_k: nilai harus salah satu preset 128/256/512/1024/2048/4096/8192 (KB)"
+                ;;
+            *)
+                if [ "$_uk_num" = "1" ]; then
+                    echo "ERROR: $_uk_k: nilai harus angka (kHz 100000-5000000, swappiness 0-200, tfo 0-3, vfs_cache_pressure 0-1000, dirty_ratio 1-90, dirty_background_ratio 1-50, backlog 128-16384)"
+                else
+                    echo "ERROR: $_uk_k: nilai harus token 1-32 karakter huruf/angka"
+                fi
+                ;;
+        esac
         return 1
     fi
     if [ "$_uk_want" = "1" ]; then
@@ -329,7 +369,7 @@ hsin_uk_set() {
 hsin_uk_del() {
     [ "$#" -ge 1 ] || { echo "ERROR: hsin_uk_del butuh <key>"; return 1; }
     if ! hsin_uk_key_ok "$1"; then
-        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched), gpu_node_<nama>_..., io_block_<nama>_..., zram_algo, swappiness, tcp_cc, tfo)"
+        echo "ERROR: key knob tidak dikenal (pola: cpu_policy_<id>_(gov|max_khz|min_khz|sched), gpu_node_<nama>_..., io_block_<nama>_(gov|max_khz|min_khz|sched|readahead), zram_algo, swappiness, tcp_cc, tfo, vfs_cache_pressure, dirty_ratio, dirty_background_ratio, backlog)"
         return 1
     fi
     _uk_rewrite "drop" "$1" ""
@@ -570,12 +610,17 @@ hsin_uk_gpu_field() {
     hsin_uk_get "gpu_node_${_uk_sn}_$2"
 }
 
-# $1 = block device (path penuh atau basename), $2 = sched
+# $1 = block device (path penuh atau basename), $2 = sched|readahead
+# (daftar tertutup: nama node dari device, jadi field-nya ikut ditutup
+# supaya key tak sengaja tidak mungkin terbentuk).
 hsin_uk_io_field() {
     [ "$#" -ge 2 ] || return 1
-    [ "$2" = "sched" ] || return 1
+    case "$2" in
+        sched|readahead) ;;
+        *) return 1 ;;
+    esac
     _uk_sanitize "${1##*/}"
-    hsin_uk_get "io_block_${_uk_sn}_sched"
+    hsin_uk_get "io_block_${_uk_sn}_$2"
 }
 
 # $1 = tag engine, $2 = key, $3 = nilai. Dipanggil engine tepat setelah

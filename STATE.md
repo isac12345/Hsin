@@ -247,3 +247,14 @@
   readahead + backlog tanpa batas di-tree -> butuh angka user (Q1-Q5).
   Penilaian 16-19: DVFS bersyarat-aman, RR bersyarat, frame-limit kurang
   cocok, SF tidak aman live. NOL kode diubah, K1 tetap [ ]. Menunggu user.
+- APP-K1 (2026-09-29, leader langsung; 2 delegasi dev-modul GAGAL/cancel):
+  TERIMA L1, batas dikunci user (vfs 0-1000, ratio 1-90, bg 1-50 +
+  validasi bg<ratio, readahead preset 7 nilai, backlog 128-16384).
+  5 knob baru: vfs_cache_pressure, dirty_ratio,
+  dirty_background_ratio, backlog, io_block_*_readahead. 7 file
+  +393/-70 tanpa file runtime baru. 3 koreksi leader (kategori hasil saat
+  tulis gagal; backup io sandboxable; BUG runtime ZIP asal M2 ditemukan
+  lewat rekonstruksi runtime + diperbaiki). Bukti: harness K1 36/36,
+  suite lama 8/8, runtime sh -n OK, dispatcher end-to-end. Baris 16-19
+  dikeluarkan dari K1 (dicatat NOTES sebagai kandidat step terpisah).
+  APP_PLAN K1 [x]. L2: validasi HP. STOP.

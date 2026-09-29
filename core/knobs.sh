@@ -384,6 +384,46 @@ _kn_mem_json() {
     return 0
 }
 
+# K1: 3 knob VM (vfs_cache_pressure, dirty_ratio, dirty_background_ratio).
+# Bentuk sama dengan swappiness: {min,max,cur,writable,supported} per node,
+# nilai live dari node. Batas = tabel HSIN_VM_SAFE (engine/memory/vm.sh),
+# yaitu rentang yang benar-benar dipakai engine untuk menulis. Dipisah dari
+# _kn_mem_json supaya tiap node punya blok JSON sendiri dan tidak ada daftar
+# batas kedua yang bisa berbeda dari engine.
+_kn_vm_knob() {
+    _kn_vk_name="$1"
+    _kn_vk_min="$2"
+    _kn_vk_max="$3"
+    _kn_vk_sup=false
+    _kn_vk_w=false
+    _kn_vk_cur=0
+    if [ -n "$HSIN_PROC" ]; then
+        _kn_vk_node="$HSIN_PROC/$_kn_sysdir/vm/$_kn_vk_name"
+        if [ -r "$_kn_vk_node" ]; then
+            _kn_vk_raw=$(hsin_node_read "$_kn_vk_node" 2>/dev/null)
+            _kn_num "$_kn_vk_raw"
+            _kn_vk_cur="$_kn_n"
+            [ -w "$_kn_vk_node" ] && _kn_vk_w=true
+            _kn_vk_sup=true
+        fi
+    fi
+    _kn_out_vk="{\"min\":${_kn_vk_min},\"max\":${_kn_vk_max},\"cur\":${_kn_vk_cur},\"writable\":${_kn_vk_w},\"supported\":${_kn_vk_sup}}"
+    return 0
+}
+
+# vfs_cache_pressure 0-1000, dirty_ratio 1-90, dirty_background_ratio 1-50
+# (keputusan user K1; batas atas = max HSIN_VM_SAFE).
+_kn_vm_knobs_json() {
+    _kn_vm_knob vfs_cache_pressure 0 1000
+    _kn_vfs="$_kn_out_vk"
+    _kn_vm_knob dirty_ratio 1 90
+    _kn_dr="$_kn_out_vk"
+    _kn_vm_knob dirty_background_ratio 1 50
+    _kn_dbr="$_kn_out_vk"
+    _kn_out_vm="{\"vfs_cache_pressure\":${_kn_vfs},\"dirty_ratio\":${_kn_dr},\"dirty_background_ratio\":${_kn_dbr}}"
+    return 0
+}
+
 # io: hsin_io_block_devs() sudah menyaring loop/ram/zram/dm-* saat scan, jadi
 # hanya device riil yang bisa ditulis user. queue/scheduler memakai penanda
 # kurung siku yang sama dengan comp_algorithm.
@@ -406,11 +446,26 @@ _kn_io_json() {
         _kn_active_token "$_kn_s_raw"
         _kn_esc "$_kn_bk"
         _kn_cur="$_kn_e"
+        # K1: readahead per block = PRESET (keputusan user), bukan rentang.
+        # Preset di sini WAJIB sama dengan daftar yang diterima
+        # hsin_uk_val_ok (core/user_knobs.sh) dan yang dicek ulang engine
+        # io/readahead.sh. Node hilang/tak-baca = supported:false + cur 0.
+        _kn_ra_sup=false
+        _kn_ra_w=false
+        _kn_ra_cur=0
+        if [ -f "$_kn_b/queue/read_ahead_kb" ]; then
+            _kn_ra_raw=$(hsin_node_read "$_kn_b/queue/read_ahead_kb" 2>/dev/null)
+            _kn_num "$_kn_ra_raw"
+            _kn_ra_cur="$_kn_n"
+            [ -w "$_kn_b/queue/read_ahead_kb" ] && _kn_ra_w=true
+            _kn_ra_sup=true
+        fi
+        _kn_ra_opts="[128,256,512,1024,2048,4096,8192]"
         _kn_esc "${_kn_b##*/}"
         _kn_nm="$_kn_e"
 
         [ "$_kn_cnt" = "0" ] || _kn_items="${_kn_items},"
-        _kn_items="${_kn_items}{\"name\":\"${_kn_nm}\",\"schedulers\":${_kn_sch},\"cur\":\"${_kn_cur}\",\"writable\":${_kn_wr}}"
+        _kn_items="${_kn_items}{\"name\":\"${_kn_nm}\",\"schedulers\":${_kn_sch},\"cur\":\"${_kn_cur}\",\"writable\":${_kn_wr},\"readahead\":{\"options\":${_kn_ra_opts},\"cur\":${_kn_ra_cur},\"writable\":${_kn_ra_w},\"supported\":${_kn_ra_sup}}}"
         _kn_cnt=$((_kn_cnt + 1))
     done
 
@@ -446,6 +501,28 @@ _kn_net_json() {
     fi
 
     _kn_out_net="{\"supported\":${_kn_tcp_sup},\"tcp_cc\":${_kn_tcp},\"tfo\":{\"min\":0,\"max\":3,\"cur\":${_kn_tfo_cur},\"supported\":${_kn_tfo_sup}}}"
+    return 0
+}
+
+# K1: netdev_max_backlog (satu knob, rentang 128-16384 sesuai keputusan
+# user; angka ini sama dengan batas yang diterima hsin_uk_val_ok di
+# core/user_knobs.sh dan yang dicek ulang engine/network/tcp.sh).
+# Node hilang = supported:false + cur 0, bukan crash.
+_kn_backlog_json() {
+    _kn_bl_sup=false
+    _kn_bl_w=false
+    _kn_bl_cur=0
+    if [ -n "$HSIN_PROC" ]; then
+        _kn_bl_node="$HSIN_PROC/$_kn_sysdir/net/core/netdev_max_backlog"
+        if [ -r "$_kn_bl_node" ]; then
+            _kn_bl_raw=$(hsin_node_read "$_kn_bl_node" 2>/dev/null)
+            _kn_num "$_kn_bl_raw"
+            _kn_bl_cur="$_kn_n"
+            [ -w "$_kn_bl_node" ] && _kn_bl_w=true
+            _kn_bl_sup=true
+        fi
+    fi
+    _kn_out_backlog="{\"min\":128,\"max\":16384,\"cur\":${_kn_bl_cur},\"writable\":${_kn_bl_w},\"supported\":${_kn_bl_sup}}"
     return 0
 }
 
@@ -604,16 +681,18 @@ hsin_knobs_json() {
     _kn_cpu_json
     _kn_gpu_json
     _kn_mem_json
+    _kn_vm_knobs_json
     _kn_io_json
     _kn_net_json
+    _kn_backlog_json
     _kn_disp_json
     _kn_feat_json
     _kn_caps_json
 
-    printf '{"v":1,"profiles":%s,"cpu":%s,"gpu":%s,"memory":%s,"io":%s,"network":%s,"display":%s,"features":%s,"capabilities":%s}\n' \
+    printf '{"v":1,"profiles":%s,"cpu":%s,"gpu":%s,"memory":%s,"vm":%s,"io":%s,"network":%s,"backlog":%s,"display":%s,"features":%s,"capabilities":%s}\n' \
         "$_kn_out_profiles" "$_kn_out_cpu" "$_kn_out_gpu" "$_kn_out_mem" \
-        "$_kn_out_io" "$_kn_out_net" "$_kn_out_disp" "$_kn_out_feat" \
-        "$_kn_out_caps"
+        "$_kn_out_vm" "$_kn_out_io" "$_kn_out_net" "$_kn_out_backlog" \
+        "$_kn_out_disp" "$_kn_out_feat" "$_kn_out_caps"
     return 0
 }
 
