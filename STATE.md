@@ -313,6 +313,8 @@
   Workflow build-apk manual tanpa step NDK. Koreksi leader d2a6b35:
   MainActivity pakai material3 TANPA dependensi (pasti gagal compile) ->
   tulis ulang foundation-only; hapus composeOptions ganda (plugin yang
-  mengatur) + testInstrumentationRunner mati. Catatan proses: pekerja
-  checkout cabang di repo utama (langgar AGENTS.md butir 7) -> leader
-  kembalikan ke main setelah merge. APP_PLAN A4 [x]. L2: build CI.
+  mengatur) + testInstrumentationRunner mati + compose-foundation
+  (build CI #1 gagal Unresolved foundation, build CI #2 run 36537576407
+  SUCCESS, APK 6.856.887 byte). Catatan proses: pekerja checkout cabang
+  di repo utama (langgar AGENTS.md butir 7) -> leader kembalikan ke main
+  setelah merge. APP_PLAN A4 [x]. L2: pasang + tes rasa di HP.
