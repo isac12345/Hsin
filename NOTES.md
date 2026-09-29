@@ -896,3 +896,29 @@
   default HSIN_DATA di dalam repo bikin sampah test_guard_m2/ — sudah
   dibersihkan, repo bersih); uji read-only WAJIB lewat dispatcher asli
   + snapshot, bukan exec file langsung.
+
+## K1 pra-kode STOP (2026-09-29, leader investigasi langsung, TANPA delegasi)
+- Penekanan user: laporkan rentang live SEBELUM coding; STOP bila butuh
+  batas manual. Hasil: NOL live-read berhasil — Termux UID u0_a263:
+  /sys/block/* (bahkan ls), /proc/sys/vm/{vfs_cache_pressure,dirty_ratio,
+  dirty_background_ratio,swappiness}, /proc/sys/net/core/netdev_max_backlog
+  + somaxconn + tcp_max_syn_backlog SEMUA Permission denied (su DILARANG
+  AGENTS.md tanpa izin, tidak dijalankan). Kontrol positif: meminfo dan
+  policy0/scaling_max_freq=1612000 TERBACA.
+- Batas di-tree (bukan live node, belum dikunci): readahead profil
+  128/512/2048/4096 KB TANPA min/max (readahead.sh:28-33); vfs 0..500
+  profil 50/100/150/200 (vm.sh HSIN_VM_SAFE:17); dirty_ratio 1..90 profil
+  40/30/20/10 (:18); dirty_bg 1..50 profil 10/5/3/1 (:19); backlog profil
+  1000/1000/5000/16384 TANPA min/max (tcp.sh:156-163).
+- Ambiguitas spec (Aturan Eksekusi #8): "inventaris M1 baris 10,13,15 /
+  16-19" TIDAK ditemukan di repo (grep NOTES + commit M1 + docs nihil) —
+  scope diambil dari nama eksplisit, perlu konfirmasi user.
+- Penilaian 16-19 (read-only): DVFS AMAN BERSYARAT (0-100, verify+restore,
+  override-aware; konflik semantik dengan knob max_khz); RR-range BERSYARAT
+  (settings+readback, mode live via dumpsys, tapi knob ganda peak+min +
+  tak bisa sandbox + ROM bisa revert); frame-limit KURANG COCOK (boolean,
+  efek tak terverifikasi); SurfaceFlinger TIDAK AMAN live (restart SF tiap
+  apply, layar blank, risiko crash-loop) — hanya intent boot-time.
+- Tanya user (Q1-Q5): kunci batas = batas engine? readahead preset/rentang
+  apa? backlog rentang apa? kirim 5x `su -c cat` dari HP? konfirmasi scope.
+  Repo NOL perubahan kode. APP_PLAN K1 tetap [ ].
