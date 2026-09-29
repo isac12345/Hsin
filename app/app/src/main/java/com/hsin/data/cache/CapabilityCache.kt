@@ -2,6 +2,7 @@ package com.hsin.data.cache
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 /**
  * Cache capability lokal. [SharedPreferences], tanpa database.
@@ -19,17 +20,14 @@ class CapabilityCache(private val prefs: SharedPreferences) {
      * yang lebih baru (kalau ada probe paralel, hasil lama tidak boleh
      * menimpa hasil baru).
      */
-    fun put(moduleVersion: String, knobsJson: String) {
+    fun put(token: String, knobs: JSONObject) {
         val existing = CapabilityCachePolicy.evaluate(
             prefs.getString(CapabilityCachePolicy.KEY, null),
-            moduleVersion
+            token
         )
         if (existing is CapabilityCachePolicy.Decision.Hit) return
         prefs.edit()
-            .putString(
-                CapabilityCachePolicy.KEY,
-                CapabilityCachePolicy.build(moduleVersion, knobsJson)
-            )
+            .putString(CapabilityCachePolicy.KEY, CapabilityCachePolicy.build(token, knobs))
             .apply()
     }
 

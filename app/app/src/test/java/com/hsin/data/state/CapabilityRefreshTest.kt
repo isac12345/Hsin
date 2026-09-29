@@ -34,10 +34,10 @@ class CapabilityRefreshTest {
         fun get(token: String): CapabilityCachePolicy.Decision =
             CapabilityCachePolicy.evaluate(stored, token)
 
-        fun put(token: String, knobsJson: String) {
+        fun put(token: String, knobs: JSONObject) {
             putCount++
             if (CapabilityCachePolicy.evaluate(stored, token) is CapabilityCachePolicy.Decision.Hit) return
-            stored = CapabilityCachePolicy.build(token, knobsJson)
+            stored = CapabilityCachePolicy.build(token, knobs)
         }
 
         fun clear() {
@@ -57,7 +57,7 @@ class CapabilityRefreshTest {
             if (it is CapabilityCachePolicy.Decision.Hit) "hit" else "miss"
         }, token)
         assertTrue("siklus pertama harus MISS", first is CapabilityCachePolicy.Decision.Miss)
-        cache.put(token, knobsJson)
+        cache.put(token, JSONObject(knobsJson))
         assertEquals(1, cache.putCount)
 
         // Siklus 2: cache terisi -> HIT, tidak perlu root lagi
@@ -71,7 +71,7 @@ class CapabilityRefreshTest {
         val cache = FakeCache()
         val token = "knobs_v1_app_1.0"
         val knobs = fixture("knobs_sandbox.txt")
-        cache.put(token, knobs)
+        cache.put(token, JSONObject(knobs))
         val fromRoot = KnobsMapping.parse(JSONObject(knobs), allowExtreme = false)
         val hit = cache.get(token) as CapabilityCachePolicy.Decision.Hit
         val fromCache = KnobsMapping.parse(hit.payload, allowExtreme = false)
@@ -82,7 +82,7 @@ class CapabilityRefreshTest {
     @Test
     fun moduleUpgradeInvalidatesCache() {
         val cache = FakeCache()
-        cache.put("knobs_v1_app_1.0", fixture("knobs_sandbox.txt"))
+        cache.put("knobs_v1_app_1.0", JSONObject(fixture("knobs_sandbox.txt")))
         // Upgrade modul -> v=2
         assertTrue(
             "versi baru harus MISS",
@@ -94,7 +94,7 @@ class CapabilityRefreshTest {
     fun invalidateCacheForcesRefetch() {
         val cache = FakeCache()
         val token = "knobs_v1_app_1.0"
-        cache.put(token, fixture("knobs_sandbox.txt"))
+        cache.put(token, JSONObject(fixture("knobs_sandbox.txt")))
         assertTrue(cache.get(token) is CapabilityCachePolicy.Decision.Hit)
         cache.clear()
         assertTrue(

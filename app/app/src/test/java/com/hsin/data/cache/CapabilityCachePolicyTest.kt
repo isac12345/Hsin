@@ -1,5 +1,6 @@
 package com.hsin.data.cache
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,14 +16,14 @@ class CapabilityCachePolicyTest {
 
     @Test
     fun sameVersionAndValidPayloadIsHit() {
-        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", knobsJson)
+        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", JSONObject(knobsJson))
         val d = CapabilityCachePolicy.evaluate(raw, "knobs_v1_app_1.0")
         assertTrue("harus HIT, dapat: $d", d is CapabilityCachePolicy.Decision.Hit)
     }
 
     @Test
     fun differentModuleVersionIsMiss() {
-        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", knobsJson)
+        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", JSONObject(knobsJson))
         val d = CapabilityCachePolicy.evaluate(raw, "knobs_v2_app_1.0")
         assertTrue(d is CapabilityCachePolicy.Decision.Miss)
         assertTrue("alasannya harus menyebut versi", (d as CapabilityCachePolicy.Decision.Miss).reason.contains("versi beda"))
@@ -30,7 +31,7 @@ class CapabilityCachePolicyTest {
 
     @Test
     fun differentAppVersionIsMiss() {
-        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", knobsJson)
+        val raw = CapabilityCachePolicy.build("knobs_v1_app_1.0", JSONObject(knobsJson))
         val d = CapabilityCachePolicy.evaluate(raw, "knobs_v1_app_2.0")
         assertTrue(d is CapabilityCachePolicy.Decision.Miss)
     }
@@ -65,7 +66,7 @@ class CapabilityCachePolicyTest {
 
     @Test
     fun emptyKnobsObjectIsMiss() {
-        val raw = CapabilityCachePolicy.build("tok", "")
+        val raw = CapabilityCachePolicy.build("tok", JSONObject())
         val d = CapabilityCachePolicy.evaluate(raw, "tok")
         assertTrue("knobs kosong = MISS", d is CapabilityCachePolicy.Decision.Miss)
     }
@@ -75,8 +76,8 @@ class CapabilityCachePolicyTest {
         // Versi disimpan di payload, bukan di nama key: upgrade modul tidak
         // menyisakan entri lama menumpuk.
         assertEquals("hsin_capability", CapabilityCachePolicy.KEY)
-        val a = CapabilityCachePolicy.build("tok_v1", knobsJson)
-        val b = CapabilityCachePolicy.build("tok_v2", knobsJson)
+        val a = CapabilityCachePolicy.build("tok_v1", JSONObject(knobsJson))
+        val b = CapabilityCachePolicy.build("tok_v2", JSONObject(knobsJson))
         // v1 -> miss setelah v2 tersimpan
         assertTrue(CapabilityCachePolicy.evaluate(a, "tok_v2") is CapabilityCachePolicy.Decision.Miss)
         assertTrue(CapabilityCachePolicy.evaluate(b, "tok_v2") is CapabilityCachePolicy.Decision.Hit)
@@ -84,7 +85,7 @@ class CapabilityCachePolicyTest {
 
     @Test
     fun hitPayloadKeepsKnobsContent() {
-        val raw = CapabilityCachePolicy.build("tok", knobsJson)
+        val raw = CapabilityCachePolicy.build("tok", JSONObject(knobsJson))
         val hit = CapabilityCachePolicy.evaluate(raw, "tok") as CapabilityCachePolicy.Decision.Hit
         assertTrue("payload harus memuat profil manual", hit.payload.toString().contains("manual"))
     }

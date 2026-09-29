@@ -30,20 +30,15 @@ object CapabilityCachePolicy {
         data class Miss(val reason: String) : Decision()
     }
 
-    /** Bentuk payload cache. */
-    fun build(version: String, knobsJson: String): String {
-        val knobs = try {
-            JSONObject(knobsJson)
-        } catch (_: Exception) {
-            // Output `knobs` yang bukan JSON tidak boleh masuk cache; simpan
-            // sebagai objek kosong supaya keputusan jadi MISS, bukan crash.
-            JSONObject()
-        }
-        return JSONObject()
-            .put(FIELD_VERSION, version)
+    /**
+     * Bentuk payload cache. [token] sudah memuat versi skema knob dan
+     * versi app oleh pemanggil.
+     */
+    fun build(token: String, knobs: JSONObject): String =
+        JSONObject()
+            .put(FIELD_VERSION, token)
             .put(FIELD_KNOBS, knobs)
             .toString()
-    }
 
     fun evaluate(raw: String?, currentVersion: String): Decision {
         if (raw.isNullOrBlank()) return Decision.Miss("kosong")
