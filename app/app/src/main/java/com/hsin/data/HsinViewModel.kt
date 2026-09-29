@@ -142,11 +142,14 @@ class HsinViewModel(
                         return@launch
                     }
                     // Simpan di cache dengan token versi yang baru diketahui.
-                    resolveToken(knobsJson)?.let { token ->
-                        cacheToken = token
-                        cache?.put(token, knobsJson)
+                    // Token null = field `v` hilang → versi modul tidak cocok
+                    // (A13): tandai, cache dilewati, tetap tampilkan knob.
+                    val resolved = resolveToken(knobsJson)
+                    if (resolved != null) {
+                        cacheToken = resolved
+                        cache?.put(resolved, knobsJson)
                     }
-                    applyCapability(knobsJson, fromCache = false, fetchAllowExtreme())
+                    applyCapability(knobsJson, fromCache = false, fetchAllowExtreme(), resolved == null)
                 }
                 is RootResult.Error -> fail(Loading.CAPABILITY, res)
             }
@@ -346,13 +349,19 @@ class HsinViewModel(
      * Terapkan capability ke state. [allowExtreme] sudah dibaca pemanggil
      * (butuh panggilan root, jadi harus di dalam coroutine).
      */
-    private fun applyCapability(knobsJson: JSONObject, fromCache: Boolean, allowExtreme: Boolean) {
+    private fun applyCapability(
+        knobsJson: JSONObject,
+        fromCache: Boolean,
+        allowExtreme: Boolean,
+        versionMismatch: Boolean = false,
+    ) {
         val parsed = KnobsMapping.parse(knobsJson, allowExtreme)
         _uiState.update {
             it.copy(
                 loadingCapability = false,
                 capability = parsed.capability,
                 capabilityFromCache = fromCache,
+                versionMismatch = versionMismatch,
                 dirty = DirtyTracker.mergeBase(it.dirty, parsed.baseValues),
             )
         }

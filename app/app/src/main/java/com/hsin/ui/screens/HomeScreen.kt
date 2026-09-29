@@ -59,6 +59,8 @@ fun HomeScreen(
 
         ApplyCard(state = state)
 
+        EdgeStatesCard(state = state)
+
         CapabilityCard(state = state)
 
         HButton(label = "Buka knob", onClick = navActions::onOpenKnobs, primary = true)
@@ -129,9 +131,53 @@ private fun ApplyCard(state: UiState) {
     }
 }
 
+/**
+ * Banner kasus tepi A13: guard aktif, transport error, versi tidak cocok,
+ * degraded (parsial), dan catatan node read-only. Semua dari presenter
+ * murni ([ErrorStatesPresenter]) — layar hanya menampilkan.
+ */
 @Composable
-private fun CapabilityCard(state: UiState) {
+private fun EdgeStatesCard(state: UiState) {
+    val banners = com.hsin.ui.ErrorStatesPresenter.allBanners(state)
+    val readOnly = com.hsin.ui.ErrorStatesPresenter.readOnlyNotes(state.applyResults)
+    if (banners.isEmpty() && readOnly.isEmpty()) return
     HCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
+            Text("Perhatian", style = TitleSmall)
+            banners.forEach { b ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(b.title, style = BodyLarge)
+                        Text(b.body, style = BodyLarge, color = Muted)
+                    }
+                    Spacer()
+                    HBadge(
+                        when (b.tone) {
+                            com.hsin.ui.ErrorStatesPresenter.Tone.ERROR -> "GAGAL"
+                            com.hsin.ui.ErrorStatesPresenter.Tone.WARN -> "PERHATIAN"
+                            com.hsin.ui.ErrorStatesPresenter.Tone.INFO -> "INFO"
+                        },
+                        when (b.tone) {
+                            com.hsin.ui.ErrorStatesPresenter.Tone.ERROR -> HStatus.FAILED
+                            com.hsin.ui.ErrorStatesPresenter.Tone.WARN -> HStatus.WARN
+                            com.hsin.ui.ErrorStatesPresenter.Tone.INFO -> HStatus.DEFAULT
+                        },
+                    )
+                }
+            }
+            readOnly.forEach { note ->
+                Text("read-only: $note", style = BodyLarge, color = Muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapabilityCard(state: UiState) {    HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text("Kemampuan perangkat", style = TitleSmall)
             HSelectRow(
