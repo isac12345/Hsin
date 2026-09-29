@@ -1,6 +1,14 @@
 #!/system/bin/sh
 # HSIN GPU Engine - ARM Mali Specific
 # Credit: logic inspired by GTurbo (GPU governor control)
+#
+# KONVENSI _profile (WAJIB dibaca sebelum menambah fungsi di file engine):
+# _profile disetel SEKALI oleh pemanggil di awal rantai apply, lalu dipakai
+# bersama. Fungsi yang butuh nilai turunan sendiri (mis. hasil pemetaan atau
+# klasifikasi lokal) WAJIB memakai nama variabelnya sendiri - contoh
+# hsin_gpu_kbase_knobs_apply memakai _mk_profile - dan TIDAK boleh membaca
+# _profile karena itu milik pemanggil. Pelajaran: bug $_mk_profile dulu
+# menulis NILAI KOSONG ke node kbase hanya karena salah nama variabel.
 
 [ -z "$HSIN_MODULE_PATH" ] && HSIN_MODULE_PATH="/data/adb/modules/hsin"
 # shellcheck disable=SC1091
