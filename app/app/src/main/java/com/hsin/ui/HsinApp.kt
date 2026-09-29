@@ -13,6 +13,7 @@ import com.hsin.data.HsinViewModel
 import com.hsin.data.state.UiState
 import com.hsin.ui.components.ScreenScaffold
 import com.hsin.ui.screens.HomeScreen
+import com.hsin.ui.screens.KnobScreen
 import com.hsin.ui.screens.PlaceholderScreen
 import com.hsin.ui.theme.HsinTheme
 
@@ -61,7 +62,12 @@ fun HsinApp(
                     viewModel.refreshCapability()
                 },
             )
-            Tab.KNOB, Tab.MONITOR, Tab.LOG ->
+            Tab.KNOB -> KnobScreen(
+                state = state,
+                onSetOverride = viewModel::setKnobOverride,
+                onApply = { /* alur apply adalah A10 */ },
+            )
+            Tab.MONITOR, Tab.LOG ->
                 PlaceholderScreen(tabTitle = Tab.entries[tab].title)
         }
     }

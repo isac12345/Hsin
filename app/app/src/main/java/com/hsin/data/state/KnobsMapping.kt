@@ -38,6 +38,41 @@ object KnobsMapping {
         val baseValues: Map<String, String>,
     )
 
+    /**
+     * Fitur bergate dari `knobs.features`. APK hanya MENAMPILKAN statusnya;
+     * membuka gate extreme tetap milik modul dan file konfigurasi.
+     */
+    private fun readGatedFeatures(knobsJson: JSONObject, allowExtreme: Boolean): List<GatedFeature> {
+        val f = knobsJson.optJSONObject("features") ?: return emptyList()
+        val ext = f.optBoolean("extreme_optin", false)
+        return listOf(
+            GatedFeature("DVFS", f.optBoolean("dvfs", false), "Hanya aktif bila modul mengizinkan"),
+            GatedFeature("Global RR", f.optBoolean("global_rr", false), "Butuh profil yang diizinkan"),
+            GatedFeature("Frame limit", f.optBoolean("frame_limit", false), "Tidak tersedia di modul ini"),
+            GatedFeature("SurfaceFlinger", f.optBoolean("surfaceflinger", false), "Tidak tersedia di modul ini"),
+            GatedFeature("Gaming", f.optBoolean("gaming", false), "Tidak tersedia di modul ini"),
+            GatedFeature(
+                "Profil extreme",
+                ext && allowExtreme,
+                when {
+                    !ext -> "Modul belum mengaktifkan extreme"
+                    !allowExtreme -> "ALLOW_EXTREME belum true di hsin.conf"
+                    else -> "Sudah dibuka di konfigurasi modul"
+                },
+            ),
+        )
+    }
+
+    /** Baca min/max dari node `knobs`; null kalau tidak dilaporkan. */
+    private fun readRange(node: JSONObject?): IntRange? {
+        if (node == null) return null
+        if (!node.optBoolean("supported", false)) return null
+        val min = node.optInt("min", Int.MIN_VALUE)
+        val max = node.optInt("max", Int.MIN_VALUE)
+        if (min == Int.MIN_VALUE || max == Int.MIN_VALUE || max < min) return null
+        return min..max
+    }
+
     fun parse(knobsJson: JSONObject, allowExtreme: Boolean = false): Parsed {
         val profiles = readStringList(knobsJson.optJSONArray("profiles"))
             .filter { it in KNOWN_PROFILES }
@@ -52,6 +87,7 @@ object KnobsMapping {
 
         val allowed = linkedMapOf<String, List<String>>()
         val base = linkedMapOf<String, String>()
+        val ranges = linkedMapOf<String, IntRange>()
 
         // --- CPU: satu key per policy yang gpio ---
         val policies = cpu?.optJSONArray("policies")
@@ -93,6 +129,7 @@ object KnobsMapping {
         val sw = memory?.optJSONObject("swappiness")
         if (sw != null && sw.optBoolean("supported", false)) {
             base["swappiness"] = sw.optInt("cur", 0).toString()
+            readRange(sw)?.let { ranges["swappiness"] = it }
         }
         val zram = memory?.optJSONObject("zram")
         if (zram != null && zram.optBoolean("supported", false)) {
@@ -104,11 +141,34 @@ object KnobsMapping {
         }
 
         // --- vm: node global dengan min/max/cur/writable ---
-        copyScalar(vm, "vfs_cache_pressure", base)
-        copyScalar(vm, "dirty_ratio", base)
-        copyScalar(vm, "dirty_background_ratio", base)
-        copyScalar(vm, "page_cluster", base)
-        copyScalar(vm, "stat_interval", base)
+        copyScalar(vm, "vfs_cache_pressure", base, ranges)
+        copyScalar(vm, "dirty_ratio", base, ranges)
+        copyScalar(vm, "dirty_background_ratio", base, ranges)
+        copyScalar(vm, "page_cluster", base, ranges)
+        copyScalar(vm, "stat_interval", base, ranges)
+
+        // --- backlog: satu node global (kontrak §4) ---
+        readRange(knobsJson.optJSONObject("backlog"))?.let { ranges["backlog"] = it }
+        base["backlog"] = knobsJson.optJSONObject("backlog")
+            ?.takeIf { it.optBoolean("supported", false) }
+            ?.optInt("cur", 0).toString() ?: base["backlog"] ?: "0"
+
+        // --- sched: sysctl global + child_runs_first ---
+        val sched = knobsJson.optJSONObject("sched")
+        readRange(sched?.optJSONObject("child_runs_first"))
+            ?.let { ranges["sched_child_runs_first"] = it }
+        val sysctl = sched?.optJSONObject("sysctl")
+        val sysctlPairs = listOf(
+            "sched_latency_ns" to "sched_latency_pct",
+            "sched_min_granularity_ns" to "sched_min_granularity_pct",
+            "sched_wakeup_granularity_ns" to "sched_wakeup_granularity_pct",
+        )
+        for ((jsonKey, knobKey) in sysctlPairs) {
+            val node = sysctl?.optJSONObject(jsonKey)
+            readRange(node)?.let { ranges[knobKey] = it }
+            node?.takeIf { it.optBoolean("supported", false) }
+                ?.let { base[knobKey] = it.optInt("cur", 0).toString() }
+        }
 
         // --- io: per block ---
         val blocks = io?.optJSONArray("blocks")
@@ -132,10 +192,13 @@ object KnobsMapping {
             base["tcp_cc"] = net?.optString("cur_cc")?.takeIf { it.isNotBlank() } ?: cc.first()
         }
 
+        val editable = allowed.keys.filter { it.matches(EDITABLE) }.sorted()
         val cap = KnobCapability(
-            supportedKeys = allowed.keys.filter { it.matches(EDITABLE) }.sorted(),
+            supportedKeys = editable,
             allowedValues = allowed.filterKeys { it.matches(EDITABLE) },
+            ranges = ranges.filterKeys { it in editable },
             allowExtreme = allowExtreme,
+            gated = readGatedFeatures(knobsJson, allowExtreme),
         )
         return Parsed(cap, base.filterKeys { it.matches(EDITABLE) })
     }
@@ -150,11 +213,18 @@ object KnobsMapping {
         return sb.toString().take(40)
     }
 
-    private fun copyScalar(vm: JSONObject?, key: String, out: MutableMap<String, String>) {
+    private fun copyScalar(
+        vm: JSONObject?,
+        key: String,
+        out: MutableMap<String, String>,
+        ranges: MutableMap<String, IntRange>,
+    ) {
         val node = vm?.optJSONObject(key) ?: return
         if (!node.optBoolean("supported", false)) return
         out[key] = node.optInt("cur", 0).toString()
+        readRange(node)?.let { ranges[key] = it }
     }
+
 
     private fun readStringList(arr: JSONArray?): List<String> {
         if (arr == null) return emptyList()
