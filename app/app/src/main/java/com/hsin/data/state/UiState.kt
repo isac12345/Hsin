@@ -71,3 +71,16 @@ enum class UiErrorKind {
  */
 fun logLinesOf(output: String, maxLines: Int): List<String> =
     output.lines().filter { it.isNotBlank() }.takeLast(maxLines)
+
+/**
+ * Ambil (ok, fail) dari baris `Restore <nama> done. ok=N fail=M` pada
+ * keluaran `rollback`. Null kalau baris itu tidak ada — pemanggil tidak
+ * boleh mengarang angka hasil pemulihan.
+ */
+fun parseRollbackDetail(output: String): Pair<Int, Int>? {
+    val line = output.lines().firstOrNull { it.contains("ok=") && it.contains("fail=") }
+        ?: return null
+    val ok = Regex("ok=(\\d+)").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+    val fail = Regex("fail=(\\d+)").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+    return ok to fail
+}
