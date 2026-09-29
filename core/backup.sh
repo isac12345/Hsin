@@ -129,7 +129,10 @@ hsin_backup_thermal() {
 }
 
 hsin_backup_io() {
-    for b in /sys/block/*; do
+    # Path sysfs dari $HSIN_SYSFS_BLOCK (default /sys/block) supaya jalur
+    # ini bisa diuji dengan pohon palsu; defaultnya identik dengan
+    # sebelumnya, jadi perilaku di HP tidak berubah.
+    for b in "${HSIN_SYSFS_BLOCK:-/sys/block}"/*; do
         [ -d "$b" ] || continue
         _name=$(basename "$b")
         case "$_name" in loop*|ram*|zram*|dm-*) continue ;; esac
@@ -140,11 +143,17 @@ hsin_backup_io() {
 
 hsin_backup_memory() {
     [ -f "$HSIN_PROC/sys/vm/swappiness" ] && hsin_backup_node "$HSIN_PROC/sys/vm/swappiness"
+    # K1: 3 knob VM baru ikut backup (restore lewat nodes.list generik).
+    [ -f "$HSIN_PROC/sys/vm/vfs_cache_pressure" ] && hsin_backup_node "$HSIN_PROC/sys/vm/vfs_cache_pressure"
+    [ -f "$HSIN_PROC/sys/vm/dirty_ratio" ] && hsin_backup_node "$HSIN_PROC/sys/vm/dirty_ratio"
+    [ -f "$HSIN_PROC/sys/vm/dirty_background_ratio" ] && hsin_backup_node "$HSIN_PROC/sys/vm/dirty_background_ratio"
 }
 
 hsin_backup_network() {
     [ -f "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control" ] && hsin_backup_node "$HSIN_PROC/sys/net/ipv4/tcp_congestion_control"
     [ -f "$HSIN_PROC/sys/net/ipv4/tcp_fastopen" ] && hsin_backup_node "$HSIN_PROC/sys/net/ipv4/tcp_fastopen"
+    # K1: knob backlog.
+    [ -f "$HSIN_PROC/sys/net/core/netdev_max_backlog" ] && hsin_backup_node "$HSIN_PROC/sys/net/core/netdev_max_backlog"
 }
 
 # Backup all (dipakai sebelum apply profile)

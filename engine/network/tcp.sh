@@ -143,37 +143,96 @@ hsin_network_apply_tfo() {
 }
 
 # Apply network sysctl tunables
+# K1: netdev_max_backlog jadi knob user `backlog` (rentang 128-16384).
+# tcp_sack / tcp_window_scaling / tcp_ecn BUKAN knob (konstanta per profil)
+# dan perilakunya tidak berubah sama sekali.
 hsin_network_apply_sysctl() {
     _profile="$1"
 
-    # Mode manual: dilewati (tanpa override knob, tidak ada penulisan di sini).
+    _bl_path="$HSIN_PROC/sys/net/core/netdev_max_backlog"
+    _bl_req="(manual)"
+    [ "$_profile" = "manual" ] || _bl_req="(profil)"
+
+    # netdev_max_backlog: hanya node yang diminta user yang ditulis. Mode
+    # manual tanpa override = nol penulisan; sack/scaling/ecn (bukan knob)
+    # tetap dilewati di manual seperti sebelumnya.
     if [ "$_profile" = "manual" ]; then
         echo "  Sysctl: dilewati (mode manual)"
-        return 0
-    fi
-
-    # netdev_max_backlog
-    if [ -w $HSIN_PROC/sys/net/core/netdev_max_backlog ]; then
+        _uk_bl=$(hsin_uk_get backlog 2>/dev/null)
+        if [ -z "$_uk_bl" ]; then
+            hsin_uk_result "backlog" "(manual)" "-" "SKIPPED" "tidak diatur (mode manual)" 2>/dev/null || true
+            return 0
+        fi
+    else
         case "$_profile" in
             battery|balanced) _v="1000" ;;
             performance)      _v="5000" ;;
             extreme)          _v="16384" ;;
         esac
-        echo "$_v" > $HSIN_PROC/sys/net/core/netdev_max_backlog 2>/dev/null
     fi
 
-    # tcp_sack
-    [ -w $HSIN_PROC/sys/net/ipv4/tcp_sack ] && echo 1 > $HSIN_PROC/sys/net/ipv4/tcp_sack 2>/dev/null
-
-    # tcp_window_scaling
-    [ -w $HSIN_PROC/sys/net/ipv4/tcp_window_scaling ] && echo 1 > $HSIN_PROC/sys/net/ipv4/tcp_window_scaling 2>/dev/null
-
-    # tcp_ecn
-    if [ -w $HSIN_PROC/sys/net/ipv4/tcp_ecn ]; then
-        case "$_profile" in
-            battery) echo "0" > $HSIN_PROC/sys/net/ipv4/tcp_ecn 2>/dev/null ;;
-            *)       echo "1" > $HSIN_PROC/sys/net/ipv4/tcp_ecn 2>/dev/null ;;
+    # Node hilang/tidak writable = UNAVAILABLE beralasan, tanpa crash.
+    if [ ! -f "$_bl_path" ] || [ ! -w "$_bl_path" ]; then
+        hsin_uk_result "backlog" "$_bl_req" "-" "UNAVAILABLE" "netdev_max_backlog hilang atau read-only" 2>/dev/null || true
+    else
+        # Validasi ulang di engine (pola tfo): file bisa diedit manual.
+        _uk_bl=$(hsin_uk_get backlog 2>/dev/null)
+        if [ -n "$_uk_bl" ]; then
+            case "$_uk_bl" in ''|*[!0-9]*)
+                hsin_log_warn "network" "override backlog=$_uk_bl ditolak: harus angka 128-16384"
+                if [ "$_profile" = "manual" ]; then
+                    hsin_uk_result "backlog" "$_uk_bl" "-" "SKIPPED" "ditolak: bukan angka (mode manual, tidak ditulis)" 2>/dev/null || true
+                    _uk_bl=""
+                else
+                    hsin_uk_result "backlog" "$_uk_bl" "$_v" "FALLBACK" "ditolak: bukan angka, pakai profil" 2>/dev/null || true
+                    _uk_bl=""
+                fi
+                ;;
+            *)
+                if [ "$_uk_bl" -lt 128 ] 2>/dev/null || [ "$_uk_bl" -gt 16384 ] 2>/dev/null; then
+                    hsin_log_warn "network" "override backlog=$_uk_bl ditolak: harus 128-16384"
+                    if [ "$_profile" = "manual" ]; then
+                        hsin_uk_result "backlog" "$_uk_bl" "-" "SKIPPED" "ditolak: di luar 128-16384 (mode manual, tidak ditulis)" 2>/dev/null || true
+                        _uk_bl=""
+                    else
+                        hsin_uk_result "backlog" "$_uk_bl" "$_v" "FALLBACK" "ditolak: di luar 128-16384, pakai profil" 2>/dev/null || true
+                        _uk_bl=""
+                    fi
+                fi
+                ;;
         esac
+        fi
+
+        if [ -n "$_uk_bl" ]; then
+            _wval="$_uk_bl"
+            if echo "$_wval" > "$_bl_path" 2>/dev/null && [ "$(cat "$_bl_path" 2>/dev/null)" = "$_wval" ]; then
+                hsin_uk_used "network" "backlog" "$_wval"
+            else
+                _cur=$(cat "$_bl_path" 2>/dev/null)
+                [ -n "$_cur" ] || _cur="tidak terbaca"
+                hsin_log_warn "network" "override backlog=$_wval gagal (node tetap $_cur)"
+                hsin_uk_result "backlog" "$_wval" "$_cur" "FAILED" "tulis/readback gagal" 2>/dev/null || true
+            fi
+        elif [ "$_profile" != "manual" ]; then
+            echo "$_v" > "$_bl_path" 2>/dev/null
+            hsin_uk_result "backlog" "(profil)" "$_v" "APPLIED" "nilai profil (tanpa override)" 2>/dev/null || true
+        fi
+    fi
+
+    if [ "$_profile" != "manual" ]; then
+        # tcp_sack
+        [ -w $HSIN_PROC/sys/net/ipv4/tcp_sack ] && echo 1 > $HSIN_PROC/sys/net/ipv4/tcp_sack 2>/dev/null
+
+        # tcp_window_scaling
+        [ -w $HSIN_PROC/sys/net/ipv4/tcp_window_scaling ] && echo 1 > $HSIN_PROC/sys/net/ipv4/tcp_window_scaling 2>/dev/null
+
+        # tcp_ecn
+        if [ -w $HSIN_PROC/sys/net/ipv4/tcp_ecn ]; then
+            case "$_profile" in
+                battery) echo "0" > $HSIN_PROC/sys/net/ipv4/tcp_ecn 2>/dev/null ;;
+                *)       echo "1" > $HSIN_PROC/sys/net/ipv4/tcp_ecn 2>/dev/null ;;
+            esac
+        fi
     fi
 
     # Ringkasan override ke apply.log dipanggil di titik TERAKHIR pipeline
