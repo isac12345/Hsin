@@ -16,6 +16,11 @@ data class UiState(
     // --- capability ---
     val capability: KnobCapability? = null,
     val capabilityFromCache: Boolean = false,
+    /**
+     * True bila `knobs` terbaca tapi field skema `v` hilang — versi modul
+     * tidak cocok/skema tak dikenal (A13). Cache dilewati, selalu baca root.
+     */
+    val versionMismatch: Boolean = false,
 
     // --- current state ---
     val guard: GuardState? = null,
