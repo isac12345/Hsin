@@ -63,6 +63,7 @@ dependencies {
   implementation(libs.activity.compose)
   implementation(libs.lifecycle.viewmodel.compose)
   implementation(libs.lifecycle.runtime.ktx)
+  implementation(libs.lifecycle.runtime.compose)
   implementation(libs.coroutines.android)
   implementation(libs.compose.material3)
   testImplementation("junit:junit:4.13.2")
