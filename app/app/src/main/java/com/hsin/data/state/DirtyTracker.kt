@@ -1,5 +1,7 @@
 package com.hsin.data.state
 
+import com.hsin.data.repository.HsinRepository
+
 /**
  * Dirty tracking knob.
  *
@@ -59,4 +61,48 @@ object DirtyTracker {
         state.entries.filter { it.value.dirty }.map { it.key }.sorted()
 
     fun dirtyCount(state: DirtyMap): Int = dirtyKeys(state).size
+
+    /**
+     * Sesudah apply (A10): reset base ke nilai baru HANYA untuk knob yang
+     * modul laporkan APPLIED. FAILED/SKIPPED/UNAVAILABLE TIDAK di-reset —
+     * nilai lama tetap jadi acuan "SAAT INI" supaya user bisa coba lagi.
+     *
+     * - APPLIED: base = applied modul (bila `-`/kosong pakai requested),
+     *   current ikut base sehingga tidak dirty lagi.
+     * - FALLBACK: sistem kini bernilai applied (Y) sementara user meminta
+     *   X — base = applied, current tetap requested sehingga masih dirty
+     *   dan badge FALLBACK tetap terlihat (jujur: belum sesuai permintaan).
+     * - Lainnya: tidak disentuh.
+     *
+     * Hanya key yang ada di [state] yang diperbarui; baris hasil untuk key
+     * yang sudah hilang dari device diabaikan.
+     */
+    fun confirmApplied(
+        state: DirtyMap,
+        results: List<HsinRepository.KnobResult>,
+    ): DirtyMap {
+        if (state.isEmpty() || results.isEmpty()) return state
+        var out = state
+        for (r in results) {
+            val entry = out[r.key] ?: continue
+            when (r.category) {
+                "APPLIED" -> {
+                    val newBase = when {
+                        r.applied.isNotBlank() && r.applied != "-" -> r.applied
+                        r.requested.isNotBlank() && r.requested != "-" &&
+                            !r.requested.startsWith("(") -> r.requested
+                        else -> entry.current
+                    }
+                    out = out + (r.key to DirtyEntry(base = newBase, current = newBase))
+                }
+                "FALLBACK" -> {
+                    if (r.applied.isNotBlank() && r.applied != "-") {
+                        out = out + (r.key to entry.copy(base = r.applied))
+                    }
+                }
+                else -> Unit
+            }
+        }
+        return out
+    }
 }
