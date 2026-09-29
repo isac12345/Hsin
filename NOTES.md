@@ -1222,3 +1222,16 @@
   `_profile` yang di-set ulang tiap fungsi; risikonya fungsi BARU harus
   meng-set sendiri, dan harness yang tidak meng-isolasi bisa menutupi
   kesalahan - sudah dikunci lewat _isolate().
+
+## Konvensi variabel `_profile` (permanen, berlaku semua file engine)
+`_profile` disetel SEKALI oleh pemanggil di awal rantai apply lalu dipakai
+bersama oleh semua engine (dipasang di header file acuan, contoh
+`engine/gpu/mali.sh`). Fungsi yang butuh nilai turunannya sendiri -
+misalnya hasil pemetaan atau klasifikasi lokal - WAJIB menamainya berbeda
+(`_mk_profile`, `_gt_profile`, ...) dan tidak boleh membaca `_profile`
+langsung. Pelajaran: `hsin_gpu_kbase_knobs_apply` dulu set `_mk_profile`
+tapi membaca `$_profile`, dan hasilnya NILAI KOSONG ditulis ke node kbase
+padahal di pipeline hanya kebetulan benar karena pemanggil menyetel
+`_profile` lebih dulu. Aturan ini juga alasan kenapa harness sandbox harus
+meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
+`_profile`/`$_uk_v` dari engine lain menutupi bug nama variabel.
