@@ -65,7 +65,7 @@ fun HsinApp(
             Tab.KNOB -> KnobScreen(
                 state = state,
                 onSetOverride = viewModel::setKnobOverride,
-                onApply = { /* alur apply adalah A10 */ },
+                onApply = { viewModel.applyDirtyKnobs() },
             )
             Tab.MONITOR, Tab.LOG ->
                 PlaceholderScreen(tabTitle = Tab.entries[tab].title)

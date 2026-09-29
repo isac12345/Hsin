@@ -1,5 +1,7 @@
 package com.hsin.data.state
 
+import com.hsin.data.repository.HsinRepository
+
 /**
  * UiState aplikasi. Immutable total: semua `val`, perubahan lewat `copy()`.
  *
@@ -20,6 +22,12 @@ data class UiState(
     val activeProfile: String? = null,
     val applyStatus: String? = null,
     val dirty: DirtyMap = emptyMap(),
+
+    // --- A10: hasil apply per knob (langsung dari modul, kontrak §3.11) ---
+    /** True selama siklus apply berjalan (non-blocking; lihat HsinViewModel.applyDirtyKnobs). */
+    val isApplying: Boolean = false,
+    /** Hasil terakhir per knob, key -> baris hasil modul. Kosong bila belum pernah apply. */
+    val applyResults: Map<String, HsinRepository.KnobResult> = emptyMap(),
 
     // --- realtime ---
     val metrics: RealtimeMetrics = RealtimeMetrics.unknown(),
