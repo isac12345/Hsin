@@ -1,30 +1,28 @@
 package com.hsin.data.repository
 
 import org.json.JSONObject
-import org.json.JSONArray
 
 /**
- * HsinRepository — parser output kontrak (§3.1–§3.11).
+ * HsinRepository — parser output kontrak (§3.1–§3.11, M3).
  *
- * Aturan (konservatif, dari kontrak):
+ * Aturan (konservatif):
  * - Abaikan key tak dikenal (jangan crash, jangan bocor ke UI).
- * - Kategori hanya: APPLIED | SKIPPED | FALLBACK | UNAVAILABLE | FAILED (§4, `core/safe_apply.sh:9-21`).
- *   Kategori asing → INVALID_RESPONSE (KDoc catat ini).
- * - `applied` boleh `-` atau `N` (manual tanpa override, §3.11).
- * - Log bercampur JSON: baris bukan `key=`/JSON diabaikan; JSON terakhir diambil blok.
+ * - Kategori hanya: APPLIED | SKIPPED | FALLBACK | UNAVAILABLE | FAILED (§4).
+ *   Kategori asing → hasil parse gagal (bukan diabaikan; lihat KnobParseResult).
+ * - `applied` boleh `-` atau `N` (§3.11).
  * - `capabilities` tidak disandbox (path `/sys` literal) — TIDAK dipakai sumber kebenaran.
+ * - `guard-status` key wajib; jika `active`/bilangan wajib tak terbaca → parse gagal.
  */
 object HsinRepository {
 
-    /** Kategori yang valid dari kode modul (§4, `core/safe_apply.sh:9-21`, `core/user_knobs.sh`). */
     private val VALID_CATS = setOf("APPLIED","SKIPPED","FALLBACK","UNAVAILABLE","FAILED")
 
     data class GuardStatus(
         val active: Int,
-        val fail_count: Int,
+        val failCount: Int,
         val threshold: Int,
-        val cooldown_remaining_sec: Int,
-        val last_reason: String
+        val cooldownRemainingSec: Int,
+        val lastReason: String
     )
 
     data class KnobResult(
@@ -35,116 +33,109 @@ object HsinRepository {
         val reason: String
     )
 
-    /** Parse `status` (output sederhana; kita ambil baris OK / error). */
-    fun parseStatus(stdout: String): String = stdout.trim()
+    /** Hasil parse knob-list: sukses atau gagal karena kategori asing/JSON rusak. */
+    sealed class KnobParseResult {
+        data class Ok(val items: List<KnobResult>, val count: Int?, val overrides: Map<String,String>) : KnobParseResult()
+        data class InvalidResponse(val reason: String) : KnobParseResult()
+    }
 
-    /** Parse `guard-status` (§3.10): 5 key=value + JSON terakhir. */
-    fun parseGuardStatus(stdout: String): GuardStatus {
+    /** Parse `guard-status`. Key wajib harus terbaca; jika tidak → nullable / gagal.
+     * Nama field Kotlin idiomatis (`failCount` dll) dengan mapping eksplisit dari key kontrak. */
+    fun parseGuardStatus(stdout: String): GuardStatus? {
         val lines = stdout.lines()
         val map = mutableMapOf<String, String>()
-        var lastJson: JSONObject? = null
+        var jsonObj: JSONObject? = null
         for (line in lines) {
             val trimmed = line.trim()
             if (trimmed.isEmpty()) continue
             if (trimmed.startsWith("{")) {
-                try { lastJson = JSONObject(trimmed) } catch (_: Exception) {}
+                try { jsonObj = JSONObject(trimmed) } catch (_: Exception) {}
             } else if (trimmed.contains("=")) {
                 val idx = trimmed.indexOf('=')
-                if (idx > 0) map[trimmed.substring(0, idx)] = trimmed.substring(idx + 1)
+                if (idx > 0) {
+                    val k = trimmed.substring(0, idx)
+                    val v = trimmed.substring(idx + 1)
+                    map[k] = v.trim().trim('"')
+                }
             }
         }
-        // Prioritas: baris key=value; JSON terakhir sebagai fallback jika key hilang
-        return GuardStatus(
-            active = map["active"]?.toIntOrNull() ?: lastJson?.optInt("active") ?: 0,
-            fail_count = map["fail_count"]?.toIntOrNull() ?: lastJson?.optInt("fail_count") ?: 0,
-            threshold = map["threshold"]?.toIntOrNull() ?: lastJson?.optInt("threshold") ?: 0,
-            cooldown_remaining_sec = map["cooldown_remaining_sec"]?.toIntOrNull() ?: lastJson?.optInt("cooldown_remaining_sec") ?: 0,
-            last_reason = map["last_reason"] ?: lastJson?.optString("last_reason") ?: ""
-        )
+        fun readInt(k: String): Int? = map[k]?.toIntOrNull() ?: jsonObj?.optInt(k, Int.MIN_VALUE)?.let { if (it == Int.MIN_VALUE) null else it }
+        val active = readInt("active") ?: return null
+        val failCount = readInt("fail_count") ?: return null
+        val threshold = readInt("threshold") ?: return null
+        val cooldown = readInt("cooldown_remaining_sec") ?: return null
+        val reason = map["last_reason"] ?: jsonObj?.optString("last_reason") ?: return null
+        return GuardStatus(active, failCount, threshold, cooldown, reason)
     }
 
-    /** Parse `knob-list` (§3.2–§3.11). Baris `key=... requested=... applied=... category=... reason="..."` + JSON terakhir. */
-    fun parseKnobList(stdout: String): List<KnobResult> {
-        val results = mutableListOf<KnobResult>()
-        var lastJsonBlock: String? = null
+    /** Parse `knob-list` (§3.11). Baris `key=...` harus di-anchor di awal. JSON terakhir adalah objek `{"count":N,"overrides":{...}}`; tidak membuat entri knob tambahan (hanya baca count/overrides). */
+    fun parseKnobList(stdout: String): KnobParseResult {
+        val items = mutableListOf<KnobResult>()
+        var lastObjStr: String? = null
         val lines = stdout.lines()
         for (line in lines) {
             val t = line.trim()
             if (t.isEmpty()) continue
             if (t.startsWith("{")) {
-                lastJsonBlock = t
+                lastObjStr = t
                 continue
             }
-            // Baris key=... (bukan JSON)
-            if (t.contains("key=")) {
-                val key = extractKey(t, "key=") ?: continue
-                val requested = extractValue(t, "requested=") ?: ""
-                val applied = extractValue(t, "applied=") ?: ""
-                val category = extractValue(t, "category=") ?: ""
-                val reason = extractQuoted(t, "reason=") ?: ""
-                // Validasi kategori: hanya set yang PUNYA (§4)
-                if (category.isNotEmpty() && category !in VALID_CATS) {
-                    // Kategori asing → abaikan entry ini (jangan crash, jangan bocor)
-                    // Tapi kita tetap simpan sebagai INVALID_RESPONSE tanda di KDoc; karena
-                    // parser hanya mengembalikan list, kita abaikan agar UI tidak menerima kategori baru.
-                    continue
-                }
-                // Abaikan jika key tak dikenal (jangan bocor) — kita hanya izinkan yang ada dalam baris
-                if (key.isNotEmpty()) {
-                    results.add(KnobResult(key, requested, applied, category, reason))
-                }
+            // Anchor di awal baris
+            if (!t.startsWith("key=")) continue
+            val key = extractFrom(t, "key=", ' ') ?: continue
+            val requested = extractFrom(t, "requested=", ' ') ?: ""
+            val applied = extractFrom(t, "applied=", ' ') ?: ""
+            val categoryRaw = extractFrom(t, "category=", ' ') ?: ""
+            val reason = extractQuoted(t, "reason=") ?: ""
+            if (categoryRaw.isNotEmpty() && categoryRaw !in VALID_CATS) {
+                return KnobParseResult.InvalidResponse("foreign category: $categoryRaw")
+            }
+            if (key.isNotEmpty()) {
+                items.add(KnobResult(key, requested, applied, categoryRaw, reason))
             }
         }
-        // JSON terakhir sebagai tambahan jika berisi array/objek knob
-        if (lastJsonBlock != null) {
+        // JSON terakhir: hanya baca count & overrides, jangan tambah entri knob dari sini
+        var count: Int? = null
+        val overrides = mutableMapOf<String, String>()
+        if (lastObjStr != null) {
             try {
-                val arr = JSONArray(lastJsonBlock)
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val k = obj.optString("key", "")
-                    val req = obj.optString("requested", "")
-                    val app = obj.optString("applied", "")
-                    val cat = obj.optString("category", "")
-                    val reas = obj.optString("reason", "")
-                    if (k.isNotEmpty() && (cat.isEmpty() || cat in VALID_CATS)) {
-                        results.add(KnobResult(k, req, app, cat, reas))
+                val obj = JSONObject(lastObjStr)
+                count = if (obj.has("count")) obj.getInt("count") else null
+                if (obj.has("overrides")) {
+                    val o = obj.getJSONObject("overrides")
+                    val keys = o.keys()
+                    while (keys.hasNext()) {
+                        val k = keys.next()
+                        overrides[k] = o.getString(k)
                     }
                 }
             } catch (_: Exception) {
-                try {
-                    val obj = JSONObject(lastJsonBlock)
-                    val k = obj.optString("key", "")
-                    if (k.isNotEmpty()) {
-                        results.add(KnobResult(k, obj.optString("requested"), obj.optString("applied"), obj.optString("category"), obj.optString("reason")))
-                    }
-                } catch (_: Exception) {}
+                return KnobParseResult.InvalidResponse("broken JSON block")
             }
         }
-        return results
+        return KnobParseResult.Ok(items, count, overrides)
     }
 
-    private fun extractKey(s: String, prefix: String): String? {
-        val idx = s.indexOf(prefix)
-        if (idx < 0) return null
-        val rest = s.substring(idx + prefix.length)
-        val end = rest.indexOf(' ')
-        return if (end > 0) rest.substring(0, end) else rest
+    /** Status sederhana (§3.1). Jika kosong / rusak → kosong, bukan karangan. */
+    fun parseStatus(stdout: String): String? {
+        val trimmed = stdout.trim()
+        return if (trimmed.isNotEmpty()) trimmed else null
     }
-    private fun extractValue(s: String, prefix: String): String? {
+
+    private fun extractFrom(s: String, prefix: String, stop: Char): String? {
         val idx = s.indexOf(prefix)
         if (idx < 0) return null
         val rest = s.substring(idx + prefix.length)
-        val end = rest.indexOf(' ')
-        val valStr = if (end > 0) rest.substring(0, end) else rest
-        return valStr.trim()
+        val end = rest.indexOf(stop)
+        return if (end > 0) rest.substring(0, end) else rest
     }
     private fun extractQuoted(s: String, prefix: String): String? {
         val idx = s.indexOf(prefix)
         if (idx < 0) return null
         val rest = s.substring(idx + prefix.length)
-        val quoteStart = rest.indexOf('"')
-        if (quoteStart < 0) return null
-        val quoteEnd = rest.indexOf('"', quoteStart + 1)
-        return if (quoteEnd > quoteStart) rest.substring(quoteStart + 1, quoteEnd) else null
+        val q1 = rest.indexOf('"')
+        if (q1 < 0) return null
+        val q2 = rest.indexOf('"', q1 + 1)
+        return if (q2 > q1) rest.substring(q1 + 1, q2) else null
     }
 }

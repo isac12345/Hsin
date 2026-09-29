@@ -1,0 +1,5 @@
+# Fixture asal (kontrak M3, APP_CONTRACT.md)
+- guard-status_inactive.txt / guard-status_active.txt → §3.10 (2026-09-29 M3)
+- knob-list_manual.txt → §3.11 (2026-09-29 M3, mode manual murni)
+- usage_rc0.txt → §2 / §3.9 (unknown command → Usage rc=0)
+- capabilities_note.txt → §3.8 / §3.9 (capabilities /sys literal, tidak disandbox)

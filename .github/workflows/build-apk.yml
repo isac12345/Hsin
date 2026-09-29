@@ -67,6 +67,7 @@ jobs:
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Build APK
+        if: github.event_name == 'workflow_dispatch'
         working-directory: app
         run: gradle :app:assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --no-daemon --stacktrace
 
