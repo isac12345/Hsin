@@ -6,6 +6,8 @@ HSIN_DATA="${HSIN_DATA:-/data/adb/hsin}"
 . "$HSIN_MODULE_PATH/core/sysfs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/gpu/detector.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/engine/gpu/generic.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/engine/gpu/devfreq_tuning.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/engine/gpu/mali.sh" 2>/dev/null
 
 hsin_gpu_backup() {
     _d="$HSIN_DATA/backups/gpu_native"
@@ -74,6 +76,18 @@ hsin_gpu_apply() {
         done
     else
         echo "    GPU devfreq: unsupported/unavailable (skip)"
+    fi
+    # K3: tunable devfreq (polling_interval/up_threshold/
+    # down_differential). Hanya berlaku bila override user ada; tanpa
+    # override tidak ada yang ditulis.
+    if command -v hsin_gpu_devfreq_tunables_apply >/dev/null 2>&1; then
+        hsin_gpu_devfreq_tunables_apply "$_profile"
+    fi
+    # K3: knob parameter Mali KBase. Gate = node kbase ADA (bukan nama
+    # vendor), jadi jalan di device yang kbase-nya ada apa pun hasil
+    # deteksi vendor.
+    if command -v hsin_gpu_kbase_knobs_apply >/dev/null 2>&1; then
+        hsin_gpu_kbase_knobs_apply "$_profile"
     fi
     case "$HSIN_GPU_VENDOR" in
         adreno) hsin_gpu_adreno_kgsl_apply "$_profile" ;;

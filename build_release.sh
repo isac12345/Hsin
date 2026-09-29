@@ -89,7 +89,7 @@ _clean_stage() {
         engine/cpu/scheduler.sh engine/cpu/safety.sh engine/cpu/apply.sh \
         engine/gpu/detector.sh engine/gpu/generic.sh \
         engine/gpu/adreno.sh engine/gpu/mali.sh engine/gpu/imgtec.sh \
-        engine/gpu/validator.sh engine/gpu/dvfs.sh engine/gpu/apply.sh \
+        engine/gpu/validator.sh engine/gpu/dvfs.sh engine/gpu/devfreq_tuning.sh engine/gpu/apply.sh \
         engine/thermal/detect.sh engine/thermal/monitor.sh engine/thermal/policy.sh \
         engine/thermal/backup.sh engine/thermal/apply.sh engine/thermal/thermal_manager.sh \
         engine/memory/detect.sh engine/memory/zram.sh engine/memory/vm.sh \
