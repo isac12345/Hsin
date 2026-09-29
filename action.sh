@@ -12,7 +12,7 @@ HSIN_DEBUG_LOG="$HSIN_DATA/logs/debug.log"
 # Skip debug log write on the hot-path status command
 # (APK refresh saat buka + swipe manual, bukan polling WebUI).
 case "${1:-info}" in
-    status) ;;
+    status|guard-status) ;;
     *) echo "----- $(date '+%Y-%m-%d %H:%M:%S') action.sh $* -----" >> "$HSIN_DEBUG_LOG" 2>/dev/null ;;
 esac
 exec 2>>"$HSIN_DEBUG_LOG"
@@ -26,6 +26,7 @@ exec 2>>"$HSIN_DEBUG_LOG"
 . "$HSIN_MODULE_PATH/core/state_manager.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/knobs.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/user_knobs.sh" 2>/dev/null
+. "$HSIN_MODULE_PATH/core/guard_status.sh" 2>/dev/null
 . "$HSIN_MODULE_PATH/core/protect.sh" 2>/dev/null
 if ! command -v hsin_protect_watermark >/dev/null 2>&1; then
     echo "ERROR: core/protect.sh missing or tampered - refusing to run"
@@ -1278,6 +1279,10 @@ _main() {
         knob-list)
             hsin_uk_list
             ;;
+        guard-status)
+            hsin_guard_status
+            ;;
+        renderer-apply)
         renderer-apply)
             . "$HSIN_MODULE_PATH/engine/render/renderer.sh" 2>/dev/null
             if hsin_render_apply_live "$1"; then
@@ -1393,8 +1398,13 @@ _main() {
             hsin_action_export_debug "$1"
             ;;
         *)
-            echo "Usage: action.sh [info|device|capabilities|status|logs|apply|backup|rollback|conflicts|export|renderer-apply|renderer-state|downscale-enable|downscale-disable|downscale-status|refresh-lock-enable|refresh-lock-disable|refresh-lock-status|export-debug|list-apps|game-list|game-add|game-remove]"
+            echo "Usage: action.sh [info|device|capabilities|status|guard-status|logs|apply|backup|rollback|conflicts|export|renderer-apply|renderer-state|downscale-enable|downscale-disable|downscale-status|refresh-lock-enable|refresh-lock-disable|refresh-lock-status|export-debug|list-apps|game-list|game-add|game-remove]"
             ;;
+    esac
+
+    # Read-only guard-status tidak boleh memicu hardening data
+    case "$_cmd" in
+        guard-status) return 0 ;;
     esac
 
     hsin_protect_harden_data
