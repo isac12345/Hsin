@@ -70,7 +70,16 @@ Entry point engine dipanggil `service.sh` section 7 via wrapper
 tweak baru didaftarkan dengan pola yang sama agar dapat isolasi
 gagal + summary per-engine gratis (`core/engine_guard.sh`).
 
-## 2. Tambah signature entry (capability-based — WAJIB)
+## 2. Tambah signature entry (capability-based — TIDAK AKTIF)
+
+> **STATUS 2026-09-30: fitur ini TIDAK AKTIF.** `hsin_override_load` =
+> 0 pemanggil di seluruh runtime, dan `capability/*.json` tidak ikut
+> ter-bundle ke ZIP (folder `capability/` dibuang saat build). Entrinya
+> tidak memengaruhi tuning apa pun. Tuning device ini berasal dari
+> `user_knobs.env` (mode manual, lewat `knob-set`) + capability `knobs`.
+> Loader tidak diubah dan tidak dipanggil; isi file hanya dokumentasi
+> untuk modder. Kalau nanti diaktifkan, harus Decision terpisah
+> (aktifkan pemanggil + bundel JSON + uji), bukan disisipkan diam-diam.
 
 File: `capability/capability_overrides.json`, array `signatures`
 (match pertama menang) + `default_fallback`. Loader:
