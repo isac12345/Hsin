@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.hsin.data.state.UiState
 import com.hsin.ui.HomePresenter
 import com.hsin.ui.ScreenPhase
@@ -30,7 +31,6 @@ import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
 import com.hsin.ui.components.HStatus
-import com.hsin.ui.components.HSelectRow
 import com.hsin.ui.components.LoadingView
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
@@ -108,12 +108,15 @@ private fun HomeContent(
     onRefresh: () -> Unit,
     onConfirmRestore: () -> Unit,
 ) {
-    StatusCard(state = state)
+    // R3: grid status 2 kolom (kata mockup: Tersedia/Terpasang/Nonaktif).
+    StatusGridCard(state = state)
 
-    ApplyCard(state = state)
+    // R3: kartu "Terakhir diterapkan · HH:MM" (maks 3 baris + jam apply.log).
+    LastAppliedCard(state = state)
 
     EdgeStatesCard(state = state)
 
+    // R3: kartu kemampuan + catatan snapshot.
     CapabilityCard(state = state)
 
     HButton(label = "Buka knob", onClick = navActions::onOpenKnobs, primary = true)
@@ -126,22 +129,28 @@ private fun HomeContent(
     }
 }
 
+/** Grid 2x2 dari [HomePresenter.grid]: label + nilai + badge (kecuali termal). */
 @Composable
-private fun StatusCard(state: UiState) {
+private fun StatusGridCard(state: UiState) {
     HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text("Status", style = TitleSmall)
-            HomePresenter.lines(state).forEach { line ->
+            HomePresenter.grid(state).chunked(2).forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Gap),
                 ) {
-                    Text(line.label, style = BodyLarge, color = Muted)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(line.value, style = BodyLarge, color = com.hsin.ui.theme.Text)
-                        Spacer()
-                        StatusDot(line.status)
+                    row.forEach { cell ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(cell.label, style = Caption, color = Muted)
+                            Text(cell.value, style = BodyLarge)
+                            if (cell.showBadge) {
+                                HBadge(cell.value, cell.status.toHStatus())
+                            }
+                        }
                     }
                 }
             }
@@ -149,16 +158,51 @@ private fun StatusCard(state: UiState) {
     }
 }
 
+private fun HomePresenter.LineStatus.toHStatus(): HStatus = when (this) {
+    HomePresenter.LineStatus.OK -> HStatus.READY
+    HomePresenter.LineStatus.WARN -> HStatus.WARN
+    HomePresenter.LineStatus.ERROR -> HStatus.FAILED
+    HomePresenter.LineStatus.UNKNOWN -> HStatus.UNAVAILABLE
+}
+
+/** Kartu hasil apply terakhir; kosong = "Belum ada apply", bukan kartu hilang. */
 @Composable
-private fun ApplyCard(state: UiState) {
-    val apply = HomePresenter.lastApply(state)
+private fun LastAppliedCard(state: UiState) {
+    val last = HomePresenter.lastApplied(state)
     HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
-            Text("Hasil terakhir", style = TitleSmall)
-            Text(apply.headline, style = BodyLarge)
-            apply.detail?.let { Text(it, style = BodyLarge, color = Muted) }
+            Text(last.title, style = TitleSmall)
+            if (last.rows.isEmpty()) {
+                Text("Belum ada apply", style = BodyLarge, color = Muted)
+            } else {
+                last.rows.forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = row.text,
+                            style = BodyLarge,
+                            color = Muted,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer()
+                        HBadge(row.badge, row.badge.toResultStatus())
+                    }
+                }
+            }
         }
     }
+}
+
+private fun String.toResultStatus(): HStatus = when (this) {
+    "APPLIED" -> HStatus.APPLIED
+    "FALLBACK" -> HStatus.FALLBACK
+    "FAILED" -> HStatus.FAILED
+    "SKIPPED" -> HStatus.SKIPPED
+    "UNAVAILABLE" -> HStatus.UNAVAILABLE
+    else -> HStatus.DEFAULT
 }
 
 /**
@@ -207,14 +251,21 @@ private fun EdgeStatesCard(state: UiState) {
 }
 
 @Composable
-private fun CapabilityCard(state: UiState) {    HCard {
+private fun CapabilityCard(state: UiState) {
+    HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text("Kemampuan perangkat", style = TitleSmall)
-            HSelectRow(
-                label = "Ringkasan",
-                value = HomePresenter.capabilitySummary(state),
-                onClick = null,
-            )
+            HomePresenter.capabilityRows(state).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(row.label, style = BodyLarge, color = Muted)
+                    Text(row.value, style = BodyLarge)
+                }
+            }
+            Text(HomePresenter.CAPABILITY_FOOTNOTE, style = Caption, color = Muted)
         }
     }
 }
@@ -232,18 +283,6 @@ private fun ErrorCard(text: String) {
 @Composable
 private fun Spacer() {
     Box(modifier = Modifier.size(Gap))
-}
-
-/** Titik status kecil; memakai HBadge agar token warna tidak bocor. */
-@Composable
-private fun StatusDot(status: HomePresenter.LineStatus) {
-    val badge = when (status) {
-        HomePresenter.LineStatus.OK -> "SIAP" to HStatus.READY
-        HomePresenter.LineStatus.WARN -> "PERHATIAN" to HStatus.WARN
-        HomePresenter.LineStatus.ERROR -> "GAGAL" to HStatus.FAILED
-        HomePresenter.LineStatus.UNKNOWN -> "N/A" to HStatus.UNAVAILABLE
-    }
-    HBadge(badge.first, badge.second)
 }
 
 private object NoopNavActions : NavActions {

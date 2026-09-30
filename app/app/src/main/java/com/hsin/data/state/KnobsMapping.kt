@@ -91,11 +91,13 @@ object KnobsMapping {
 
         // --- CPU: satu key per policy yang gpio ---
         val policies = cpu?.optJSONArray("policies")
+        var policyCount = 0
         if (policies != null) {
             for (i in 0 until policies.length()) {
                 val p = policies.optJSONObject(i) ?: continue
                 val id = p.optString("id")
                 if (id.isBlank()) continue
+                policyCount++
                 val govs = readStringList(p.optJSONArray("govs"))
                 allowed["cpu_policy_${id}_gov"] = govs
                 base["cpu_policy_${id}_gov"] = p.optString("cur_gov")
@@ -113,11 +115,13 @@ object KnobsMapping {
 
         // --- GPU: satu key per node devfreq ---
         val nodes = gpu?.optJSONArray("nodes")
+        var nodeCount = 0
         if (nodes != null) {
             for (i in 0 until nodes.length()) {
                 val n = nodes.optJSONObject(i) ?: continue
                 val raw = n.optString("name")
                 if (raw.isBlank()) continue
+                nodeCount++
                 val key = sanitize(raw)
                 val govs = readStringList(n.optJSONArray("govs"))
                 allowed["gpu_node_${key}_gov"] = govs
@@ -132,7 +136,8 @@ object KnobsMapping {
             readRange(sw)?.let { ranges["swappiness"] = it }
         }
         val zram = memory?.optJSONObject("zram")
-        if (zram != null && zram.optBoolean("supported", false)) {
+        val zramSupported = zram != null && zram.optBoolean("supported", false)
+        if (zramSupported) {
             val algos = readStringList(zram.optJSONArray("algos"))
             if (algos.isNotEmpty()) {
                 allowed["zram_algo"] = algos
@@ -172,11 +177,13 @@ object KnobsMapping {
 
         // --- io: per block ---
         val blocks = io?.optJSONArray("blocks")
+        var blockCount = 0
         if (blocks != null) {
             for (i in 0 until blocks.length()) {
                 val b = blocks.optJSONObject(i) ?: continue
                 val name = sanitize(b.optString("name"))
                 if (name.isBlank()) continue
+                blockCount++
                 val scheds = readStringList(b.optJSONArray("schedulers"))
                 if (scheds.isNotEmpty()) {
                     allowed["io_block_${name}_sched"] = scheds
@@ -199,6 +206,10 @@ object KnobsMapping {
             ranges = ranges.filterKeys { it in editable },
             allowExtreme = allowExtreme,
             gated = readGatedFeatures(knobsJson, allowExtreme),
+            cpuPolicies = policyCount,
+            gpuNodes = nodeCount,
+            zramSupported = zramSupported,
+            ioBlocks = blockCount,
         )
         return Parsed(cap, base.filterKeys { it.matches(EDITABLE) })
     }

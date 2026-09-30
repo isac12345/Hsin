@@ -160,12 +160,16 @@ private fun CategoryRow(cat: KnobCategoryUi, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextLine(cat.category.title, BodyLarge)
+            // R3: "Nama + N knob + chevron" sesuai mockup.
+            Column {
+                TextLine(cat.category.title, BodyLarge)
+                TextLine("${cat.rows.size} knob", Caption)
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (cat.dirtyCount > 0) {
                     HBadge("DIUBAH ${cat.dirtyCount}", HStatus.DIUBAH)
                 }
-                HBadge("${cat.rows.size}", HStatus.DEFAULT)
+                TextLine("›", BodyLarge)
             }
         }
     }
