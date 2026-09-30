@@ -1691,3 +1691,17 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   DONE per step + map/footer sinkron. 21/21 hash terverifikasi `git log`.
   Step 22 gate tetap BELUM LOLOS (tunggu L2 HP). PELAJARAN: klaim "selesai"
   wajib cek silang PLAN/STATUS/PQ/APP_PLAN — 4 file itu gampang basi.
+
+## MODULE_NOT_FOUND palsu: java.io.File tak melihat /data/adb (2026-09-30, f0d659b)
+- Gejala L2: modul sudah di-flash tapi semua tab GAGAL "module path missing:
+  /data/adb/modules/hsin/action.sh". RootClient mengecek modul dengan
+  `java.io.File.exists()` — sandbox aplikasi tak bisa baca /data/adb tanpa
+  root sehingga SELALU false. Lolos CI + unit test karena test memakai path
+  TMP yang memang ada di mesin CI (false negative test).
+- Fix: probe `[ -f '<path>' ]` lewat CommandRunner yang sama (su -c).
+  rc=0 lanjut; rc!=0 tanpa output = hilang; rc!=0 dengan output (su ditolak)
+  = ROOT_UNAVAILABLE. Test FakeRunner/ScriptRunner menjawab probe per-prefix.
+- Follow-up pecah 1 test: ApplyFlowTest.success... (tiap execute kini
+  1 probe + 1 command nyata) — diperbaiki di 7b34fba.
+- PELAJARAN: JANGAN cek path perangkat dengan java.io.File dari aplikasi;
+  semua yang butuh hak root (termasuk sekadar `-f`) wajib lewat runner su.
