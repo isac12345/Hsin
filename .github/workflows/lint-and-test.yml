@@ -34,6 +34,18 @@ jobs:
             sh -n "$f" || { echo "FAIL: sh -n $f"; exit 1; }
           done
 
+      - name: Bundle merge integrity (runtime.sh hasil merge)
+        run: |
+          set -e
+          # Gate anti kelas bug "merge diam-diam rusak": insiden
+          # 2026-09-30 - statement top-level `return`/`exit` dan guard
+          # `command -v X || \` dari file yang di-source LOLOS ke
+          # runtime.sh gabungan, sehingga sourcing terpotong dan
+          # hsin_apply_all_engines (jalur apply) tidak pernah
+          # terdefinisi. Semua test lama tetap hijau karena menyource
+          # file per-file dari source tree, bukan hasil merge.
+          sh tests/verify_bundle_runtime.sh --merge-only
+
       - name: JSON config validation
         run: |
           set -e
