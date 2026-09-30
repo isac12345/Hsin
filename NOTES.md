@@ -1652,3 +1652,21 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   "TIDAK AKTIF" + catatan status), CHANGELOG.md entri capability.
 - Gate permanen tetap hijau: verify_bundle_runtime.sh PASS 15/FAIL 0
   (kini 506 fungsi, +1 dari hsin_thermal_check_run).
+
+## PELAJARAN: layout composable wajib bukti visual di device (2026-09-30, L2 pertama)
+- Perubahan pada ScreenScaffold/layout composable WAJIB diverifikasi
+  dengan install + screenshot di device asli sebelum dianggap selesai.
+  Compile dan unit test tidak bisa mendeteksi bug layout visual seperti
+  Box fillMaxSize yang mendorong BottomNav keluar layar (ditemukan
+  setelah L2 pertama, 30 Sep).
+- Kronologi: `ScreenScaffold.kt` memakai `Box(Modifier.fillMaxSize())`
+  di dalam `Column` sejak A5 (`bb8ac65`) -> BottomNav dapat tinggi 0 di
+  SEMUA build, tapi 9 step app (A8-A16) dilaporkan selesai karena
+  verifikasi hanya compile CI + unit test + preview (preview merender
+  komponen, bukan memvalidasi ruang layout). Gejala L2: header + 3 tombol
+  saja, tanpa bottom nav, user terjebak di tab Beranda.
+- Fix: konten jadi `Modifier.weight(1f) + verticalScroll
+  (rememberScrollState())` SENTRAL di ScreenScaffold (bukan per layar:
+  1 file, mencakup Beranda/Knob/Monitor/Log; HSlider knob aman karena
+  scroll hanya vertikal). Aturan turunan: klaim "layar X selesai" =
+  belum sah tanpa screenshot device; preview/CI hijau = L1 saja.
