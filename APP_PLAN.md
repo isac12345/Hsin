@@ -213,7 +213,7 @@ menyetujui penambahan kontrak di masa depan, kandidatnya:
 | A15 | Dokumen dan QA | [x] |
 | A16 | Status final | [x] |
 | R1 | Tema terang + komponen ulang | [x] |
-| R2 | Navigasi ikon + judul konten + state anti-blank | [ ] |
+| R2 | Navigasi ikon + judul konten + state anti-blank | [x] |
 | R3 | Beranda + Monitor sesuai mockup (mapping interim) | [ ] |
 | R4 | Bukti screenshot L2 semua tab + penanda selesai | [ ] |
 
