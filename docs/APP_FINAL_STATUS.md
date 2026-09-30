@@ -50,3 +50,18 @@ production-ready. Hash = `git log` asli (jangan dikarang).
 2. Isi `docs/APP_QA_CHECKLIST.md` dengan HASIL (angka/log), 8 bagian.
 3. Kirim baris `APPLY-TIME` dari `/data/adb/hsin/logs/debug.log` (bukti cepat).
 4. Setelah QA hijau + L2 → evaluasi gate rilis (di luar scope A16).
+
+## Realignment R1–R4 (status 2026-09-30 — R4 BELUM SELESAI, menunggu L2)
+
+- R1 tema terang: `b787706` (feat) / merge `c8c3cca`.
+- R2 nav ikon + state anti-blank: `483d76c` (feat) / merge `0e74f28`.
+- R3 Beranda + Monitor mockup: `f89991d` (feat) / merge `b227a95`.
+- APK uji terakhir: build-apk `#36674432099` SUCCESS (APK debug
+  8.974.554 byte). CI lint-and-test `#36674845472` SUCCESS.
+- R4 butuh bukti L2 (belum ada di repo, belum ada folder screenshots/):
+  4 screenshot tab isi nyata (Beranda, Knob, Monitor, Log) + screenshot
+  state Gagal/Kosong (simulasi tanpa root / modul nonaktif bila aman).
+- Setelah screenshot diterima: verifikasi tiap nilai ke kontrak §3,
+  tulis hash + tanggal ke tabel APP_PLAN §4 (R4 [x]), commit
+  `docs: reference realignment complete with device proof (App R4)`.
+  Versi tetap beta.

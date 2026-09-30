@@ -1670,3 +1670,14 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   1 file, mencakup Beranda/Knob/Monitor/Log; HSlider knob aman karena
   scroll hanya vertikal). Aturan turunan: klaim "layar X selesai" =
   belum sah tanpa screenshot device; preview/CI hijau = L1 saja.
+
+## APP-R4 BLOCKER screenshot L2 (2026-09-30, leader, BELUM SELESAI)
+- Spec R4 butuh 4 screenshot tab isi nyata + Gagal/Kosong dari HP fisik.
+  Bukti: `screenshots/` tidak ada di repo; `gh run list` CI hijau
+  (lint #36674845472, build-apk #36674432099, APK 8.974.554 byte) = L1
+  saja, bukan L2 visual (§0.10). Tabel APP_PLAN R4 tetap [ ].
+- Yang dikerjakan sesi ini (dokumen saja, tanpa sentuh modul/app):
+  seksi pending di docs/APP_FINAL_STATUS.md (hash R1-R3 + APK + daftar
+  bukti yang ditunggu). Commit checklist, BUKAN commit final R4.
+- Untuk user: install APK build #36674432099 + modul terbaru, kirim
+  4+2 screenshot + tanggal; baru R4 bisa ditutup + tabel dicentang.
