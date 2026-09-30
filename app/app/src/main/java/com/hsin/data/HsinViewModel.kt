@@ -220,6 +220,9 @@ class HsinViewModel(
     fun setConfig(key: String) {
         viewModelScope.launch {
             call("config-set", key, "true")
+            // Paksa baca ulang: token cache versi modul tidak berubah oleh
+            // config-set, jadi refresh biasa akan kena cache basi.
+            refreshCapability(forceReload = true)
         }
     }
 
