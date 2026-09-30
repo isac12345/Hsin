@@ -11,6 +11,12 @@
 #   sh build_release.sh dev
 #   sh build_release.sh release
 #   sh build_release.sh          (builds both)
+#   sh build_release.sh merge-only   (staging + merge runtime.sh, NO zip)
+#
+# merge-only dipakai tests/verify_bundle_runtime.sh: menjalankan merge
+# yang sama persis dengan build tanpa menghasilkan ZIP, supaya integritas
+# runtime gabungan bisa diuji di CI pada setiap push (bukan hanya saat
+# build ZIP).
 
 set -e
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -104,7 +110,37 @@ _clean_stage() {
         core/apply_engines.sh core/monitor.sh; do
         [ -f "$_stage/$_src" ] || continue
         printf '\n# --- %s ---\n' "$_src" >> "$_runtime"
-        awk '!/^#!\/system\/bin\/sh$/ && !/^return 0 2>\/dev\/null \|\| true$/' "$_stage/$_src" >> "$_runtime"
+        # Buang SEMUA statement top-level (kolom 0) `return ...` dan
+        # `exit ...` milik file yang di-source. Alasannya (insiden nyata
+        # 2026-09-30): pola yang sebelumnya dibuang hanya `return 0
+        # 2>/dev/null || true`, sehingga core/thermal_check.sh yang
+        # berakhir `return $VAR 2>/dev/null || exit $VAR` UTUH masuk
+        # runtime.sh dan menghentikan sourcing di tengah file -> semua
+        # yang di-merge setelahnya (termasuk core/apply_engines.sh,
+        # jadi hsin_apply_all_engines) tidak pernah terdefinisi, dan
+        # apply di ZIP mati total tanpa error. Di shell, `return`/
+        # `exit` top-level di file yang di-source selalu berarti
+        # "berhenti", jadi di runtime gabungan tidak pernah berguna.
+        #
+        # Buang juga guard top-level `command -v X >/dev/null 2>&1 || \`.
+        # Alasannya (insiden sama, kelas kedua): baris ini hanya ada
+        # untuk me-source file lain secara kondisional. Di runtime
+        # gabungan, baris `. ...` yang dirantai ke Continuation tersebut
+        # DIHAPUS oleh sed di bawah, jadi `|| \` jadi yatim dan
+        # menelan baris-baris berikutnya (termasuk definisi fungsi
+        # sesudahnya) sebagai kelanjutan perintah -> fungsi hilang tanpa
+        # error. 8 file kena (cpu/governor, cpu/frequency, cpu/scheduler,
+        # gpu/generic, gpu/devfreq_tuning, io/readahead, io/queue_tuning,
+        # memory/zram).
+        #
+        # Verifikasi wajib: tests/verify_bundle_runtime.sh (CI).
+        # CATATAN 1: program awk WAJIB satu baris - backslash-newline di
+        # dalam single-quote bukan line continuation shell, jadi awk
+        # menerima program rusak dan merge menghasilkan runtime kosong.
+        # CATATAN 2: pipe HARUS di-escape (`\|\|`) - kalau ditulis `||`
+        # mentah, awk把它当作 operator OR sehingga filter match ke
+        # SETIAP baris dan runtime jadi kosong tanpa error.
+        awk '!/^#!\/system\/bin\/sh$/ && !/^return[[:space:]]/ && !/^exit[[:space:]]/ && !/^command -v [a-zA-Z0-9_]* >\/dev\/null 2>&1 \|\| \\$/' "$_stage/$_src" >> "$_runtime"
     done
     [ -f "$_stage/engine/game/games.conf" ] && cp "$_stage/engine/game/games.conf" "$_stage/config/games.conf"
     # All functions are now present in runtime.sh; split-file source calls
@@ -336,9 +372,18 @@ $_helper_new"
     rm -rf "$_stage"
 }
 
+merge_only() {
+    echo "[merge-only] staging + merge runtime.sh (tanpa zip)..."
+    _stage="$OUT_DIR/stage-merge"
+    _clean_stage "$_stage"
+    touch "$_stage/.devmode"
+    echo "MERGE_STAGE=$_stage"
+}
+
 case "$1" in
     dev) build_dev ;;
     release) build_release ;;
+    merge-only) merge_only ;;
     *)
         build_dev
         build_release

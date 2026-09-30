@@ -40,6 +40,14 @@ jobs:
               echo "FATAL: runtime.sh tidak punya cache-scan/override"; exit 1; }
           done
 
+      - name: Gate integritas runtime hasil merge (wajib)
+        run: |
+          set -e
+          # Memakai file build_release.sh yang sama persis dengan yang
+          # menghasilkan ZIP di step sebelumnya - bukanmerge ulang
+          # terpisah, supaya yang diuji benar-benar yang dipaketkan.
+          sh tests/verify_bundle_runtime.sh build/*.zip
+
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
