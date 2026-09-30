@@ -146,31 +146,49 @@ _thermal_critical_intervene() {
     return 1
 }
 
-# Main: baca -> basis -> klasifikasi -> (CRITICAL: intervensi sekali).
-_read_thermal_max
-_read_thermal_basis
-_classify_thermal
+# --- Eksekusi (fungsi eksplisit, BUKAN auto-exec saat di-source) --------
+# Jalankan guardrail: baca -> basis -> klasifikasi -> (CRITICAL: intervensi
+# sekali) -> export state untuk caller.
+#
+# PENTING (insiden 2026-09-30): versi sebelumnya menjalankan blok ini di
+# level TOP-LEVEL. build_release.sh menggabungkan semua core/*.sh ke satu
+# core/runtime.sh, sehingga blok auto-exec ikut jalan setiap kali
+# runtime.sh di-source - yaitu pada SETIAP perintah action.sh termasuk
+# polling monitor (mencetak "[thermal_check] <state>" ke stderr), dan
+# blok `if [ -f core/thermal_check.sh ]` di service.sh tetap buta karena
+# file tidak ada lagi sebagai file terpisah. Sekarang eksplisit: caller
+# memanggil hsin_thermal_check_run.
+#
+# Caller saat ini: service.sh (boot, setelah boot guard, sebelum tuning).
+hsin_thermal_check_run() {
+    _read_thermal_max
+    _read_thermal_basis
+    _classify_thermal
 
-case "$HSIN_THERMAL_CHECK_STATE" in
-    NORMAL) HSIN_THERMAL_CHECK_RC=0 ;;
-    HIGH) HSIN_THERMAL_CHECK_RC=1 ;;
-    "VERY HIGH") HSIN_THERMAL_CHECK_RC=2 ;;
-    CRITICAL)
-        HSIN_THERMAL_CHECK_RC=3
-        _thermal_critical_intervene || true
-        ;;
-    *) HSIN_THERMAL_CHECK_RC=4 ;;
-esac
+    case "$HSIN_THERMAL_CHECK_STATE" in
+        NORMAL) HSIN_THERMAL_CHECK_RC=0 ;;
+        HIGH) HSIN_THERMAL_CHECK_RC=1 ;;
+        "VERY HIGH") HSIN_THERMAL_CHECK_RC=2 ;;
+        CRITICAL)
+            HSIN_THERMAL_CHECK_RC=3
+            _thermal_critical_intervene || true
+            ;;
+        *) HSIN_THERMAL_CHECK_RC=4 ;;
+    esac
 
-# Export state untuk caller (service.sh / apply pipeline).
-export HSIN_THERMAL_CHECK_STATE
-export THERMAL_MAX_TEMP
-export THERMAL_ZONE_COUNT
-export HSIN_THERMAL_CHECK_INTERVENED
-export HSIN_THERMAL_CHECK_RC
-export HSIN_THERMAL_SAFE_RC
-export HSIN_THERMAL_CHECK_BASIS
-# return (bukan exit) agar service.sh yang me-source tidak ikut mati;
-# fallback exit bila file dieksekusi langsung.
+    # Export state untuk caller (service.sh / apply pipeline).
+    export HSIN_THERMAL_CHECK_STATE
+    export THERMAL_MAX_TEMP
+    export THERMAL_ZONE_COUNT
+    export HSIN_THERMAL_CHECK_INTERVENED
+    export HSIN_THERMAL_CHECK_RC
+    export HSIN_THERMAL_SAFE_RC
+    export HSIN_THERMAL_CHECK_BASIS
+
+    return $HSIN_THERMAL_CHECK_RC
+}
+
+# Konvensi repo untuk file yang hanya berisi definisi: tidak melakukan
+# apa pun saat di-source (khusunya tidak Cetak ke stderr).
 # shellcheck disable=SC2086
-return $HSIN_THERMAL_CHECK_RC 2>/dev/null || exit $HSIN_THERMAL_CHECK_RC
+return 0 2>/dev/null || true

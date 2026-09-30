@@ -44,6 +44,19 @@ di `/sdcard/Android/hsin/hsin.conf` (default `false`).
 
 ## Profiles
 
+> Mode utama HSIN = **manual**: modul hanya menulis knob yang benar-benar
+> diubah user (`user_knobs.env` via `action.sh knob-set`), knob lain
+> dibiarkan `SKIPPED` dengan alasan "tidak diatur (mode manual)".
+
+### Override berbasis capability signature — TIDAK AKTIF
+
+`capability/capability_overrides.json` + `core/load_overrides.sh`
+(`hsin_override_load`) **tidak dipakai**: loader tidak punya pemanggil
+di runtime dan file JSON tidak ikut ter-bundle ke ZIP. Tuning nyata
+berasal dari knob manual di atas, bukan dari signature JSON. Keduanya
+dibiarkan sebagai referensi; status ini dicatat juga di `API.md` §2 dan
+`CHANGELOG.md`.
+
 | Profil | Cocok untuk |
 |---|---|
 | `battery` | Hemat daya, limit paling agresif |

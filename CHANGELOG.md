@@ -20,6 +20,14 @@ Perubahan roadmap capability-first (PQ Step 1–18).
 - `capability/capability_overrides.json` + `core/load_overrides.sh` —
   override keyed by capability signature + `default_fallback`
   (PQ Step 9–10).
+  **TIDAK AKTIF (2026-09-30):** `hsin_override_load` tidak punya satu
+  pun pemanggil di runtime — parser + JSON ini sisa roadmap yang tidak
+  pernah disambungkan ke jalur apply, dan file JSON-nya juga tidak ikut
+  ter-bundle (build_release.sh tidak memasukkan folder `capability/` ke
+  ZIP). Tuning efektif device ini datang dari `user_knobs.env` +
+  `knobs` (mode manual), bukan dari capability signature. File dan
+  loader sengaja **dibiarkan** sebagai referensi; loader tidak
+  dipanggil dan tidak mengubah apa pun.
 - `core/thermal_check.sh` — guardrail thermal 4 state
   (NORMAL/HIGH/VERY HIGH/CRITICAL + UNKNOWN) berbasis trip_point
   kernel terdeteksi; intervensi hanya di CRITICAL via safe_apply

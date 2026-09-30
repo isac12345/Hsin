@@ -68,9 +68,13 @@ sleep 2  # Beri waktu sysfs stabil
 # STEP 10 (thermal guardrail): setelah boot guard, SEBELUM apply tuning.
 # Tidak duplikasi boot guard; hanya panggil thermal_check, ekspor state,
 # dan biarkan intervensi terbatas hanya di CRITICAL (via safe_apply).
-if [ -f "$MODPATH/core/thermal_check.sh" ]; then
-    . "$MODPATH/core/thermal_check.sh" 2>/dev/null || true
-    hsin_log_info "thermal" "check_state=$HSIN_THERMAL_CHECK_STATE max=${THERMAL_MAX_TEMP:-0} zones=${THERMAL_ZONE_COUNT:-0}"
+# PANGGIL eksPLISIT lewat command -v: build_release.sh menyatukan semua
+# core/*.sh ke core/runtime.sh, jadi `if [ -f core/thermal_check.sh ]`
+# selalu FALSE di ZIP (file tidak ada sebagai file terpisah) - dan
+# thermal_check tidak lagi menjalankan dirinya saat di-source.
+if command -v hsin_thermal_check_run >/dev/null 2>&1; then
+    hsin_thermal_check_run >/dev/null 2>&1 || true
+    hsin_log_info "thermal" "check_state=$HSIN_THERMAL_CHECK_STATE max=${THERMAL_MAX_TEMP:-0} zones=${THERMAL_ZONE_COUNT:-0} basis=${HSIN_THERMAL_CHECK_BASIS:-?}"
 fi
 
 # 2. Load config user
