@@ -1506,3 +1506,114 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   (file tidak ada). Jadi thermal check boot di ZIP sebenarnya TIDAK
   jalan - ini temuan kedua yang perlu keputusan (panggil sebagai fungsi
   vs buang).
+
+## FIX merge runtime + gate CI (2026-09-30, leader, commit 95b4daa) - BLOCKER L2-CLOSED
+- POIN 1 (filter merge): inventaris SEMUA statement top-level di 71 file
+  yang di-merge. Hasil: 68 file memakai `return 0 2>/dev/null || true`
+  (seragam), HANYA `core/thermal_check.sh:176` memakai bentuk variabel
+  `return $VAR 2>/dev/null || exit $VAR`. Tidak ada `set -e`/`exec`/
+  `trap`/`eval` top-level di file yang di-merge. Fix: filter awk
+  membuang SEMUA `^return `/`^exit ` (bukan cuma satu pola), dengan
+  alasan tertulis di build_release.sh.
+- POIN 1b (KELAS BARU, ditemukan oleh test): `sed -i '/^\s*\. .*core
+  |engine|extreme\//d'` menghapus baris `. "$PATH/..."`, tapi TIDAK
+  menghapus guard 2-baris `command -v X >/dev/null 2>&1 || \`. Sisanya
+  jadi `|| \` YATIM; kelanjutan baris itu menelan baris berikutnya
+  (termasuk definisi fungsi) sebagai lanjutan perintah -> fungsi hilang
+  TANPA error. Terverifikasi di runtime.sh: baris `command -v
+  hsin_cpu_policy_ids ... || \` langsung diikuti baris `hsin_cpu_
+  governor_pick() {`, dan fungsi itu tidak terdefinisi. 8 file kena:
+  cpu/governor.sh, cpu/frequency.sh, cpu/scheduler.sh, gpu/generic.sh,
+  gpu/devfreq_tuning.sh, io/readahead.sh, io/queue_tuning.sh,
+  memory/zram.sh. Contoh fungsi yang hilang di ZIP lama:
+  hsin_cpu_governor_pick, hsin_cpu_sched_apply, hsin_io_scheduler_apply,
+  hsin_io_apply_readahead, hsin_zram_detect, hsin_gpu_tune_one,
+  hsin_profile_rank, 4× _hsin_refresh_*. Fix: filter juga membuang
+  `^command -v ... >/dev/null 2>&1 || \` (pipe di-escape `\|\|`).
+- Jebakan Implementasi (2, keduanya sempat merusak merge):
+  (a) program awk WAJIB satu baris - backslash-newline di dalam
+  single-quote BUKAN line continuation shell -> awk dapat program rusak
+  -> runtime hanya 144 baris (hanya header) tanpa error;
+  (b) `||` mentah di dalam regex awk dibaca OPERATOR OR, bukan teks ->
+  filter match ke SETIAP baris -> runtime kosong tanpa error.
+  Dicek ulang dengan printf/awk terisolasi sebelum commit.
+- POIN 2 (test permanen): tests/verify_bundle_runtime.sh (BARU, 240
+  baris). Dua mode: `--merge-only` (panggil `build_release.sh
+  merge-only` - merge yang SAMA PERSIS dengan build, tanpa zip, supaya
+  tidak bisa drift) dan `<zip>` (verifikasi ZIP asli). Cek:
+  (1) tidak ada `^return `/`^exit ` bocor di runtime.sh; (2) `sh -n`
+  lolos; (3) sourcing di sandbox HSIN_SANDBOX=1 dengan prefix sysfs/proc
+  kosong menghasilkan rc=0; (4) SETIAP fungsi yang didefinisikan di 71
+  file yang di-merge WAJIB terdefinisi setelah source (505 fungsi);
+  (5) setiap fungsi inti (hsin_apply_all_engines, hsin_boot_guard_check,
+  hsin_safe_apply, hsin_thermal_apply, hsin_engine_run, hsin_knobs_json,
+  hsin_uk_set, hsin_guard_status, hsin_scan_cache_load) dicek satu per
+  satu; (6) semua hsin_* yang dipanggil entrypoint (posisi perintah)
+  WAJIB terdefinisi. Probe dijalankan INLINE di subshell yang sama -
+  lewat `sh probe.sh` anak tidak mewarisi fungsi shell dan akan selalu
+  melaporkan semua hilang. Ekstraksi call-site hanya menghitung token
+  di POSISI PERINTAH; `_hsin_boot_log`/`_hsin_is_game`/`_hsin_mpid`
+  adalah variabel (false positive yang sudah dibuang), dan token
+  diprefix `_(hsin_)` boleh agar privat ikut teruji.
+  Gate dipasang di DUA workflow: lint-and-test (setiap push, mode
+  merge-only) + build-modul (setiap build ZIP, terhadap build/*.zip).
+- BUKTI NEGATIF/POSITIF (ini yang membuktikan test punya gigi):
+  test terhadap ZIP LAMA (run 36656203932) = MERAH: PASS 9 / FAIL 5,
+  termasuk "hsin_apply_all_engines HILANG", "hsin_thermal_apply HILANG",
+  plus return/exit bocor; merge baru = HIJAU PASS 15 / FAIL 0.
+- POIN 3 (build ulang + smoke test identik): run build-modul #36659882646
+  (mode=both, SUCCESS, gate hijau di log CI untuk kedua ZIP).
+  validate_build.sh VALID untuk kedua ZIP.
+  SEBELUM -> SESUDAH apply manual (node palsu, release ZIP):
+    vfs_cache_pressure      100 -> 250     APPLIED
+    dirty_ratio              20 -> 30      APPLIED
+    netdev_max_backlog     1000 -> 16384   APPLIED
+    read_ahead_kb           128 -> 2048    APPLIED
+    nomerges                  2 -> 1        APPLIED
+    gpu polling_interval     50 -> 100     APPLIED
+    sched_child_runs_first   (node tak ada di pohon palsu) UNAVAILABLE
+    scaling_governor      schedutil -> schedutil (TIDAK ditulis = mode
+                             manual murni terbukti, knob tanpa override)
+  apply.log: "override: 6 key dipakai" + "Profile applied: manual";
+  error.log tidak pernah dibuat. knob-list = 6 APPLIED + 1 UNAVAILABLE
+  ("node hilang atau read-only") + sisanya SKIPPED "tidak diatur (mode
+  manual)" - persis bentuk yang;A10 consume. ZIP lama: 0 node berubah,
+  "belum ada hasil apply", [ERROR] main.
+- POIN 4 (JAWABAN: thermal_check TIDAK mematikan M1b). Bukti pemanggilan:
+  `hsin_thermal_apply` (engine/thermal/policy.sh:294, tempat cap M1b +
+  restore pre-cap) dipanggil dari `hsin_thermal_engine_apply`
+  (engine/thermal/apply.sh:55), dan ITU dipanggil dari DUA jalur:
+  `core/apply_engines.sh:135` (APPLY NORMAL) dan `service.sh:365`
+  (BOOT). Sementara `core/thermal_check.sh` di-source HANYA di
+  service.sh:71-72 di balik `if [ -f core/thermal_check.sh ]` yang
+  selalu FALSE di ZIP (file tidak ada sebagai file terpisah), dan 4
+  fungsinya private, 0 caller. Bukti empiris di ZIP baru: suhu 96C ->
+  apply -> scaling_max_freq 1800000 -> 600000 + file
+  thermal_pre_cap.list terbentuk; suhu turun 45C -> apply -> kembali
+  1800000. Jadi cap + restore M1b UTUH di jalur apply normal; yang mati
+  hanya pre-check/log boot di service.sh (EFEK SAMPING: g_block itu
+  masih dieksekusi tiap runtime.sh di-source karena auto-exec-nya tidak
+  dihapus - pada VERY HIGH dia hanya PRINT "limited intervention only if
+  justified" dan tidak menulis; pre-existing, bukan regresi).
+  KEPUTUSAN(user, belum dikerjakan): panggil thermal_check sebagai
+  fungsi dari boot, atau buang blok service.sh:71-73.
+- UKURAN ZIP lama -> baru: dev 494.919 -> 500.331; release 484.059 ->
+  489.472. module.prop tetap v5.0.0-beta1/5001 (tidak di-bump).
+- POIN 5 (OPSI, menunggu keputusan user - belum ada perubahan):
+  capability/capability_overrides.json tidak ikut ter-bundle (folder
+  capability/ hilang di dev & release) dan `hsin_override_load` = 0
+  caller di seluruh runtime -> sisa fitur roadmap 22-step yang mati.
+  OPSI (a) bundel ulang capability/*.json ke ZIP; (b) dokumentasikan
+  sebagai fitur nonaktif/tidak dipakai dan biarkan file di source tree
+  untuk*/参照; (c) hapus file + load_overrides.sh beserta rujukan test.
+  Tidak ada yang saya kerjakan; menunggu user.
+- PELAJARAN: (41) merge banyak file ke satu file运行时 Wajib diuji
+  dengan me-source HASIL merge-nya; test per-file dari source tree
+  tidak akan pernah menangkap kelas bug ini. (42) saat menghapus baris
+  (sed/awk) dari hasil merge, cek sisa CONTINUATION baris (`|| \`,
+  `&& \`) - baris hilang tapi sambungannya masih menggigit baris
+  berikutnya. (43) awk: `||` di dalam regex harus di-escape, dan program
+  awk jangan multi-baris di dalam single-quote. (44) probe fungsi shell
+  harus inline di subshell yang sama; `sh probe.sh` anak tidak mewarisi
+  fungsi. (45) grep nama fungsi tanpa.kotlin posisi perintah menghasilkan
+  false positive dari variabel bernama mirip fungsi.
