@@ -15,45 +15,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.hsin.ui.theme.ErrorFill
+import com.hsin.ui.theme.Error
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.MonoCaption
-import com.hsin.ui.theme.NeutralFill
-import com.hsin.ui.theme.OkFill
-import com.hsin.ui.theme.Outline
+import com.hsin.ui.theme.Neutral
+import com.hsin.ui.theme.Ok
 import com.hsin.ui.theme.Radius
+import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.Text
-import com.hsin.ui.theme.WarnFill
+import com.hsin.ui.theme.Warn
 
 // Status aplikasi (kategori hasil apply + status readiness).
 enum class HStatus { APPLIED, FALLBACK, WARN, DIUBAH, FAILED, SKIPPED, DEFAULT, UNAVAILABLE, READY }
 
-// Fill pastel badge per status (teks selalu tinta, lihat HBadge).
-fun HStatus.fill(): Color = when (this) {
-    HStatus.APPLIED, HStatus.READY -> OkFill
-    HStatus.FALLBACK, HStatus.WARN, HStatus.DIUBAH -> WarnFill
-    HStatus.FAILED -> ErrorFill
-    HStatus.SKIPPED, HStatus.DEFAULT, HStatus.UNAVAILABLE -> NeutralFill
+fun HStatus.color(): Color = when (this) {
+    HStatus.APPLIED, HStatus.READY -> Ok
+    HStatus.FALLBACK, HStatus.WARN, HStatus.DIUBAH -> Warn
+    HStatus.FAILED -> Error
+    HStatus.SKIPPED, HStatus.DEFAULT, HStatus.UNAVAILABLE -> Neutral
 }
 
-// Badge HSIN: FILL PASTEL + teks tinta (sesuai mockup terang, bukan
-// outline-only). Garis tinta tipis 1 dp menjaga gaya neobrutalism.
+// Badge HSIN: OUTLINE-ONLY (garis berwarna, tanpa fill blok). Isi hanya
+// surface kartu; warna status dibawa border, teks tetap Text agar terbaca.
 @Composable
 fun HBadge(
     label: String,
     status: HStatus,
     modifier: Modifier = Modifier
 ) {
-    val fill = status.fill()
+    val c = status.color()
     Box(
         modifier = modifier
-            .background(fill, RoundedCornerShape(Radius))
-            .border(BorderStroke(1.dp, Outline), RoundedCornerShape(Radius))
+            .background(Surface, RoundedCornerShape(Radius))
+            .border(BorderStroke(1.dp, c), RoundedCornerShape(Radius))
             .padding(horizontal = Gap, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Teks badge memakai Text, bukan warna status: label 12sp butuh
+        // 4.5:1, sedangkan Error (3.85:1) dan Neutral (3.21:1) hanya lolos
+        // ambang non-teks 3:1. Warna status tetap dibawa oleh border.
         Text(text = label, style = MonoCaption, color = Text)
     }
 }

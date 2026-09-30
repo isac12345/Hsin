@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.ui.theme.Accent
+import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.BodyLarge
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
@@ -61,7 +62,9 @@ fun HSegmented(
                     .padding(horizontal = Pad),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = label, style = BodyLarge, color = Text)
+                // Segmen aktif berlatar Accent (emas terang) jadi teksnya
+                // Bg, bukan Text: Aksen+Text hanya 1.82:1 (lihat HButton).
+                Text(text = label, style = BodyLarge, color = if (active) Bg else Text)
             }
         }
     }

@@ -12,20 +12,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.hsin.ui.theme.TouchMin
 import com.hsin.ui.theme.Text
+import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.Radius
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.Gap
+import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.Accent
 
-// Tombol utama = fill accent + teks tinta. Sekunder = outline tinta,
-// isi transparan. Tanpa gradient/blur. Target sentuh >= 44 dp.
+// Tombol utama = fill accent + teks gelap. Sekunder = outline accent, isi
+// surface. Tanpa gradient/blur. Target sentuh >= 44 dp.
 @Composable
 fun HButton(
     label: String,
@@ -38,13 +39,13 @@ fun HButton(
         modifier = modifier.heightIn(min = TouchMin),
         shape = RoundedCornerShape(Radius),
         colors = if (primary) {
-            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Text)
+            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Bg)
         } else {
-            ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Text)
+            ButtonDefaults.buttonColors(containerColor = Surface, contentColor = Accent)
         },
-        border = if (primary) null else BorderStroke(1.dp, Outline)
+        border = if (primary) null else BorderStroke(1.dp, Accent)
     ) {
-        Text(text = label, color = Text)
+        Text(text = label, color = if (primary) Bg else Text)
     }
 }
 
