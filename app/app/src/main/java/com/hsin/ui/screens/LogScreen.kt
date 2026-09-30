@@ -18,11 +18,16 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.data.state.LogPresenter
 import com.hsin.data.state.UiState
+import com.hsin.ui.ScreenPhase
+import com.hsin.ui.ScreenStates
+import com.hsin.ui.components.ContentTitle
+import com.hsin.ui.components.EmptyView
+import com.hsin.ui.components.ErrorView
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
 import com.hsin.ui.components.HStatus
-import com.hsin.ui.theme.BodyLarge
+import com.hsin.ui.components.LoadingView
 import com.hsin.ui.theme.Caption
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
@@ -63,24 +68,22 @@ fun LogScreen(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        HCard {
-            Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
-                Text("Log", style = TitleSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-                    HButton(
-                        label = "boot.log",
-                        onClick = { tab = 0 },
-                        primary = tab == 0,
-                    )
-                    HButton(
-                        label = "apply.log",
-                        onClick = { tab = 1 },
-                        primary = tab == 1,
-                    )
-                }
-                HButton(
-                    label = if (copied > 0) "Disalin ($copied)" else "Salin ringkasan laporan bug",
-                    onClick = {
+        // R2: judul konten besar "Log".
+        ContentTitle("Log")
+        // R2: fase eksplisit — tidak ada jalur yang merender blank.
+        when (ScreenStates.log(state)) {
+            ScreenPhase.LOADING -> LoadingView("Memuat log dari modul...")
+            ScreenPhase.ERROR -> ErrorView(
+                message = state.error?.let { com.hsin.ui.friendlyError(it.kind.name, it.detail) }
+                    ?: "Terjadi kesalahan.",
+                onRetry = onRefresh,
+            )
+            ScreenPhase.EMPTY -> {
+                LogControlCard(
+                    tab = tab,
+                    onTab = { tab = it },
+                    copied = copied,
+                    onCopy = {
                         clipboard.setText(
                             AnnotatedString(
                                 LogPresenter.buildBugReport(
@@ -93,31 +96,83 @@ fun LogScreen(
                         )
                         copied++
                     },
-                    primary = false,
+                    onRefresh = onRefresh,
                 )
-                HButton(label = "Muat ulang", onClick = onRefresh, primary = false)
+                EmptyView(
+                    message = "Belum ada baris log (file hilang di modul = kosong, bukan error).",
+                    actionLabel = "Muat ulang",
+                    onAction = onRefresh,
+                )
             }
-        }
-        if (lines.isEmpty()) {
-            HCard {
-                Text("Belum ada baris log (file hilang di modul = kosong, bukan error).", style = BodyLarge)
-            }
-        } else {
-            lines.forEach { line ->
-                HCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("baris log", style = Caption, color = Muted)
-                            HBadge(LogPresenter.levelOf(line), levelStatus(LogPresenter.levelOf(line)))
+            ScreenPhase.CONTENT -> {
+                LogControlCard(
+                    tab = tab,
+                    onTab = { tab = it },
+                    copied = copied,
+                    onCopy = {
+                        clipboard.setText(
+                            AnnotatedString(
+                                LogPresenter.buildBugReport(
+                                    state.guard,
+                                    state.capability,
+                                    state.logBoot,
+                                    state.logApply,
+                                )
+                            )
+                        )
+                        copied++
+                    },
+                    onRefresh = onRefresh,
+                )
+                lines.forEach { line ->
+                    HCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("baris log", style = Caption, color = Muted)
+                                HBadge(LogPresenter.levelOf(line), levelStatus(LogPresenter.levelOf(line)))
+                            }
+                            Text(line, style = MonoCaption)
                         }
-                        Text(line, style = MonoCaption)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LogControlCard(
+    tab: Int,
+    onTab: (Int) -> Unit,
+    copied: Int,
+    onCopy: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    HCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
+            Text("Log", style = TitleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
+                HButton(
+                    label = "boot.log",
+                    onClick = { onTab(0) },
+                    primary = tab == 0,
+                )
+                HButton(
+                    label = "apply.log",
+                    onClick = { onTab(1) },
+                    primary = tab == 1,
+                )
+            }
+            HButton(
+                label = if (copied > 0) "Disalin ($copied)" else "Salin ringkasan laporan bug",
+                onClick = onCopy,
+                primary = false,
+            )
+            HButton(label = "Muat ulang", onClick = onRefresh, primary = false)
         }
     }
 }
@@ -133,5 +188,13 @@ private fun levelStatus(level: String): HStatus = when (level) {
 private fun LogScreenPreview() {
     HsinTheme {
         LogScreen(state = UiState(), onRefresh = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun LogScreenLoadingPreview() {
+    HsinTheme {
+        LogScreen(state = UiState(loadingLogs = true), onRefresh = {})
     }
 }

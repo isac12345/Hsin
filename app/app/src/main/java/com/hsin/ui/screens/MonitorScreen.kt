@@ -22,10 +22,15 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.hsin.data.state.RealtimeMetrics
 import com.hsin.data.state.UiState
 import com.hsin.ui.MonitorPresenter
+import com.hsin.ui.ScreenPhase
+import com.hsin.ui.ScreenStates
+import com.hsin.ui.components.EmptyView
+import com.hsin.ui.components.ErrorView
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
 import com.hsin.ui.components.HStatus
+import com.hsin.ui.components.LoadingView
 import com.hsin.ui.theme.BodyLarge
 import com.hsin.ui.theme.Caption
 import com.hsin.ui.theme.Gap
@@ -72,6 +77,32 @@ fun MonitorScreen(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
+        // R2: fase eksplisit — tidak ada jalur yang merender blank.
+        // Polling di atas tetap jalan agar Gagal/Kosong pulih sendiri.
+        when (ScreenStates.monitor(state)) {
+            ScreenPhase.LOADING -> LoadingView("Memuat metrik...")
+            ScreenPhase.ERROR -> ErrorView(
+                message = state.error?.let { com.hsin.ui.friendlyError(it.kind.name, it.detail) }
+                    ?: "Terjadi kesalahan.",
+                onRetry = onTick,
+            )
+            ScreenPhase.EMPTY -> EmptyView(
+                message = "Belum ada metrik. Metrik dibaca saat layar dibuka.",
+                actionLabel = "Muat ulang",
+                onAction = onTick,
+            )
+            ScreenPhase.CONTENT -> MonitorContent(state = state, paused = paused, onTogglePause = { paused = !paused })
+        }
+    }
+}
+
+@Composable
+private fun MonitorContent(
+    state: UiState,
+    paused: Boolean,
+    onTogglePause: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
         HCard {
             Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
                 Text("Monitor", style = TitleSmall)
@@ -82,7 +113,7 @@ fun MonitorScreen(
                 )
                 HButton(
                     label = if (paused) "Lanjut" else "Jeda",
-                    onClick = { paused = !paused },
+                    onClick = onTogglePause,
                     primary = false,
                 )
             }
@@ -121,5 +152,16 @@ private fun Spacer() {
 private fun MonitorScreenPreview() {
     HsinTheme {
         MonitorScreen(state = UiState(metrics = RealtimeMetrics.unknown()), onTick = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun MonitorScreenLoadingPreview() {
+    HsinTheme {
+        MonitorScreen(
+            state = UiState(metrics = RealtimeMetrics.unknown(), loadingRealtime = true),
+            onTick = {},
+        )
     }
 }

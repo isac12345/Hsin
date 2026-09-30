@@ -9,7 +9,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.hsin.R
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Pad
 import com.hsin.ui.theme.HsinTheme
@@ -44,9 +47,25 @@ fun ScreenScaffold(
         ) {
             content()
         }
-        BottomNav(selectedIndex = selectedIndex, onSelect = onSelectTab)
+        BottomNav(
+            selectedIndex = selectedIndex,
+            onSelect = onSelectTab,
+            icons = navIcons(),
+        )
     }
 }
+
+/**
+ * Empat ikon tab dari vector drawable XML di `res/` (tanpa dependency baru,
+ * APP_PLAN R2). Urutan WAJIB sama dengan [DEFAULT_TABS].
+ */
+@Composable
+private fun navIcons(): List<ImageVector?> = listOf(
+    ImageVector.vectorResource(R.drawable.ic_nav_home),
+    ImageVector.vectorResource(R.drawable.ic_nav_knob),
+    ImageVector.vectorResource(R.drawable.ic_nav_monitor),
+    ImageVector.vectorResource(R.drawable.ic_nav_log),
+)
 
 @Preview(name = "ScreenScaffold", showBackground = true, backgroundColor = PreviewBg)
 @Composable
