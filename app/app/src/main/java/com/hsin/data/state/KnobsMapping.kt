@@ -137,6 +137,27 @@ object KnobsMapping {
             }
         }
 
+        // --- GPU tunables (devfreq tunables per node) ---
+        val gtArr = knobsJson.optJSONArray("gpu_tunables")
+        if (gtArr != null) {
+            for (i in 0 until gtArr.length()) {
+                val gtNode = gtArr.optJSONObject(i) ?: continue
+                val nodeRaw = gtNode.optString("node")
+                if (nodeRaw.isBlank()) continue
+                val nodeKey = sanitize(nodeRaw)
+                val tunables = gtNode.optJSONObject("tunables")
+                if (tunables == null) continue
+                for (tKey in listOf("polling_interval", "up_threshold", "down_differential")) {
+                    val tObj = tunables.optJSONObject(tKey) ?: continue
+                    if (!tObj.optBoolean("supported", false)) continue
+                    val knobKey = "gpu_node_${nodeKey}_${tKey}"
+                    val curVal = tObj.optInt("cur", 0)
+                    base[knobKey] = curVal.toString()
+                    readRange(tObj)?.let { ranges[knobKey] = it }
+                }
+            }
+        }
+
         // --- memory: skalar + zram ---
         val sw = memory?.optJSONObject("swappiness")
         if (sw != null && sw.optBoolean("supported", false)) {

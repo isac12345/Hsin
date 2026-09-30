@@ -217,6 +217,15 @@ class HsinViewModel(
     // ------------------------------------------------------------------
     // Aksi edit knob + A10 alur Terapkan
     // ------------------------------------------------------------------
+    fun setConfig(key: String) {
+        viewModelScope.launch {
+            call("config-set", key, "true")
+            // Paksa baca ulang: token cache versi modul tidak berubah oleh
+            // config-set, jadi refresh biasa akan kena cache basi.
+            refreshCapability(forceReload = true)
+        }
+    }
+
     fun setKnobOverride(key: String, value: String) {
         _uiState.update { it.copy(dirty = DirtyTracker.setOverride(it.dirty, key, value)) }
     }
