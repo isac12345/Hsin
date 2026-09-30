@@ -54,9 +54,9 @@ hsin_thermal_read() {
     HSIN_THERMAL_MAX_TEMP_ALL=0
 
     for _zone in $HSIN_SCAN_THERMAL_ZONES; do
-        _zname="${_zone%%|*}"
-        _ztype="${_zone#*|}"
-        _ztype="${_ztype%%|*}"
+        _zname="${_zone%%\|*}"
+        _ztype="${_zone#*\|}"
+        _ztype="${_ztype%%\|*}"
         _zpath="$HSIN_SYSFS_THERMAL/$_zname"
         [ -f "$_zpath/temp" ] || continue
         _t=""

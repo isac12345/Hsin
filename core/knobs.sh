@@ -537,10 +537,10 @@ _kn_gpu_tunables_json() {
         _kn_esc "${_kn_g##*/}"
         _kn_gtn="$_kn_e"
         for _kn_gt_spec in "polling_interval|1|1000" "up_threshold|1|100" "down_differential|0|100"; do
-            _kn_gt_f="${_kn_gt_spec%%|*}"
-            _kn_gt_rest="${_kn_gt_spec#*|}"
-            _kn_gt_min="${_kn_gt_rest%%|*}"
-            _kn_gt_max="${_kn_gt_rest#*|}"
+            _kn_gt_f="${_kn_gt_spec%%\|*}"
+            _kn_gt_rest="${_kn_gt_spec#*\|}"
+            _kn_gt_min="${_kn_gt_rest%%\|*}"
+            _kn_gt_max="${_kn_gt_rest#*\|}"
             _kn_gt_node="$_kn_g/$_kn_gt_f"
             if [ -r "$_kn_gt_node" ]; then
                 _kn_gt_raw=$(hsin_node_read "$_kn_gt_node" 2>/dev/null)
@@ -585,10 +585,10 @@ _kn_sched_json() {
     fi
     _kn_sc_lat='{"min":10,"max":200,"cur":0,"writable":false,"supported":false}'
     for _kn_sc_spec in "sched_latency_ns|10|200" "sched_min_granularity_ns|10|200" "sched_wakeup_granularity_ns|10|200"; do
-        _kn_sc_f="${_kn_sc_spec%%|*}"
-        _kn_sc_rest="${_kn_sc_spec#*|}"
-        _kn_sc_min="${_kn_sc_rest%%|*}"
-        _kn_sc_max="${_kn_sc_rest#*|}"
+        _kn_sc_f="${_kn_sc_spec%%\|*}"
+        _kn_sc_rest="${_kn_sc_spec#*\|}"
+        _kn_sc_min="${_kn_sc_rest%%\|*}"
+        _kn_sc_max="${_kn_sc_rest#*\|}"
         _kn_sc_node="$HSIN_PROC/sys/kernel/$_kn_sc_f"
         if [ -r "$_kn_sc_node" ]; then
             _kn_sc_raw=$(hsin_node_read "$_kn_sc_node" 2>/dev/null)
@@ -608,8 +608,8 @@ _kn_sched_json() {
     _kn_uc_dir="${HSIN_UCLAMP_DIR:-/dev/cpuctl}/foreground"
     _kn_uc_all=""
     for _kn_uc_spec in "uclamp_min|cpu.uclamp.min" "uclamp_max|cpu.uclamp.max"; do
-        _kn_uc_key="${_kn_uc_spec%%|*}"
-        _kn_uc_file="${_kn_uc_spec#*|}"
+        _kn_uc_key="${_kn_uc_spec%%\|*}"
+        _kn_uc_file="${_kn_uc_spec#*\|}"
         _kn_uc_node="$_kn_uc_dir/$_kn_uc_file"
         if [ -r "$_kn_uc_node" ]; then
             _kn_uc_raw=$(hsin_node_read "$_kn_uc_node" 2>/dev/null)
@@ -633,12 +633,12 @@ _kn_sched_json() {
 _kn_kbase_json() {
     _kn_kb_all=""
     for _kn_kb_spec in "mali_boost_level2|gpu_boost_level2|0|1" "mali_pollingtime|gpu_pollingtime|1|10" "mali_upthreshold|gpu_upthreshold|10|100"; do
-        _kn_kb_key="${_kn_kb_spec%%|*}"
-        _kn_kb_rest="${_kn_kb_spec#*|}"
-        _kn_kb_file="${_kn_kb_rest%%|*}"
-        _kn_kb_rest2="${_kn_kb_rest#*|}"
-        _kn_kb_min="${_kn_kb_rest2%%|*}"
-        _kn_kb_max="${_kn_kb_rest2#*|}"
+        _kn_kb_key="${_kn_kb_spec%%\|*}"
+        _kn_kb_rest="${_kn_kb_spec#*\|}"
+        _kn_kb_file="${_kn_kb_rest%%\|*}"
+        _kn_kb_rest2="${_kn_kb_rest#*\|}"
+        _kn_kb_min="${_kn_kb_rest2%%\|*}"
+        _kn_kb_max="${_kn_kb_rest2#*\|}"
         _kn_kb_node="${HSIN_SYSFS_KBASE:-/sys/module/mali_kbase/parameters}/$_kn_kb_file"
         if [ -r "$_kn_kb_node" ]; then
             _kn_kb_raw=$(hsin_node_read "$_kn_kb_node" 2>/dev/null)

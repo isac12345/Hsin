@@ -29,7 +29,7 @@ hsin_thermal_backup() {
     _zones=0
 
     for _zone in $HSIN_SCAN_THERMAL_ZONES; do
-        _zone_name="${_zone%%|*}"
+        _zone_name="${_zone%%\|*}"
         _zone_dir="$HSIN_SYSFS_THERMAL/$_zone_name"
         if [ ! -d "$_zone_dir" ]; then
             hsin_thermal_log "backup: zone gone, skip: $_zone_name"

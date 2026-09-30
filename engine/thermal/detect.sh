@@ -34,10 +34,10 @@ hsin_thermal_detect() {
 
     for _zone in $HSIN_SCAN_THERMAL_ZONES; do
         _total=$((_total + 1))
-        _zname="${_zone%%|*}"
-        _ztype="${_zone#*|}"
-        _ztype="${_ztype%%|*}"
-        _zw="${_zone##*|}"
+        _zname="${_zone%%\|*}"
+        _ztype="${_zone#*\|}"
+        _ztype="${_ztype%%\|*}"
+        _zw="${_zone##*\|}"
         [ "$_zw" = "1" ] && _writable=$((_writable + 1))
 
         # Classify by type
@@ -143,12 +143,12 @@ hsin_thermal_zone_temp() {
 
     hsin_scan_thermal_zones_get
     for _zone in $HSIN_SCAN_THERMAL_ZONES; do
-        _ztype="${_zone#*|}"
-        _ztype="${_ztype%%|*}"
+        _ztype="${_zone#*\|}"
+        _ztype="${_ztype%%\|*}"
         hsin_scan_classify "$_ztype"
         [ "$_sc_class" = "$_target" ] || continue
         _temp=""
-        _zpath="$HSIN_SYSFS_THERMAL/${_zone%%|*}"
+        _zpath="$HSIN_SYSFS_THERMAL/${_zone%%\|*}"
         [ -f "$_zpath/temp" ] && IFS= read -r _temp < "$_zpath/temp" 2>/dev/null
         case "$_temp" in ''|*[!0-9]*) continue ;; esac
         [ "$_temp" -gt "$_max" ] 2>/dev/null && _max="$_temp"
@@ -172,9 +172,9 @@ hsin_thermal_save_detection() {
         echo "  \"zones\": ["
         _first=true
         for _zone in $HSIN_SCAN_THERMAL_ZONES; do
-            _zname="${_zone%%|*}"
-            _ztype="${_zone#*|}"
-            _ztype="${_ztype%%|*}"
+            _zname="${_zone%%\|*}"
+            _ztype="${_zone#*\|}"
+            _ztype="${_ztype%%\|*}"
             _zpath="$HSIN_SYSFS_THERMAL/$_zname"
             _temp=""
             _mode=""

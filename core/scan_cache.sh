@@ -130,11 +130,11 @@ hsin_scan_lookup() {
             "$2|"*) ;;
             *) continue ;;
         esac
-        _sc_rest="${_sc_l#*|}"
+        _sc_rest="${_sc_l#*\|}"
         _sc_i=1
         while [ "$_sc_i" -lt "$3" ]; do
             case "$_sc_rest" in
-                *'|'*) _sc_rest="${_sc_rest#*|}" ;;
+                *'|'*) _sc_rest="${_sc_rest#*\|}" ;;
                 *) _sc_rest=""; break ;;
             esac
             _sc_i=$((_sc_i + 1))
@@ -143,7 +143,7 @@ hsin_scan_lookup() {
         # (field terakhir tidak punya '|' jadi harus tetap diambil utuh).
         if [ "$_sc_i" -eq "$3" ]; then
             case "$_sc_rest" in
-                *'|'*) _sc_f="${_sc_rest%%|*}" ;;
+                *'|'*) _sc_f="${_sc_rest%%\|*}" ;;
                 *) _sc_f="$_sc_rest" ;;
             esac
         fi
@@ -329,7 +329,7 @@ hsin_scan_write() {
         echo "BOOT_ID=$HSIN_SCAN_BOOT_ID"
         echo "CPU_POLICIES=$HSIN_SCAN_CPU_POLICIES"
         for _sw_p in $HSIN_SCAN_CPU_POLICY_LINES; do
-            echo "CPU_POLICY_${_sw_p%%|*}=${_sw_p#*|}"
+            echo "CPU_POLICY_${_sw_p%%\|*}=${_sw_p#*\|}"
         done
         echo "CPU_BIG=$HSIN_SCAN_CPU_BIG"
         echo "CPU_LITTLE=$HSIN_SCAN_CPU_LITTLE"
@@ -337,7 +337,7 @@ hsin_scan_write() {
         echo "GPU_DEVFREQ=$HSIN_SCAN_GPU_DEVFREQ"
         echo "DEVFREQ_NODES=$HSIN_SCAN_DEVFREQ_NODES"
         for _sw_d in $HSIN_SCAN_DEVFREQ_LINES; do
-            echo "DEVFREQ_OPP_${_sw_d%%|*}=${_sw_d#*|}"
+            echo "DEVFREQ_OPP_${_sw_d%%\|*}=${_sw_d#*\|}"
         done
         echo "THERMAL_ZONES=$HSIN_SCAN_THERMAL_ZONES"
         echo "THERMAL_MAXZONE=$HSIN_SCAN_THERMAL_MAXZONE"

@@ -591,9 +591,9 @@ hsin_uk_list() {
                 case "$_ukr_el" in
                     "$_ukr_sk="*)
                         _ukr_ev="${_ukr_el#*=}"
-                        _ukr_prq="${_ukr_ev%%|*}"; _ukr_rx="${_ukr_ev#*|}"
-                        _ukr_pap="${_ukr_rx%%|*}"; _ukr_rx="${_ukr_rx#*|}"
-                        _ukr_pct="${_ukr_rx%%|*}"; _ukr_prs="${_ukr_rx#*|}"
+                        _ukr_prq="${_ukr_ev%%\|*}"; _ukr_rx="${_ukr_ev#*\|}"
+                        _ukr_pap="${_ukr_rx%%\|*}"; _ukr_rx="${_ukr_rx#*\|}"
+                        _ukr_pct="${_ukr_rx%%\|*}"; _ukr_prs="${_ukr_rx#*\|}"
                         case "$_ukr_pct" in
                             APPLIED|SKIPPED|FALLBACK|UNAVAILABLE|FAILED)
                                 _ukr_rq="$_ukr_prq"; _ukr_pa="$_ukr_pap"
@@ -614,9 +614,9 @@ hsin_uk_list() {
             case "$_ukr_done" in *" $_ukr_k2 "*) continue ;; esac
             _ukr_done="$_ukr_done$_ukr_k2 "
             _ukr_ev2="${_ukr_el2#*=}"
-            _ukr_prq="${_ukr_ev2%%|*}"; _ukr_rx="${_ukr_ev2#*|}"
-            _ukr_pap="${_ukr_rx%%|*}"; _ukr_rx="${_ukr_rx#*|}"
-            _ukr_pct="${_ukr_rx%%|*}"; _ukr_prs="${_ukr_rx#*|}"
+            _ukr_prq="${_ukr_ev2%%\|*}"; _ukr_rx="${_ukr_ev2#*\|}"
+            _ukr_pap="${_ukr_rx%%\|*}"; _ukr_rx="${_ukr_rx#*\|}"
+            _ukr_pct="${_ukr_rx%%\|*}"; _ukr_prs="${_ukr_rx#*\|}"
             case "$_ukr_pct" in
                 APPLIED|SKIPPED|FALLBACK|UNAVAILABLE|FAILED) ;;
                 *) continue ;;
