@@ -15,7 +15,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
-import com.hsin.ui.theme.MonoCaption
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.OutlineThick
 import com.hsin.ui.theme.Pad
@@ -23,13 +22,14 @@ import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.TitleLarge
 
-// TopBar HSIN: judul + subjudul status opsional, garis bawah outline.
-// Tanpa elevation/bayangan (neobrutalism memakai garis, bukan shadow lembut).
+// TopBar HSIN: judul "HSIN" saja, tanpa subtitle. Subtitle versi modul yang
+// di-hardcode DILARANG (APP_PLAN bagian 1); versi modul hanya tampil bila
+// kontrak menyediakannya (pending bagian 3). Garis bawah outline, tanpa
+// elevation/bayangan.
 @Composable
 fun TopBar(
     title: String,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
@@ -43,13 +43,6 @@ fun TopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(text = title, style = TitleLarge)
-        }
-        if (subtitle != null) {
-            Text(
-                text = subtitle,
-                style = MonoCaption,
-                modifier = Modifier.padding(start = Pad, end = Pad, bottom = Gap)
-            )
         }
         Box(
             modifier = Modifier
@@ -65,7 +58,7 @@ fun TopBar(
 private fun TopBarPreview() {
     HsinTheme {
         Column {
-            TopBar("Beranda", subtitle = "root: siap · modul: aktif")
+            TopBar("HSIN")
         }
     }
 }

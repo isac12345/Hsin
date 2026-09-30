@@ -16,10 +16,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.ui.theme.Accent
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
+import com.hsin.ui.theme.Neutral
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.MonoBody
 import com.hsin.ui.theme.MonoCaption
-import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.TouchMin
 import com.hsin.ui.theme.Text
 
@@ -54,7 +54,7 @@ fun HSlider(
             colors = SliderDefaults.colors(
                 thumbColor = Accent,
                 activeTrackColor = Accent,
-                inactiveTrackColor = Outline
+                inactiveTrackColor = Neutral
             ),
             modifier = Modifier
                 .fillMaxWidth()

@@ -15,44 +15,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.hsin.ui.theme.Error
+import com.hsin.ui.theme.ErrorFill
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.MonoCaption
-import com.hsin.ui.theme.Neutral
-import com.hsin.ui.theme.Ok
+import com.hsin.ui.theme.NeutralFill
+import com.hsin.ui.theme.OkFill
+import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.Radius
-import com.hsin.ui.theme.Surface
-import com.hsin.ui.theme.Warn
+import com.hsin.ui.theme.Text
+import com.hsin.ui.theme.WarnFill
 
 // Status aplikasi (kategori hasil apply + status readiness).
 enum class HStatus { APPLIED, FALLBACK, WARN, DIUBAH, FAILED, SKIPPED, DEFAULT, UNAVAILABLE, READY }
 
-fun HStatus.color(): Color = when (this) {
-    HStatus.APPLIED, HStatus.READY -> Ok
-    HStatus.FALLBACK, HStatus.WARN, HStatus.DIUBAH -> Warn
-    HStatus.FAILED -> Error
-    HStatus.SKIPPED, HStatus.DEFAULT, HStatus.UNAVAILABLE -> Neutral
+// Fill pastel badge per status (teks selalu tinta, lihat HBadge).
+fun HStatus.fill(): Color = when (this) {
+    HStatus.APPLIED, HStatus.READY -> OkFill
+    HStatus.FALLBACK, HStatus.WARN, HStatus.DIUBAH -> WarnFill
+    HStatus.FAILED -> ErrorFill
+    HStatus.SKIPPED, HStatus.DEFAULT, HStatus.UNAVAILABLE -> NeutralFill
 }
 
-// Badge HSIN: OUTLINE-ONLY (garis berwarna + teks berwarna). Fill hanya
-// surface kartu, bukan blok warna status.
+// Badge HSIN: FILL PASTEL + teks tinta (sesuai mockup terang, bukan
+// outline-only). Garis tinta tipis 1 dp menjaga gaya neobrutalism.
 @Composable
 fun HBadge(
     label: String,
     status: HStatus,
     modifier: Modifier = Modifier
 ) {
-    val c = status.color()
+    val fill = status.fill()
     Box(
         modifier = modifier
-            .background(Surface, RoundedCornerShape(Radius))
-            .border(BorderStroke(1.dp, c), RoundedCornerShape(Radius))
+            .background(fill, RoundedCornerShape(Radius))
+            .border(BorderStroke(1.dp, Outline), RoundedCornerShape(Radius))
             .padding(horizontal = Gap, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = label, style = MonoCaption, color = c)
+        Text(text = label, style = MonoCaption, color = Text)
     }
 }
 
