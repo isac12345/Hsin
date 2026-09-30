@@ -2,7 +2,7 @@
 
 **Read this file** when executing next step. Each step is **atomic** and **independent**.
 
-**Current Status:** Phase 1 DONE (Steps 1-4) → Phase 2 NEXT (Step 5: boot_guard.sh)
+**Current Status:** Phase 1-4 DONE (Steps 1-21) + Step 23 DONE → Phase 5 tersisa Step 22 GATE RILIS (tunggu L2 HP nyata)
 **Total Steps:** 22 (realign 2026-09-27: antrean lama 31 step dirombak —
 Step 5 lama device-name-keyed DIREVERT, thermal JSON angka-tetap diganti
 thermal_check.sh, migrasi 7 engine diringkas jadi 1 bukti pola, bump
@@ -19,10 +19,10 @@ node hilang = skip + log (bukan crash), shellcheck 0 + sh -n lolos + CI hijau.
 
 ```
 ✅ PHASE 1: Testing Infrastructure (Steps 1-4) — DONE
-⏳ PHASE 2: Boot Guard & Safe Apply (Steps 5-8) — NEXT
-⏳ PHASE 3: Capability Overrides (Steps 9-12) — BLOCKED (wait Phase 2)
-⏳ PHASE 4: Documentation (Steps 13-18) — BLOCKED (wait Phase 3)
-⏳ PHASE 5: QA & Release (Steps 19-22) — BLOCKED (wait Phase 4)
+✅ PHASE 2: Boot Guard & Safe Apply (Steps 5-8) — DONE
+✅ PHASE 3: Capability Overrides (Steps 9-12) — DONE
+✅ PHASE 4: Documentation (Steps 13-18) — DONE
+⏳ PHASE 5: QA & Release (Steps 19-21 DONE, Step 22 GATE BELUM LOLOS — tunggu L2 HP)
 ```
 
 ---
@@ -64,7 +64,9 @@ wajib membaca histori ini + PLAN.md dulu.
 
 ---
 
-## STEP 5: Create core/boot_guard.sh — Boot Guard (NEXT)
+## STEP 5: Create core/boot_guard.sh — Boot Guard (DONE)
+**Status:** ✅ COMPLETE (commit 5f3355c, 2026-09-27)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Implement boot guard mechanism that tracks boot failures and auto-disables
@@ -126,7 +128,9 @@ feat: boot guard with fail-count auto-disable (Phase 2, Step 5)
 
 ---
 
-## STEP 6: Integrate boot_guard.sh into service.sh
+## STEP 6: Integrate boot_guard.sh into service.sh (DONE)
+**Status:** ✅ COMPLETE (commit 62ee738, 2026-09-27)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Call boot guard at service.sh startup. If guard is active, skip all tuning
@@ -170,7 +174,9 @@ refactor: integrate boot guard into service (Phase 2, Step 6)
 
 ---
 
-## STEP 7: Create core/safe_apply.sh — Safe Write with Verify
+## STEP 7: Create core/safe_apply.sh — Safe Write with Verify (DONE)
+**Status:** ✅ COMPLETE (commit 6ea5619, 2026-09-27)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Single choke point for ALL sysfs/proc writes: check node exist + writable,
@@ -221,7 +227,9 @@ feat: safe sysfs write with read-back verify (Phase 2, Step 7)
 
 ---
 
-## STEP 8: Migrate engine/cpu to safe_apply.sh (proof of pattern)
+## STEP 8: Migrate engine/cpu to safe_apply.sh (proof of pattern) (DONE)
+**Status:** ✅ COMPLETE (commit 6ea5619, 2026-09-27 — bukti pola = `engine/io/readahead.sh`, risiko terkecil, bukan engine/cpu)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Migrate MINIMAL ONE engine (`engine/cpu`) to `safe_apply.sh` as proof the
@@ -271,7 +279,9 @@ Next: Phase 3 (Capability-Driven Overrides)
 
 ---
 
-## STEP 9: Create capability/capability_overrides.json (capability-signature-keyed)
+## STEP 9: Create capability/capability_overrides.json (capability-signature-keyed) (DONE)
+**Status:** ✅ COMPLETE (commit b79763d, 2026-09-27 — JSON + loader `core/load_overrides.sh`)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Per-capability tuning defaults keyed by CAPABILITY SIGNATURE — NEVER by
@@ -347,7 +357,9 @@ feat: capability-signature-keyed overrides (Phase 3, Step 9)
 
 ---
 
-## STEP 10: Create core/load_overrides.sh — Signature Match + Fallback
+## STEP 10: Create core/load_overrides.sh — Signature Match + Fallback (DONE, dieksekusi sebagai thermal guardrail)
+**Status:** ✅ COMPLETE (commit 2a56064 + revisi 546f9a5, 2026-09-27 — loader ikut Step 9 `b79763d`; slot Step 10 dipakai `core/thermal_check.sh`)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Compute device capability signature from `detected.conf` + live writability
@@ -394,7 +406,9 @@ feat: capability signature match + default fallback (Phase 3, Step 10)
 
 ---
 
-## STEP 11: Create core/thermal_check.sh — Zone-Based Thermal Classes
+## STEP 11: Create core/thermal_check.sh — Zone-Based Thermal Classes (DONE)
+**Status:** ✅ COMPLETE (harmonisasi spec 912b3bf, 2026-09-27 — implementasi = Step 10; cap-only `cf20708`)
+**No action needed — spec di bawah arsip historis (checkbox [x] di dalam = terverifikasi, sisanya tertutup fix cap-only).**
 
 **Objective:**
 Thermal classification NORMAL / HIGH / VERY HIGH / CRITICAL derived from
@@ -453,7 +467,9 @@ feat: zone-based thermal classification (Phase 3, Step 11)
 
 ---
 
-## STEP 12: Formalize Graceful Degradation (engine fail != module fail)
+## STEP 12: Formalize Graceful Degradation (engine fail != module fail) (DONE)
+**Status:** ✅ COMPLETE (commit 7ae4573, 2026-09-27 — `core/engine_guard.sh` + wiring service.sh)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Make graceful degradation explicit contract: per-engine applied/failed
@@ -501,7 +517,9 @@ Next: Phase 4 (Documentation)
 
 ---
 
-## STEPS 13-18: Documentation Creation
+## STEPS 13-18: Documentation Creation (DONE)
+**Status:** ✅ COMPLETE 2026-09-27 (README `a9e4e03`, TESTING `50bf8e6`, TROUBLESHOOTING `ce4dfbd`, DEVICE_COMPATIBILITY `1f362e7`, API `b37b0f2`, CHANGELOG `3c46f66`)
+**No action needed — spec di bawah arsip historis.**
 
 **Objective:**
 Create honest documentation: validated claims vs graceful-degrade claims
@@ -557,7 +575,9 @@ Next: Phase 5 (QA & Release)
 
 ---
 
-## STEPS 19-21: QA & Release Prep
+## STEPS 19-21: QA & Release Prep (DONE)
+**Status:** ✅ COMPLETE 2026-09-27 (QA_CHECKLIST `ed5e34e`, RELEASE_NOTES `a7e90e5`, SUPPORT_POLICY `1734654`)
+**No action needed — spec di bawah arsip historis.**
 
 ### STEP 19: Create QA_CHECKLIST.md
 - Code quality (shellcheck, sh -n, JSON valid, file wajib, module.prop)
@@ -582,7 +602,8 @@ Next: Phase 5 (QA & Release)
 
 ---
 
-## STEP 22: Final Status Update + Release Gate
+## STEP 22: Final Status Update + Release Gate (⏳ GATE BELUM LOLOS — tunggu L2 HP)
+**Status:** dievaluasi `d84bb49` 2026-09-27: Phase 2-3 selesai ✅, sandbox degrade ✅, L2 HP ❌ (device_reports kosong, QA 0/25), device kedua + extreme ❌. `module.prop` tetap v5.0.0-beta1/5001. JANGAN bump versi sebelum L2.
 
 **Objective:**
 Mark all phases complete and enforce the release gate: NO stable
@@ -604,7 +625,8 @@ versionCode bump before Phase 2-3 DONE **AND** validated on real hardware
 
 ---
 
-## STEP 23: Knob Result Visibility (tambahan, di luar 22 step awal)
+## STEP 23: Knob Result Visibility (tambahan, di luar 22 step awal) (DONE)
+**Status:** ✅ COMPLETE (commit 05191f1, 2026-09-27)
 
 **Objective:**
 Jejak diminta X → diterapkan Y → alasan Z jangan hanya di log:
@@ -656,25 +678,26 @@ PHASE 1: Testing Infrastructure (Steps 1-4) — DONE
 ├─ Step 3: validate_build.sh ✅ (7e41841)
 └─ Step 4: core/detector.sh ✅ (5b373ea)
 
-PHASE 2: Boot Guard & Safe Apply (Steps 5-8) — NEXT
-├─ Step 5: core/boot_guard.sh (NEXT)
-├─ Step 6: integrate service.sh
-├─ Step 7: core/safe_apply.sh
-└─ Step 8: migrate engine/cpu (proof of pattern)
+PHASE 2: Boot Guard & Safe Apply (Steps 5-8) — DONE
+├─ Step 5: core/boot_guard.sh ✅ (5f3355c)
+├─ Step 6: integrate service.sh ✅ (62ee738)
+├─ Step 7: core/safe_apply.sh ✅ (6ea5619)
+└─ Step 8: proof of pattern (io/readahead) ✅ (6ea5619)
 
-PHASE 3: Capability Overrides (Steps 9-12) — BLOCKED (wait Phase 2)
-├─ Step 9: capability_overrides.json (signature-keyed, replaces reverted Step 5 lama)
-├─ Step 10: load_overrides.sh (match + default fallback)
-├─ Step 11: thermal_check.sh (zone-based NORMAL/HIGH/VERY HIGH/CRITICAL)
-└─ Step 12: graceful degradation contract
+PHASE 3: Capability Overrides (Steps 9-12) — DONE
+├─ Step 9: capability_overrides.json + loader ✅ (b79763d)
+├─ Step 10: thermal_check.sh guardrail ✅ (2a56064/546f9a5)
+├─ Step 11: harmonisasi spec ✅ (912b3bf)
+└─ Step 12: graceful degradation contract ✅ (7ae4573)
 
-PHASE 4: Documentation (Steps 13-18) — BLOCKED (wait Phase 3)
-├─ README, TESTING, TROUBLESHOOTING
-├─ DEVICE_COMPATIBILITY (validated vs degrade), API, CHANGELOG
+PHASE 4: Documentation (Steps 13-18) — DONE
+├─ README ✅ (a9e4e03), TESTING ✅ (50bf8e6), TROUBLESHOOTING ✅ (ce4dfbd)
+├─ DEVICE_COMPATIBILITY ✅ (1f362e7), API ✅ (b37b0f2), CHANGELOG ✅ (3c46f66)
 
-PHASE 5: QA & Release (Steps 19-22) — BLOCKED (wait Phase 4)
-├─ QA_CHECKLIST, RELEASE_NOTES, SUPPORT_POLICY
-└─ Step 22: final status + release gate (version bump ONLY here)
+PHASE 5: QA & Release (Steps 19-22) — 19-21 DONE, 22 GATE BELUM LOLOS
+├─ QA_CHECKLIST ✅ (ed5e34e), RELEASE_NOTES ✅ (a7e90e5), SUPPORT_POLICY ✅ (1734654)
+├─ Step 22: gate BELUM LOLOS (d84bb49, tunggu L2 HP)
+└─ Step 23: knob visibility ✅ (05191f1)
 ```
 
 **Dropped/merged from old 31-step queue (explicit, not silent):**
@@ -709,7 +732,7 @@ Human: "Execute Step 6"
 
 ---
 
-**Last Updated:** 2026-09-27 (realign capability-first)
-**Total Steps:** 22 (Steps 1-4 DONE, Step 5 NEXT)
-**Phase 2 Progress:** 0/4
-**Next:** STEP 5 — Create core/boot_guard.sh
+**Last Updated:** 2026-09-30 (sinkron status: Steps 5-21 + 23 DONE + hash; Step 22 gate belum lolos)
+**Total Steps:** 22 (+ Step 23 tambahan; Steps 1-21 + 23 DONE, Step 22 GATE tunggu L2 HP)
+**Phase 2 Progress:** 4/4 DONE
+**Next:** STEP 22 GATE RILIS — TESTING.md di HP fisik + report L2 + QA (tanpa L2 = tanpa bump versi)

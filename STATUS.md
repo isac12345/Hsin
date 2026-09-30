@@ -1,21 +1,20 @@
 # STATUS.md — HSIN Real-Time Progress Tracker (capability-first)
 
-**Last Updated:** 2026-09-27 (PQ Step 12 DONE; Phase 3 SELESAI 4/4; STOP sebelum Phase 4 — tunggu approve user)
-**Overall Progress:** Phase 1 DONE → Phase 2 DONE → Phase 3 DONE → Phase 4 MENUNGGU APPROVE
+**Last Updated:** 2026-09-30 (sinkron: Phase 1-4 + Step 19-21 + Step 23 DONE; Step 22 GATE BELUM LOLOS — tunggu L2 HP)
+**Overall Progress:** Phase 1 DONE → Phase 2 DONE → Phase 3 DONE → Phase 4 DONE → Phase 5 (19-21 DONE, 22 GATE BELUM LOLOS)
 
 ---
 
 ## 🎯 Master Progress
 
 ```
-[███████████░░░░░░░░░] 55% (12/22 steps DONE, penomoran PQ)
+[█████████████████████░] 95% (21/22 steps DONE + Step 23 DONE; Step 22 GATE BELUM LOLOS — tunggu L2 HP)
 
 PHASE 1: Testing Infrastructure (Steps 1-4)    [██████████] 100% — DONE
 PHASE 2: Boot Guard & Safe Apply (Steps 5-8)   [██████████] 100% — DONE
-PHASE 3: Capability Overrides (PQ Steps 9-12)  [██████████] 100% — DONE (STOP: Phase 4 tunggu approve user)
-PHASE 3: Capability Overrides (Steps 9-12)     [░░░░░░░░░░] 0% — BLOCKED (wait Phase 2)
-PHASE 4: Documentation (Steps 13-18)           [░░░░░░░░░░] 0% — BLOCKED (wait Phase 3)
-PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 0% — BLOCKED (wait Phase 4)
+PHASE 3: Capability Overrides (PQ Steps 9-12)  [██████████] 100% — DONE
+PHASE 4: Documentation (Steps 13-18)           [██████████] 100% — DONE
+PHASE 5: QA & Release (Steps 19-22)            [███████░░░] 75% — 19-21 DONE, 22 GATE BELUM LOLOS (tunggu L2 HP)
 ```
 
 ---
@@ -117,9 +116,12 @@ PHASE 5: QA & Release (Steps 19-22)            [░░░░░░░░░░] 
   tautologi + bug rc/exit/duplikat). CI lint-and-test success.
   `detected.conf` + writability live, pilih entry cocok, fallback
   `default` + log bila tidak cocok.
-- [ ] **Step 11** — `core/thermal_check.sh` — threshold NORMAL / HIGH /
-  VERY HIGH / CRITICAL dari thermal_zone TERDETEKSI. Tanpa zone →
-  no-op + log (bukan crash, bukan throttle buta).
+- [x] **Step 11** — threshold thermal dari thermal_zone TERDETEKSI —
+  DONE 2026-09-27, harmonisasi spec `912b3bf` (implementasi aktual =
+  Step 10 `thermal_check.sh`: max `trip_point_*_temp` kernel semua zona +
+  fallback konservatif tercatat di `HSIN_THERMAL_CHECK_BASIS`; cap-only
+  thermal diverifikasi di fix `cf20708`). FOLLOW-UP bukan blocker: override
+  via capability entry `thermal_class: managed` (lihat Known Follow-ups).
 - [x] **PQ Step 12** — graceful degradation formal (`core/engine_guard.sh`
   + wiring `service.sh`) — DONE 2026-09-27. Wrapper `hsin_engine_run`
   (snapshot counter safe_apply -> panggil langsung -> delta per-engine;
@@ -280,11 +282,11 @@ Langkah berikutnya yang konkret:
 
 | Metric | Value |
 |---|---|
-| **Total Steps** | 22 |
-| **Completed** | 8 (Steps 1-8 dokumen; penomoran user↔dokumen sinkron kembali) |
-| **Next** | STEP 8 (fix Known Issue scan_cache:47), lalu Phase 3 butuh approve |
+| **Total Steps** | 22 (+ Step 23 tambahan) |
+| **Completed** | 21 (Steps 1-21 dokumen; Step 23 DONE `05191f1`) |
+| **Next** | STEP 22 GATE RILIS (tunggu L2 HP: TESTING.md di fisik + report + QA) |
 | **Reverted** | 1 (Step 5 lama, `36d2256`) |
-| **Pending** | 14 (Steps 9-22) |
+| **Pending** | 1 (Step 22 gate: L2 HP + device kedua + extreme) |
 | **Expected Commits** | ~18 (1 per step, tanpa force push) |
 
 ---
@@ -324,4 +326,4 @@ Langkah berikutnya yang konkret:
 
 ---
 
-**Next Step:** STEP 9 (PQ Step 9) — `capability/capability_overrides.json` keyed by capability signature — STOP, TUNGGU APPROVE USER. Jangan mulai sebelum approve.
+**Next Step:** STEP 22 GATE RILIS — TESTING.md tahap 1–5 di HP fisik + report L2 pertama + QA_CHECKLIST. Tanpa L2 = tanpa rilis stabil. R4 screenshot app (APP_PLAN) juga menunggu HP yang sama.
