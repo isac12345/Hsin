@@ -38,8 +38,9 @@ class ApplyFlowTest {
         val seen = mutableListOf<String>()
         override fun run(cmd: String, timeoutMs: Long, out: StringBuilder, onTimeout: () -> Unit): Int {
             // cmd = "sh '<path>' '<command>' '<arg>' ..." — ambil command ke-2 yang di-quote.
+            // Probe modul ("[ -f '<path>' ]") hanya punya 1 token quoted -> catat "<probe>".
             val quoted = Regex("'([^']*)'").findAll(cmd).map { it.groupValues[1] }.toList()
-            val sub = quoted.getOrNull(1) ?: ""
+            val sub = quoted.getOrNull(1) ?: "<probe>"
             seen.add(sub)
             if (sub in timeoutCmds) {
                 onTimeout()
@@ -98,9 +99,16 @@ class ApplyFlowTest {
         assertEquals(2, results.size)
         assertEquals("APPLIED", results.first { it.key == "cpu_policy_0_gov" }.category)
         assertEquals("performance", results.first { it.key == "cpu_policy_0_gov" }.applied)
-        // Hanya dirty yang dikirim: 2× knob-set + apply + knob-list = 4 panggilan.
-        assertEquals(4, runner.seen.size)
-        assertEquals(listOf("knob-set", "knob-set", "apply", "knob-list"), runner.seen)
+        // Hanya dirty yang dikirim: 2× knob-set + apply + knob-list, masing-masing
+        // didahului probe modul `[ -f ]` via root -> 8 panggilan total.
+        assertEquals(8, runner.seen.size)
+        assertEquals(
+            listOf("knob-set", "knob-set", "apply", "knob-list"),
+            runner.seen.filter { it != "<probe>" })
+        assertEquals("tiap command nyata didahului probe", 4, runner.seen.count { it == "<probe>" })
+        assertTrue(
+            "urutan probe-dulu: ${runner.seen}",
+            runner.seen.chunked(2).all { it == listOf("<probe>", it[1]) })
     }
 
     @Test
