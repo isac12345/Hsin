@@ -1401,3 +1401,47 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   tokennya lebih kecil dari system prompt kita.
 - PELAJARAN: (34) sebelum ganti model, test live dengan prompt trivial dan
   catat yang respons kosong/error pensiun/limit — jangan percaya katalog.
+
+## APP-A10 s/d A16 (2026-09-30, leader langsung, semua merge + CI hijau)
+- Alur: A10 apply flow (merge 646000f, feat 5760376) → A11 monitor
+  (567787d/0ef8eff) → A12 log (8f2cc6c/95ebbe1) → A13 edge states
+  (446f207/05b703b) → A14 audit (dd915fa/73e07d2) → A15 docs
+  (e65d458/d745fa0) → A16 status (a8a204f/bfcbddf). Tabel status APP_PLAN
+  semua [x].
+- Kode produksi A10: `data/state/ApplyFlow.kt` (N× knob-set dirty → 1×
+  apply manual → baca `knob-list` PER KNOB; knob-set yang ditolak modul
+  jadi baris FAILED synthetic yang MENIMPA baris modul, kalau tidak
+  baris "SKIPPED (manual)" lama akan menutupi kegagalan),
+  `DirtyTracker.confirmApplied` (base di-reset hanya untuk APPLIED;
+  FALLBACK = base=applied tapi current tetap requested sehingga masih
+  dirty; FAILED/SKIPPED/UNAVAILABLE tidak disentuh), `UiState.isApplying`
+  + `applyResults`, `KnobScreen.ResultLine` (badge per knob).
+- Bukti L1: 161 unit test JVM hijau LOKAL di main HEAD (16 file main
+  murni + 15 file test, dikompilasi dengan kotlin-compiler Termux
+  + JDK 21); CI `lint-and-test` + `build-apk` success di semua branch
+  step dan di main. Artefak APK terakhir di CI sudah kedaluwarsa
+  (retensi Actions) → ukuran APK pasca-A10 BELUM diukur (dicatat di
+  APP_FOOTPRINT + APP_FINAL_STATUS, bukan dikarang).
+- Verifikasi lokal menang penuh: tidak ada satu pun kegagalan compile di CI
+  untuk A10-A14 (berbeda A7/A9 yang butuh 2× revisi karena salah tipe
+  state Compose). Kuncinya: file yang bisa diuji (presenter/pure) ditulis
+  di `ui/` atau `data/state/` BUKAN di dalam `@Composable`, lalu
+  dipanggil dari composable — begitu 90% logika ter-cover test lokal.
+- PELAJARAN: (35) `HsinRepository.KnobResult` dipakai di Signature
+  `KnobControl(row, result, onChange)` — default-argumen TIDAK boleh di
+  tengah daftar parameter (Composable sempat gagal compile saat
+  `onChange` setelah `modifier`); tulis parameter bernilai dulu, default
+  selalu di belakang. (36) `viewModel::applyDirtyKnobs` TIDAK bisa
+  dipakai langsung sebagai `() -> Unit` kalau fungsi punya parameter
+  default `profile: String` — type mismatch (fungsi 1 argumen vs 0),
+  harus dibungkus lambda `{ viewModel.applyDirtyKnobs() }`; ini yang
+  membuat A11 (yang sempat pakai `::refreshRealtime`, aman karena
+  tanpa parameter) tidak error tapi A10 iya. (37) Classpath test lokal
+  di Termux: `kotlinx-coroutines-test-1.8.1.jar` dari Maven itu
+  metadata-only (multiplatform) — yang berisi `runTest` class bytecode
+  adalah artifact `-jvm`; pakai yang sudah ada di
+  `~/usr/tmp/opencode/ctest.jar`, jangan unduh yang `-1.8.1.jar` itu
+  lagi (compile test gagal: unresolved `runTest`). (38) Fungsi yang
+  sudah tidak dipakai (mis. `PlaceholderScreen` setelah semua tab nyata
+  di A12) harus DIHAPUS di audit, bukan dibiarkan sebagai "cadangan" —
+  dead code composite adalah beban review (A14).
