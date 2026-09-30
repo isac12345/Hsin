@@ -16,6 +16,11 @@ class RootClientTest {
         private val rc: Int,
         private val outText: String = "",
         private val throwMsg: String? = null,
+        // Jawaban probe keberadaan modul `[ -f ... ]` via root.
+        // Meniru `test -f`: probeRc=0 = ada; probeRc=1 + probeOut kosong =
+        // hilang; probeRc!=0 + ada output = su sendiri bermasalah.
+        private val probeRc: Int = 0,
+        private val probeOut: String = "",
     ) : CommandRunner {
         var calls = 0
         var lastCmd: String? = null
@@ -23,16 +28,20 @@ class RootClientTest {
             calls++
             lastCmd = cmd
             throwMsg?.let { throw RuntimeException(it) }
+            if (cmd.startsWith("[ -f")) {
+                out.append(probeOut)
+                return probeRc
+            }
             out.append(outText)
             return rc
         }
     }
 
     /**
-     * Path yang dipakai test: bukan path modul asli (tidak ada di mesin CI),
-     * tapi path yang dijamin ada. [RootClient] hanya mengecek `File.exists()`,
-     * jadi isi file tidak pernah dieksekusi — command tetap dijalankan lewat
-     * [CommandRunner] fake.
+     * Path yang dipakai test: bukan path modul asli (tidak ada di mesin CI).
+     * [RootClient] mengecek keberadaan lewat probe `[ -f ... ]` via
+     * [CommandRunner] fake — jawaban probe diatur per-test (probeRc), BUKAN
+     * dari filesystem CI — dan command nyata tetap dijalankan lewat fake.
      */
     private val existingModulePath: String =
         java.io.File(System.getProperty("java.io.tmpdir") ?: "/tmp", "hsin-test-action.sh")
@@ -57,7 +66,7 @@ class RootClientTest {
         val fake = FakeRunner(rc = 0, outText = "OK cpu_policy_0_gov=performance\n")
         val res = client(fake).execute("knob-set", listOf("cpu_policy_0_gov", "performance"))
         assertTrue("knob-set harus diterima: $res", res is RootResult.Success)
-        assertEquals(1, fake.calls)
+        assertEquals("probe root + command nyata", 2, fake.calls)
     }
 
     @Test
@@ -126,7 +135,7 @@ class RootClientTest {
         val fake = FakeRunner(rc = 0, outText = "OK: Applying manual\n")
         val res = client(fake).execute("apply", listOf("manual"))
         assertTrue(res is RootResult.Success)
-        assertEquals(1, fake.calls)
+        assertEquals("probe root + command nyata", 2, fake.calls)
     }
 
     @Test
@@ -140,7 +149,8 @@ class RootClientTest {
 
     @Test
     fun module_not_found_when_path_missing() = runTest {
-        val fake = FakeRunner(rc = 0)
+        // Probe `[ -f ]` rc=1 tanpa output = file hilang di sisi root.
+        val fake = FakeRunner(rc = 0, probeRc = 1)
         val c = RootClient(
             runner = fake, timeoutMs = 500L,
             modulePath = "/data/adb/modules/tidak-ada-xyz/action.sh"
@@ -148,7 +158,22 @@ class RootClientTest {
         val res = c.execute("status")
         assertTrue(res is RootResult.Error)
         assertEquals(RootError.MODULE_NOT_FOUND, (res as RootResult.Error).type)
-        assertEquals("runner tak boleh dipanggil", 0, fake.calls)
+        // Probe jalan (1 call), command nyata tidak pernah dikirim.
+        assertEquals(1, fake.calls)
+        assertTrue("path modul harus quoted di probe: ${fake.lastCmd}",
+            fake.lastCmd!!.contains("'/data/adb/modules/tidak-ada-xyz/action.sh'"))
+        assertTrue("command nyata tak boleh jalan: ${fake.lastCmd}",
+            fake.lastCmd!!.startsWith("[ -f"))
+    }
+
+    @Test
+    fun root_probe_denied_maps_to_root_unavailable() = runTest {
+        // su ada tapi menolak (mis. izin root dicabut): probe rc!=0 DENGAN
+        // output. Beda dari file hilang (rc!=0 tanpa output).
+        val fake = FakeRunner(rc = 0, probeRc = 1, probeOut = "Permission denied")
+        val res = client(fake).execute("status")
+        assertTrue(res is RootResult.Error)
+        assertEquals(RootError.ROOT_UNAVAILABLE, (res as RootResult.Error).type)
     }
 
     @Test

@@ -8,7 +8,10 @@ import kotlinx.coroutines.withContext
  *
  * Pemetaan error (kontrak §5 butir 5; §3.9 jebakan Usage rc=0):
  * - ROOT_UNAVAILABLE: su tidak bisa dijalankan / exception transport
- * - MODULE_NOT_FOUND: path `/data/adb/modules/hsin/action.sh` tidak ada (diperiksa sebelum run)
+ * - MODULE_NOT_FOUND: path modul tidak ada — diperiksa SEBELUM run via probe
+ *   root `[ -f ... ]`. DILARANG memakai java.io.File: sandbox aplikasi tidak
+ *   bisa membaca /data/adb tanpa root sehingga selalu false (berujung
+ *   MODULE_NOT_FOUND palsu di HP nyata walau modul terpasang).
  * - FEATURE_UNSUPPORTED: TIDAK dari rc; berasal dari payload `knobs` (writable:false) di Repository
  * - COMMAND_FAILED: rc!=0 + `ERROR:`; atau `Usage:` meski rc=0 (§3.9)
  * - TIMEOUT: proses tidak selesai dalam timeoutMs
@@ -116,11 +119,35 @@ class RootClient(
             }
         }
 
-        // Pemeriksaan path modul sebelum menjalankan → MODULE_NOT_FOUND
-        val moduleFile = java.io.File(modulePath)
-        if (!moduleFile.exists()) {
+        // Pemeriksaan path modul HARUS lewat root. java.io.File hanya melihat
+        // sandbox aplikasi (/data/adb tak terbaca tanpa root) sehingga selalu
+        // false -> MODULE_NOT_FOUND palsu di HP nyata. Probe via `[ -f ... ]`
+        // lewat runner yang sama: rc=0 = ada. rc!=0 + output kosong = hilang
+        // (test -f tidak mencetak apa-apa). rc!=0 + ada output (mis. su
+        // ditolak) = transport/root bermasalah -> ROOT_UNAVAILABLE.
+        val probeOut = StringBuilder()
+        var probeTimeout = false
+        val probeRc = try {
+            runner.run("[ -f ${modulePath.quoteShell()} ]", timeoutMs, probeOut) {
+                probeTimeout = true
+            }
+        } catch (e: Exception) {
+            val msg = e.message ?: e.toString()
             return@withContext RootResult.Error(
-                RootError.MODULE_NOT_FOUND, "module path missing: $modulePath")
+                RootError.ROOT_UNAVAILABLE, "transport error: $msg")
+        }
+        if (probeTimeout || probeRc == SudoCommandRunner.TIMEOUT_EXIT) {
+            return@withContext RootResult.Error(
+                RootError.TIMEOUT, "timeout after ${timeoutMs}ms")
+        }
+        if (probeRc != 0) {
+            val detail = probeOut.toString().trim()
+            if (detail.isEmpty()) {
+                return@withContext RootResult.Error(
+                    RootError.MODULE_NOT_FOUND, "module path missing: $modulePath")
+            }
+            return@withContext RootResult.Error(
+                RootError.ROOT_UNAVAILABLE, "root probe failed: $detail")
         }
 
         val cmdStr = buildString {
