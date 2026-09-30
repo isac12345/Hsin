@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,9 +34,14 @@ fun ScreenScaffold(
             .background(Bg)
     ) {
         TopBar(title = title, subtitle = subtitle)
+        // Konten pakai weight(1f) — BUKAN fillMaxSize — supaya BottomNav
+        // kebagian ruang. verticalScroll sentral di sini (bukan per layar)
+        // supaya konten tidak terpotong di layar kecil (temuan L2 30 Sep:
+        // Box fillMaxSize mendorong BottomNav keluar layar sejak A5).
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .padding(Pad)
         ) {
             content()
