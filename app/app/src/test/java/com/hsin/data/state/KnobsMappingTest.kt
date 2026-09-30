@@ -140,6 +140,22 @@ class KnobsMappingTest {
     }
 
     @Test
+    fun gpuTunablesParsedToEditableKeys() {
+        val knobs = JSONObject("""
+            {"v":1,"profiles":["manual"],
+             "gpu_tunables":[{"node":"23100000.gpu","tunables":{
+               "polling_interval":{"min":1,"max":1000,"cur":50,"supported":true,"writable":true},
+               "up_threshold":{"min":1,"max":100,"cur":10,"supported":true,"writable":true},
+               "down_differential":{"min":0,"max":100,"cur":5,"supported":true,"writable":true}
+             }}]}
+        """.trimIndent())
+        val parsed = KnobsMapping.parse(knobs, false)
+        assertTrue("gpu_tunables polling_interval harus ada", parsed.capability.supportedKeys.contains("gpu_node_23100000_gpu_polling_interval"))
+        assertEquals("50", parsed.baseValues["gpu_node_23100000_gpu_polling_interval"])
+        assertTrue("down_differential harus ada", parsed.capability.supportedKeys.contains("gpu_node_23100000_gpu_down_differential"))
+    }
+
+    @Test
     fun emptyKnobsYieldsEmptyCapability() {
         val parsed = KnobsMapping.parse(JSONObject("""{"v":1}"""), allowExtreme = false)
         assertNotNull(parsed.capability)

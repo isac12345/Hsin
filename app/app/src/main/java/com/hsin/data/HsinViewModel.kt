@@ -217,6 +217,12 @@ class HsinViewModel(
     // ------------------------------------------------------------------
     // Aksi edit knob + A10 alur Terapkan
     // ------------------------------------------------------------------
+    fun setConfig(key: String) {
+        viewModelScope.launch {
+            call("config-set", key, "true")
+        }
+    }
+
     fun setKnobOverride(key: String, value: String) {
         _uiState.update { it.copy(dirty = DirtyTracker.setOverride(it.dirty, key, value)) }
     }
