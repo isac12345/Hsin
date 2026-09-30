@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -62,6 +65,7 @@ fun KnobScreen(
     modifier: Modifier = Modifier,
     onApply: () -> Unit = {},
     onRefresh: () -> Unit = {},
+    onConfigSet: (String) -> Unit = {},
 ) {
     var openCategory by remember { mutableStateOf<KnobCategory?>(null) }
 
@@ -101,6 +105,8 @@ fun KnobScreen(
                 onOpenCategory = { openCategory = it },
                 onSetOverride = onSetOverride,
                 onApply = onApply,
+                onConfigSet = onConfigSet,
+                onRefresh = onRefresh,
             )
         }
     }
@@ -114,6 +120,8 @@ private fun KnobContent(
     onOpenCategory: (KnobCategory?) -> Unit,
     onSetOverride: (String, String) -> Unit,
     onApply: () -> Unit,
+    onConfigSet: (String) -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
         val dirty = state.dirtyCount
@@ -137,7 +145,7 @@ private fun KnobContent(
             categories.forEach { cat ->
                 CategoryRow(cat) { onOpenCategory(cat.category) }
             }
-            GatedCard(state)
+            GatedCard(state, onConfigSet = onConfigSet, onRefresh = onRefresh)
         } else {
             HButton(label = "Kembali", onClick = { onOpenCategory(null) }, primary = false)
             val catUi = categories.firstOrNull { it.category == open }
@@ -307,23 +315,59 @@ private fun ResultLine(
     }
 }
 
-/** Baris fitur bergate: terkunci, tanpa kontrol — tampilkan alasan modul. */
+/** Baris fitur bergate: bisa diklik jika punya saklar conf. */
 @Composable
-private fun GatedCard(state: UiState) {
+private fun GatedCard(
+    state: UiState,
+    onConfigSet: (String) -> Unit = {},
+    onRefresh: () -> Unit = {},
+) {
     val feats = state.capability?.gated.orEmpty()
     if (feats.isEmpty()) return
+    val map = mapOf(
+        "DVFS" to "ADVANCED_DVFS_ENABLED",
+        "Global RR" to "GLOBAL_RR_ENABLED",
+        "Frame limit" to "FRAME_RATE_LIMIT_DISABLED",
+        "SurfaceFlinger" to "SURFACEFLINGER_TWEAK_ENABLED",
+        "Gaming" to "GAM_BOOST_ENABLED",
+        "Profil extreme" to "ALLOW_EXTREME",
+    )
+    var showDialog by remember { mutableStateOf<String?>(null) }
+    val selected = showDialog
     HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             TextLine(KnobCategory.GATED.title, BodyLarge)
             feats.forEach { f ->
+                val key = map[f.label]
+                val canTune = key != null
                 HSelectRow(
                     label = f.label,
                     value = if (f.available) "Tersedia" else "Terkunci",
-                    onClick = null,
+                    onClick = if (canTune) {
+                        { showDialog = f.label }
+                    } else null,
                 )
                 if (f.why.isNotBlank()) TextLine(f.why, Caption)
             }
         }
+    }
+    if (selected != null) {
+        val confKey = map[selected] ?: return
+        AlertDialog(
+            onDismissRequest = { showDialog = null },
+            title = { TextLine("Nyalakan $selected?", BodyLarge) },
+            text = { TextLine("Mengubah hsin.conf via config-set $confKey true", Caption) },
+            confirmButton = {
+                Button(onClick = {
+                    onConfigSet(confKey)
+                    showDialog = null
+                    onRefresh()
+                }) { TextLine("Ya", Caption) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = null }) { TextLine("Tidak", Caption) }
+            },
+        )
     }
 }
 
