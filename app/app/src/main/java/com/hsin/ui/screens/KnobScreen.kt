@@ -2,9 +2,13 @@ package com.hsin.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -193,14 +197,31 @@ private fun KnobControl(
             }
             when (row.kind) {
                 KnobKind.CHOICE -> {
-                    // Nilai saat ini = yang diminta user; daftar pilihan
-                    // berasal dari `knobs`. APK tidak memetakan governor.
-                    HSelectRow(
-                        label = "Nilai",
-                        value = row.current.ifBlank { "tidak terbaca" },
-                        onClick = null,
-                        selected = row.dirty,
-                    )
+                    // Dropdown pilihan dari `knobs` — nilai dikirim apa adanya.
+                    var expanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        HSelectRow(
+                            label = "Nilai",
+                            value = row.current.ifBlank { "tidak terbaca" },
+                            onClick = { expanded = true },
+                            selected = row.dirty,
+                        )
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            row.choices.forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text(c) },
+                                    onClick = {
+                                        expanded = false
+                                        if (c != row.current) onChange(c)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    TextLine("${row.choices.size} pilihan (dari modul)", Caption)
                 }
                 KnobKind.SLIDER -> {
                     val lo = (row.range?.first ?: 0).toFloat()
@@ -286,7 +307,7 @@ private fun ResultLine(
     }
 }
 
-/** Baris fitur bergate: terkunci, tanpa kontrol. */
+/** Baris fitur bergate: terkunci, tanpa kontrol — tampilkan alasan modul. */
 @Composable
 private fun GatedCard(state: UiState) {
     val feats = state.capability?.gated.orEmpty()
@@ -295,7 +316,12 @@ private fun GatedCard(state: UiState) {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             TextLine(KnobCategory.GATED.title, BodyLarge)
             feats.forEach { f ->
-                HSelectRow(label = f.label, value = "Terkunci", onClick = null)
+                HSelectRow(
+                    label = f.label,
+                    value = if (f.available) "Tersedia" else "Terkunci",
+                    onClick = null,
+                )
+                if (f.why.isNotBlank()) TextLine(f.why, Caption)
             }
         }
     }
