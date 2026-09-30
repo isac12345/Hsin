@@ -147,14 +147,14 @@ hsin_gpu_kbase_knobs_apply() {
         "mali_boost_level2|gpu_boost_level2|0|1|0|0|1|1" \
         "mali_pollingtime|gpu_pollingtime|1|10|8|4|4|1" \
         "mali_upthreshold|gpu_upthreshold|10|100|88|72|55|30"; do
-        _mk_key="${_mk_spec%%|*}"
-        _mk_rest="${_mk_spec#*|}"
-        _mk_node="$HSIN_GPU_KBASE/${_mk_rest%%|*}"
-        _mk_rest2="${_mk_rest#*|}"
-        _mk_min="${_mk_rest2%%|*}"
-        _mk_rest3="${_mk_rest2#*|}"
-        _mk_max="${_mk_rest3%%|*}"
-        _mk_defs="${_mk_rest3#*|}"
+        _mk_key="${_mk_spec%%\|*}"
+        _mk_rest="${_mk_spec#*\|}"
+        _mk_node="$HSIN_GPU_KBASE/${_mk_rest%%\|*}"
+        _mk_rest2="${_mk_rest#*\|}"
+        _mk_min="${_mk_rest2%%\|*}"
+        _mk_rest3="${_mk_rest2#*\|}"
+        _mk_max="${_mk_rest3%%\|*}"
+        _mk_defs="${_mk_rest3#*\|}"
         _mk_uk=$(hsin_uk_get "$_mk_key" 2>/dev/null)
         if [ -n "$_mk_uk" ]; then
             # Cek ulang di engine (pola tfo): file override bisa manual.
@@ -181,9 +181,9 @@ hsin_gpu_kbase_knobs_apply() {
                 continue
             fi
             # Nilai profil persis seperti sebelumnya (perilaku lama).
-            _mk_v_bat=${_mk_defs%%|*}; _mk_rest4="${_mk_defs#*|}"
-            _mk_v_bal=${_mk_rest4%%|*}; _mk_rest5="${_mk_rest4#*|}"
-            _mk_v_perf=${_mk_rest5%%|*}; _mk_v_ext=${_mk_rest5#*|}
+            _mk_v_bat=${_mk_defs%%\|*}; _mk_rest4="${_mk_defs#*\|}"
+            _mk_v_bal=${_mk_rest4%%\|*}; _mk_rest5="${_mk_rest4#*\|}"
+            _mk_v_perf=${_mk_rest5%%\|*}; _mk_v_ext=${_mk_rest5#*\|}
             _mk_req="(profil)"
             case "$_mk_profile" in
                 battery)     _mk_v="$_mk_v_bat" ;;
