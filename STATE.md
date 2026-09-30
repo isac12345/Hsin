@@ -420,3 +420,14 @@
   ter-bundle dan loader 0 caller - bundel ulang vs tandai fitur
   nonaktif. BELUM ada perubahan untuk keduanya. JANGAN flash sebelum
   user memutuskan.
+- THERMAL FIX + DOK KAPABILITAS (2026-09-30, leader, 509a215): thermal_check
+  auto-exec -> fungsi `hsin_thermal_check_run`, dipanggil dari service.sh
+  via `command -v`. Bukti: (a) pre-check boot + darurat hidup
+  (NORMAL rc=0 @45C, VERY HIGH rc=2 @96C), (b) noise per-source hilang
+  (0 baris di status/guard-status/knob-list), (c) M1b utuh (96C->600000,
+  45C->1800000). capability_overrides.json + hsin_override_load dicatat
+  TIDAK AKTIF di README/API.md §2/CHANGELOG (dokumen saja). Build final:
+  build-modul #36661729610 (mode=both) + build-apk #36661739940, keduanya
+  SUCCESS; lint-and-test #36661660022 SUCCESS. ZIP dev 505.374 /
+  release 494.517 byte; APK 8.939.368 byte; module.prop tetap
+  v5.0.0-beta1/5001. Menunggu user: tidak ada flash tanpa perintah.
