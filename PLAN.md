@@ -61,36 +61,37 @@
   komprehensif + cache `detected.conf` (fondasi signature capability).
 - Detail hash/commit: lihat STATUS.md (Step 1-4 DONE dengan hash asli).
 
-## Fase 2 — Boot Guard & Safe Apply (Step 5-8, BERIKUTNYA)
+## Fase 2 — Boot Guard & Safe Apply (Step 5-8, SELESAI 2026-09-27)
 
-- [ ] Step 5 (NEXT): `core/boot_guard.sh` — referensi pola dari repo
-  (note: K1-K3 docs inserted in APP_PLAN; execution gated on user approve)
-  isac12345/Alpha (`service.sh`): hitung boot fail count, auto-disable
-  tuning kalau gagal berturut-turut, log jelas kapan guard aktif.
-- [ ] Step 6: integrasi boot guard ke `service.sh` (cek di awal boot,
-  skip tuning + exit bersih bila guard aktif, reset bila boot sukses).
-- [ ] Step 7: `core/safe_apply.sh` — referensi `apply_tweak()` dari Alpha:
-  cek node exist + writable, write, read-back, verify, kategorikan hasil
-  APPLIED / SKIPPED / FALLBACK / FAILED. Tanpa verify = tanpa klaim sukses.
-- [ ] Step 8: migrasi minimal SATU engine (`engine/cpu`) ke `safe_apply.sh`
-  sebagai bukti pola terpakai (engine lain menyusul setelah pola terbukti).
+- [x] Step 5 (DONE `5f3355c`): `core/boot_guard.sh` — hitung boot fail
+  count, auto-disable tuning kalau gagal berturut-turut (>= 2x, perintah
+  user), log jelas kapan guard aktif.
+- [x] Step 6 (DONE `62ee738`): integrasi boot guard ke `service.sh` (cek
+  di awal boot, skip tuning + exit bersih bila guard aktif, reset bila
+  boot sukses).
+- [x] Step 7 (DONE `6ea5619`): `core/safe_apply.sh` — cek node exist +
+  writable, write, read-back, verify, kategorikan hasil APPLIED / SKIPPED
+  / FALLBACK / FAILED / UNAVAILABLE. Tanpa verify = tanpa klaim sukses.
+- [x] Step 8 (DONE `6ea5619`, engine `io/readahead` sebagai bukti pola
+  risiko terkecil — bukan `engine/cpu` seperti rencana awal): migrasi
+  minimal SATU engine ke `safe_apply.sh` sebagai bukti pola terpakai.
 
-## Fase 3 — Capability-Driven Overrides & Thermal Safety (Step 9-12)
+## Fase 3 — Capability-Driven Overrides & Thermal Safety (Step 9-12, SELESAI 2026-09-27)
 
-- [ ] Step 9: `capability/capability_overrides.json` — keyed by CAPABILITY
-  SIGNATURE, BUKAN nama chipset (ganti total rencana Step 5 lama yang
-  direvert). Format signature baku, mis.
-  `cpu2+_gpu-devfreq_thermal2+`, plus entry `default` sebagai fallback aman.
-- [ ] Step 10: `core/load_overrides.sh` — hitung signature device dari
-  `detected.conf` + cek writability live, pilih entry cocok, fallback ke
-  `default` bila tidak ada yang cocok (dengan log alasannya).
-- [ ] Step 11: `core/thermal_check.sh` — threshold NORMAL / HIGH /
-  VERY HIGH / CRITICAL berbasis data thermal_zone yang TERDETEKSI, bukan
-  angka tetap per chipset. Tanpa thermal zone → fitur thermal degrade
-  jadi no-op + log, bukan crash dan bukan throttle buta.
-- [ ] Step 12: graceful degradation formal — engine gagal != module gagal
-  (counter applied/failed per engine, partial success = return 0, service
-  lanjut ke engine berikut).
+- [x] Step 9 (DONE `b79763d`): `capability/capability_overrides.json` —
+  keyed by CAPABILITY SIGNATURE, BUKAN nama chipset. Format signature
+  baku, mis. `cpu2+_gpu-devfreq_thermal2+`, plus entry `default` sebagai
+  fallback aman.
+- [x] Step 10 (DONE `2a56064`, revisi `546f9a5`): `core/thermal_check.sh`
+  — guardrail NORMAL / HIGH / VERY HIGH / CRITICAL (+ UNKNOWN) dari
+  trip_point kernel terdeteksi; hanya CRITICAL intervensi via safe_apply.
+- [x] Step 11 (DONE, harmonisasi spec `912b3bf`): threshold NORMAL / HIGH /
+  VERY HIGH / CRITICAL dari thermal_zone TERDETEKSI. Tanpa zone →
+  no-op + log (bukan crash, bukan throttle buta). FOLLOW-UP bukan blocker:
+  override threshold via capability entry `thermal_class: managed`.
+- [x] Step 12 (DONE `7ae4573`): graceful degradation formal —
+  `core/engine_guard.sh` + wiring `service.sh`: engine gagal != module
+  gagal (counter applied/failed per engine, partial success = return 0).
 
 ## Fase 4 — Documentation (Step 13-18)
 
