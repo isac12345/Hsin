@@ -1445,3 +1445,64 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   sudah tidak dipakai (mis. `PlaceholderScreen` setelah semua tab nyata
   di A12) harus DIHAPUS di audit, bukan dibiarkan sebagai "cadangan" —
   dead code composite adalah beban review (A14).
+
+## BLOCKER L2-BUILD (2026-09-30, leader, ZIP apply MATI - jangan flash dulu)
+- Konteks: run build-modul #36656203932 (mode=both, SUCCESS) +
+  build-apk #36656232453 (SUCCESS) dari main `72651ce`. validate_build.sh
+  LULUS untuk KEDUA ZIP (wajib file + fungsi cache-scan/override + <50MB).
+- Temuan 1 (permintaan user, jawaban jujur): file `core/boot_guard.sh`,
+  `core/safe_apply.sh`, `core/thermal_check.sh`, `core/engine_guard.sh`
+  TIDAK ADA sebagai file terpisah di ZIP mana pun - build_release.sh
+  menyatukan semuanya ke `core/runtime.sh` (baris 82-108). Isi/fungsinya
+  TERBUKTI ada di dalam runtime.sh (15.679 baris, sh -n rc=0). Jadi cek
+  harus di level FUNGSI, bukan nama file.
+- Temuan 2: `capability/capability_overrides.json` TIDAK ikut ZIP (folder
+  `capability/` hilang total di dev & release). Verified 0 pemanggil:
+  `hsin_override_load` = 0 caller di seluruh runtime (hanya build_release
+  + tests) -> itu sisa roadmap lama yang direvert, bukan bug打包 yang baru.
+  KEPUTUSAN(user): bundling atau tandai dead code - belum saya ubah.
+- Temuan 3 = BLOCKER SERIUS: apply TIDAK BEKERJA di kedua ZIP.
+  Bukti: `action.sh apply manual` -> "OK: Applying manual (running in
+  background)"; debug.log: "apply_*.sh: 19: hsin_apply_all_engines: not
+  found" + error.log "[ERROR] main"; knob-list tetap "belum ada hasil
+  apply"; node tidak berubah sama sekali.
+  AKAR MASALAH (terbukti, bukan dugaan): `core/thermal_check.sh:176`
+  diakhiri `return $HSIN_THERMAL_CHECK_RC 2>/dev/null || exit
+  $HSIN_THERMAL_CHECK_RC`. Filter merge di build_release.sh:107 hanya
+  membuang pola `return 0 2>/dev/null || true` (68 file ikut pola itu),
+  TIDAK membuang bentuk variabel ini. Jadi baris itu utuh di runtime.sh
+  baris 7035 -> saat runtime.sh di-source, `return 4` (UNKNOWN)/
+  `exit` menghentikan sourcing SETELAH baris itu. Semua yang di-merge
+  sesudahnya - termasuk `core/apply_engines.sh` (baris 15282,
+  hsin_apply_all_engines) - TIDAK PERNAH terdefinisi.
+  Bukti lanjutan: (1) `sh -n runtime.sh` rc=0 (parse-SEHAT) tapi
+  `. runtime.sh` rc=4 + thermal_check mencetak "[thermal_check] UNKNOWN"
+  saat source; (2) fungsi sebelum 7035 ADA (hsin_log_warn,
+  hsin_safe_apply, hsin_knobs_json, hsin_uk_set, hsin_boot_guard_check),
+  fungsi sesudahnya TIDAK (hsin_apply_all_engines); (3) uji pada SALINAN:
+  baris 7035 dinonaktifkan -> hsin_apply_all_engines TERDEFINISI.
+  (4) sh Termux = dash, dan `return` di sourced file memang menghentikan
+  file itu (diuji dengan file minimal).
+- DAMPAK: di HP, flash ZIP mana pun = knob tidak pernah diterapkan;
+  aplikasi tidak error (tetap rc=0 "queued"), knob_results.env tidak
+  pernah lahir, jadi A10 selalu tampil "DIUBAH" tanpa hasil. A10 tidak
+  bisa divalidasi L2 sebelum ZIP ini dibetulkan.
+- KELAS BUG: sama dengan "BUG ZIP RUNTIME" M2 (guard_status.sh) dan
+  thermal_check yang hilang (ee5f85b) -.merge runtime belum punya
+  negative test. Root: tidak ada uji yang meng-source runtime.sh hasil
+  build (semua sandbox test menyource file SATU per file dari source tree).
+- PERBAIKAN MINIMAL (1 baris, SIAP tapi BELUM saya kerjakan - menunggu
+  approve user): perlebar filter awk build_release.sh:107 agar juga
+  membuang `return $VAR 2>/dev/null || exit $VAR` di kolom 0, mis.
+  `!/^return \$[A-Za-z_][A-Za-z0-9_]* 2>\/dev\/null \|\| exit \$/`
+  Source tetap bisa dijalankan langsung (`sh core/thermal_check.sh`
+  masih keluar dengan rc), yang hilang hanya efek auto-exec saat
+  di-merge. Setelah itu WAJIB: build ulang + smoke test apply dari ZIP
+  (harness baru yang meng-source runtime.sh hasil build).
+- CATATAN JUJUR thermal_check: 4 fungsinya (_read_thermal_max,
+  _read_thermal_basis, _classify_thermal, _thermal_critical_intervene)
+ private dan 0 caller di luar file itself; blok thermal di service.sh:71
+  dijaga `if [ -f core/thermal_check.sh ]` yang sudah FALSE di ZIP
+  (file tidak ada). Jadi thermal check boot di ZIP sebenarnya TIDAK
+  jalan - ini temuan kedua yang perlu keputusan (panggil sebagai fungsi
+  vs buang).
