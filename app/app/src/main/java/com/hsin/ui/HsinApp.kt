@@ -66,6 +66,7 @@ fun HsinApp(
                 state = state,
                 onSetOverride = viewModel::setKnobOverride,
                 onApply = { viewModel.applyDirtyKnobs() },
+                onRefresh = viewModel::refreshCapability,
             )
             Tab.MONITOR -> MonitorScreen(
                 state = state,
