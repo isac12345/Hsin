@@ -1459,7 +1459,7 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
 - Temuan 2: `capability/capability_overrides.json` TIDAK ikut ZIP (folder
   `capability/` hilang total di dev & release). Verified 0 pemanggil:
   `hsin_override_load` = 0 caller di seluruh runtime (hanya build_release
-  + tests) -> itu sisa roadmap lama yang direvert, bukan bug打包 yang baru.
+  + tests) -> itu sisa roadmap lama yang direvert, bukan bug kemasan baru.
   KEPUTUSAN(user): bundling atau tandai dead code - belum saya ubah.
 - Temuan 3 = BLOCKER SERIUS: apply TIDAK BEKERJA di kedua ZIP.
   Bukti: `action.sh apply manual` -> "OK: Applying manual (running in
@@ -1605,9 +1605,9 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   caller di seluruh runtime -> sisa fitur roadmap 22-step yang mati.
   OPSI (a) bundel ulang capability/*.json ke ZIP; (b) dokumentasikan
   sebagai fitur nonaktif/tidak dipakai dan biarkan file di source tree
-  untuk*/参照; (c) hapus file + load_overrides.sh beserta rujukan test.
+  untuk referensi; (c) hapus file + load_overrides.sh beserta rujukan test.
   Tidak ada yang saya kerjakan; menunggu user.
-- PELAJARAN: (41) merge banyak file ke satu file运行时 Wajib diuji
+- PELAJARAN: (41) merge banyak file ke satu file runtime WAJIB diuji
   dengan me-source HASIL merge-nya; test per-file dari source tree
   tidak akan pernah menangkap kelas bug ini. (42) saat menghapus baris
   (sed/awk) dari hasil merge, cek sisa CONTINUATION baris (`|| \`,
@@ -1615,5 +1615,6 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   berikutnya. (43) awk: `||` di dalam regex harus di-escape, dan program
   awk jangan multi-baris di dalam single-quote. (44) probe fungsi shell
   harus inline di subshell yang sama; `sh probe.sh` anak tidak mewarisi
-  fungsi. (45) grep nama fungsi tanpa.kotlin posisi perintah menghasilkan
+  fungsi. (45) grep nama fungsi tanpa memeriksa posisi perintah
+  menghasilkan false positive dari variabel bernama mirip fungsi.
   false positive dari variabel bernama mirip fungsi.

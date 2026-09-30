@@ -385,3 +385,38 @@
   openrouter/opencode. Berlaku sesi opencode berikutnya.
 - POSISI: A10 Alur Terapkan [ ] berikutnya. A10-A16 belum dikerjakan. L2 HP
   untuk A6-A9 belum dilakukan.
+- APP-A10 s/d A16 (2026-09-30, leader): semua selesai + merge. HEAD saat
+  itu `72651ce`, tabel APP_PLAN A1-A16 [x]. 161 unit test JVM hijau
+  LOKAL di main HEAD; CI lint-and-test + build-apk success di semua
+  branch step dan main. Modul: M1/M1b manual murni, M2 guard-status,
+  K1-K3 knob (semua merge + CI hijau). L2 HP BELUM (tidak ada device).
+- L2 BUILD (2026-09-30): build-modul #36656203932 (mode=both) + build-apk
+  #36656232453 (debug) dari main. validate_build.sh VALID untuk kedua
+  ZIP. APK 8.939.368 byte. module.prop v5.0.0-beta1/5001 (tidak di-bump).
+  BLOCKER ditemukan saat smoke test: apply MATI di kedua ZIP (0 node
+  berubah, "belum ada hasil apply", [ERROR] main).
+- FIX merge runtime (2026-09-30, leader, 95b4daa + 0844982): 2 kelas
+  bug merge - (1) statement top-level `return`/`exit` bocor ke
+  runtime.sh (thermal_check) menghentikan sourcing -> apply_all_engines
+  hilang; (2) guard `command -v X || \` yatim setelah baris `.` dihapus
+  -> 8 file kehilangan fungsi berikutnya. Test permanen
+  tests/verify_bundle_runtime.sh jadi gate di lint-and-test (tiap push)
+  + build-modul (tiap ZIP). Bukti negatif: test MERAH pada ZIP lama
+  (PASS 9/FAIL 5), HIJAU pada merge baru (PASS 15/FAIL 0).
+  Build ulang #36659882646 SUCCESS, gate hijau untuk kedua ZIP.
+  Smoke test apply pada release ZIP: 6 knob APPLIED (vfs_cache_pressure
+  100->250, dirty_ratio 20->30, backlog 1000->16384, read_ahead_kb
+  128->2048, nomerges 2->1, gpu polling_interval 50->100),
+  sched_child_runs_first UNAVAILABLE (node tak ada di pohon palsu),
+  knob tanpa override TIDAK ditulis (mode manual murni). apply.log
+  "override: 6 key dipakai"; error.log tidak pernah dibuat.
+  M1b thermal terbukti UTUH di ZIP: 96C -> scaling_max_freq
+  1800000->600000 + thermal_pre_cap.list; 45C -> kembali 1800000.
+  UKURAN ZIP lama->baru: dev 494.919->500.331, release 484.059->489.472.
+- MENUNGGU KEPUTUSAN USER (2026-09-30): (a) thermal_check di ZIP -
+  pre-check/log boot service.sh:71-73 mati (file tak ada terpisah),
+  sementara cap+restore M1b UTUH (bukti di atas); opsi: panggil sebagai
+  fungsi saat boot, atau buang blok; (b) capability_overrides.json tidak
+  ter-bundle dan loader 0 caller - bundel ulang vs tandai fitur
+  nonaktif. BELUM ada perubahan untuk keduanya. JANGAN flash sebelum
+  user memutuskan.
