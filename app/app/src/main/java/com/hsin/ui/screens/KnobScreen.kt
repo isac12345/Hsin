@@ -359,9 +359,10 @@ private fun GatedCard(
             text = { TextLine("Mengubah hsin.conf via config-set $confKey true", Caption) },
             confirmButton = {
                 Button(onClick = {
+                    // setConfig sudah refresh paksa setelah tulis; tanpa
+                    // onRefresh() di sini (cache akan mengembalikan basi).
                     onConfigSet(confKey)
                     showDialog = null
-                    onRefresh()
                 }) { TextLine("Ya", Caption) }
             },
             dismissButton = {
