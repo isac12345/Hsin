@@ -23,7 +23,6 @@ import com.hsin.ui.theme.MonoCaption
 import com.hsin.ui.theme.Neutral
 import com.hsin.ui.theme.Ok
 import com.hsin.ui.theme.Radius
-import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.Text
 import com.hsin.ui.theme.Warn
 
@@ -37,8 +36,8 @@ fun HStatus.color(): Color = when (this) {
     HStatus.SKIPPED, HStatus.DEFAULT, HStatus.UNAVAILABLE -> Neutral
 }
 
-// Badge HSIN: OUTLINE-ONLY (garis berwarna, tanpa fill blok). Isi hanya
-// surface kartu; warna status dibawa border, teks tetap Text agar terbaca.
+// Badge HSIN: fill pastel + teks tinta (sesuai mockup, APP_PLAN bagian 2).
+// Warna status dibawa fill + border; teks tetap Text agar terbaca.
 @Composable
 fun HBadge(
     label: String,
@@ -48,14 +47,12 @@ fun HBadge(
     val c = status.color()
     Box(
         modifier = modifier
-            .background(Surface, RoundedCornerShape(Radius))
+            .background(c.copy(alpha = 0.22f), RoundedCornerShape(Radius))
             .border(BorderStroke(1.dp, c), RoundedCornerShape(Radius))
             .padding(horizontal = Gap, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Teks badge memakai Text, bukan warna status: label 12sp butuh
-        // 4.5:1, sedangkan Error (3.85:1) dan Neutral (3.21:1) hanya lolos
-        // ambang non-teks 3:1. Warna status tetap dibawa oleh border.
+        // Teks badge memakai Text (tinta): kontras ke fill pastel.
         Text(text = label, style = MonoCaption, color = Text)
     }
 }

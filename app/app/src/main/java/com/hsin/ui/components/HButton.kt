@@ -22,10 +22,9 @@ import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.Gap
-import com.hsin.ui.theme.Bg
 import com.hsin.ui.theme.Accent
 
-// Tombol utama = fill accent + teks gelap. Sekunder = outline accent, isi
+// Tombol utama = fill accent + teks tinta. Sekunder = outline accent, isi
 // surface. Tanpa gradient/blur. Target sentuh >= 44 dp.
 @Composable
 fun HButton(
@@ -39,13 +38,13 @@ fun HButton(
         modifier = modifier.heightIn(min = TouchMin),
         shape = RoundedCornerShape(Radius),
         colors = if (primary) {
-            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Bg)
+            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Text)
         } else {
             ButtonDefaults.buttonColors(containerColor = Surface, contentColor = Accent)
         },
         border = if (primary) null else BorderStroke(1.dp, Accent)
     ) {
-        Text(text = label, color = if (primary) Bg else Text)
+        Text(text = label, color = if (primary) Text else Text)
     }
 }
 
