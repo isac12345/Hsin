@@ -461,3 +461,10 @@
 - SINKRON-DOK (2026-09-30, leader, tanya user): PLAN/STATUS/PRIORITY_QUEUE
   basi (Step 5-12 masih NEXT) → sinkron DONE + hash (d7b9edf), push DONE.
   Kode tetap: APP_PLAN 27/28 [x], sisa R4 + L2 HP (pending user).
+- FIX-KNOB-UI (2026-09-30, work/hsin-knob-ui f2349bf): knob CHOICE dropdown
+  (sebelumnya onClick=null, tidak bisa dipilih) + GatedCard tampilkan why +
+  KnobsMapping range-keys ikut editable + parser rate_limit/readahead/
+  queue_tuning/tfo (Memori dan VM + CPU 3 knob/policy balik, contoh vs real
+  selisih tinggal data modul) + tema terang contoh (lightColorScheme,
+  badge fill pastel, shadow hitam). L1 = grep statis hijau (tanpa sisa
+  hex gelap di main); L2 = build CI + screenshot HP user (pending).
