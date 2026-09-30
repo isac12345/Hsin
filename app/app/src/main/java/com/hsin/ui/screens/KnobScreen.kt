@@ -14,12 +14,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.data.state.UiState
+import com.hsin.ui.ScreenPhase
+import com.hsin.ui.ScreenStates
+import com.hsin.ui.components.ContentTitle
+import com.hsin.ui.components.EmptyView
+import com.hsin.ui.components.ErrorView
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
 import com.hsin.ui.components.HSelectRow
 import com.hsin.ui.components.HSlider
 import com.hsin.ui.components.HStatus
+import com.hsin.ui.components.LoadingView
 import com.hsin.ui.knob.KnobCategory
 import com.hsin.ui.knob.KnobCategoryBuilder
 import com.hsin.ui.knob.KnobCategoryUi
@@ -51,6 +57,7 @@ fun KnobScreen(
     onSetOverride: (String, String) -> Unit,
     modifier: Modifier = Modifier,
     onApply: () -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     var openCategory by remember { mutableStateOf<KnobCategory?>(null) }
 
@@ -58,24 +65,53 @@ fun KnobScreen(
     val categories = remember(cap, state.dirty) {
         if (cap == null) emptyList() else KnobCategoryBuilder.build(cap, state.dirty)
     }
+    val contentCount = categories.size + (cap?.gated?.size ?: 0)
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        if (cap == null) {
-            HCard {
-                Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
-                    TextLine("Belum ada data knob", BodyLarge)
-                    TextLine(
-                        "Kemampuan perangkat belum dimuat. Periksa dari Beranda.",
-                        Caption,
-                    )
-                }
-            }
-            return@Column
+        // R2: judul konten besar "Knob" (Beranda/Monitor langsung kartu).
+        ContentTitle("Knob")
+        // R2: fase eksplisit — tidak ada jalur yang merender blank.
+        when (ScreenStates.knob(state, contentCount)) {
+            ScreenPhase.LOADING -> LoadingView("Memuat knob dari modul...")
+            ScreenPhase.ERROR -> ErrorView(
+                message = state.error?.let { com.hsin.ui.friendlyError(it.kind.name, it.detail) }
+                    ?: "Terjadi kesalahan.",
+                onRetry = onRefresh,
+            )
+            ScreenPhase.EMPTY -> EmptyView(
+                message = if (cap == null) {
+                    "Belum ada data knob. Kemampuan perangkat belum dimuat."
+                } else {
+                    "Tidak ada knob terdeteksi (scan kosong)."
+                },
+                actionLabel = "Muat ulang",
+                onAction = onRefresh,
+            )
+            ScreenPhase.CONTENT -> KnobContent(
+                state = state,
+                categories = categories,
+                openCategory = openCategory,
+                onOpenCategory = { openCategory = it },
+                onSetOverride = onSetOverride,
+                onApply = onApply,
+            )
         }
+    }
+}
 
+@Composable
+private fun KnobContent(
+    state: UiState,
+    categories: List<com.hsin.ui.knob.KnobCategoryUi>,
+    openCategory: KnobCategory?,
+    onOpenCategory: (KnobCategory?) -> Unit,
+    onSetOverride: (String, String) -> Unit,
+    onApply: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
         val dirty = state.dirtyCount
         HButton(
             label = when {
@@ -95,11 +131,11 @@ fun KnobScreen(
         val open = openCategory
         if (open == null) {
             categories.forEach { cat ->
-                CategoryRow(cat) { openCategory = cat.category }
+                CategoryRow(cat) { onOpenCategory(cat.category) }
             }
             GatedCard(state)
         } else {
-            HButton(label = "Kembali", onClick = { openCategory = null }, primary = false)
+            HButton(label = "Kembali", onClick = { onOpenCategory(null) }, primary = false)
             val catUi = categories.firstOrNull { it.category == open }
             if (catUi == null) {
                 HCard {
@@ -271,5 +307,30 @@ private fun TextLine(text: String, style: androidx.compose.ui.text.TextStyle) {
 private fun KnobScreenEmptyPreview() {
     HsinTheme {
         KnobScreen(state = UiState(), onSetOverride = { _, _ -> })
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun KnobScreenLoadingPreview() {
+    HsinTheme {
+        KnobScreen(state = UiState(loadingCapability = true), onSetOverride = { _, _ -> })
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun KnobScreenErrorPreview() {
+    HsinTheme {
+        KnobScreen(
+            state = UiState(
+                error = com.hsin.data.state.UiError(
+                    kind = com.hsin.data.state.UiErrorKind.TIMEOUT,
+                    detail = "",
+                    retryable = true,
+                ),
+            ),
+            onSetOverride = { _, _ -> },
+        )
     }
 }

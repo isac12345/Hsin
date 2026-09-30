@@ -194,6 +194,7 @@ class HsinViewModel(
      */
     fun refreshLogs(maxLines: Int = LogPresenter.MAX_LINES) {
         viewModelScope.launch {
+            _uiState.update { it.copy(loadingLogs = true) }
             val lines = maxLines.toString()
             val boot = when (val res = call("logs", "boot", lines)) {
                 is RootResult.Success -> LogPresenter.parseLogOutput(res.output, maxLines)
@@ -209,7 +210,7 @@ class HsinViewModel(
                     return@launch
                 }
             }
-            _uiState.update { it.copy(logBoot = boot, logApply = apply) }
+            _uiState.update { it.copy(loadingLogs = false, logBoot = boot, logApply = apply) }
         }
     }
 
@@ -402,6 +403,7 @@ class HsinViewModel(
                 loadingStatus = it.loadingStatus && loading != Loading.STATUS,
                 loadingCapability = it.loadingCapability && loading != Loading.CAPABILITY,
                 loadingRealtime = it.loadingRealtime && loading != Loading.REALTIME,
+                loadingLogs = it.loadingLogs && loading != Loading.NONE,
                 error = UiError(
                     kind = kind,
                     detail = res.message,

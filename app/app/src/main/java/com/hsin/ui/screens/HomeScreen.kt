@@ -20,13 +20,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.hsin.data.state.UiState
 import com.hsin.ui.HomePresenter
+import com.hsin.ui.ScreenPhase
+import com.hsin.ui.ScreenStates
 import com.hsin.ui.friendlyError
 import com.hsin.ui.NavActions
+import com.hsin.ui.components.EmptyView
+import com.hsin.ui.components.ErrorView
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
 import com.hsin.ui.components.HStatus
 import com.hsin.ui.components.HSelectRow
+import com.hsin.ui.components.LoadingView
 import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.Muted
@@ -55,20 +60,20 @@ fun HomeScreen(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        StatusCard(state = state)
-
-        ApplyCard(state = state)
-
-        EdgeStatesCard(state = state)
-
-        CapabilityCard(state = state)
-
-        HButton(label = "Buka knob", onClick = navActions::onOpenKnobs, primary = true)
-        HButton(label = "Pulihkan backup", onClick = { confirmRestore = true }, primary = false)
-        HButton(label = "Periksa ulang", onClick = onRefresh, primary = false)
-
-        state.error?.let { err ->
-            ErrorCard(text = friendlyError(err.kind.name, err.detail))
+        // R2: fase eksplisit — tidak ada jalur yang merender blank.
+        when (ScreenStates.home(state)) {
+            ScreenPhase.LOADING -> LoadingView("Memuat status modul...")
+            ScreenPhase.ERROR -> ErrorView(
+                message = state.error?.let { friendlyError(it.kind.name, it.detail) }
+                    ?: "Terjadi kesalahan.",
+                onRetry = onRefresh,
+            )
+            ScreenPhase.EMPTY -> EmptyView(
+                message = "Belum ada data modul. Periksa ulang untuk memuat status.",
+                actionLabel = "Periksa ulang",
+                onAction = onRefresh,
+            )
+            ScreenPhase.CONTENT -> HomeContent(state, navActions, onRefresh, onConfirmRestore = { confirmRestore = true })
         }
     }
 
@@ -93,6 +98,31 @@ fun HomeScreen(
             },
             containerColor = com.hsin.ui.theme.Surface,
         )
+    }
+}
+
+@Composable
+private fun HomeContent(
+    state: UiState,
+    navActions: NavActions,
+    onRefresh: () -> Unit,
+    onConfirmRestore: () -> Unit,
+) {
+    StatusCard(state = state)
+
+    ApplyCard(state = state)
+
+    EdgeStatesCard(state = state)
+
+    CapabilityCard(state = state)
+
+    HButton(label = "Buka knob", onClick = navActions::onOpenKnobs, primary = true)
+    HButton(label = "Pulihkan backup", onClick = onConfirmRestore, primary = false)
+    HButton(label = "Periksa ulang", onClick = onRefresh, primary = false)
+
+    // Error inline saat data sudah ada: isi tetap tampil, bukan layar gagal.
+    state.error?.let { err ->
+        ErrorCard(text = friendlyError(err.kind.name, err.detail))
     }
 }
 
@@ -227,6 +257,36 @@ private fun HomeScreenPreview() {
     HsinTheme {
         HomeScreen(
             state = UiState(),
+            navActions = NoopNavActions,
+            onRefresh = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun HomeScreenLoadingPreview() {
+    HsinTheme {
+        HomeScreen(
+            state = UiState(loadingCapability = true),
+            navActions = NoopNavActions,
+            onRefresh = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = PreviewBg)
+@Composable
+private fun HomeScreenErrorPreview() {
+    HsinTheme {
+        HomeScreen(
+            state = UiState(
+                error = com.hsin.data.state.UiError(
+                    kind = com.hsin.data.state.UiErrorKind.MODULE_NOT_FOUND,
+                    detail = "",
+                    retryable = false,
+                ),
+            ),
             navActions = NoopNavActions,
             onRefresh = {},
         )

@@ -48,6 +48,8 @@ data class UiState(
     val loadingStatus: Boolean = false,
     val loadingCapability: Boolean = false,
     val loadingRealtime: Boolean = false,
+    /** R2: true selama `refreshLogs` berjalan (layar Log butuh fase Memuat). */
+    val loadingLogs: Boolean = false,
     val error: UiError? = null,
 ) {
     /** Jumlah knob yang akan berubah kalau apply — untuk label A10. */
