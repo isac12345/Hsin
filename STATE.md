@@ -468,3 +468,9 @@
   selisih tinggal data modul) + tema terang contoh (lightColorScheme,
   badge fill pastel, shadow hitam). L1 = grep statis hijau (tanpa sisa
   hex gelap di main); L2 = build CI + screenshot HP user (pending).
+- GATED-UNLOCK (2026-09-30, dev-apk 66be01e + koreksi leader 33eed4a, merge
+  5d3470b): GatedCard bisa diketuk -> dialog -> config-set <KEY> true ->
+  refresh paksa (forceReload, hindari cache basi); parse gpu_tunables
+  (polling_interval/up_threshold/down_differential per node). CI lint +
+  build-apk hijau di branch maupun main. L2 = flash modul baru + install
+  APK baru + screenshot HP (pending user).
