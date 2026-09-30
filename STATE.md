@@ -458,3 +458,6 @@
   Manual build-apk #36674432099 SUCCESS, APK debug 8.974.554 byte.
   R4 (screenshot HP 4 tab + Gagal/Kosong) + L2 PENDING USER (tanpa device
   di Termux). STOP — lanjut MIKO, HSIN dilanjut sesi berikut.
+- SINKRON-DOK (2026-09-30, leader, tanya user): PLAN/STATUS/PRIORITY_QUEUE
+  basi (Step 5-12 masih NEXT) → sinkron DONE + hash (d7b9edf), push DONE.
+  Kode tetap: APP_PLAN 27/28 [x], sisa R4 + L2 HP (pending user).
