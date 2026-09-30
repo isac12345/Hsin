@@ -144,10 +144,10 @@ hsin_cpu_uclamp_apply() {
     _uc_max_node="$_uc_dir/cpu.uclamp.max"
     _uc_applied=0
     for _uc_pair in "min|$_uc_min_node|$_min" "max|$_uc_max_node|$_max"; do
-        _uc_f="${_uc_pair%%\\\|*}"
-        _uc_rest="${_uc_pair#*\\\|}"
-        _uc_node="${_uc_rest%%\\\|*}"
-        _uc_prof="${_uc_rest#*\\\|}"
+        _uc_f="${_uc_pair%%\|*}"
+        _uc_rest="${_uc_pair#*\|}"
+        _uc_node="${_uc_rest%%\|*}"
+        _uc_prof="${_uc_rest#*\|}"
         _uc_key="uclamp_$_uc_f"
         _uc_uk=$(hsin_uk_get "$_uc_key" 2>/dev/null)
         if [ -n "$_uc_uk" ]; then
@@ -432,14 +432,14 @@ hsin_cpu_sched_lat_apply() {
         "sched_latency_pct|$_hl_uk_lat|_lat_pct|sched_latency_ns" \
         "sched_min_granularity_pct|$_hl_uk_min|_mingran_pct|sched_min_granularity_ns" \
         "sched_wakeup_granularity_pct|$_hl_uk_wake|_wake_pct|sched_wakeup_granularity_ns"; do
-        _hl_key="${_hl_spec%%\\\|*}"
-        _hl_rest="${_hl_spec#*\\\|}"
-        _hl_uk="${_hl_rest%%\\\|*}"
-        _hl_rest2="${_hl_rest#*\\\|}"
+        _hl_key="${_hl_spec%%\|*}"
+        _hl_rest="${_hl_spec#*\|}"
+        _hl_uk="${_hl_rest%%\|*}"
+        _hl_rest2="${_hl_rest#*\|}"
         # _hl_var diisi lewat eval karena nama variabel profil datang dari
         # daftar tertutup di atas.
-        eval "_hl_var=\${_hl_rest2%%\\\|*}"
-        _hl_canon="${_hl_rest2#*\\\|}"
+        eval "_hl_var=\${_hl_rest2%%\|*}"
+        _hl_canon="${_hl_rest2#*\|}"
         if [ -n "$_hl_uk" ]; then
             _hl_bad=0
             case "$_hl_uk" in
