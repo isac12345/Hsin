@@ -1618,3 +1618,37 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   fungsi. (45) grep nama fungsi tanpa memeriksa posisi perintah
   menghasilkan false positive dari variabel bernama mirip fungsi.
   false positive dari variabel bernama mirip fungsi.
+
+## thermal_check jadi fungsi eksplisit + capability override TIDAK AKTIF (2026-09-30, 509a215)
+- Investigative DULU (bukti, bukan asumsi): policy.sh SUDAH punya 5 state
+  (cool/normal/warm/hot/critical, ambang TETAP 60/75/85/95C, perf target
+  100/95/85/70/50) dan monitor.sh punya 5 state untuk display. Jadi
+  graduated behavior BUKAN hanya di thermal_check - thermal_check bukan
+  satu-satunya pemegang ladder. Yang unik hanya 3: (1) basis ambang dari
+  trip_point kernel (68%/84%/100% dari critical device, filter 40-125C),
+  (2) jalur intervensi darurat kedua yang independen dari pipeline apply,
+  (3) state UNKNOWN saat tanpa data + filter sensor abnormal.
+--effectiveness di ZIP: blok auto-exec thermal_check ikut jalan di SETIAP
+  source runtime.sh (terbukti: 2 source berturut @45C = 2 baris print),
+  sedangkan blok boot service.sh `if [ -f core/thermal_check.sh ]`
+  selalu FALSE. Jadi check termal hidup sebagai EFEK SAMPING, pre-check
+  boot tetap buta. HSIN_THERMAL_CHECK_RC/BASIS = 0 pembaca lain.
+- Fix (leader, 2 file + 3 dokumen): blok top-level diekstrak jadi
+  `hsin_thermal_check_run` (file ends `return 0 2>/dev/null || true`,
+  tidak ada pemanggilan top-level lagi); service.sh pakai
+  `command -v hsin_thermal_check_run` + log Basis. Tidak ada threshold
+  M1b yang disentuh (trip_point di jalur apply = langkah terpisah).
+- Bukti tiga efek (merge lokal DAN ZIP final build #36661729610):
+  (a) pre-check + jalur darurat hidup: NORMAL rc=0 @45C, VERY HIGH rc=2
+      @96C, basis trip_point:100000 terbaca;
+  (b) noise hilang: thermal_check=0 pada `action.sh status`/
+      `guard-status`/`knob-list`, dan 0 saat source runtime.sh
+      (sebelumnya 1 per source, termasuk tiap polling monitor);
+  (c) M1b utuh: 96C -> scaling_max_freq 1800000->600000
+      (Policy=critical Perf=50%), 45C -> 1800000 (Policy=cool Perf=100%);
+      knob manual tetap APPLIED (vfs_cache_pressure=250).
+- Dokumentasi (DOKUMEN SAJA, loader tidak diubah, JSON tidak dibundel,
+  file tidak dihapus): README.md Profiles, API.md §2 (judul diubah jadi
+  "TIDAK AKTIF" + catatan status), CHANGELOG.md entri capability.
+- Gate permanen tetap hijau: verify_bundle_runtime.sh PASS 15/FAIL 0
+  (kini 506 fungsi, +1 dari hsin_thermal_check_run).
