@@ -31,6 +31,16 @@ data class KnobCapability(
     val allowExtreme: Boolean,
     /** Fitur bergate dari `knobs.features`; tampil terkunci, tanpa kontrol. */
     val gated: List<GatedFeature> = emptyList(),
+    /**
+     * R3 (langsung dari JSON `knobs`, kontrak A3): hitungan mentah untuk
+     * kartu kemampuan Beranda. Bukan hasil hitung APK atas key knob —
+     * disalin dari struktur `cpu.policies`, `gpu.nodes`, `memory.zram`,
+     * `io.blocks` apa adanya.
+     */
+    val cpuPolicies: Int = 0,
+    val gpuNodes: Int = 0,
+    val zramSupported: Boolean = false,
+    val ioBlocks: Int = 0,
 ) : DataKind
 
 /** Fitur yang dikunci modul. APK tidak pernah membuka gate extreme. */
@@ -65,6 +75,15 @@ data class RealtimeMetrics(
     val refreshHz: Metric,
     val loadPercent: Metric,
     val zramPct: Metric,
+    /**
+     * R3 (kontrak §3.1, sudah ada di JSON `status`): frekuensi per klaster
+     * + maksimum untuk bar kartu Frekuensi. Sentinel 0 = tak terbaca
+     * (lihat helper baca); klaster kecil 0 disembunyikan presenter.
+     */
+    val cpuFreqBigMhz: Metric,
+    val cpuFreqLittleMhz: Metric,
+    val cpuFreqMaxMhz: Metric,
+    val gpuFreqMaxMhz: Metric,
 ) : DataKind {
     companion object {
         /** Semua metrik belum diketahui — dipakai sebelum refresh pertama. */
@@ -79,6 +98,10 @@ data class RealtimeMetrics(
             refreshHz = Metric(null, "Hz"),
             loadPercent = Metric(null, "%"),
             zramPct = Metric(null, "%"),
+            cpuFreqBigMhz = Metric(null, "MHz"),
+            cpuFreqLittleMhz = Metric(null, "MHz"),
+            cpuFreqMaxMhz = Metric(null, "MHz"),
+            gpuFreqMaxMhz = Metric(null, "MHz"),
         )
     }
 }
@@ -176,6 +199,10 @@ object StatusMapping {
             refreshHz = readRaw(json, "refresh_hz", "Hz") ?: u.refreshHz,
             loadPercent = readLoadPercent(json) ?: u.loadPercent,
             zramPct = readRaw(json, "zram_pct", "%") ?: u.zramPct,
+            cpuFreqBigMhz = readMhzFromKhz(json, "cpu_freq_big") ?: u.cpuFreqBigMhz,
+            cpuFreqLittleMhz = readMhzFromKhz(json, "cpu_freq_little") ?: u.cpuFreqLittleMhz,
+            cpuFreqMaxMhz = readMhzFromKhz(json, "cpu_max_khz") ?: u.cpuFreqMaxMhz,
+            gpuFreqMaxMhz = readMhzFromKhz(json, "gpu_max_khz") ?: u.gpuFreqMaxMhz,
         )
     }
 
