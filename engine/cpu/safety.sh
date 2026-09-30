@@ -58,7 +58,7 @@ hsin_cpu_safety_temp() {
 
     _max=0
     for _zone in $_zones; do
-        _zpath="$HSIN_SYSFS_THERMAL/${_zone%%|*}/temp"
+        _zpath="$HSIN_SYSFS_THERMAL/${_zone%%\|*}/temp"
         [ -f "$_zpath" ] || continue
         _t=""
         IFS= read -r _t < "$_zpath" 2>/dev/null

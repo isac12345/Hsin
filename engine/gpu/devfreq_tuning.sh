@@ -44,10 +44,10 @@ _hsin_gpu_tune_one() {
     _uk_sanitize "${_gt_d##*/}"
 
     for _gt_spec in $_HSIN_GPU_TUNE_SPEC; do
-        _gt_f="${_gt_spec%%|*}"
-        _gt_rest="${_gt_spec#*|}"
-        _gt_min="${_gt_rest%%|*}"
-        _gt_max="${_gt_rest#*|}"
+        _gt_f="${_gt_spec%%\|*}"
+        _gt_rest="${_gt_spec#*\|}"
+        _gt_min="${_gt_rest%%\|*}"
+        _gt_max="${_gt_rest#*\|}"
         _gt_key="gpu_node_${_uk_sn}_${_gt_f}"
         _gt_node="$_gt_d/$_gt_f"
 
@@ -134,7 +134,7 @@ hsin_gpu_devfreq_tunables_state() {
     for _gs_d in $HSIN_GPU_DEVFRES; do
         [ -d "$_gs_d" ] || continue
         for _gs_spec in $_HSIN_GPU_TUNE_SPEC; do
-            _gs_f="${_gs_spec%%|*}"
+            _gs_f="${_gs_spec%%\|*}"
             _gs_n="$_gs_d/$_gs_f"
             if [ -r "$_gs_n" ]; then
                 _gs_v=$(hsin_node_read "$_gs_n")
