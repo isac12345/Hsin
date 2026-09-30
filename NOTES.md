@@ -1705,3 +1705,26 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   1 probe + 1 command nyata) — diperbaiki di 7b34fba.
 - PELAJARAN: JANGAN cek path perangkat dengan java.io.File dari aplikasi;
   semua yang butuh hak root (termasuk sekadar `-f`) wajib lewat runner su.
+
+## Pipa `|` dalam pola ${} rusak di sh Unisoc (2026-09-30, merge eae5618)
+- Gejala L2: layar Knob GAGAL "Expected literal value at character 3543";
+  dump `knobs` di HP menunjukkan `"sysctl":{"":{"min":,...}` (key kosong,
+  min kosong). Kode repo benar — `/system/bin/sh` HP (406KB) memperlakukan
+  `|` sebagai alternation regex di pola `#`/`%`: `${s%%|*}` menghapus SEMUA,
+  `${s#*|}` tidak menghapus apa-apa (dibuktikan empiris via su).
+  Yang aman: `-` `:` `/` `.` `_`; yang rusak: HANYA `|`.
+- Dampak sistemik: 68 situs di 10 file (knobs, user_knobs, thermal detect/
+  monitor, scheduler, mali, devfreq, scan_cache, safety, backup) — parsing
+  thermal-zone, knob_results, uclamp ikut rusak diam-diam di HP itu.
+- Fix: escape TEPAT SATU backslash (`\|`) — diverifikasi di HP (1x benar;
+  2x/3x salah). Separator `|` dan pola `case a|b)` TIDAK diubah.
+- Drama verifikasi: putaran 1 dev-modul (cfac3f9) memakai TIGA backslash +
+  mengotori main (3 file M + 5 .bak/.tmp) — leader tolak setelah cek od -c;
+  putaran 2 (51a7c06) benar: sandbox k1 36/0, k2 46/0, k3 51/0 (leader
+  jalankan sendiri), grep NOL, sh -n 10/10. Merge eae5618, CI hijau.
+  ZIP dev baru: build-modul #36698856311 -> /sdcard/Download/
+  HSIN-modul-eae5618-pipefix.zip (terverifikasi isi runtime.sh).
+- PELAJARAN: (1) klaim pekerja wajib verifikasi byte (od), bukan baca klaim;
+  (2) pola `${}` dengan `|` harus dihindari di modul — pakai separator yang
+  terbukti aman (`:`, `-`) untuk kode baru; (3) sandbox Termux TIDAK menangkap
+  bug shell-spesifik-ponsel — L2 HP tetap wajib.
