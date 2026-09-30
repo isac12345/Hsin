@@ -26,6 +26,7 @@ import com.hsin.ui.components.ErrorView
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
+import com.hsin.ui.components.HSegmented
 import com.hsin.ui.components.HStatus
 import com.hsin.ui.components.LoadingView
 import com.hsin.ui.theme.Caption
@@ -155,18 +156,12 @@ private fun LogControlCard(
     HCard {
         Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text("Log", style = TitleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-                HButton(
-                    label = "boot.log",
-                    onClick = { onTab(0) },
-                    primary = tab == 0,
-                )
-                HButton(
-                    label = "apply.log",
-                    onClick = { onTab(1) },
-                    primary = tab == 1,
-                )
-            }
+            // R3: toggle tersegmentasi (aktif = fill accent), tanpa ubah logic.
+            HSegmented(
+                options = listOf("boot.log", "apply.log"),
+                selected = tab,
+                onSelect = onTab,
+            )
             HButton(
                 label = if (copied > 0) "Disalin ($copied)" else "Salin ringkasan laporan bug",
                 onClick = onCopy,

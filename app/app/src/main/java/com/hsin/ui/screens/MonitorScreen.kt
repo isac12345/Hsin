@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.hsin.data.state.RealtimeMetrics
@@ -26,6 +27,7 @@ import com.hsin.ui.ScreenPhase
 import com.hsin.ui.ScreenStates
 import com.hsin.ui.components.EmptyView
 import com.hsin.ui.components.ErrorView
+import com.hsin.ui.components.HBar
 import com.hsin.ui.components.HBadge
 import com.hsin.ui.components.HButton
 import com.hsin.ui.components.HCard
@@ -102,6 +104,7 @@ private fun MonitorContent(
     paused: Boolean,
     onTogglePause: () -> Unit,
 ) {
+    // R3: Beranda dan Monitor langsung kartu (tanpa judul konten).
     Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
         HCard {
             Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
@@ -118,23 +121,47 @@ private fun MonitorContent(
                 )
             }
         }
+        // R3: kartu Frekuensi — rata-rata + big/little + GPU + bar.
         HCard {
             Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
-                MonitorPresenter.lines(state.metrics).forEach { line ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(line.label, style = BodyLarge, color = Muted)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Frekuensi", style = TitleSmall)
+                MonitorPresenter.freqLines(state.metrics).forEach { line ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(line.label, style = BodyLarge, color = Muted)
                             Text(line.display, style = BodyLarge)
-                            Spacer()
-                            HBadge(
-                                if (line.readable) "TERBACA" else "N/A",
-                                if (line.readable) HStatus.READY else HStatus.UNAVAILABLE,
-                            )
                         }
+                        line.fraction?.let { HBar(it) }
+                    }
+                }
+            }
+        }
+        // R3: kartu Suhu dan memori — tanpa badge state (pending kontrak).
+        HCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Gap)) {
+                Text("Suhu dan memori", style = TitleSmall)
+                MonitorPresenter.memLines(state.metrics).forEach { line ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(line.label, style = BodyLarge, color = Muted)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(line.display, style = BodyLarge)
+                                Spacer()
+                                HBadge(
+                                    if (line.readable) "TERBACA" else "N/A",
+                                    if (line.readable) HStatus.READY else HStatus.UNAVAILABLE,
+                                )
+                            }
+                        }
+                        line.fraction?.let { HBar(it) }
                     }
                 }
             }
