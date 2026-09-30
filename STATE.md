@@ -431,3 +431,9 @@
   SUCCESS; lint-and-test #36661660022 SUCCESS. ZIP dev 505.374 /
   release 494.517 byte; APK 8.939.368 byte; module.prop tetap
   v5.0.0-beta1/5001. Menunggu user: tidak ada flash tanpa perintah.
+- FIX SCAFFOLD LAYOUT (2026-09-30, leader, work/fix-scaffold): ScreenScaffold
+  Box konten fillMaxSize -> weight(1f) + verticalScroll sentral (1 file
+  app + NOTES pelajaran visual). Logcat Termux: 0 baris hsin, tanpa FATAL
+  (adb tanpa device; buffer lokal saja). Status: L1 = CI build-apk;
+  L2 = install + screenshot user (WAJIB sebelum klaim selesai). STOP
+  setelah build hijau.
