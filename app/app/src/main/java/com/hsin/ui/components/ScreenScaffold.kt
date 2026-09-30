@@ -24,7 +24,6 @@ fun ScreenScaffold(
     selectedIndex: Int,
     onSelectTab: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    subtitle: String? = null,
     content: @Composable () -> Unit
 ) {
     Column(
@@ -32,7 +31,7 @@ fun ScreenScaffold(
             .fillMaxSize()
             .background(Bg)
     ) {
-        TopBar(title = title, subtitle = subtitle)
+        TopBar(title = title)
         // Konten pakai weight(1f) — BUKAN fillMaxSize — supaya BottomNav
         // kebagian ruang. verticalScroll sentral di sini (bukan per layar)
         // supaya konten tidak terpotong di layar kecil (temuan L2 30 Sep:
@@ -54,10 +53,9 @@ fun ScreenScaffold(
 private fun ScreenScaffoldPreview() {
     HsinTheme {
         ScreenScaffold(
-            title = "Beranda",
+            title = "HSIN",
             selectedIndex = 0,
             onSelectTab = {},
-            subtitle = "boot guard: aktif"
         ) {
             HCard {
                 HBadge("APPLIED", HStatus.APPLIED)
