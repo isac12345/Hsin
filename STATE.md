@@ -437,3 +437,24 @@
   (adb tanpa device; buffer lokal saja). Status: L1 = CI build-apk;
   L2 = install + screenshot user (WAJIB sebelum klaim selesai). STOP
   setelah build hijau.
+
+- APP-R1 (2026-09-30, leader, work/app-r1 b787706, merge c8c3cca): tema terang
+  neobrutalist (§2 revisi: bg #F3EEE1, accent #C26A45, dst) + HBadge fill pastel
+  + HButton accent/tinta + TopBar judul HSIN saja (2 subtitle hardcode dihapus)
+  + BottomNav slot ikon + HSlider track Neutral. CI lint+build-apk hijau.
+  APP_PLAN R1 [x]. L2: screenshot HP (pending user).
+- APP-R2 (2026-09-30, leader, work/app-r2 483d76c, merge 0e74f28): 4 vector
+  drawable nav (home/knob/monitor/log) + ContentTitle Knob/Log + 4 fase
+  eksplisit per layar (ScreenStates resolver murni + Loading/Error/EmptyView,
+  UiState.loadingLogs baru). 18 test ScreenStatesTest. CI hijau. R2 [x].
+  L2: screenshot HP (pending user).
+- APP-R3 (2026-09-30, leader, work/app-r3 f89991d, merge b227a95): Beranda
+  grid 2 kolom + kartu Terakhir diterapkan·HH:MM (jam dari apply.log) +
+  kartu kemampuan + footnote snapshot; Monitor kartu Frekuensi (big/little/
+  little disembunyi bila 0 + bar nilai/maks) + Suhu dan memori (RAM GB +
+  Beban GPU N/A); chevron N knob; HSegmented log; HBar. Data baru diparse
+  dari kontrak §3.1 (RealtimeMetrics +4 field, KnobCapability +4 hitungan).
+  18 test R3MockupTest, total 192 @Test. CI hijau. R3 [x].
+  Manual build-apk #36674432099 SUCCESS, APK debug 8.974.554 byte.
+  R4 (screenshot HP 4 tab + Gagal/Kosong) + L2 PENDING USER (tanpa device
+  di Termux). STOP — lanjut MIKO, HSIN dilanjut sesi berikut.
