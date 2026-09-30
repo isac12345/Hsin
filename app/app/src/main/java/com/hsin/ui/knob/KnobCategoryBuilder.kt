@@ -91,6 +91,14 @@ object KnobCategoryBuilder {
         }
         if (key.startsWith("io_block_")) {
             val rest = key.removePrefix("io_block_")
+            // queue_tuning: io_block_<blk>_<field> dengan field multi-kata.
+            for (q in listOf("add_random", "iostats", "nomerges", "readahead", "sched")) {
+                if (rest.endsWith("_$q")) {
+                    val blk = rest.removeSuffix("_$q")
+                    val field = q.replaceFirstChar { it.uppercase() }
+                    return "$blk · $field"
+                }
+            }
             val idx = rest.lastIndexOf('_')
             if (idx > 0) {
                 val blk = rest.substring(0, idx)

@@ -2,12 +2,12 @@ package com.hsin.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 // Override TOTAL: semua slot colorScheme diisi dari token HSIN supaya tidak
 // ada warna default Material3 yang bocor ke komponen mana pun.
-val HsinColorScheme = darkColorScheme(
+val HsinColorScheme = lightColorScheme(
     primary = Accent,
     onPrimary = Text,
     primaryContainer = Surface,
@@ -51,8 +51,8 @@ val HsinTypography = Typography(
     labelSmall = Caption
 )
 
-// Dark-only sesuai spec user: palet gelap, tanpa dynamic color (dynamic color
-// akan menimpa token HSIN dengan warna sistem).
+// Neobrutalism TERANG sesuai mockup (APP_PLAN bagian 2): palet krem,
+// tanpa dynamic color (dynamic color akan menimpa token HSIN).
 @Composable
 fun HsinTheme(content: @Composable () -> Unit) {
     MaterialTheme(

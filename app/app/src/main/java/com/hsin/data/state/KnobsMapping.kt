@@ -110,6 +110,14 @@ object KnobsMapping {
                         base["cpu_policy_${id}_sched"] = p.optString("cur_sched")
                     }
                 }
+
+                // rate_limit_us per policy -> slider CPU (contoh: 3 knob per policy).
+                val rl = p.optJSONObject("rate_limit_us")
+                if (rl != null && rl.optBoolean("supported", false)) {
+                    val key = "cpu_policy_${id}_rate_limit_us"
+                    base[key] = rl.optInt("cur", 0).toString()
+                    readRange(rl)?.let { ranges[key] = it }
+                }
             }
         }
 
@@ -160,8 +168,10 @@ object KnobsMapping {
 
         // --- sched: sysctl global + child_runs_first ---
         val sched = knobsJson.optJSONObject("sched")
-        readRange(sched?.optJSONObject("child_runs_first"))
-            ?.let { ranges["sched_child_runs_first"] = it }
+        val crf = sched?.optJSONObject("child_runs_first")
+        readRange(crf)?.let { ranges["sched_child_runs_first"] = it }
+        crf?.takeIf { it.optBoolean("supported", false) }
+            ?.let { base["sched_child_runs_first"] = it.optInt("cur", 0).toString() }
         val sysctl = sched?.optJSONObject("sysctl")
         val sysctlPairs = listOf(
             "sched_latency_ns" to "sched_latency_pct",
@@ -189,6 +199,28 @@ object KnobsMapping {
                     allowed["io_block_${name}_sched"] = scheds
                     base["io_block_${name}_sched"] = b.optString("cur")
                 }
+                // readahead per blok -> CHOICE (options dari modul).
+                val ra = b.optJSONObject("readahead")
+                if (ra != null && ra.optBoolean("supported", false)) {
+                    val opts = readIntList(ra.optJSONArray("options")).map { it.toString() }
+                    if (opts.isNotEmpty()) {
+                        allowed["io_block_${name}_readahead"] = opts
+                        base["io_block_${name}_readahead"] = ra.optInt("cur", 0).toString()
+                    }
+                }
+                // queue_tuning per blok -> CHOICE 0/1 (atau 0/1/2 untuk nomerges).
+                val qt = b.optJSONObject("queue_tuning")
+                if (qt != null) {
+                    for (qkey in listOf("add_random", "iostats", "nomerges")) {
+                        val qn = qt.optJSONObject(qkey) ?: continue
+                        if (!qn.optBoolean("supported", false)) continue
+                        val opts = readIntList(qn.optJSONArray("options")).map { it.toString() }
+                        if (opts.isNotEmpty()) {
+                            allowed["io_block_${name}_${qkey}"] = opts
+                            base["io_block_${name}_${qkey}"] = qn.optInt("cur", 0).toString()
+                        }
+                    }
+                }
             }
         }
 
@@ -198,8 +230,15 @@ object KnobsMapping {
             allowed["tcp_cc"] = cc
             base["tcp_cc"] = net?.optString("cur_cc")?.takeIf { it.isNotBlank() } ?: cc.first()
         }
+        // TFO -> slider 0..3 (dari modul).
+        val tfo = net?.optJSONObject("tfo")
+        if (tfo != null && tfo.optBoolean("supported", false)) {
+            base["tfo"] = tfo.optInt("cur", 0).toString()
+            readRange(tfo)?.let { ranges["tfo"] = it }
+        }
 
-        val editable = allowed.keys.filter { it.matches(EDITABLE) }.sorted()
+        // Slider/skalar tanpa choices tetap bisa diedit: gabung range-keys.
+        val editable = (allowed.keys + ranges.keys).filter { it.matches(EDITABLE) }.sorted()
         val cap = KnobCapability(
             supportedKeys = editable,
             allowedValues = allowed.filterKeys { it.matches(EDITABLE) },
@@ -243,6 +282,16 @@ object KnobsMapping {
         for (i in 0 until arr.length()) {
             val s = arr.optString(i)
             if (s.isNotBlank()) out.add(s)
+        }
+        return out
+    }
+
+    private fun readIntList(arr: JSONArray?): List<Int> {
+        if (arr == null) return emptyList()
+        val out = ArrayList<Int>(arr.length())
+        for (i in 0 until arr.length()) {
+            val v = arr.optInt(i, Int.MIN_VALUE)
+            if (v != Int.MIN_VALUE) out.add(v)
         }
         return out
     }
