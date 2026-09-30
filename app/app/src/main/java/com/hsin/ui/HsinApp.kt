@@ -48,7 +48,6 @@ fun HsinApp(
 
     ScreenScaffold(
         title = "HSIN",
-        subtitle = "beta · modul v5.0.0-beta1",
         selectedIndex = tab,
         onSelectTab = { tab = it },
         modifier = modifier,
@@ -86,7 +85,6 @@ private fun HsinAppPreview() {
     HsinTheme {
         ScreenScaffold(
             title = "HSIN",
-            subtitle = "beta · modul v5.0.0-beta1",
             selectedIndex = 0,
             onSelectTab = {},
         ) {

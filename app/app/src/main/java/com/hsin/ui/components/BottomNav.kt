@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.hsin.ui.theme.Accent
@@ -21,19 +24,24 @@ import com.hsin.ui.theme.Gap
 import com.hsin.ui.theme.HsinTheme
 import com.hsin.ui.theme.PreviewBg
 import com.hsin.ui.theme.MonoCaption
+import com.hsin.ui.theme.Muted
 import com.hsin.ui.theme.Outline
 import com.hsin.ui.theme.OutlineThick
 import com.hsin.ui.theme.Surface
 import com.hsin.ui.theme.TouchMin
 
-// Bottom nav 4 tab, state-based TANPA library navigasi:Pemanggil yang
-// memegang state (selectedIndex) dan meneruskan onSelect.
+// Bottom nav 4 tab = ikon + label, state-based TANPA library navigasi:
+// pemanggil yang memegang state (selectedIndex) dan meneruskan onSelect.
+// Slot `icons`: diisi di R2 dengan 4 vector drawable XML di `res/` (tanpa
+// dependency baru); null = label saja (kompatibel R1). Tab aktif accent,
+// nonaktif muted.
 @Composable
 fun BottomNav(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    labels: List<String> = DEFAULT_TABS
+    labels: List<String> = DEFAULT_TABS,
+    icons: List<ImageVector?>? = null
 ) {
     Column(modifier = modifier.fillMaxWidth().background(Surface)) {
         Box(
@@ -51,25 +59,28 @@ fun BottomNav(
         ) {
             labels.forEachIndexed { index, label ->
                 val selected = index == selectedIndex
-                Box(
+                val icon = icons?.getOrNull(index)
+                val tint = if (selected) Accent else Muted
+                Column(
                     modifier = Modifier
                         .heightIn(min = TouchMin)
                         .clickable { onSelect(index) }
-                        .padding(horizontal = Gap),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = Gap, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    // Tab aktif ditandai GARIS accent di atas + teks accent
-                    // (outline, bukan blok fill) supaya tetap konsisten dengan
-                    // gaya kartu/badge.
-                    Box(
-                        modifier = Modifier
-                            .height(OutlineThick)
-                            .background(if (selected) Accent else Outline)
-                    )
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Text(
                         text = label,
                         style = MonoCaption,
-                        color = if (selected) Accent else Outline
+                        color = tint
                     )
                 }
             }
