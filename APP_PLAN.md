@@ -31,6 +31,20 @@ Skill yang berlaku: `alpha-hsin-leader-agent` (proses), `alpha-hsin-controller-a
    sampai ada validasi di HP fisik bersama modul.
 8. Kalau spec step ambigu atau bertabrakan dengan kondisi kode aktual,
    laporkan dulu, jangan menafsirkan sendiri.
+9. Source of truth visual = screenshot di `/sdcard/hsin/docs/ui/`
+   (`home_reference`, `home_detail_reference`, `knob_reference`,
+   `knob_empty_reference`, `monitor_reference`, `log_reference`,
+   `hsin_blank_reference` + `README.md`). Mockup terang = tampilan yang
+   dimau; foto gelap = kondisi bug saat ini, BUKAN target. Bila mockup
+   bertentangan dengan teks plan ini, mockup menang untuk visual,
+   kontrak modul menang untuk data.
+10. Setiap step yang menyentuh UI wajib bukti screenshot di HP fisik
+    (L2 visual) sebelum dianggap selesai — compile hijau + unit test
+    TIDAK bisa mendeteksi bug layout (pelajaran 30 Sep: BottomNav hilang
+    sejak A5 tanpa terdeteksi).
+11. Dilarang layar blank: tiap layar wajib punya 4 state eksplisit —
+    Memuat, Gagal (pesan + tombol coba lagi), Kosong (pesan + aksi),
+    Isi. Tidak ada kondisi yang merender layar kosong.
 
 ---
 
@@ -50,45 +64,88 @@ Skill yang berlaku: `alpha-hsin-leader-agent` (proses), `alpha-hsin-controller-a
 - Dependency seminim mungkin. Prefer API platform daripada library pihak ketiga.
 - Navigasi berbasis state (tanpa library navigasi) kecuali Leader bisa
   membuktikan manfaat nyata dan user setuju.
+- Tema TERANG mengikuti mockup (`/sdcard/hsin/docs/ui/`), bukan tema gelap
+  A5. Palet di bagian 2 diganti seluruhnya.
+- Bottom nav = ikon + label (4 tab tetap: Beranda, Knob, Monitor, Log),
+  ikon dari vector drawable XML di `res/` (tanpa dependency baru).
+- Layar Knob dan Log memakai judul konten besar ("Knob", "Log");
+  Beranda dan Monitor langsung kartu (sesuai mockup).
+- Subtitle versi modul yang di-hardcode DILARANG. Versi modul hanya tampil
+  bila kontrak menyediakannya (pending, lihat bagian 3) — TopBar hanya
+  judul "HSIN" sampai saat itu.
 
 ---
 
-## 2. Spesifikasi Desain (disetujui user)
+## 2. Spesifikasi Desain (revisi 30 Sep 2026 — mengikuti mockup terang)
 
-Gaya: neobrutalism versi dark, simpel, minimalis, elegan. Palet tunggal:
+Gaya: neobrutalism TERANG (diukur dari mockup, dikunci setelah screenshot
+L2). Palet tunggal:
 
-| Token | Hex | Pemakaian |
+| Token | Hex (sementara) | Pemakaian |
 |---|---|---|
-| bg | #121214 | latar layar |
-| surface | #1B1C1F | kartu |
-| outline | #3A3C42 | garis 1,5 dp |
-| text | #ECE8DF | teks utama |
-| muted | #9A978E | teks sekunder |
-| accent | #C8A97E | SATU-SATUNYA aksen (tombol utama, tab aktif, slider) |
-| ok | #7E9A85 | APPLIED, status siap |
-| warn | #B9954F | FALLBACK, WARN, DIUBAH |
+| bg | #F3EEE1 | latar layar (krem) |
+| surface | #FCF9F1 | kartu (krem terang) |
+| outline | #23211B | garis 1,5 dp (tinta, bukan abu) |
+| text | #23211B | teks utama (tinta) |
+| muted | #8B8471 | teks sekunder |
+| accent | #C26A45 | SATU-SATUNYA aksen (terakota: tombol utama, tab aktif, toggle aktif, slider) |
+| ok | #7E9A85 | APPLIED, status siap (sage) |
+| warn | #B9954F | FALLBACK, WARN, DIUBAH (mustard) |
 | error | #B5604F | FAILED |
 | neutral | #6B6B70 | SKIPPED, DEFAULT, UNAVAILABLE |
 
-Aturan visual: kartu = surface + outline 1,5 dp + bayangan keras hitam offset
-3 dp tanpa blur. Badge status = outline tipis berwarna (bukan blok penuh).
-Tombol utama = fill accent dengan teks gelap. Tanpa gradient, tanpa blur.
-Target sentuh minimal 44 dp. Nilai angka dan log memakai font monospace.
+Aturan visual: kartu = surface + outline tinta 1,5 dp + bayangan keras
+hitam offset 3 dp tanpa blur. Badge status = fill pastel + teks tinta
+(sesuai mockup, bukan outline-only). Tombol utama = fill accent + teks
+tinta; tombol sekunder = outline tinta transparan. Tanpa gradient, tanpa
+blur. Target sentuh minimal 44 dp. Nilai angka dan log monospace.
 
-Struktur layar (bottom nav 4 tab):
+Struktur layar (bottom nav 4 tab, ikon + label):
 
-- **Beranda**: status (root, modul, boot guard, termal), hasil terakhir
-  diterapkan (badge + teks), ringkasan kemampuan perangkat (dari cache),
-  tombol "Buka knob" dan "Pulihkan backup" (wajib dialog konfirmasi).
-- **Knob**: daftar kategori (mis. CPU per policy, GPU, I/O, Memori dan VM,
-  Jaringan, Layar; daftar final dari kontrak A3) lalu halaman detail per
-  kategori. Bar bawah "Terapkan (N)" menghitung knob yang diubah. Bagian
-  "Lanjutan (terkunci)" tampil sebagai baris terkunci.
-- **Monitor**: frekuensi, suhu dengan label state, memori. Polling hanya saat
-  layar terlihat dan aplikasi foreground, ada tombol Jeda. Metrik yang tidak
-  tersedia tampil "N/A" dengan badge UNAVAILABLE, BUKAN 0.
-- **Log**: tab boot.log dan apply.log, baris berbadge level, tombol "Salin
-  ringkasan laporan bug".
+- **Beranda** (tanpa judul konten, langsung kartu, sesuai mockup):
+  kartu Status grid 2 kolom — Root (Tersedia/Tidak tersedia, dari
+  `rootLine`), Modul (Terpasang/Belum diperiksa, dari `moduleLine`),
+  Boot guard (Nonaktif / Aktif·tuning dilewati + alasan, dari
+  `guard-status` kontrak §3.10), Termal (state modul bila ada, SEMENTARA
+  suhu CPU saja tanpa badge — badge NORMAL menunggu field kontrak,
+  pending bagian 3);
+  kartu "Terakhir diterapkan · HH:MM" — maks 3 baris hasil knob-list
+  (badge + `key requested→applied (alasan)`, kontrak §3.3/§3.4),
+  jam dari baris terakhir `apply.log` (format `YYYY-MM-DD HH:MM:SS`,
+  kontrak §3.6), fallback "waktu tak tercatat"; belum ada apply =
+  state Kosong ("Belum ada apply", bukan kartu hilang);
+  kartu "Kemampuan perangkat" — CPU policy N (`knobs.cpu.policies.size`),
+  GPU devfreq Ada/Tidak (`gpu.nodes` tak kosong), zRAM Ada/Tidak
+  (`memory.zram.supported`), I/O blok N; jumlah zona termal PENDING
+  (tak ada di `knobs`, jangan karang); catatan kaki "Dibaca dari
+  snapshot modul, tidak scan ulang tiap aplikasi dibuka." (cache APK);
+  tombol "Buka knob" (primer) + "Pulihkan backup" (outline, wajib dialog
+  konfirmasi, memanggil `rollback` kontrak §3.7) + "Periksa ulang"
+  (outline, refresh 4 aksi).
+- **Knob** (judul konten "Knob"): daftar kategori dari `knobs`
+  (CPU per policy, GPU, I/O, Memori dan VM, Jaringan, Layar bila
+  `supported`; daftar final dari kontrak A3) sebagai kartu "Nama + N
+  knob + chevron"; halaman detail per kategori (label + kontrol pilihan
+  atau slider + baris hasil); penanda DIUBAH per knob; bar bawah
+  "Terapkan (N)" = jumlah dirty; bagian "Lanjutan (terkunci)" untuk
+  fitur bergate (`features.*` false). Daftar `profiles` di JSON
+  DIABAIKAN UI (tidak ada selector profil di mana pun).
+- **Monitor** (tanpa judul konten, langsung kartu): kartu "Frekuensi" —
+  baris CPU rata-rata (`cpu_freq`), Klaster besar (`cpu_freq_big`),
+  Klaster kecil (`cpu_freq_little`, sembunyikan bila 0), GPU
+  (`gpu_freq`); bar = nilai/maks (`cpu_max_khz`/`gpu_max_khz`,
+  kontrak §3.1); baris per-policy mockup PENDING (status tak punya
+  array per policy); kartu "Suhu dan memori" — Suhu CPU/GPU (°C),
+  badge state PENDING (tampil tanpa badge sampai kontrak ada),
+  RAM pakai/total GB + bar (`ram_used_kb`/`ram_total_kb`),
+  Beban GPU = "N/A" + UNAVAILABLE (tak ada key-nya di kontrak — jujur,
+  bukan 0). Polling on-demand ~2 detik, lifecycle-aware, tombol Jeda.
+- **Log** (judul konten "Log"): toggle tersegmentasi boot.log/apply.log
+  (aktif = fill accent) via `logs <type> <lines>` (kontrak §3.6, maks
+  200 baris); entri = badge level + teks monospace; baris rusak tampil
+  apa adanya; tombol "Salin ringkasan laporan bug" (guard + capability
+  + ekor log); kosong = state Kosong ("Belum ada baris log"), bukan
+  layar blank.
 
 Per knob: label, kontrol (pilihan atau slider), dan baris hasil.
 State baris hasil: `SAAT INI` (belum diubah), `DIUBAH`, lalu setelah apply
@@ -111,6 +168,20 @@ dari modul.
 | Klasifikasi termal | Modul |
 | Tampilan, input user, dirty tracking, kirim perintah, tampilkan hasil | APK |
 | Cache capability untuk render cepat | APK (turunan dari modul, ada aturan invalidasi) |
+
+### Pending kontrak modul (DILARANG dikerjakan sekarang — dicatat saja)
+
+Mockup butuh data yang BELUM disediakan kontrak (verifikasi 30 Sep 2026).
+APK dilarang mengarangnya (lihat aturan interim di bagian 2). Bila user
+menyetujui penambahan kontrak di masa depan, kandidatnya:
+
+| Kebutuhan mockup | Status kontrak sekarang | Kandidat penambahan |
+|---|---|---|
+| Badge state termal (NORMAL/dst) | `status` tak punya state; APK dilarang threshold sendiri | field `thermal_state` di JSON `status`, atau command `thermal-state` |
+| Baris frekuensi per policy | `status` hanya rata-rata + big/little | array per policy di `status` |
+| Jumlah zona termal | tak ada di `knobs` | field di `knobs` atau `capabilities` |
+| Versi modul di header | tak ada command yang mengembalikannya | field `module_version` (sumber: `module.prop`) |
+| Jam "Terakhir diterapkan" | interim: parse baris terakhir `apply.log` | field waktu eksplisit bila diinginkan |
 
 ---
 
@@ -141,6 +212,10 @@ dari modul.
 | A14 | Audit footprint dan kualitas | [x] |
 | A15 | Dokumen dan QA | [x] |
 | A16 | Status final | [x] |
+| R1 | Tema terang + komponen ulang | [ ] |
+| R2 | Navigasi ikon + judul konten + state anti-blank | [ ] |
+| R3 | Beranda + Monitor sesuai mockup (mapping interim) | [ ] |
+| R4 | Bukti screenshot L2 semua tab + penanda selesai | [ ] |
 
 ---
 
@@ -361,9 +436,11 @@ Requirements:
 - Token warna, tipografi, dan bentuk dari bagian 2 di satu tempat (single
   source). Komponen: HCard (outline + bayangan keras), HBadge (outline-only
   per status), HButton (utama dan sekunder), HSlider, HSelectRow, TopBar,
-  BottomNav, ScreenScaffold.
+   BottomNav, ScreenScaffold.
 - Katalog komponen hanya lewat `@Preview` (bukan layar yang dikirim).
 - Tanpa gradient dan blur. Target sentuh minimal 44 dp. Kontras teks dicek.
+- CATATAN 30 Sep: spec ini disupersede R1 (tema jadi terang, badge jadi
+  fill pastel + teks tinta, nav berikon). Riwayat tidak diubah.
 
 Acceptance: semua komponen punya preview, lint bersih, CI hijau.
 
@@ -531,6 +608,86 @@ Commit: `docs: app final status (App A16)`
 
 ---
 
+## 7. Realignment ke screenshot reference (R1–R4, setelah A16)
+
+GATE tiap step R: user bilang lanjut (satu step per instruksi, aturan §0.1).
+Dilarang menyentuh modul/core/engine/capability di semua step R.
+
+### R1 — Tema terang + komponen ulang
+
+Requirements:
+- Ganti token bagian 2 (gelap → terang) di satu tempat; komponen HCard
+  (outline tinta + bayangan keras), HBadge (fill pastel + teks tinta),
+  HButton (primer accent / sekunder outline), HSlider, HSelectRow,
+  TopBar (judul "HSIN" saja, tanpa subtitle hardcode), BottomNav
+  (slot ikon + label), ScreenScaffold mengikuti.
+- Katalog komponen hanya lewat `@Preview`.
+- Tanpa gradient dan blur. Target sentuh minimal 44 dp.
+
+Acceptance: semua komponen punya preview; lint bersih; CI hijau
+(compile + unit test). Belum perlu screenshot (belum layar).
+
+Commit: `feat: light neobrutalist theme and components (App R1)`
+
+### R2 — Navigasi ikon + judul konten + state anti-blank
+
+Requirements:
+- Bottom nav 4 tab = ikon (4 vector drawable XML di `res/`, tanpa
+  dependency baru) + label; tab aktif accent.
+- Judul konten besar di Knob ("Knob") dan Log ("Log"); Beranda dan
+  Monitor langsung kartu.
+- Tiap layar (Beranda, Knob, Monitor, Log) punya 4 state eksplisit:
+  Memuat (progress + teks), Gagal (pesan ramah + tombol coba lagi),
+  Kosong (pesan + aksi), Isi. Tidak ada jalur yang merender blank
+  (foto bug `knob_reference`, `knob_empty_reference`,
+  `hsin_blank_reference` tidak boleh terulang).
+- Perbaikan bug isi yang blank di HP (kartu status tak muncul) termasuk
+  di sini bila akar masalahnya di APK; bila akarnya di kontrak/modul:
+  STOP dan laporkan (jangan workaround engine di APK).
+
+Acceptance: tiap state tiap layar punya preview atau unit test presenter;
+CI hijau; screenshot HP 4 tab dilampirkan sebagai L2 (aturan §0.10).
+
+Commit: `feat: icon nav, content titles, explicit states (App R2)`
+
+### R3 — Beranda + Monitor sesuai mockup (mapping interim)
+
+Requirements:
+- Beranda persis bagian 2 revisi: grid status 2 kolom (kata mockup:
+  Tersedia/Terpasang/Nonaktif), kartu "Terakhir diterapkan · HH:MM"
+  (maks 3 baris + jam dari `apply.log`), kartu kemampuan + catatan
+  snapshot, 3 tombol (Buka knob / Pulihkan backup + konfirmasi +
+  Periksa ulang). Tanpa badge termal dan tanpa jumlah zona termal
+  sampai kontrak menyediakannya (pending bagian 3).
+- Monitor persis bagian 2 revisi: kartu Frekuensi (rata-rata + big/
+  little + GPU + bar), kartu Suhu dan memori (tanpa badge state sampai
+  kontrak ada), Beban GPU N/A + UNAVAILABLE. Tanpa baris per policy
+  sampai kontrak menyediakannya.
+- Knob dan Log: selaraskan detail kecil ke mockup (hitungan "N knob" +
+  chevron; toggle tersegmentasi log) tanpa mengubah logic.
+- Daftar `profiles` di JSON tetap diabaikan UI.
+
+Acceptance: screenshot HP Beranda + Monitor + Knob + Log cocok dengan
+mockup (isi boleh beda karena data nyata); tiap nilai di screenshot
+bisa ditelusur ke kontrak §3; CI hijau.
+
+Commit: `feat: home and monitor per reference mockups (App R3)`
+
+### R4 — Bukti screenshot L2 semua tab + penanda selesai
+
+Requirements:
+- Kumpulkan screenshot HP fisik 4 tab (isi nyata dari modul) +
+  1 screenshot tiap state Gagal/Kosong (simulasi: tanpa root / modul
+  nonaktif bila memungkinkan tanpa merusak HP).
+- Perbarui `docs/APP_FINAL_STATUS.md` dan tabel status bagian 4
+  (R1–R4 [x]) dengan hash commit + tanggal screenshot. Versi tetap beta.
+- STOP. Langkah berikutnya perlu keputusan user (kontrak pending
+  bagian 3: tambah field modul atau tetap interim).
+
+Commit: `docs: reference realignment complete with device proof (App R4)`
+
+---
+
 ## 6. Larangan Keras
 
 - Logic engine di APK (mapping OPP, validasi governor, klasifikasi termal
@@ -543,3 +700,10 @@ Commit: `docs: app final status (App A16)`
 - Force-push atau amend pada commit yang sudah di-push.
 - Build lokal di Termux.
 - Klaim stabil, siap rilis, atau production-ready.
+- Tema gelap A5 (digantikan tema terang bagian 2).
+- Subtitle versi modul yang di-hardcode di APK.
+- Klasifikasi termal dengan threshold buatan APK.
+- Layar blank dalam kondisi apa pun (wajib 4 state eksplisit).
+- Bottom nav teks saja (wajib ikon + label).
+- Menampilkan jumlah zona termal, state termal, frekuensi per policy,
+  atau versi modul yang dikarang tanpa sumber kontrak.
