@@ -32,15 +32,21 @@ fun HCard(
     content: @Composable () -> Unit
 ) {
     Box(modifier = modifier) {
+        // Bayangan: matchParentSize AGAR ikut ukuran kartu, jadi tidak ikut
+        // menentukan ukuran (itu tugas anak kartunya di bawah).
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .padding(start = ShadowOffset, top = ShadowOffset)
                 .background(Shadow, RoundedCornerShape(Radius))
         )
+        // Kartu TIDAK boleh matchParentSize: modifier itu mengukur anak dengan
+        // ukuran final induk TANPA menyumbang ukuran itself. Kalau kedua anak
+        // outer Box memakai matchParentSize, tidak ada yang menyumbang ukuran
+        // sehingga kartu jadi 0x0 dan semua isinya tak terlihat (bug sejak A5,
+        // bb8ac65 — baru ketahuan lewat screenshot L2 30 Sep 2026).
         Box(
             modifier = Modifier
-                .matchParentSize()
                 .background(Surface, RoundedCornerShape(Radius))
                 .border(BorderStroke(OutlineThick, Outline), RoundedCornerShape(Radius))
         ) {
