@@ -1681,3 +1681,13 @@ meng-`_isolate` variabel global per skenario: tanpa itu, kebocoran
   bukti yang ditunggu). Commit checklist, BUKAN commit final R4.
 - Untuk user: install APK build #36674432099 + modul terbaru, kirim
   4+2 screenshot + tanggal; baru R4 bisa ditutup + tabel dicentang.
+
+## Sinkron status basi (2026-09-30, leader, tanya user "yg bener udh kelar smua?")
+- Temuan: PLAN.md Fase 2-3 masih `[ ] NEXT`, STATUS.md header 27 Sep +
+  progress 55% (12/22), PRIORITY_QUEUE map masih NEXT/BLOCKED + footer
+  "Phase 2 0/4" — padahal Steps 5-21 + 23 DONE 27 Sep (bukti NOTES+hash).
+- Fix (commit d7b9edf, dokumen saja): PLAN Fase 2-3 [x]+hash; STATUS header
+  30 Sep + Step 11 [x] (`912b3bf`) + progress 95% (21/22+23); PQ banner
+  DONE per step + map/footer sinkron. 21/21 hash terverifikasi `git log`.
+  Step 22 gate tetap BELUM LOLOS (tunggu L2 HP). PELAJARAN: klaim "selesai"
+  wajib cek silang PLAN/STATUS/PQ/APP_PLAN — 4 file itu gampang basi.
