@@ -513,7 +513,7 @@ fun CustomScreen(vm: HsinVm) {
             Slider(
                 value = vm.cardAlpha,
                 onValueChange = { vm.cardAlpha = it },
-                onValueChangeFinished = { vm.setCardAlpha(vm.cardAlpha) },
+                onValueChangeFinished = { vm.applyCardAlpha(vm.cardAlpha) },
                 valueRange = 0.15f..0.9f,
                 colors = SliderDefaults.colors(thumbColor = p.pill, activeTrackColor = p.pill, inactiveTrackColor = p.line)
             )
@@ -521,7 +521,7 @@ fun CustomScreen(vm: HsinVm) {
         HCard {
             Label("Tema")
             Spacer(Modifier.height(10.dp))
-            Segmented(listOf("Gelap", "Terang", "Sistem"), vm.theme, { vm.setTheme(it) })
+            Segmented(listOf("Gelap", "Terang", "Sistem"), vm.theme, { vm.applyTheme(it) })
         }
     }
 }

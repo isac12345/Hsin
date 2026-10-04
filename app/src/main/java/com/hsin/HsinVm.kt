@@ -245,8 +245,8 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
     }
 
     // ================= tampilan =================
-    fun setTheme(t: Int) { theme = t; store.theme = t }
-    fun setCardAlpha(a: Float) { cardAlpha = a; store.cardAlpha = a }
+    fun applyTheme(t: Int) { theme = t; store.theme = t }
+    fun applyCardAlpha(a: Float) { cardAlpha = a; store.cardAlpha = a }
 
     fun setImage(uri: Uri, banner: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
