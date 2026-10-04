@@ -1,1 +1,0 @@
-{"gam_boost_enabled":"false","allow_extreme":"false","renderer":"system","downscale_enabled":"false","downscale_percent":"30","refresh_lock_enabled":"false","refresh_lock_hz":"120"}

@@ -1,0 +1,6 @@
+id=hsin
+name=HSIN Universal Manual Tuning
+version=v5.0.0
+versionCode=5002
+author=Somwan
+description=Tuning manual CPU/GPU/memori/IO/jaringan. Hanya menulis knob yang kamu ubah lewat app, lalu menerapkannya lagi tiap boot.

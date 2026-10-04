@@ -1,0 +1,56 @@
+name: build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tes modul (sandbox)
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y dash >/dev/null
+          bash tests/sandbox.sh dash
+          bash tests/sandbox.sh bash
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Siapkan keystore dari Secrets (opsional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/hsin.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/hsin.jks" >> "$GITHUB_ENV"
+          else
+            echo "Secret KEYSTORE_BASE64 kosong: APK ditandatangani debug key."
+          fi
+
+      - name: Build APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Kemas modul + rapikan nama
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/HSIN-v5.0.0.apk
+          (cd module && zip -r9 -X ../out/HSIN-v5.0.0-module.zip .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HSIN-v5.0.0
+          path: out/*
