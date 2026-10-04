@@ -1,9 +1,7 @@
-*.zip
-*.apk
 *.jks
 *.keystore
-keystore.properties
+local.properties
 build/
-build-output/
-work/tools/
-.opencode/
+.gradle/
+.idea/
+out/

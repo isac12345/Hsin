@@ -1,160 +1,28 @@
-# HSIN — Universal Manual Performance Module (v5.0.0-beta1)
+# HSIN v5.0.0
 
-HSIN adalah modul root untuk mengatur performa Android secara **manual**
-(pengguna yang pegang kendali penuh lewat profil + knob), dirancang
-**defensive by design**: tidak pernah menulis buta ke node yang tidak
-ada, tidak pernah bootloop karena tuning, dan selalu degrade dengan
-anggun di device yang belum dikenal.
+Modul Magisk (tuning manual) + app Kotlin/Compose. Satu build di GitHub Actions menghasilkan dua file:
+`HSIN-v5.0.0.apk` dan `HSIN-v5.0.0-module.zip`.
 
-Prinsip arsitektur: **capability-first** — semua keputusan diambil dari
-hasil deteksi kapabilitas device saat itu (node writable, governor yang
-tersedia, thermal zone), bukan dari nama chipset.
+## Ganti gambar (sebelum build)
+Timpa dua file ini dengan gambarmu, NAMA FILE HARUS SAMA:
 
-## Requirements
+| File | Ukuran saran | Fungsi |
+|---|---|---|
+| `app/src/main/res/drawable-nodpi/banner_default.jpg` | 1200×500 atau lebih, JPG | banner bawaan di Dash |
+| `app/src/main/res/drawable-nodpi/ic_launcher_foreground.png` | 432×432, PNG transparan, isi di tengah (zona aman ±66%) | ikon app |
 
-- Android dengan root: Magisk (minimal versi 20400, sesuai `module.prop`)
-  atau KernelSU.
-- Aplikasi pendamping HSIN (untuk UI), atau akses shell root untuk CLI.
+Warna latar ikon: `app/src/main/res/values/ic_launcher_background.xml`.
+Banner dan wallpaper juga bisa diganti dari dalam app (ikon gear di banner).
 
-## Quick Start
+## Build
+1. Push semua isi folder ini ke repo GitHub (branch `main`).
+2. (Opsional, supaya APK stabil tiap update) isi Secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+   Tanpa secret, APK ditandatangani debug key. Keystore tidak boleh masuk repo (`.gitignore` sudah memblokir).
+3. Actions → build → Run workflow → unduh artifact.
 
-1. Pasang ZIP modul (`HSIN-v5.0.0-beta1.zip` atau dev build) lewat
-   aplikasi root manager, lalu reboot.
-2. Tunggu boot selesai — profil default adalah `manual` (M1): `service.sh`
-   TIDAK menulis knob apa pun sampai user menyetelnya. Tidak ada tuning
-   otomatis.
-3. Cek status:
-   - CLI (sebagai root): `hsin status`
-   - Log boot: `/data/adb/hsin/logs/boot.log`
-4. Ganti profil: `hsin apply performance`
-   (pilihan: `manual` (default), `battery`, `balanced`, `performance`,
-   `extreme`).
-5. Fine-tuning per knob (contoh): `hsin knob-set cpu_policy_0_gov performance`
-   Daftar knob yang tersedia di device ini: `hsin knobs`.
-6. Lihat hasil knob siklus apply terakhir (diminta → diterapkan +
-   kategori + alasan): `hsin knob-list`. Contoh baris:
-   `key=cpu_policy_0_max_khz requested=1000000 applied=600000
-   category=FALLBACK reason="tidak ada di tabel OPP; snap ke 600000"`.
-   Disimpan di `/data/adb/hsin/knob_results.env` (direset tiap apply;
-   belum ada hasil = `belum ada hasil apply`). Knob tanpa override
-   tampil sebagai nilai profil.
+## Pasang
+Pasang `HSIN-v5.0.0-module.zip` di Magisk/KernelSU/APatch → reboot → pasang APK → beri izin root.
+Modul lama (v4) dengan id sama akan tergantikan; data lama di `/data/adb/hsin` tidak dipakai lagi.
 
-Profil `extreme` hanya aktif bila `ALLOW_EXTREME=true` ditulis eksplisit
-di `/sdcard/Android/hsin/hsin.conf` (default `false`).
-
-## Profiles
-
-> Mode utama HSIN = **manual**: modul hanya menulis knob yang benar-benar
-> diubah user (`user_knobs.env` via `action.sh knob-set`), knob lain
-> dibiarkan `SKIPPED` dengan alasan "tidak diatur (mode manual)".
-
-### Override berbasis capability signature — TIDAK AKTIF
-
-`capability/capability_overrides.json` + `core/load_overrides.sh`
-(`hsin_override_load`) **tidak dipakai**: loader tidak punya pemanggil
-di runtime dan file JSON tidak ikut ter-bundle ke ZIP. Tuning nyata
-berasal dari knob manual di atas, bukan dari signature JSON. Keduanya
-dibiarkan sebagai referensi; status ini dicatat juga di `API.md` §2 dan
-`CHANGELOG.md`.
-
-| Profil | Cocok untuk |
-|---|---|
-| `battery` | Hemat daya, limit paling agresif |
-| `manual` | **Default** — hanya menulis knob yang kamu set |
-| `balanced` | Profil harian (menulis nilai profil) |
-| `performance` | Gaming / beban berat |
-| `extreme` | Maksimal, risiko tinggi, butuh opt-in `ALLOW_EXTREME=true` |
-
-Nilai tiap profil ada di `profiles/*.conf`. Pilihan pengguna (knob
-override) selalu menang atas nilai profil; thermal guardrail tidak
-pernah menaikkan limit di atas pilihan pengguna (hanya menahan).
-
-## Safety Features (defensive by design)
-
-- **Boot guard** (`core/boot_guard.sh`): boot yang gagal dicatat di
-  `/data/adb/hsin/.boot_fail_count` (format `timestamp:count`). Gagal
-  **2x berturut-turut** → semua tuning dilewati boot itu (modul tidak
-  melakukan apa-apa, bukan bootloop). Boot yang sukses mereset counter.
-- **Safe apply** (`core/safe_apply.sh`): setiap tulis sysfs dicek
-  (node ada → writable → tulis → baca-balik → cocok) dan dikategorikan
-  jujur: `APPLIED` / `SKIPPED` (node hilang atau read-only + alasan) /
-  `UNAVAILABLE` / `FALLBACK` / `FAILED`. Tanpa verify = tanpa klaim sukses.
-- **Thermal guardrail** (`core/thermal_check.sh`): klasifikasi suhu dari
-  thermal zone yang **terdeteksi** (`NORMAL` / `HIGH` / `VERY HIGH` /
-  `CRITICAL`), threshold dari `trip_point` kernel device itu sendiri
-  (bukan angka universal). `HIGH` dan `VERY HIGH` hanya dimonitor —
-  intervensi darurat hanya di `CRITICAL`. Tanpa data sensor → `UNKNOWN`
-  (tidak memblokir tuning normal, tidak mengarang status aman).
-- **Graceful degradation per-engine** (`core/engine_guard.sh`): satu
-  engine gagal total (mis. semua node read-only) tidak menghentikan
-  engine lain; sukses parsial (`applied > 0`) dihitung sukses; tiap
-  skip mencantumkan alasan; laporan akhir merangkum status semua engine.
-- **Backup/restore**: snapshot node sebelum apply (`/data/adb/hsin/backup/`);
-  uninstall mengembalikan backup terakhir (best-effort).
-
-## Supported Devices
-
-**Tervalidasi di hardware fisik (1 device):**
-
-| Device | Bukti |
-|---|---|
-| Perangkat developer (Unisoc T615 / GPU Mali) | Pengujian langsung di HP developer |
-
-**Semua device lain: graceful degrade — BELUM divalidasi.**
-Modul akan mendeteksi kapabilitas dan melewati (skip + log beralasan)
-setiap tuning yang tidak cocok, bukan memaksakan angka. Klaim
-"mendukung device X" hanya ditambahkan setelah validasi nyata di
-hardware tersebut (lihat `DEVICE_COMPATIBILITY.md` setelah tersedia).
-
-Daftar nama chipset lain sebagai matriks kompatibilitas sengaja TIDAK
-dicantumkan — satu nama chipset di ROM/kernel berbeda bisa punya
-governor, OPP table, dan thermal zone yang berbeda.
-
-## Log Locations
-
-Semua di `/data/adb/hsin/logs/`:
-
-| File | Isi |
-|---|---|
-| `boot.log` | Alur boot, status engine, thermal check, guard |
-| `apply.log` | Hasil apply manual per engine |
-| `error.log` | Error (termasuk engine yang gagal) |
-| `rollback.log` | Riwayat rollback/restore |
-| `monitor.log` | Monitor berkala |
-| `extreme.log` | Override + watchdog mode extreme |
-| `debug.log` | Debug umum |
-
-Status ringkas: `/data/adb/hsin/service.state`
-(`ready` = semua engine jalan, `degraded` = ada engine yang gagal
-tapi service selesai).
-
-## Cara Lihat Status Boot Guard
-
-```sh
-# Counter kegagalan (tidak ada file = belum pernah gagal / sudah reset)
-su -c 'cat /data/adb/hsin/.boot_fail_count'
-
-# Status service boot terakhir
-su -c 'cat /data/adb/hsin/service.state'
-
-# Baris guard di log
-su -c 'grep -i "guard" /data/adb/hsin/logs/boot.log'
-```
-
-Jika guard aktif (`BOOT-GUARD AKTIF` di log), modul sengaja tidak
-menerapkan tuning apa pun boot itu. Untuk pulih: reboot normal yang
-sukses akan mereset counter otomatis (atau tunggu cooldown kedaluwarsa).
-
-## Uninstall
-
-1. Hapus modul lewat aplikasi root manager (menjalankan
-   `uninstall.sh`: backup terakhir dikembalikan, lalu
-   `/data/adb/hsin` dan `/sdcard/Android/hsin` dihapus).
-2. Reboot — kernel sudah mereset semua tuning sysfs saat reboot.
-
-## Support
-
-- Sertakan saat melapor: isi `/data/adb/hsin/service.state`,
-  potongan relevan `boot.log`/`error.log`, dan file
-  `/data/adb/hsin/device.txt` (hasil deteksi capability).
-- Jangan mengirim file config berisi data pribadi selain yang diminta.
+## Tes modul tanpa HP
+`bash tests/sandbox.sh dash` (pohon sysfs palsu, 50 pemeriksaan).

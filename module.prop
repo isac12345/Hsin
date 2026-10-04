@@ -1,9 +1,0 @@
-id=hsin
-name=HSIN Universal Adaptive Performance Engine
-version=v5.0.0-beta1
-versionCode=5001
-author=Somwan
-description=Simple adaptive CPU/GPU/memory engine. Applies only verified writable nodes and skips unsupported controls.
-updateJson=
-minMagisk=20400
-support=magisk

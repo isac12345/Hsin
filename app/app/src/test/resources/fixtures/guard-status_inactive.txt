@@ -1,6 +1,0 @@
-active=0
-fail_count=0
-threshold=2
-cooldown_remaining_sec=0
-last_reason="tidak ada state"
-{"active":0,"fail_count":0,"threshold":2,"cooldown_remaining_sec":0,"last_reason":"tidak ada state"}
