@@ -94,6 +94,19 @@ object Images {
         }
     }
 
+    fun loadDefaultWall(ctx: Context): ImageBitmap? {
+        return try {
+            val b = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeResource(ctx.resources, R.drawable.wallpaper_default, b)
+            val o = BitmapFactory.Options().apply { inSampleSize = sample(b.outWidth, b.outHeight, 1600) }
+            BitmapFactory.decodeResource(ctx.resources, R.drawable.wallpaper_default, o)?.asImageBitmap()
+        } catch (e: Exception) {
+            null
+        } catch (e: OutOfMemoryError) {
+            null
+        }
+    }
+
     fun delete(ctx: Context, name: String) {
         file(ctx, name).delete()
     }

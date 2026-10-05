@@ -16,17 +16,32 @@ data class Knob(
 
 data class Category(val id: String, val title: String, val knobs: List<Knob>)
 
+data class Policy(val id: Int, val cur: Long, val min: Long, val max: Long, val hw: Long, val gov: String)
+
 data class Live(
     val cpuKhz: Long,
+    val cores: Int,
+    val policies: List<Policy>,
     val gpuHz: Long,
+    val gpuMaxHz: Long,
+    val gpuGov: String,
     val cpuTemp: Int,
     val gpuTemp: Int,
+    val tempMax: Int,
     val batPct: Int,
     val batTemp: Int,
+    val charging: Boolean,
     val ramTotalKb: Long,
     val ramUsedKb: Long,
+    val swapTotalKb: Long,
+    val swapUsedKb: Long,
     val loadX100: Int,
+    val cpuTotal: Long,
+    val cpuIdle: Long,
     val safeMode: Boolean,
+    val thermalTrip: Boolean,
+    val gameMode: Boolean,
+    val gameActive: String,
     val overrides: Int
 )
 
@@ -48,5 +63,11 @@ data class ApplyResult(
 )
 
 data class Preset(val name: String, val values: Map<String, String>)
+
+data class GameProfile(val pkg: String, val label: String, val values: Map<String, String>)
+
+data class AppItem(val pkg: String, val label: String)
+
+data class ThermalCfg(val on: Boolean, val limit: Int, val trip: Boolean)
 
 enum class Setup { Loading, NoRoot, NoModule, Ready }

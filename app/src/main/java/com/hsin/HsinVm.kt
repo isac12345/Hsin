@@ -4,10 +4,10 @@ import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class HsinVm(app: Application) : AndroidViewModel(app) {
     private val ctx: Context = app.applicationContext
@@ -36,10 +37,14 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
     var message by mutableStateOf<String?>(null)
     var lastApply by mutableStateOf("Terakhir diterapkan: belum ada")
     var failures by mutableStateOf<List<Pair<String, String>>>(emptyList())
+    var conflicts by mutableStateOf<List<String>>(emptyList())
+    var conflictHidden by mutableStateOf(false)
+    var thermal by mutableStateOf(ThermalCfg(true, 90, false))
 
     // ---- navigasi ----
-    var tab by mutableIntStateOf(0)
+    var tab by mutableIntStateOf(0) // 0 Dash, 1 Knob, 2 Games, 3 Monitor
     var openCat by mutableStateOf<String?>(null)
+    var openGame by mutableStateOf<String?>(null)
     var customOpen by mutableStateOf(false)
 
     // ---- tampilan ----
@@ -47,17 +52,24 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
     var cardAlpha by mutableStateOf(store.cardAlpha)
     var bannerBmp by mutableStateOf<ImageBitmap?>(null)
     var wallBmp by mutableStateOf<ImageBitmap?>(null)
+    var wallCustom by mutableStateOf(false)
     var presets by mutableStateOf(store.presets)
+
+    // ---- games ----
+    var games by mutableStateOf(store.games)
+    var apps by mutableStateOf<List<AppItem>>(emptyList())
+    var appsLoading by mutableStateOf(false)
+    private var gamesSynced = false
 
     // ---- monitor ----
     var paused by mutableStateOf(false)
     var monitorMode by mutableIntStateOf(0) // 0 live, 1 log
-    var logWhich by mutableIntStateOf(0) // 0 boot, 1 apply
+    var monitorMs by mutableIntStateOf(store.monitorMs)
+    var logWhich by mutableIntStateOf(0) // 0 boot, 1 apply, 2 game
     var logLines by mutableStateOf<List<String>>(emptyList())
-    val hCpuTemp = mutableStateListOf<Float>()
-    val hCpuMhz = mutableStateListOf<Float>()
-    val hGpuMhz = mutableStateListOf<Float>()
-    val hRamGb = mutableStateListOf<Float>()
+    var cpuUsage by mutableIntStateOf(-1)
+    private var prevTotal = 0L
+    private var prevIdle = 0L
 
     private var foreground = false
     private var loading = false
@@ -69,12 +81,13 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         startMonitor()
     }
 
-    // ================= helper turunan =================
+    // ================= turunan =================
     val allKnobs: List<Knob> get() = cats.flatMap { it.knobs }
     val supportedCount: Int get() = allKnobs.count { it.type != "locked" }
     val changedCount: Int get() = allKnobs.count { it.type != "locked" && it.cur != it.def }
 
     fun valueOf(k: Knob): String = pending[k.key] ?: k.cur
+    fun knobByKey(key: String): Knob? = allKnobs.firstOrNull { it.key == key }
 
     val pendingList: List<Pair<String, String>>
         get() {
@@ -90,16 +103,41 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         if (v == k.cur) pending.remove(k.key) else pending[k.key] = v
     }
 
+    fun resetKnob(k: Knob) {
+        if (k.cur == k.def) pending.remove(k.key) else pending[k.key] = k.def
+    }
+
     private fun valid(k: Knob, v: String): Boolean = when (k.type) {
         "choice" -> v in k.options
         "range" -> v.toIntOrNull()?.let { it in k.min..k.max } ?: false
         else -> false
     }
 
+    fun goTab(i: Int) {
+        if (i == 3) { prevTotal = 0L; cpuUsage = -1 }
+        if (i != 1) openCat = null
+        if (i != 2) openGame = null
+        tab = i
+        if (i == 3 && monitorMode == 1) loadLogs()
+    }
+
+    fun gameLabel(pkg: String): String = games.firstOrNull { it.pkg == pkg }?.label ?: pkg
+
     // ================= muat data =================
     fun onForeground(f: Boolean) {
         foreground = f
         if (f && setup != Setup.Loading) loadAll(silent = true)
+    }
+
+    private fun consumeLive(st: Live) {
+        if (prevTotal > 0L && st.cpuTotal > prevTotal) {
+            val dt = st.cpuTotal - prevTotal
+            val di = st.cpuIdle - prevIdle
+            cpuUsage = (((dt - di) * 100L) / dt).toInt().coerceIn(0, 100)
+        }
+        prevTotal = st.cpuTotal
+        prevIdle = st.cpuIdle
+        live = st
     }
 
     fun loadAll(silent: Boolean = false) {
@@ -108,8 +146,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             if (!silent) withContext(Dispatchers.Main) { setup = Setup.Loading }
             withContext(Dispatchers.Main) { refreshing = true }
-            val root = Shell.hasRoot()
-            if (!root) {
+            if (!Shell.hasRoot()) {
                 withContext(Dispatchers.Main) { setup = Setup.NoRoot; refreshing = false }
                 loading = false
                 return@launch
@@ -122,6 +159,12 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             val dev = Repo.device()
             val c = Repo.knobs()
             val st = Repo.status()
+            val cf = Repo.conflicts()
+            val th = Repo.thermalGet()
+            if (!gamesSynced) {
+                for (g in store.games) Repo.gameSet(g.pkg, g.values)
+                gamesSynced = true
+            }
             withContext(Dispatchers.Main) {
                 if (dev != null) device = dev
                 if (c != null) {
@@ -134,7 +177,9 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
                     pending.clear()
                     pending.putAll(keep)
                 }
-                if (st != null) live = st
+                if (st != null) consumeLive(st)
+                conflicts = cf
+                if (th != null) thermal = th
                 setup = Setup.Ready
                 refreshing = false
             }
@@ -144,9 +189,11 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
 
     fun loadImages() {
         viewModelScope.launch(Dispatchers.IO) {
-            val b = Images.load(ctx, Images.BANNER, 1400) ?: Images.loadDefaultBanner(ctx)
-            val w = Images.load(ctx, Images.WALL, 1600)
-            withContext(Dispatchers.Main) { bannerBmp = b; wallBmp = w }
+            val custom = Images.load(ctx, Images.BANNER, 1400)
+            val b = custom ?: Images.loadDefaultBanner(ctx)
+            val wc = Images.load(ctx, Images.WALL, 1600)
+            val w = wc ?: Images.loadDefaultWall(ctx)
+            withContext(Dispatchers.Main) { bannerBmp = b; wallBmp = w; wallCustom = wc != null }
         }
     }
 
@@ -163,7 +210,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.Main) {
                 for (k in r.okKeys) pending.remove(k)
                 if (c != null) cats = c
-                if (st != null) live = st
+                if (st != null) consumeLive(st)
                 lastApply = if (r.error.isNotEmpty()) "Gagal: ${r.error}"
                 else "Terakhir diterapkan: ${r.ok} knob, ${r.fail} gagal"
                 if (r.fail > 0 || r.error.isNotEmpty()) {
@@ -188,7 +235,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.Main) {
                 pending.clear()
                 if (c != null) cats = c
-                if (st != null) live = st
+                if (st != null) consumeLive(st)
                 lastApply = if (r.error.isNotEmpty()) "Gagal: ${r.error}" else "Dipulihkan ke bawaan: ${r.ok} knob, ${r.fail} gagal"
                 message = lastApply
                 busy = false
@@ -201,8 +248,32 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             val ok = Repo.guardReset()
             val st = Repo.status()
             withContext(Dispatchers.Main) {
-                if (st != null) live = st
+                if (st != null) consumeLive(st)
                 message = if (ok) "Mode aman dimatikan" else "Gagal mematikan mode aman"
+            }
+        }
+    }
+
+    // ================= pengaman panas =================
+    fun updateThermal(on: Boolean, limit: Int) {
+        thermal = ThermalCfg(on, limit, thermal.trip)
+        viewModelScope.launch(Dispatchers.IO) { Repo.thermalSet(on, limit) }
+    }
+
+    fun ackThermal() {
+        if (busy) return
+        busy = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = Repo.thermalAck()
+            val c = Repo.knobs()
+            val st = Repo.status()
+            val th = Repo.thermalGet()
+            withContext(Dispatchers.Main) {
+                if (c != null) cats = c
+                if (st != null) consumeLive(st)
+                if (th != null) thermal = th
+                message = "Setelan diterapkan lagi: ${r.ok} knob, ${r.fail} gagal"
+                busy = false
             }
         }
     }
@@ -234,7 +305,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             message = "Preset sudah sama dengan kondisi sekarang"
         } else {
             openCat = null
-            tab = 1
+            goTab(1)
             message = "$n knob siap diterapkan, tekan Terapkan"
         }
     }
@@ -244,15 +315,169 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         store.presets = presets
     }
 
+    private fun copyText(text: String) {
+        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("HSIN", text))
+    }
+
+    fun exportPreset(p: Preset) {
+        val o = JSONObject()
+        o.put("hsin", 1)
+        o.put("name", p.name)
+        val v = JSONObject()
+        for ((k, x) in p.values) v.put(k, x)
+        o.put("values", v)
+        copyText(o.toString())
+        message = "Kode preset disalin"
+    }
+
+    fun importPreset() {
+        try {
+            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val raw = cm.primaryClip?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
+            val o = JSONObject(raw)
+            if (o.optInt("hsin") != 1) throw IllegalArgumentException("bukan preset")
+            val vals = o.getJSONObject("values")
+            val m = LinkedHashMap<String, String>()
+            val it = vals.keys()
+            while (it.hasNext()) {
+                val k = it.next()
+                val v = vals.getString(k)
+                val ok = k.isNotEmpty() && v.isNotEmpty() &&
+                    k.all { c -> c.isLetterOrDigit() || c in "_.:+-" } &&
+                    v.all { c -> c.isLetterOrDigit() || c in "_.:+-" }
+                if (ok) m[k] = v
+            }
+            if (m.isEmpty()) throw IllegalArgumentException("kosong")
+            val nm = o.optString("name", "Preset ${presets.size + 1}").take(24).ifBlank { "Preset ${presets.size + 1}" }
+            presets = presets + Preset(nm, m)
+            store.presets = presets
+            message = "Preset \"$nm\" diimpor (${m.size} knob)"
+        } catch (e: Exception) {
+            message = "Clipboard tidak berisi kode preset HSIN"
+        }
+    }
+
+    // ================= games =================
+    fun toggleGameMode(on: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = Repo.gameMode(on)
+            val st = Repo.status()
+            withContext(Dispatchers.Main) {
+                if (st != null) consumeLive(st)
+                if (!ok) message = "Gagal mengubah mode per game"
+            }
+        }
+    }
+
+    fun loadApps() {
+        if (appsLoading) return
+        appsLoading = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val out = ArrayList<AppItem>()
+            try {
+                val pm = ctx.packageManager
+                val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                @Suppress("DEPRECATION")
+                val list = pm.queryIntentActivities(intent, 0)
+                val seen = HashSet<String>()
+                for (ri in list) {
+                    val pkg = ri.activityInfo.packageName
+                    if (pkg == ctx.packageName || !seen.add(pkg)) continue
+                    out.add(AppItem(pkg, ri.loadLabel(pm).toString()))
+                }
+            } catch (e: Exception) {
+                // abaikan
+            }
+            out.sortBy { it.label.lowercase() }
+            withContext(Dispatchers.Main) { apps = out; appsLoading = false }
+        }
+    }
+
+    private fun persistGames(list: List<GameProfile>) {
+        games = list
+        store.games = list
+    }
+
+    fun addGame(a: AppItem) {
+        if (games.any { it.pkg == a.pkg }) { openGame = a.pkg; return }
+        val g = GameProfile(a.pkg, a.label, emptyMap())
+        persistGames(games + g)
+        syncGame(g)
+        openGame = a.pkg
+    }
+
+    fun removeGame(pkg: String) {
+        persistGames(games.filter { it.pkg != pkg })
+        openGame = null
+        viewModelScope.launch(Dispatchers.IO) {
+            Repo.gameDel(pkg)
+            val st = Repo.status()
+            withContext(Dispatchers.Main) { if (st != null) consumeLive(st) }
+        }
+    }
+
+    private fun syncGame(g: GameProfile) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = Repo.gameSet(g.pkg, g.values)
+            if (r.fail > 0 || r.error.isNotEmpty()) {
+                withContext(Dispatchers.Main) { message = "Sebagian knob game ditolak modul" }
+            }
+        }
+    }
+
+    private fun updateGame(pkg: String, values: Map<String, String>) {
+        val cur = games.firstOrNull { it.pkg == pkg } ?: return
+        val g = cur.copy(values = values)
+        persistGames(games.map { if (it.pkg == pkg) g else it })
+        syncGame(g)
+    }
+
+    fun setGameValue(pkg: String, key: String, value: String) {
+        val g = games.firstOrNull { it.pkg == pkg } ?: return
+        val m = LinkedHashMap(g.values)
+        m[key] = value
+        updateGame(pkg, m)
+    }
+
+    fun removeGameKnob(pkg: String, key: String) {
+        val g = games.firstOrNull { it.pkg == pkg } ?: return
+        val m = LinkedHashMap(g.values)
+        m.remove(key)
+        updateGame(pkg, m)
+    }
+
+    fun addKnobToGame(pkg: String, k: Knob) {
+        val g = games.firstOrNull { it.pkg == pkg } ?: return
+        if (g.values.containsKey(k.key)) return
+        setGameValue(pkg, k.key, valueOf(k))
+    }
+
+    fun copyPresetToGame(pkg: String, p: Preset) {
+        val g = games.firstOrNull { it.pkg == pkg } ?: return
+        val m = LinkedHashMap(g.values)
+        var n = 0
+        for ((key, v) in p.values) {
+            val k = knobByKey(key) ?: continue
+            if (k.type == "locked" || !valid(k, v)) continue
+            m[key] = v
+            n++
+        }
+        updateGame(pkg, m)
+        message = "$n knob disalin dari \"${p.name}\""
+    }
+
     // ================= tampilan =================
     fun applyTheme(t: Int) { theme = t; store.theme = t }
     fun applyCardAlpha(a: Float) { cardAlpha = a; store.cardAlpha = a }
+    fun applyMonitorMs(ms: Int) { monitorMs = ms; store.monitorMs = ms }
 
     fun setImage(uri: Uri, banner: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val name = if (banner) Images.BANNER else Images.WALL
-            val ok = Images.saveFrom(ctx, uri, name, if (banner) 1400 else 1600)
-            val bmp = if (ok) Images.load(ctx, name, if (banner) 1400 else 1600) else null
+            val side = if (banner) 1400 else 1600
+            val ok = Images.saveFrom(ctx, uri, name, side)
+            val bmp = if (ok) Images.load(ctx, name, side) else null
             withContext(Dispatchers.Main) {
                 if (!ok || bmp == null) {
                     message = "Gambar tidak bisa dibaca"
@@ -260,6 +485,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
                     bannerBmp = bmp
                 } else {
                     wallBmp = bmp
+                    wallCustom = true
                 }
             }
         }
@@ -268,43 +494,31 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
     fun resetImage(banner: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             Images.delete(ctx, if (banner) Images.BANNER else Images.WALL)
-            val b = if (banner) Images.loadDefaultBanner(ctx) else null
+            val b = if (banner) Images.loadDefaultBanner(ctx) else Images.loadDefaultWall(ctx)
             withContext(Dispatchers.Main) {
-                if (banner) bannerBmp = b else wallBmp = null
+                if (banner) bannerBmp = b else { wallBmp = b; wallCustom = false }
             }
         }
     }
 
     // ================= monitor & log =================
-    private fun push(list: MutableList<Float>, v: Float) {
-        list.add(v)
-        while (list.size > 30) list.removeAt(0)
-    }
-
     private fun startMonitor() {
         monitorJob?.cancel()
         monitorJob = viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                if (foreground && tab == 2 && monitorMode == 0 && !paused && setup == Setup.Ready && !customOpen) {
+                if (foreground && tab == 3 && monitorMode == 0 && !paused && setup == Setup.Ready && !customOpen) {
                     val st = Repo.status()
-                    if (st != null) {
-                        withContext(Dispatchers.Main) {
-                            live = st
-                            if (st.cpuTemp > 0) push(hCpuTemp, st.cpuTemp.toFloat())
-                            if (st.cpuKhz > 0) push(hCpuMhz, st.cpuKhz / 1000f)
-                            if (st.gpuHz > 0) push(hGpuMhz, st.gpuHz / 1000000f)
-                            if (st.ramUsedKb > 0) push(hRamGb, st.ramUsedKb / 1048576f)
-                        }
-                    }
+                    if (st != null) withContext(Dispatchers.Main) { consumeLive(st) }
                 }
-                delay(2000)
+                delay(monitorMs.toLong())
             }
         }
     }
 
     fun loadLogs() {
         viewModelScope.launch(Dispatchers.IO) {
-            val lines = Repo.logs(if (logWhich == 0) "boot" else "apply", 80)
+            val which = when (logWhich) { 0 -> "boot"; 1 -> "apply"; else -> "game" }
+            val lines = Repo.logs(which, 80)
             withContext(Dispatchers.Main) { logLines = lines }
         }
     }
@@ -316,13 +530,17 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             val sb = StringBuilder()
             sb.append("HSIN v5.0.0\n")
             if (d != null) sb.append("Device: ${d.brand} ${d.model} | ${d.soc} | kernel ${d.kernel} | android ${d.android}\n")
-            if (st != null) sb.append("CPU ${st.cpuKhz / 1000} MHz | GPU ${st.gpuHz / 1000000} MHz | suhu ${st.cpuTemp} C | safe_mode ${st.safeMode}\n")
+            if (st != null) {
+                sb.append("CPU ${st.cpuKhz / 1000} MHz | GPU ${st.gpuHz / 1000000} MHz | suhu CPU ${st.cpuTemp} C | safe_mode ${st.safeMode} | trip ${st.thermalTrip}\n")
+                sb.append("Per game: ${st.gameMode} aktif=${st.gameActive}\n")
+            }
             sb.append("Knob diubah: $changedCount dari $supportedCount\n")
-            sb.append("\n--- boot.log ---\n").append(Repo.logs("boot", 60).joinToString("\n"))
-            sb.append("\n\n--- apply.log ---\n").append(Repo.logs("apply", 60).joinToString("\n"))
+            sb.append("Modul lain: ${conflicts.joinToString(", ").ifEmpty { "-" }}\n")
+            for (w in listOf("boot", "apply", "game")) {
+                sb.append("\n--- $w.log ---\n").append(Repo.logs(w, 50).joinToString("\n"))
+            }
             withContext(Dispatchers.Main) {
-                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("HSIN", sb.toString()))
+                copyText(sb.toString())
                 message = "Laporan disalin"
             }
         }

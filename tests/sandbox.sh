@@ -26,6 +26,13 @@ mk $P/sys/net/ipv4/tcp_congestion_control cubic; mk $P/sys/net/ipv4/tcp_availabl
 mk $P/sys/net/ipv4/tcp_fastopen 1
 mk $P/meminfo "MemTotal:        8000000 kB"; printf 'MemAvailable:    5000000 kB\n' >> $P/meminfo
 mk $P/loadavg "2.35 1.90 1.50 1/500 1234"
+printf 'SwapTotal:       2000000 kB\nSwapFree:        1500000 kB\n' >> $P/meminfo
+mk $P/stat "cpu  1000 0 500 8000 500 0 0 0 0 0"
+for c in 0 1 2 3 4 5 6 7; do mkdir -p $S/devices/system/cpu/cpu$c; done
+mk $S/class/power_supply/battery/status Charging
+mkdir -p $T/mods/alpha $T/mods/hsin $T/mods/other; printf 'id=alpha\nname=Alpha Fusion\n' > $T/mods/alpha/module.prop; printf 'id=other\nname=Pemutar Musik\n' > $T/mods/other/module.prop
+mkdir -p $T/cpuset/top-app; mkdir -p $P/4242 $P/4300; printf 'com.kurogame.haru\000' > $P/4242/cmdline; printf 'com.android.systemui\000' > $P/4300/cmdline
+printf '4300\n' > $T/cpuset/top-app/cgroup.procs
 mk $S/class/thermal/thermal_zone0/type "soc-thermal"; mk $S/class/thermal/thermal_zone0/temp 45000
 mk $S/class/thermal/thermal_zone1/type "gpu-thermal"; mk $S/class/thermal/thermal_zone1/temp 42000
 mk $S/class/power_supply/battery/capacity 77; mk $S/class/power_supply/battery/temp 312
@@ -42,7 +49,7 @@ cat > $B/setprop <<EOT
 printf '%s\n' "\$2" > "$PR/\$1"
 EOT
 chmod +x $B/*
-export PATH="$B:$PATH" HSIN_SYS="$S" HSIN_PROC="$P" HSIN_DATA="$D" HSIN_MODULE_PATH="$ROOT/module"
+export PATH="$B:$PATH" HSIN_SYS="$S" HSIN_PROC="$P" HSIN_DATA="$D" HSIN_MODULE_PATH="$ROOT/module" HSIN_MODS="$T/mods" HSIN_CPUSET="$T/cpuset"
 A() { $SH "$ROOT/module/action.sh" "$@"; }
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "PASS: $1"; }
@@ -99,11 +106,77 @@ r=$(A restore); jv "$r" && ok "restore json" || bad "restore json" "$r"
 # logs
 r=$(A logs apply 5); [ -n "$r" ] && ok "logs apply ada isi" || bad logs kosong
 # guard
-r=$(A guard); chk "guard" "$r" '"safe_mode":0'
+r=$(A status); chk "status safe 0" "$r" '"safe_mode":0'
 echo 3 > $D/boot_count; : > $D/safe_mode; r=$(A status); chk "status safe" "$r" '"safe_mode":1'
 r=$(A guard-reset); chk "guard-reset" "$r" '"ok":1'; [ ! -f $D/safe_mode ] && ok "safe_mode dihapus" || bad safe x
+
+# ---------- status baru ----------
+r=$(A status); jv "$r" && ok "status json lengkap" || bad "status json lengkap" "$r"
+chk "policies" "$r" '"policies":[{"id":0,"cur":1200000,"min":300000,"max":1800000'
+chk "cores" "$r" '"cores":8'; chk "swap used" "$r" '"swap_total_kb":2000000,"swap_used_kb":500000'
+chk "cpu stat" "$r" '"cpu_total":10000,"cpu_idle":8500'; chk "charging" "$r" '"bat_charging":1'
+chk "gpu max" "$r" '"gpu_max_hz":850000000'
+# ---------- modul lain ----------
+r=$(A conflicts); jv "$r" && ok "conflicts json" || bad "conflicts json" "$r"
+chk "conflict alpha" "$r" 'Alpha Fusion'; case "$r" in *Pemutar*|*hsin*) bad "false positive" "$r";; *) ok "modul lain tidak salah deteksi";; esac
+touch $T/mods/alpha/disable; r=$(A conflicts); chk "disable diabaikan" "$r" '"list":[]'; rm $T/mods/alpha/disable
+# penolakan write -> pesan menyebut modul lain
+r=$(. "$ROOT/module/core/lib.sh"; reject_msg "$P/sys/vm/swappiness"); chk "pesan tolak sebut modul" "$r" 'dipegang modul lain Alpha Fusion'
+printf '%s /x tmpfs rw 0 0\n' none >> $P/mounts; sed -i "s#/x#$P/sys/vm/dirty_ratio#" $P/mounts
+r=$(. "$ROOT/module/core/lib.sh"; reject_msg "$P/sys/vm/dirty_ratio"); chk "pesan tolak node ditimpa mount" "$r" 'ditimpa mount'
+r=$(. "$ROOT/module/core/lib.sh"; reject_msg "$P/sys/vm/lain"); chk "pesan tolak sertakan modul" "$r" 'Alpha Fusion'
+mv $T/mods/alpha $T/mods_alpha; r=$(. "$ROOT/module/core/lib.sh"; reject_msg "$P/sys/vm/lain"); chk "tanpa modul lain: ditolak kernel" "$r" 'ditolak kernel'; mv $T/mods_alpha $T/mods/alpha
+# ---------- pengaman panas ----------
+r=$(A thermal-get); chk "thermal default" "$r" '"on":1,"limit":90,"trip":0'
+r=$(A thermal-set 1 500); chk "thermal batas ditolak" "$r" '"ok":0'
+r=$(A thermal-set 1 60); chk "thermal set" "$r" '"ok":1'; mk $S/class/thermal/thermal_zone0/temp 65000
+A set-many vm.swappiness=20 cpu.p0.governor=performance >/dev/null
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+[ -f $D/thermal_trip ] && ok "pengaman panas trip" || bad trip "tidak trip"
+[ "$(cat $P/sys/vm/swappiness)" = 60 ] && ok "trip kembalikan ke bawaan" || bad "trip nilai" "$(cat $P/sys/vm/swappiness)"
+grep -q 'vm.swappiness=20' $D/overrides.env && ok "override tersimpan saat trip" || bad "override hilang" x
+r=$(A status); chk "status trip" "$r" '"thermal_trip":1'
+r=$(A thermal-ack); chk "ack menerapkan lagi" "$r" '"fail":0'; [ "$(cat $P/sys/vm/swappiness)" = 20 ] && ok "ack: swappiness 20" || bad ack "$(cat $P/sys/vm/swappiness)"
+mk $S/class/thermal/thermal_zone0/temp 45000; A thermal-set 1 90 >/dev/null; HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"; [ ! -f $D/thermal_trip ] && ok "tidak trip di bawah batas" || bad trip2 x
+A restore >/dev/null
+# ---------- per game ----------
+r=$(A detect); chk "detect cpuset" "$r" '"ok":1'
+r=$(A game-set com.kurogame.haru vm.swappiness=10 cpu.p0.governor=performance); chk "game-set ok" "$r" '"ok":2,"fail":0'
+r=$(A game-set com.kurogame.haru vm.swappiness=999 foo.bar=1); chk "game-set tolak" "$r" '"ok":0,"fail":2'
+r=$(A game-set com.kurogame.haru vm.swappiness=10 cpu.p0.governor=performance)
+r=$(A game-set bukanpaket x=1); chk "paket invalid" "$r" 'nama paket tidak valid'
+r=$(A game-list); jv "$r" && ok "game-list json" || bad "game-list json" "$r"; chk "game terdaftar" "$r" '"pkg":"com.kurogame.haru","n":2'
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"; [ "$(cat $P/sys/vm/swappiness)" = 60 ] && ok "mode per game mati: tidak diterapkan" || bad gm0 "$(cat $P/sys/vm/swappiness)"
+r=$(A game-mode 1); chk "game-mode on" "$r" '"ok":1'
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"; [ "$(cat $P/sys/vm/swappiness)" = 60 ] && ok "bukan game di depan: tidak diterapkan" || bad nogame x
+printf '4242\n' > $T/cpuset/top-app/cgroup.procs
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+[ "$(cat $P/sys/vm/swappiness)" = 10 ] && ok "game dibuka: swappiness 10" || bad gameopen "$(cat $P/sys/vm/swappiness)"
+[ "$(cat $S/devices/system/cpu/cpufreq/policy0/scaling_governor)" = performance ] && ok "game dibuka: governor performance" || bad gamegov x
+r=$(A status); chk "status game aktif" "$r" '"game_active":"com.kurogame.haru"'
+grep -q 'vm.swappiness=10' $D/overrides.env && bad "profil game bocor ke override" x || ok "profil game tidak disimpan sebagai global"
+printf '4300\n' > $T/cpuset/top-app/cgroup.procs
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+[ "$(cat $P/sys/vm/swappiness)" = 60 ] && ok "game ditutup: kembali Global 60" || bad gameclose "$(cat $P/sys/vm/swappiness)"
+[ "$(cat $S/devices/system/cpu/cpufreq/policy0/scaling_governor)" = schedutil ] && ok "game ditutup: governor schedutil" || bad gamegov2 x
+# Global pakai override user: saat game ditutup kembali ke nilai override user, bukan baseline
+A set-many vm.swappiness=35 >/dev/null
+printf '4242\n' > $T/cpuset/top-app/cgroup.procs; HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+[ "$(cat $P/sys/vm/swappiness)" = 10 ] && ok "game override menang atas Global" || bad gameov "$(cat $P/sys/vm/swappiness)"
+printf '4300\n' > $T/cpuset/top-app/cgroup.procs; HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+[ "$(cat $P/sys/vm/swappiness)" = 35 ] && ok "game ditutup: kembali ke Global user 35" || bad gameglob "$(cat $P/sys/vm/swappiness)"
+# hapus profil saat game aktif
+printf '4242\n' > $T/cpuset/top-app/cgroup.procs; HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"
+r=$(A game-del com.kurogame.haru); chk "game-del" "$r" '"ok":1'
+[ "$(cat $P/sys/vm/swappiness)" = 35 ] && ok "game-del saat aktif: kembali Global" || bad gamedel "$(cat $P/sys/vm/swappiness)"
+[ ! -f $D/game_active ] && ok "game_active dibersihkan" || bad gameact x
+# mode aman menghentikan daemon
+: > $D/safe_mode; A game-mode 1 >/dev/null; A game-set com.kurogame.haru vm.swappiness=10 >/dev/null
+HSIN_ONESHOT=1 $SH "$ROOT/module/daemon.sh"; [ "$(cat $P/sys/vm/swappiness)" = 35 ] && ok "mode aman: daemon diam" || bad safed "$(cat $P/sys/vm/swappiness)"
+rm -f $D/safe_mode
 # service.sh jalan (boot) tanpa tunggu lama: ganti sleep
 sed 's/sleep [0-9]*/sleep 0/' "$ROOT/module/service.sh" > "$T/service_t.sh"; cp "$T/service_t.sh" "$ROOT/module/service_t.sh"
+A game-mode 0 >/dev/null; A thermal-set 0 90 >/dev/null; rm -rf $D/games/*; printf "" > $D/overrides.env
 A set-many vm.swappiness=25 >/dev/null; printf '60\n' > $P/sys/vm/swappiness
 $SH "$ROOT/module/service_t.sh"; sleep 2; rm -f "$ROOT/module/service_t.sh"
 [ "$(cat $P/sys/vm/swappiness)" = 25 ] && ok "service.sh menerapkan override saat boot" || bad service "$(cat $P/sys/vm/swappiness)"
