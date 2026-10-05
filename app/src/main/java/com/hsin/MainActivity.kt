@@ -9,7 +9,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -48,13 +47,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HsinApp(vm: HsinVm) {
-    val sysDark = isSystemInDarkTheme()
-    val dark = when (vm.theme) {
-        0 -> true
-        1 -> false
-        else -> sysDark
-    }
-    val pal = Pal(dark, vm.cardAlpha)
+    val pal = Pal(vm.theme, vm.cardAlpha)
+    val dark = pal.dark
     val act = LocalContext.current as ComponentActivity
 
     LaunchedEffect(dark) {
@@ -70,13 +64,8 @@ fun HsinApp(vm: HsinVm) {
         MaterialTheme(colorScheme = scheme) {
             Box(Modifier.fillMaxSize().background(pal.bg)) {
                 val wall = vm.wallBmp
-                if (wall != null) {
-                    Image(
-                        bitmap = wall,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                if (wall != null && (vm.wallCustom || vm.theme == 0)) {
+                    Image(bitmap = wall, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(pal.scrim))
                 }
                 if (vm.customOpen) {
@@ -85,6 +74,7 @@ fun HsinApp(vm: HsinVm) {
                     when (vm.tab) {
                         0 -> DashScreen(vm)
                         1 -> KnobScreen(vm)
+                        2 -> GamesScreen(vm)
                         else -> MonitorScreen(vm)
                     }
                     BottomNav(vm, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())

@@ -1,24 +1,32 @@
-# Kontrak app ↔ modul HSIN v5
+# Kontrak app ↔ modul HSIN v5.0.0
 
 App memanggil: `su -c "sh /data/adb/modules/hsin/action.sh <perintah> [arg]"`.
-Semua perintah mencetak SATU baris JSON (kecuali `ping`, `logs`). Data modul di `/data/adb/hsin5/`.
+Hampir semua perintah mencetak SATU baris JSON. Data modul di `/data/adb/hsin5/`.
 
 | Perintah | Hasil |
 |---|---|
 | `ping` | `pong v5.0.0` |
-| `device` | `{"v":5,"module","model","brand","soc","kernel","android","ram_kb"}` |
-| `status` | `{"cpu_khz","gpu_hz","cpu_temp","gpu_temp","bat_pct","bat_temp","ram_total_kb","ram_used_kb","load_x100","safe_mode","overrides"}` (nilai tak tersedia = -1 / 0) |
-| `knobs` | `{"v":5,"categories":[{"id","title","knobs":[...]}]}` |
-| `set-many k=v k=v ...` | tulis + verifikasi + simpan override. `{"ok","fail","results":[{"key","ok","value","msg"}]}` |
-| `apply` | tulis ulang semua override tersimpan (dipakai boot) |
-| `restore` | kembalikan ke baseline bawaan + hapus semua override |
-| `snapshot` | simpan baseline (otomatis bila belum ada) |
-| `guard` / `guard-reset` | status / matikan mode aman |
-| `logs boot\|apply [n]` | n baris terakhir, format `YYYY-MM-DD HH:MM:SS LEVEL pesan` |
+| `device` | `{"v":5,"module","model","brand","soc","kernel","android"}` |
+| `status` | CPU (`cpu_khz`,`cores`,`policies[{id,cur,min,max,hw,gov}]`,`cpu_total`,`cpu_idle`), GPU (`gpu_hz`,`gpu_max_hz`,`gpu_gov`), suhu (`cpu_temp`,`gpu_temp`,`temp_max`,`bat_temp`), baterai (`bat_pct`,`bat_charging`), memori (`ram_*_kb`,`swap_*_kb`), `load_x100`, status (`safe_mode`,`thermal_trip`,`game_mode`,`game_active`,`overrides`). Tidak tersedia = -1 / 0. Pemakaian CPU dihitung app dari selisih `cpu_total`/`cpu_idle` antar panggilan. |
+| `knobs` | `{"v":5,"categories":[{"id","title","knobs":[...]}]}`; knob `choice`(`options`) / `range`(`min`,`max`,`step`) / `locked`(`reason`); `cur` sekarang, `def` bawaan boot |
+| `set-many k=v ...` | tulis + verifikasi + simpan override global. `{"ok","fail","results":[{"key","ok","value","msg"}]}` |
+| `apply` | tulis ulang override global (dipakai saat boot) |
+| `restore` | kembalikan semua ke baseline + hapus override global |
+| `conflicts` | `{"list":["Alpha Fusion",...]}` modul aktif lain yang kemungkinan ikut mengatur performa |
+| `thermal-get` / `thermal-set <0\|1> <60..110>` / `thermal-ack` | pengaman panas; `thermal-ack` menerapkan lagi override global setelah trip |
+| `game-set <pkg> [k=v ...]` / `game-del <pkg>` / `game-list` / `game-mode <0\|1>` / `detect` | profil per game |
+| `guard-reset` | matikan mode aman |
+| `logs boot\|apply\|game\|thermal [n]` | n baris terakhir: `YYYY-MM-DD HH:MM:SS LEVEL pesan` |
 
-Knob: `type` = `choice` (`options`) | `range` (`min`,`max`,`step`) | `locked` (`reason`). `cur` = nilai sekarang, `def` = nilai bawaan boot.
-Nilai kosong tidak pernah dikirim. Hanya `[A-Za-z0-9_.:+-]` yang lolos (app dan modul sama-sama menyaring).
+Alasan penolakan knob: `node read-only`, `node ditimpa mount modul lain`, `ditolak: kemungkinan dipegang modul lain <nama>`, `ditolak kernel`, atau `nilai kembali ke X karena ada yang menahan`.
 
-Boot: `service.sh` menyimpan baseline → menerapkan override → reset counter setelah 60 dtk stabil.
-Mode aman: bila counter ≥ 3 (boot tak pernah stabil), override TIDAK diterapkan sampai dimatikan lewat app.
-Preset hidup di sisi app (SharedPreferences); modul tidak tahu soal preset.
+## Boot dan daemon
+`service.sh`: baseline → override global → jalankan `daemon.sh` → counter boot direset setelah 60 dtk stabil.
+Mode aman: boot tidak pernah stabil 3 kali berturut-turut → override TIDAK diterapkan sampai `guard-reset`.
+
+`daemon.sh` (satu proses): tiap 3 dtk (mode per game aktif) atau 10 dtk.
+- Pengaman panas: suhu CPU ≥ batas → tulis baseline ke semua knob (override tersimpan TIDAK dihapus), buat `thermal_trip`; berhenti memproses game sampai `thermal-ack`.
+- Per game: baca `/dev/cpuset/top-app/cgroup.procs` → `/proc/<pid>/cmdline`; bila paket punya `games/<pkg>.env`: tulis nilainya (tidak disimpan sebagai global). Game ditutup: tiap knob profil kembali ke nilai Global (override user, kalau tidak ada baseline). Deteksi tidak tersedia → `detect` mengembalikan `ok:0`.
+- Mode aman menghentikan semua tindakan daemon.
+
+Preset hidup di sisi app (SharedPreferences, ekspor/impor lewat clipboard). Profil game disimpan di app dan disalin ke modul lewat `game-set` (disinkronkan ulang tiap sesi app).

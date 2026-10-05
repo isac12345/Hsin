@@ -1,7 +1,6 @@
 package com.hsin
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,11 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -138,23 +133,11 @@ fun Divider() {
 }
 
 @Composable
-fun Sparkline(values: List<Float>, modifier: Modifier = Modifier) {
+fun Bar(fraction: Float, modifier: Modifier = Modifier, hot: Boolean = false) {
     val p = LocalPal.current
-    Canvas(modifier) {
-        if (values.size < 2) return@Canvas
-        var lo = values.minOrNull() ?: 0f
-        var hi = values.maxOrNull() ?: 1f
-        if (hi - lo < 0.001f) { lo -= 1f; hi += 1f }
-        val path = Path()
-        var lastY = 0f
-        values.forEachIndexed { i, x ->
-            val px = size.width * i / (values.size - 1)
-            val py = size.height - ((x - lo) / (hi - lo)) * size.height * 0.88f - size.height * 0.06f
-            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-            lastY = py
-        }
-        drawPath(path, p.text, style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round))
-        drawCircle(p.text, 2.5.dp.toPx(), Offset(size.width, lastY))
+    val f = if (fraction.isNaN()) 0f else fraction.coerceIn(0f, 1f)
+    Box(modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(p.track)) {
+        Box(Modifier.fillMaxWidth(f).height(6.dp).clip(CircleShape).background(if (hot) p.warn else p.pill))
     }
 }
 
