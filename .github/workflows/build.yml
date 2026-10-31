@@ -42,7 +42,12 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        run: |
+          set +e
+          gradle :app:assembleRelease --no-daemon --stacktrace > build.log 2>&1
+          rc=$?
+          grep -E "^e: |error:|What went wrong" -A2 build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
+          exit $rc
 
       - name: Kemas modul + rapikan nama
         run: |
