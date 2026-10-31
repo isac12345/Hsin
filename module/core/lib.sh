@@ -2,7 +2,7 @@
 # HSIN v5 core. POSIX sh (mksh/ash/dash). Di-source oleh action.sh, service.sh, daemon.sh.
 # Tanpa awk/grep/sed: hanya builtin shell + sort/tr/ls/cat/date/uname/head/tail.
 
-HSIN_VER="v5.0.0"
+HSIN_VER="v6.0.0"
 HSIN_DATA="${HSIN_DATA:-/data/adb/hsin5}"
 SYS="${HSIN_SYS:-/sys}"
 PROC="${HSIN_PROC:-/proc}"
@@ -414,6 +414,8 @@ global_value() { # nilai Global untuk key: override tersimpan, kalau tidak ada b
     printf '%s' "$_g"
 }
 game_apply() {
+    res_apply "$1"
+    [ "$(cfg_get dnd_game 0)" = 1 ] && dnd_set 1
     _list=$(file_pairs "$GAMEDIR/$1.env")
     [ -n "$_list" ] || return 0
     # shellcheck disable=SC2086
@@ -421,6 +423,8 @@ game_apply() {
     log INFO game "$1 dibuka: ok=$RES_OK gagal=$RES_FAIL"
 }
 game_restore() {
+    res_reset "$1"
+    [ "$(cfg_get dnd_game 0)" = 1 ] && dnd_set 0
     _list=""
     if [ -f "$GAMEDIR/$1.env" ]; then
         while IFS='=' read -r _k _v; do
@@ -459,3 +463,72 @@ thermal_trip() { # $1 = suhu, $2 = batas
     rm -f "$ACTF"
     log WARN thermal "suhu CPU $1 C melewati batas $2 C: setelan dikembalikan ke bawaan sementara"
 }
+
+
+# ---------- mode (Hemat / Bawaan / Seimbang / Boost) ----------
+# Posisi persen dalam daftar frekuensi naik: 0 = terendah, 100 = tertinggi. Boost = tanpa batas.
+nth_pct() { # "<daftar naik>" persen
+    _np_old=$IFS; IFS=' 	
+'
+    set -- $2 $1
+    IFS=$_np_old
+    _pc=$1; shift
+    _cnt=$#
+    [ "$_cnt" -gt 0 ] || return 1
+    _ix=$(( (_cnt - 1) * _pc / 100 ))
+    shift "$_ix"
+    printf '%s' "$1"
+}
+# mode_args <mode>: cetak "k=v k=v ..." dari knob yang ADA di perangkat ini
+mode_args() {
+    case "$1" in
+        hemat)    _cmx=70; _cmn=0;   _gmx=55;  _gmn=0;   _gov="";            _mem=0 ;;
+        seimbang) _cmx=100; _cmn=35; _gmx=100; _gmn=35;  _gov="";            _mem=0 ;;
+        boost)    _cmx=100; _cmn=100; _gmx=100; _gmn=100; _gov="performance"; _mem=1 ;;
+        *) return 0 ;;
+    esac
+    load_defs
+    _out=""
+    _old=$IFS
+    IFS='
+'
+    for _line in $DEFS; do
+        IFS=$_old
+        IFS='|' read -r _c _k _lb _ty _kd _nd _op _un <<EOT
+$_line
+EOT
+        IFS='
+'
+        [ "$_ty" = "locked" ] && continue
+        case "$_k" in
+            cpu.p*.max_freq) _v=$(nth_pct "$_op" "$_cmx") ;;
+            cpu.p*.min_freq) _v=$(nth_pct "$_op" "$_cmn") ;;
+            gpu.*.max_freq)  _v=$(nth_pct "$_op" "$_gmx") ;;
+            gpu.*.min_freq)  _v=$(nth_pct "$_op" "$_gmn") ;;
+            cpu.p*.governor|gpu.*.governor)
+                _v=""
+                if [ -n "$_gov" ] && in_list "$_gov" "$_op"; then _v=$_gov; fi ;;
+            vm.swappiness)         [ "$_mem" = 1 ] && _v=40 || _v="" ;;
+            vm.vfs_cache_pressure) [ "$_mem" = 1 ] && _v=50 || _v="" ;;
+            io.read_ahead)         [ "$_mem" = 1 ] && _v=1024 || _v="" ;;
+            *) _v="" ;;
+        esac
+        [ -n "$_v" ] && _out="$_out $_k=$_v"
+    done
+    IFS=$_old
+    printf '%s' "$_out"
+}
+
+# ---------- tambahan game: resolusi (Game Mode Android), Jangan ganggu, bersihkan RAM ----------
+dnd_set() { # 1 = prioritas, 0 = mati
+    command -v cmd >/dev/null 2>&1 || return 1
+    if [ "$1" = 1 ]; then cmd notification set_dnd priority >/dev/null 2>&1; else cmd notification set_dnd off >/dev/null 2>&1; fi
+}
+res_apply() { # pkg persen (50-100); mode Game Mode angka 2 = performance
+    _rp=$(rd "$GAMEDIR/$1.res") || return 0
+    isint "$_rp" || return 0
+    [ "$_rp" -ge 100 ] && return 0
+    _ds=$(( _rp / 100 )).$(( _rp % 100 / 10 ))$(( _rp % 10 ))
+    cmd game set --mode 2 --downscale "$_ds" "$1" >/dev/null 2>&1 && log INFO game "$1 resolusi ${_rp}%"
+}
+res_reset() { [ -f "$GAMEDIR/$1.res" ] && cmd game reset "$1" >/dev/null 2>&1; }

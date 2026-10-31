@@ -89,4 +89,39 @@ class Store(ctx: Context) {
             }
             sp.edit().putString("presets", arr.toString()).apply()
         }
+
+    /** Mode dan resolusi per game: pkg -> "mode:res" (mode: global|hemat|bawaan|seimbang|boost). */
+    var gameCfg: Map<String, Pair<String, Int>>
+        get() {
+            val out = LinkedHashMap<String, Pair<String, Int>>()
+            try {
+                val o = JSONObject(sp.getString("game_cfg_v6", "{}") ?: "{}")
+                val it = o.keys()
+                while (it.hasNext()) {
+                    val k = it.next()
+                    val v = o.getString(k).split(":")
+                    out[k] = Pair(v.getOrElse(0) { "global" }, (v.getOrNull(1)?.toIntOrNull() ?: 100).coerceIn(50, 100))
+                }
+            } catch (e: Exception) {
+                // data rusak: abaikan
+            }
+            return out
+        }
+        set(m) {
+            val o = JSONObject()
+            for ((k, v) in m) o.put(k, v.first + ":" + v.second)
+            sp.edit().putString("game_cfg_v6", o.toString()).apply()
+        }
+
+    var dndGame: Boolean
+        get() = sp.getBoolean("dnd_game", true)
+        set(v) { sp.edit().putBoolean("dnd_game", v).apply() }
+
+    var hudOn: Boolean
+        get() = sp.getBoolean("hud_on", true)
+        set(v) { sp.edit().putBoolean("hud_on", v).apply() }
+
+    var lastGame: String
+        get() = sp.getString("last_game", "") ?: ""
+        set(v) { sp.edit().putString("last_game", v).apply() }
 }

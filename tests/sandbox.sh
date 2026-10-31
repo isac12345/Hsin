@@ -58,7 +58,7 @@ chk() { # nama, perintah-hasil, pola
   case "$2" in *"$3"*) ok "$1";; *) bad "$1" "$2";; esac; }
 jv() { python3 -c "import json,sys;json.loads(sys.stdin.read())" <<<"$1" 2>/dev/null; }
 
-r=$(A ping); chk "ping" "$r" "pong v5.0.0"
+r=$(A ping); chk "ping" "$r" "pong v6.0.0"
 r=$(A device); jv "$r" && ok "device json" || bad "device json" "$r"; chk "device model" "$r" '"model":"P671L"'
 r=$(A status); jv "$r" && ok "status json" || bad "status json" "$r"
 chk "status cpu avg" "$r" '"cpu_khz":1200000'; chk "status gpu" "$r" '"gpu_hz":384000000'
@@ -181,6 +181,32 @@ A set-many vm.swappiness=25 >/dev/null; printf '60\n' > $P/sys/vm/swappiness
 $SH "$ROOT/module/service_t.sh"; sleep 2; rm -f "$ROOT/module/service_t.sh"
 [ "$(cat $P/sys/vm/swappiness)" = 25 ] && ok "service.sh menerapkan override saat boot" || bad service "$(cat $P/sys/vm/swappiness)"
 [ "$(cat $D/boot_count)" = 0 ] && ok "boot counter reset" || bad counter "$(cat $D/boot_count)"
+
+# ---- mode (v6) ----
+A restore >/dev/null; A thermal-set 1 90 >/dev/null; printf "" > $D/overrides.env
+CP0="$S/devices/system/cpu/cpufreq/policy0"; GP="$S/class/devfreq/23100000.gpu"
+r=$(A mode boost); jv "$r" && ok "mode boost json" || bad "mode boost json" "$r"
+[ "$(cat $CP0/scaling_min_freq)" = 1800000 ] && [ "$(cat $CP0/scaling_max_freq)" = 1800000 ] && ok "boost: CPU min=max=tertinggi" || bad boostcpu "$(cat $CP0/scaling_min_freq)/$(cat $CP0/scaling_max_freq)"
+[ "$(cat $CP0/scaling_governor)" = performance ] && ok "boost: governor performance" || bad boostgov "$(cat $CP0/scaling_governor)"
+[ "$(cat $GP/min_freq)" = 850000000 ] && ok "boost: GPU min=tertinggi" || bad boostgpu "$(cat $GP/min_freq)"
+chk "boost: batas panas 100" "$(A thermal-get)" '"limit":100'
+chk "mode-get boost" "$(A mode-get)" '"mode":"boost"'
+r=$(A mode hemat); jv "$r" && ok "mode hemat json" || bad "mode hemat json" "$r"
+[ "$(cat $CP0/scaling_max_freq)" = 1200000 ] && [ "$(cat $CP0/scaling_min_freq)" = 300000 ] && ok "hemat: CPU max 70%, min terendah" || bad hematcpu "$(cat $CP0/scaling_min_freq)/$(cat $CP0/scaling_max_freq)"
+[ "$(cat $GP/max_freq)" = 384000000 ] && ok "hemat: GPU max 55%" || bad hematgpu "$(cat $GP/max_freq)"
+chk "hemat: batas panas kembali 90" "$(A thermal-get)" '"limit":90'
+A mode seimbang >/dev/null
+[ "$(cat $CP0/scaling_max_freq)" = 1800000 ] && [ "$(cat $CP0/scaling_min_freq)" = 600000 ] && ok "seimbang: max penuh, min 35%" || bad seimbangcpu "$(cat $CP0/scaling_min_freq)/$(cat $CP0/scaling_max_freq)"
+A mode boost >/dev/null; A mode bawaan >/dev/null
+[ "$(cat $CP0/scaling_min_freq)" = 300000 ] && [ "$(cat $CP0/scaling_governor)" = schedutil ] && ok "bawaan: kembali ke baseline" || bad bawaan "$(cat $CP0/scaling_min_freq)"
+chk "mode salah ditolak" "$(A mode ngawur)" '"ok":0'
+r=$(A game-cfg com.kurogame.haru boost 80); chk "game-cfg boost" "$r" '"ok":1'
+chk "game-get" "$(A game-get com.kurogame.haru)" '"mode":"boost","res":80'
+[ -f $D/games/com.kurogame.haru.env ] && [ "$(cat $D/games/com.kurogame.haru.res)" = 80 ] && ok "game-cfg menulis env dan res" || bad gamecfgfiles "-"
+chk "game-cfg res salah" "$(A game-cfg com.kurogame.haru boost 20)" '"ok":0'
+A game-cfg com.kurogame.haru bawaan 100 >/dev/null
+[ ! -f $D/games/com.kurogame.haru.res ] && ok "res dihapus saat 100" || bad resrm "-"
+A game-del com.kurogame.haru >/dev/null; A restore >/dev/null
 echo "--- $SH: PASS=$PASS FAIL=$FAIL"
 rm -rf "$T"
 [ $FAIL -eq 0 ]

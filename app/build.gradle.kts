@@ -12,8 +12,8 @@ android {
         applicationId = "com.hsin"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5000
-        versionName = "5.0.0"
+        versionCode = 6000
+        versionName = "6.0.0"
     }
 
     // Keystore TIDAK pernah ada di repo. Diisi dari GitHub Secrets lewat env.

@@ -47,10 +47,10 @@ jobs:
       - name: Kemas modul + rapikan nama
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk out/HSIN-v5.0.0.apk
-          (cd module && zip -r9 -X ../out/HSIN-v5.0.0-module.zip .)
+          cp app/build/outputs/apk/release/app-release.apk out/HSIN-v6.0.0.apk
+          (cd module && zip -r9 -X ../out/HSIN-v6.0.0-module.zip .)
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HSIN-v5.0.0
+          name: HSIN-v6.0.0
           path: out/*

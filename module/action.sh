@@ -205,6 +205,107 @@ cmd_detect() {
     if fg_game; then echo '{"ok":1,"src":"cpuset"}'; else echo '{"ok":0,"src":"none"}'; fi
 }
 
+# ---------- mode: Hemat / Bawaan / Seimbang / Boost ----------
+cmd_mode() { # nama
+    case "$1" in hemat|bawaan|seimbang|boost) ;; *) echo '{"ok":0,"error":"mode tidak dikenal"}'; return 1 ;; esac
+    [ -s "$BASE" ] || snapshot_baseline
+    restore_baseline >/dev/null 2>&1
+    RES_OK=0; RES_FAIL=0; RES_JSON=""
+    if [ "$1" != bawaan ]; then
+        _a=$(mode_args "$1")
+        # shellcheck disable=SC2086
+        [ -n "$_a" ] && batch_write 1 $_a
+    fi
+    # Boost: pengaman panas dinaikkan ke 100 C supaya performa tidak dibatasi; mode lain mengembalikan batas user
+    if [ "$1" = boost ]; then
+        [ -n "$(cfg_get thermal_prev '')" ] || cfg_set thermal_prev "$(cfg_get thermal_limit 90)"
+        cfg_set thermal_limit 100
+    elif [ -n "$(cfg_get thermal_prev '')" ]; then
+        cfg_set thermal_limit "$(cfg_get thermal_prev 90)"; kv_del "$CFG" thermal_prev
+    fi
+    cfg_set mode "$1"
+    log INFO apply "mode $1: ok=$RES_OK gagal=$RES_FAIL"
+    printf '{"ok":%s,"fail":%s,"mode":"%s","results":[%s]}\n' "$RES_OK" "$RES_FAIL" "$1" "$RES_JSON"
+}
+cmd_mode_get() { printf '{"mode":"%s"}\n' "$(cfg_get mode bawaan)"; }
+
+# Pengaturan per game: mode (hemat|bawaan|seimbang|boost|global) dan resolusi 50-100
+cmd_game_cfg() { # pkg mode res
+    _pk=$1; _md=$2; _rs=$3
+    valid_pkg "$_pk" || { echo '{"ok":0,"error":"nama paket tidak valid"}'; return 1; }
+    case "$_md" in hemat|bawaan|seimbang|boost|global) ;; *) echo '{"ok":0,"error":"mode tidak dikenal"}'; return 1 ;; esac
+    if [ -n "$_rs" ]; then
+        if ! isint "$_rs" || [ "$_rs" -lt 50 ] || [ "$_rs" -gt 100 ]; then echo '{"ok":0,"error":"resolusi 50 sampai 100"}'; return 1; fi
+    fi
+    _active=0; [ "$(rd "$ACTF")" = "$_pk" ] && _active=1
+    [ "$_active" = 1 ] && game_restore "$_pk"
+    if [ "$_md" = global ] || [ "$_md" = bawaan ]; then : > "$GAMEDIR/$_pk.env"
+    else printf '%s\n' $(mode_args "$_md") > "$GAMEDIR/$_pk.env"; fi
+    printf '%s\n' "$_md" > "$GAMEDIR/$_pk.mode"
+    if [ -n "$_rs" ] && [ "$_rs" -lt 100 ]; then printf '%s\n' "$_rs" > "$GAMEDIR/$_pk.res"; else rm -f "$GAMEDIR/$_pk.res"; fi
+    [ "$_active" = 1 ] && game_apply "$_pk"
+    log INFO game "cfg $_pk mode=$_md res=${_rs:-100}"
+    echo '{"ok":1}'
+}
+cmd_game_get() { # pkg
+    _pk=$1
+    valid_pkg "$_pk" || { echo '{"ok":0}'; return 1; }
+    _md=$(rd "$GAMEDIR/$_pk.mode"); [ -n "$_md" ] || _md=global
+    _rs=$(rd "$GAMEDIR/$_pk.res"); [ -n "$_rs" ] || _rs=100
+    _in=0; [ -f "$GAMEDIR/$_pk.env" ] && _in=1
+    printf '{"ok":1,"pkg":"%s","mode":"%s","res":%s,"listed":%s}\n' "$_pk" "$(jstr "$_md")" "$(num "$_rs")" "$_in"
+}
+
+# MULAI GAME: terapkan pengaturan game (mode, resolusi, jangan ganggu), lalu buka game
+cmd_launch() { # pkg
+    _pk=$1
+    valid_pkg "$_pk" || { echo '{"ok":0,"error":"nama paket tidak valid"}'; return 1; }
+    if [ -n "$(pidof "$_pk" 2>/dev/null)" ]; then echo '{"ok":0,"error":"game sedang jalan, tutup dulu lalu mulai lagi dari HSIN"}'; return 1; fi
+    if [ ! -f "$GAMEDIR/$_pk.env" ]; then : > "$GAMEDIR/$_pk.env"; fi
+    cfg_set game_mode 1
+    game_apply "$_pk"
+    printf '%s\n' "$_pk" > "$ACTF"
+    # Jangan pakai resolve-activity: game dengan banyak pintu (Roblox) mengembalikan chooser sistem
+    monkey -p "$_pk" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+    log INFO game "$_pk dibuka dari HSIN"
+    echo '{"ok":1}'
+}
+
+cmd_dnd_cfg() { # 0|1 : Jangan ganggu otomatis saat game
+    case "$1" in 0|1) ;; *) echo '{"ok":0}'; return 1 ;; esac
+    cfg_set dnd_game "$1"
+    echo '{"ok":1}'
+}
+cmd_dnd_now() { # 0|1
+    case "$1" in 0|1) ;; *) echo '{"ok":0}'; return 1 ;; esac
+    dnd_set "$1" && echo '{"ok":1}' || echo '{"ok":0,"error":"perintah DND tidak tersedia"}'
+}
+
+cmd_ram_clean() {
+    command -v pm >/dev/null 2>&1 || { echo '{"ok":0,"error":"pm tidak tersedia"}'; return 1; }
+    _a=$(num "$(meminfo_avail)")
+    _ime=$(settings get secure default_input_method 2>/dev/null); _ime=${_ime%%/*}
+    _home=$(pm resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null | tail -n 1); _home=${_home%%/*}
+    _act=$(rd "$ACTF")
+    _n=0
+    for _l in $(pm list packages -3 2>/dev/null); do
+        _p=${_l#package:}
+        case "$_p" in
+            ''|com.hsin|"$_ime"|"$_home"|"$_act"|com.termux*|com.topjohnwu.magisk|me.weishu.kernelsu|me.bmax.apatch|com.android.*|com.google.android.inputmethod*) continue ;;
+        esac
+        am kill "$_p" >/dev/null 2>&1; _n=$((_n + 1))
+    done
+    sleep 1
+    _b=$(num "$(meminfo_avail)")
+    _f=$((_b - _a)); [ "$_f" -lt 0 ] && _f=0
+    log INFO apply "bersihkan RAM: $_n app, bebas ${_f}KB"
+    printf '{"ok":1,"apps":%s,"freed_kb":%s}\n' "$_n" "$_f"
+}
+meminfo_avail() {
+    while read -r _k _v _u; do [ "$_k" = "MemAvailable:" ] && { printf '%s' "$_v"; return 0; }; done < "$PROC/meminfo"
+    printf '0'
+}
+
 case "$cmd" in
     ping) echo "pong $HSIN_VER" ;;
     device) cmd_device ;;
@@ -237,6 +338,14 @@ case "$cmd" in
     game-del) cmd_game_del "$1" ;;
     game-mode) cmd_game_mode "$1" ;;
     detect) cmd_detect ;;
+    mode) cmd_mode "$1" ;;
+    mode-get) cmd_mode_get ;;
+    game-cfg) cmd_game_cfg "$1" "$2" "$3" ;;
+    game-get) cmd_game_get "$1" ;;
+    launch) cmd_launch "$1" ;;
+    dnd-cfg) cmd_dnd_cfg "$1" ;;
+    dnd-now) cmd_dnd_now "$1" ;;
+    ram-clean) cmd_ram_clean ;;
     logs)
         _w="${1:-apply}"; _n="${2:-60}"
         case "$_w" in boot|apply|game|thermal) ;; *) _w=apply ;; esac

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -68,7 +69,9 @@ fun HsinApp(vm: HsinVm) {
                     Image(bitmap = wall, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(pal.scrim))
                 }
-                if (vm.customOpen) {
+                if (!vm.advanced) {
+                    SpaceRoot(vm)
+                } else if (vm.customOpen) {
                     CustomScreen(vm)
                 } else {
                     when (vm.tab) {
@@ -79,8 +82,9 @@ fun HsinApp(vm: HsinVm) {
                     }
                     BottomNav(vm, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
                     MessageBar(vm, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 84.dp))
+                    BackToSpace(vm, Modifier.align(Alignment.TopEnd).statusBarsPadding())
                 }
-                FailureDialog(vm)
+                if (vm.advanced) FailureDialog(vm)
             }
         }
     }
