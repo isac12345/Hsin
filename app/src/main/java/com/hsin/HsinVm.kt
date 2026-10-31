@@ -567,7 +567,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         "hemat" -> "Hemat"; "seimbang" -> "Seimbang"; "boost" -> "Boost"; else -> "Bawaan"
     }
 
-    fun setMode(m: String) {
+    fun chooseMode(m: String) {
         if (m == mode) return
         val old = mode
         mode = m
@@ -582,7 +582,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setModeLocal(m: String) { mode = m }
+    fun forceMode(m: String) { mode = m }
 
     fun cfgOf(pkg: String): Pair<String, Int> = gameCfg[pkg] ?: Pair("global", 100)
 
@@ -637,13 +637,13 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setDndGame(on: Boolean) {
+    fun chooseDnd(on: Boolean) {
         dndGame = on
         store.dndGame = on
         viewModelScope.launch(Dispatchers.IO) { Repo.dndCfg(on) }
     }
 
-    fun setHudOn(on: Boolean) {
+    fun chooseHud(on: Boolean) {
         hudOn = on
         store.hudOn = on
         if (!on) Hud.stop(ctx)
