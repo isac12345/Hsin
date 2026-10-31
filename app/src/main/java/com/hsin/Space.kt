@@ -481,7 +481,7 @@ private fun ModeTiles(vm: HsinVm) {
                 Modifier
                     .weight(1f)
                     .rise(120 + i * 60)
-                    .tap { vm.setMode(m.key) }
+                    .tap { vm.chooseMode(m.key) }
                     .drawBehind {
                         if (sel) {
                             val g = 0.22f + 0.16f * sin(clock.floatValue * 2.6f)
@@ -771,8 +771,8 @@ private fun SettingsTab(vm: HsinVm) {
     val ctx = LocalContext.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SText("PENGATURAN", 12.sp, SP.gold, spacing = 2.sp, modifier = Modifier.rise(0))
-        SwitchRow("Jangan ganggu otomatis saat game", "Notifikasi dibisukan selama game jalan, balik normal saat game ditutup.", vm.dndGame, 40) { vm.setDndGame(it) }
-        SwitchRow("Floating FPS saat game", "Logo FPS melayang; ketuk untuk panel, ganti mode, dan rekam.", vm.hudOn, 80) { vm.setHudOn(it) }
+        SwitchRow("Jangan ganggu otomatis saat game", "Notifikasi dibisukan selama game jalan, balik normal saat game ditutup.", vm.dndGame, 40) { vm.chooseDnd(it) }
+        SwitchRow("Floating FPS saat game", "Logo FPS melayang; ketuk untuk panel, ganti mode, dan rekam.", vm.hudOn, 80) { vm.chooseHud(it) }
         if (!Hud.canDraw(ctx)) {
             Glass(Modifier.fillMaxWidth().tap { ctx.startActivity(Hud.permissionIntent(ctx)) }.rise(120)) {
                 Column(Modifier.padding(12.dp)) {
@@ -792,7 +792,7 @@ private fun SettingsTab(vm: HsinVm) {
         }
         Row(Modifier.fillMaxWidth().rise(200), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             QBtn("Salin laporan", false, Modifier.weight(1f)) { vm.copyReport() }
-            QBtn("Pulihkan bawaan", false, Modifier.weight(1f)) { vm.restoreDefaults(); vm.setModeLocal("bawaan") }
+            QBtn("Pulihkan bawaan", false, Modifier.weight(1f)) { vm.restoreDefaults(); vm.forceMode("bawaan") }
         }
         Box(
             Modifier.fillMaxWidth().rise(240).tap { vm.advanced = true }.clip(RoundedCornerShape(10.dp)).border(1.dp, SP.gold, RoundedCornerShape(10.dp)).padding(vertical = 14.dp),
