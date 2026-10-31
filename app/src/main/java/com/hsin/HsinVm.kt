@@ -46,6 +46,17 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
     var openCat by mutableStateOf<String?>(null)
     var openGame by mutableStateOf<String?>(null)
     var customOpen by mutableStateOf(false)
+    var advanced by mutableStateOf(false)      // true = layar tuning manual lama ("Lanjutan")
+    var spaceTab by mutableIntStateOf(0)       // 0 Beranda, 1 Game, 2 Rekaman, 3 Pengaturan
+
+    // ---- game space (v6) ----
+    var mode by mutableStateOf("bawaan")       // hemat | bawaan | seimbang | boost
+    var gameCfg by mutableStateOf(store.gameCfg)
+    var gameIdx by mutableIntStateOf(0)
+    var dndGame by mutableStateOf(store.dndGame)
+    var hudOn by mutableStateOf(store.hudOn)
+    var cleaning by mutableStateOf(false)
+    var dndNow by mutableStateOf(false)
 
     // ---- tampilan ----
     var theme by mutableIntStateOf(store.theme)
@@ -161,9 +172,12 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             val st = Repo.status()
             val cf = Repo.conflicts()
             val th = Repo.thermalGet()
+            val md = Repo.modeGet()
             if (!gamesSynced) {
                 for (g in store.games) Repo.gameSet(g.pkg, g.values)
                 gamesSynced = true
+                for ((p, c) in store.gameCfg) if (c.first != "global" || c.second < 100) Repo.gameCfg(p, c.first, c.second)
+                Repo.dndCfg(store.dndGame)
             }
             withContext(Dispatchers.Main) {
                 if (dev != null) device = dev
@@ -180,6 +194,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
                 if (st != null) consumeLive(st)
                 conflicts = cf
                 if (th != null) thermal = th
+                mode = md
                 setup = Setup.Ready
                 refreshing = false
             }
@@ -506,7 +521,8 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
         monitorJob?.cancel()
         monitorJob = viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                if (foreground && tab == 3 && monitorMode == 0 && !paused && setup == Setup.Ready && !customOpen) {
+                val watch = if (advanced) (tab == 3 && monitorMode == 0 && !paused && !customOpen) else (spaceTab == 0 || spaceTab == 1)
+                if (foreground && watch && setup == Setup.Ready) {
                     val st = Repo.status()
                     if (st != null) withContext(Dispatchers.Main) { consumeLive(st) }
                 }
@@ -528,7 +544,7 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
             val d = device
             val st = live
             val sb = StringBuilder()
-            sb.append("HSIN v5.0.0\n")
+            sb.append("HSIN v6.0.0\n")
             if (d != null) sb.append("Device: ${d.brand} ${d.model} | ${d.soc} | kernel ${d.kernel} | android ${d.android}\n")
             if (st != null) {
                 sb.append("CPU ${st.cpuKhz / 1000} MHz | GPU ${st.gpuHz / 1000000} MHz | suhu CPU ${st.cpuTemp} C | safe_mode ${st.safeMode} | trip ${st.thermalTrip}\n")
@@ -543,6 +559,118 @@ class HsinVm(app: Application) : AndroidViewModel(app) {
                 copyText(sb.toString())
                 message = "Laporan disalin"
             }
+        }
+    }
+
+    // ================= game space (v6) =================
+    fun modeLabel(m: String): String = when (m) {
+        "hemat" -> "Hemat"; "seimbang" -> "Seimbang"; "boost" -> "Boost"; else -> "Bawaan"
+    }
+
+    fun setMode(m: String) {
+        if (m == mode) return
+        val old = mode
+        mode = m
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = Repo.modeSet(m)
+            val st = Repo.status()
+            withContext(Dispatchers.Main) {
+                if (st != null) consumeLive(st)
+                if (!r.first) { mode = old; message = r.second.ifEmpty { "Gagal mengganti mode" } }
+                else message = "Mode ${modeLabel(m)} aktif"
+            }
+        }
+    }
+
+    fun setModeLocal(m: String) { mode = m }
+
+    fun cfgOf(pkg: String): Pair<String, Int> = gameCfg[pkg] ?: Pair("global", 100)
+
+    fun setGameCfg(pkg: String, m: String, res: Int) {
+        val n = LinkedHashMap(gameCfg)
+        n[pkg] = Pair(m, res.coerceIn(50, 100))
+        gameCfg = n
+        store.gameCfg = n
+        viewModelScope.launch(Dispatchers.IO) { Repo.gameCfg(pkg, m, res.coerceIn(50, 100)) }
+    }
+
+    fun gameModeText(pkg: String): String {
+        val c = cfgOf(pkg)
+        val m = if (c.first == "global") mode else c.first
+        return "Mode ${modeLabel(m)} · Resolusi ${c.second}%"
+    }
+
+    fun launchGame(pkg: String) {
+        store.lastGame = pkg
+        viewModelScope.launch(Dispatchers.IO) {
+            val c = cfgOf(pkg)
+            Repo.gameCfg(pkg, c.first, c.second)
+            val r = Repo.launch(pkg)
+            withContext(Dispatchers.Main) {
+                if (!r.first) message = r.second.ifEmpty { "Game gagal dibuka" }
+                else if (hudOn && Hud.canDraw(ctx)) Hud.start(ctx, pkg)
+            }
+        }
+    }
+
+    fun cleanRam() {
+        if (cleaning) return
+        cleaning = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = Repo.ramClean()
+            val st = Repo.status()
+            withContext(Dispatchers.Main) {
+                cleaning = false
+                if (st != null) consumeLive(st)
+                message = if (r.first) "RAM dibersihkan: ${r.second / 1024} MB bebas" else "Gagal membersihkan RAM"
+            }
+        }
+    }
+
+    fun toggleDndNow() {
+        val want = !dndNow
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = Repo.dndNow(want)
+            withContext(Dispatchers.Main) {
+                if (r.first) dndNow = want else message = r.second.ifEmpty { "Jangan ganggu tidak bisa diatur" }
+            }
+        }
+    }
+
+    fun setDndGame(on: Boolean) {
+        dndGame = on
+        store.dndGame = on
+        viewModelScope.launch(Dispatchers.IO) { Repo.dndCfg(on) }
+    }
+
+    fun setHudOn(on: Boolean) {
+        hudOn = on
+        store.hudOn = on
+        if (!on) Hud.stop(ctx)
+    }
+
+    // ---- rekaman FPS ----
+    var recs by mutableStateOf<List<RecItem>>(emptyList())
+
+    fun loadRecs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ls = Shell.run("ls -t /sdcard/Download/Hsin_fps_*.csv 2>/dev/null | head -n 12", 15).second
+            val out = ArrayList<RecItem>()
+            for (raw in ls.lines()) {
+                val f = raw.trim()
+                if (!Regex("/sdcard/Download/Hsin_fps_[A-Za-z0-9_]+\\.csv").matches(f)) continue
+                val txt = Shell.run("cat '$f'", 15).second
+                parseRec(f.substringAfterLast('/'), txt)?.let { out.add(it) }
+            }
+            withContext(Dispatchers.Main) { recs = out }
+        }
+    }
+
+    fun deleteRec(name: String) {
+        if (!Regex("Hsin_fps_[A-Za-z0-9_]+\\.csv").matches(name)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            Shell.run("rm -f '/sdcard/Download/$name'", 10)
+            loadRecs()
         }
     }
 }

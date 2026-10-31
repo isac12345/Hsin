@@ -172,4 +172,33 @@ object Repo {
         if (out.isBlank()) return emptyList()
         return out.lines().filter { it.isNotBlank() }
     }
+
+    // ---- mode & game space (v6) ----
+    fun modeGet(): String = obj("mode-get")?.optString("mode", "bawaan") ?: "bawaan"
+
+    fun modeSet(mode: String): Pair<Boolean, String> {
+        val o = obj("mode", mode) ?: return Pair(false, "Tidak ada jawaban dari modul")
+        return Pair(o.optInt("ok") == 1, o.optString("error"))
+    }
+
+    fun gameCfg(pkg: String, mode: String, res: Int): Boolean =
+        obj("game-cfg", pkg, mode, res.toString())?.optInt("ok") == 1
+
+    fun launch(pkg: String): Pair<Boolean, String> {
+        val o = obj("launch", pkg) ?: return Pair(false, "Tidak ada jawaban dari modul")
+        return Pair(o.optInt("ok") == 1, o.optString("error"))
+    }
+
+    fun dndCfg(on: Boolean): Boolean = obj("dnd-cfg", if (on) "1" else "0")?.optInt("ok") == 1
+
+    fun dndNow(on: Boolean): Pair<Boolean, String> {
+        val o = obj("dnd-now", if (on) "1" else "0") ?: return Pair(false, "")
+        return Pair(o.optInt("ok") == 1, o.optString("error"))
+    }
+
+    /** Pair(ok, kB yang dibebaskan). */
+    fun ramClean(): Pair<Boolean, Long> {
+        val o = obj("ram-clean") ?: return Pair(false, 0L)
+        return Pair(o.optInt("ok") == 1, o.optLong("freed_kb"))
+    }
 }

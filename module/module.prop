@@ -1,6 +1,6 @@
 id=hsin
 name=HSIN Universal Manual Tuning
-version=v5.0.0
-versionCode=5003
+version=v6.0.0
+versionCode=6000
 author=Somwan
-description=Tuning manual CPU/GPU/memori/IO/jaringan dengan profil per game dan pengaman panas. Hanya menulis knob yang kamu ubah lewat app.
+description=Game booster: mode Hemat/Bawaan/Seimbang/Boost, profil per game, floating FPS, pengaman panas dan boot.

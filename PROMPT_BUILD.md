@@ -8,7 +8,7 @@ Konteks: repo ini lengkap (modul `module/`, app `app/`, tes `tests/`, workflow `
 3. Jangan pernah commit keystore (`*.jks`, `*.keystore`). Kunci hanya dari GitHub Secrets.
 4. Jangan mengubah `module/` kecuali `bash tests/sandbox.sh dash` atau `bash` gagal. Kontrak app↔modul ada di `docs/CONTRACT.md` dan harus tetap cocok.
 5. Satu perbaikan per commit, pesan commit jelas. Tanpa refactor, tanpa fitur baru.
-6. Jangan menambah mode profil (battery/balanced/performance), WebUI, bubble, atau notifikasi. HSIN = tuning manual + preset + profil per game.
+6. (Direvisi v6.0.0 atas keputusan pemilik) Mode Hemat/Bawaan/Seimbang/Boost dan floating FPS DIIZINKAN. Tetap dilarang: WebUI dan notifikasi selain notifikasi wajib service floating. Boost tidak boleh dibatasi.
 
 ## Langkah
 1. `bash tests/sandbox.sh dash` dan `bash tests/sandbox.sh bash` harus `PASS=96 FAIL=0`.
