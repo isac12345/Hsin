@@ -1,6 +1,7 @@
-id=hsin
-name=HSIN Universal Manual Tuning
+id=alpha_uperf_fasrs_fusion
+name=HSIN
 version=v6.0.0
-versionCode=6000
-author=Somwan
-description=Game booster: mode Hemat/Bawaan/Seimbang/Boost, profil per game, floating FPS, pengaman panas dan boot.
+versionCode=60
+author=somwan
+description=HSIN game booster: mode Hemat/Seimbang/Performa/Gacor, floating FPS, rekam layar. Berbasis Alpha Fusion (Uperf + fas-rs), kredit di app.
+updateJson=

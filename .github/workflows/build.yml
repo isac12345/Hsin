@@ -10,21 +10,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Tes modul (sandbox)
-        run: |
-          sudo apt-get update -y >/dev/null
-          sudo apt-get install -y dash >/dev/null
-          bash tests/sandbox.sh dash
-          bash tests/sandbox.sh bash
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
+
+      - name: SDK 34
+        run: |
+          if ! ls -d "$ANDROID_SDK_ROOT"/platforms/android-34 >/dev/null 2>&1; then
+            SDKM=$(ls "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+            if [ -n "$SDKM" ]; then
+              yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+              "$SDKM" "platforms;android-34" "build-tools;34.0.0" || true
+            fi
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.9
+          gradle-version: '8.7'
+
+      - name: Cek script modul
+        run: bash tools/check_module.sh
 
       - name: Siapkan keystore dari Secrets (opsional)
         env:
@@ -49,13 +55,18 @@ jobs:
           grep -E "^e: |error:|What went wrong" -A2 build.log | head -60 | while IFS= read -r l; do echo "::error::${l}"; done
           exit $rc
 
-      - name: Kemas modul + rapikan nama
+      - name: Kemas modul (APK ikut di companion/) dan apk
         run: |
-          mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk out/HSIN-v6.0.0.apk
-          (cd module && zip -r9 -X ../out/HSIN-v6.0.0-module.zip .)
+          VER=$(tr -d '[:space:]' < version.txt)
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          mkdir -p module/companion dist
+          cp "$APK" module/companion/AlphaBubble.apk
+          cp "$APK" "dist/HSIN-v6.0.0.apk"
+          (cd module && zip -r9 -q "../dist/HSIN-v6.0.0-module.zip" . -x '*.git*')
+          ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: HSIN-v6.0.0
-          path: out/*
+          path: dist/*
