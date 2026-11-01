@@ -30,7 +30,7 @@ class ProfileTileService : TileService() {
 
     private fun render(p: String) {
         val t = qsTile ?: return
-        t.label = "Alpha ${profileLabel(p)}"
+        t.label = "HSIN ${profileLabel(p)}"
         t.state = if (p == "none") Tile.STATE_INACTIVE else Tile.STATE_ACTIVE
         t.updateTile()
     }

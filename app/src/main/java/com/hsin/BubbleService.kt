@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  */
 class BubbleService : Service() {
     companion object {
-        const val CH = "alpha_profile"
+        const val CH = "hsin_mode"
         const val NID = 7
         const val ACT_SET = "com.hsin.SET_PROFILE"
         const val ACT_SHOW = "com.hsin.SHOW_BUBBLE"
@@ -65,6 +65,8 @@ class BubbleService : Service() {
     private var gamePkg = ""
     private var hudPkg = ""
     private var recOn = false
+    private var ovdOn = false
+    private var lastFps = 0
     private var protectedFor = ""
     private var flJob: Job? = null
 
@@ -137,13 +139,15 @@ class BubbleService : Service() {
                 val s = Alpha.status()
                 if (s == null) {
                     // status gagal/lambat: floating tetap dipastikan ada (jangan hilang menunggu su)
-                    if (!(prefs.bubbleHidden || (!prefs.bubbleOn && !prefs.hudOn) || !Settings.canDrawOverlays(this@BubbleService))) floating?.setGame("auto")
+                    if (orbAllowed()) floating?.setGame("auto")
                 }
                 if (s != null) {
                     profile = s.profile
                     tempC = s.tempC
                     batt = s.batt
                     gamePkg = s.gamePkg
+                    ovdOn = s.ovd
+                    if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
                     // Lindungi proses ini dari pembunuh memori tiap kali game baru terdeteksi (satu panggilan su, bukan tiap siklus).
                     if (hudPkg.isNotEmpty() && hudPkg != protectedFor) {
@@ -154,21 +158,27 @@ class BubbleService : Service() {
                     floating?.setOvd(s.ovd, s.ovdLevel, s.gamePkg.isNotEmpty())
                     floating?.setSession(s.gamePkg)
                     floating?.setProfileState(profile, recOn)
-                    if (prefs.bubbleHidden || (!prefs.bubbleOn && !prefs.hudOn) || !Settings.canDrawOverlays(this@BubbleService)) {
+                    if (!orbAllowed()) {
                         floating?.detach()
                     } else {
+                        floating?.attach()
                         floating?.setGame("auto")
                     }
                 }
                 // baterai/suhu selalu dari sistem (tanpa su) supaya notifikasi tidak basi walau status gagal/lambat
                 readBattery()
                 updateNotification()
-                delay(8000)
+                delay(if (gamePkg.isNotEmpty()) 4000L else 6000L)
             }
         }
     }
 
     private var screenOn: android.content.BroadcastReceiver? = null
+
+    /** Orb hanya muncul saat game berjalan (atau saat merekam FPS); di luar itu disembunyikan. */
+    private fun orbAllowed(): Boolean =
+        !(prefs.bubbleHidden || (!prefs.bubbleOn && !prefs.hudOn) || !Settings.canDrawOverlays(this)) &&
+            (gamePkg.isNotEmpty() || FpsLog.on || recOn)
 
     /** Minta sistem jangan membekukan/membunuh service ini: whitelist hemat daya, bucket aktif, oom. Butuh root, gagal diam-diam. */
     private fun harden() {
@@ -196,7 +206,12 @@ class BubbleService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACT_SET -> intent.getStringExtra(EXTRA_P)?.let { setProfile(it) }
+            ACT_SET -> intent.getStringExtra(EXTRA_P)?.let {
+                if (it == "puncak") {
+                    if (gamePkg.isEmpty()) Toast.makeText(this, "Buka game dulu untuk mode Puncak", Toast.LENGTH_SHORT).show()
+                    else toggleOvd(!ovdOn)
+                } else setProfile(it)
+            }
             ACT_FPSLOG -> {
                 // layar Performa di app: mulai/berhenti rekam data FPS; pastikan floating terpasang (aliran HUD)
                 if (!FpsLog.on) { prefs.bubbleHidden = false; rebuild() }
@@ -222,7 +237,7 @@ class BubbleService : Service() {
 
     private fun rebuild() {
         updateNotification()
-        if (prefs.bubbleHidden || (!prefs.bubbleOn && !prefs.hudOn) || !Settings.canDrawOverlays(this)) {
+        if (!orbAllowed()) {
             floating?.detach()
             return
         }
@@ -241,7 +256,7 @@ class BubbleService : Service() {
             val r = Alpha.setProfile(p)
             Toast.makeText(
                 this@BubbleService,
-                if (r.ok) "Profil ${profileLabel(p)}" else "Gagal ganti profil",
+                if (r.ok) "Mode ${profileLabel(p)}" else "Gagal ganti mode",
                 Toast.LENGTH_SHORT,
             ).show()
             Alpha.status()?.let {
@@ -263,7 +278,7 @@ class BubbleService : Service() {
                 val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                 Toast.makeText(this@BubbleService, msg, Toast.LENGTH_LONG).show()
             }
-            Alpha.status()?.let { floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()) }
+            Alpha.status()?.let { ovdOn = it.ovd; floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()); updateNotification() }
         }
     }
 
@@ -284,10 +299,15 @@ class BubbleService : Service() {
     // ---------- notifikasi ----------
     private fun createChannel() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val ch = NotificationChannel(CH, "Profil Alpha", NotificationManager.IMPORTANCE_LOW)
+        try { nm.deleteNotificationChannel("alpha_profile") } catch (_: Exception) {}
+        val ch = NotificationChannel(CH, "HSIN", NotificationManager.IMPORTANCE_LOW)
         ch.setShowBadge(false)
+        ch.setSound(null, null)
+        ch.enableVibration(false)
         nm.createNotificationChannel(ch)
     }
+
+    private fun modeNow(): String = if (ovdOn) "Puncak" else profileLabel(profile)
 
     private fun buildNotification(): Notification {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -301,33 +321,37 @@ class BubbleService : Service() {
                 flags,
             )
         }
-        val line1 = buildString {
-            if (batt >= 0) append("Baterai $batt%")
-            if (tempC > 0f) { if (isNotEmpty()) append(" · "); append("suhu baterai %.0f°C".format(tempC)) }
-        }
         val gameName = if (gamePkg.isNotEmpty()) {
             try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(gamePkg, 0)).toString() } catch (_: Exception) { gamePkg }
         } else ""
-        val line2 = if (gameName.isNotEmpty()) "Game jalan: $gameName (profil game dipakai)" else ""
-        val text = if (hidden) "Floating disembunyikan · ketuk untuk memunculkan" else line1.ifEmpty { "Alpha Fusion" }
-        val big = listOf(text, line2).filter { it.isNotEmpty() }.joinToString("\n")
+        lastFps = floating?.lastFps ?: 0
+        val text = buildString {
+            if (gameName.isNotEmpty()) append(gameName) else append("Siaga")
+            if (gameName.isNotEmpty() && lastFps > 0) append(" · ").append(lastFps).append(" FPS")
+            if (tempC > 0f) append(" · %.0f°C".format(tempC))
+            if (batt >= 0) append(" · ").append(batt).append("%")
+        }
         val b = NotificationCompat.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_stat_alpha)
-            .setContentTitle("Profil aktif: ${profileLabel(profile)}")
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(big))
+            .setContentTitle("HSIN · Mode ${modeNow()}")
+            .setContentText(if (hidden) "Orb disembunyikan · ketuk untuk memunculkan" else text)
             .setContentIntent(content)
             .setOngoing(true)
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-        PROFILE_KEYS.forEachIndexed { i, k ->
+        val keys = PROFILE_KEYS + "puncak"
+        val labels = PROFILE_LABELS + "Puncak"
+        keys.forEachIndexed { i, k ->
+            val active = if (k == "puncak") ovdOn else (!ovdOn && k == profile)
             val pi = PendingIntent.getService(
                 this, 100 + i,
                 Intent(this, BubbleService::class.java).setAction(ACT_SET).putExtra(EXTRA_P, k),
                 flags,
             )
-            b.addAction(0, (if (k == profile) "● " else "") + PROFILE_LABELS[i], pi)
+            b.addAction(0, (if (active) "● " else "") + labels[i], pi)
         }
         return b.build()
     }

@@ -112,7 +112,7 @@ fun profileShort(p: String): String = when (p) {
 }
 
 val PROFILE_KEYS = listOf("battery", "balanced", "performance")
-val PROFILE_LABELS = listOf("DAILY", "BALANCED", "PERF")
+val PROFILE_LABELS = listOf("Hemat", "Seimbang", "Performa")
 
 /** Ringkasan FPS satu sesi game. low1 = rata-rata 1% sampel terburuk (sampel 1 per detik). */
 data class FpsSession(

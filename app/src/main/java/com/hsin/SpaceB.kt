@@ -688,8 +688,8 @@ internal fun RitualOverlay(vm: AppViewModel) {
     val en = LocalEn.current
     val names = if (en) listOf("Clean RAM", "Apply mode", "Resolution", "Do not disturb", "Floating", "Open game")
     else listOf("Bersihkan RAM", "Terapkan mode", "Resolusi game", "Jangan ganggu", "Siapkan floating", "Buka game")
-    val subs = if (en) listOf("Background apps only", "Profile for this game", "Applied when the game starts", "Silence notifications", "FPS orb inside the game", "Starting now")
-    else listOf("Hanya app latar belakang", "Profil khusus game ini", "Dipasang saat game mulai", "Notifikasi dibisukan", "Orb FPS di dalam game", "Dimulai sekarang")
+    val subs = if (en) listOf("Background apps only", "Profile for this game", "Applied by the module at launch", "Silence notifications", "FPS orb inside the game", "Starting now")
+    else listOf("Hanya app latar belakang", "Profil khusus game ini", "Dipasang modul saat buka", "Notifikasi dibisukan", "Orb FPS di dalam game", "Dimulai sekarang")
     val results = remember(pkg) { mutableStateOf(List(6) { "" }) }
     var step by remember(pkg) { mutableIntStateOf(-1) }
     var cancelled by remember(pkg) { mutableStateOf(false) }
@@ -707,7 +707,12 @@ internal fun RitualOverlay(vm: AppViewModel) {
         setRes(0, if (mb > 0) "+$mb MB" else "OK")
         delay(350)
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
-        step = 1; delay(500); setRes(1, if (en) mode.nameEn else mode.nameId)
+        step = 1
+        val gProf = g?.profile ?: "balanced"
+        val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Alpha.setProfile(gProf).ok else true
+        delay(350)
+        setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else if (en) " ✗" else " ✗")
+        if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 2; delay(450)
         setRes(2, fx["downscale"].orEmpty().toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%")
@@ -718,9 +723,15 @@ internal fun RitualOverlay(vm: AppViewModel) {
         step = 5
         val r = Alpha.launchGame(pkg)
         setRes(5, if (r.ok) (if (en) "Go" else "Mulai") else (if (en) "Failed" else "Gagal"))
+        if (r.ok) {
+            // verifikasi jujur: tunggu game benar-benar di depan
+            var seen = false
+            for (k in 0 until 6) { delay(700); if (Alpha.status()?.gamePkg == pkg) { seen = true; break } }
+            if (!seen) setRes(5, if (en) "Starting…" else "Memuat…")
+        }
         if (!r.ok) vm.toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         step = 6
-        done = true
+        done = r.ok
         delay(900)
         UiState.ritual = ""
     }

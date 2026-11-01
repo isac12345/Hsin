@@ -313,7 +313,8 @@ fun SpaceRoot(vm: AppViewModel) {
 
 @Composable
 private fun SpaceContent(vm: AppViewModel, land: Boolean, modifier: Modifier) {
-    Box(modifier) {
+    val tk = popKey(UiState.tab, 320)
+    Box(modifier.graphicsLayer { alpha = 0.15f + 0.85f * tk; translationX = (1f - tk) * 28.dp.toPx() }) {
         if (vm.loaded && !vm.rootOk) {
             NoticeCard(tx("Akses root belum diberikan", "Root access not granted"), tx("Buka manager root (KernelSU/Magisk/APatch) dan izinkan HSIN, lalu coba lagi.", "Open your root manager and allow HSIN, then retry."), vm)
         } else if (vm.loaded && vm.modPath.isEmpty()) {
