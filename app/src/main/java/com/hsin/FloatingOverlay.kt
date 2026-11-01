@@ -1619,7 +1619,6 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             canvas.drawArc(rect, -90f, 360f * frac, false, p)
         }
     }
-    }
 
     private inner class BarView(private val color: Int) : View(ctx) {
         var frac = 0f
