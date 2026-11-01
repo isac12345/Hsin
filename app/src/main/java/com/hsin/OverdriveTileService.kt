@@ -32,11 +32,11 @@ class OverdriveTileService : TileService() {
             if (s.ovd) {
                 Alpha.ovdStop()
             } else if (s.gamePkg.isEmpty()) {
-                Toast.makeText(applicationContext, "Buka game terdaftar dulu, Overdrive hanya untuk game", Toast.LENGTH_LONG).show()
+                Toast.makeText(applicationContext, "Buka game terdaftar dulu, Puncak hanya untuk game", Toast.LENGTH_LONG).show()
             } else {
                 val r = Alpha.ovdStart()
                 if (!r.ok) {
-                    val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Overdrive gagal"
+                    val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                     Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show()
                 }
             }
@@ -46,7 +46,7 @@ class OverdriveTileService : TileService() {
 
     private fun render(s: Status?) {
         val t = qsTile ?: return
-        t.label = "Overdrive"
+        t.label = "Puncak"
         t.state = when {
             s == null -> Tile.STATE_UNAVAILABLE
             s.ovd -> Tile.STATE_ACTIVE

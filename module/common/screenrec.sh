@@ -1,12 +1,12 @@
 #!/system/bin/sh
-# Alpha Fusion - screenrec: rekam layar lewat `screenrecord` bawaan Android (root, tanpa dialog izin).
+# HSIN - screenrec: rekam layar lewat `screenrecord` bawaan Android (root, tanpa dialog izin).
 #
 #   screenrec.sh start     mulai merekam (satu file per sesi; baru dipotong bila batas waktu perangkat tercapai)
 #   screenrec.sh stop      berhenti dan tutup file dengan benar
 #   screenrec.sh status    running=1|0, file=<potongan sekarang>, dir=<folder>
 #   screenrec.sh list [N]  N file rekaman terbaru
 #
-# Hasil: /sdcard/Movies/Alpha/Alpha_<tanggal>_<jam>.mp4 (potongan lanjutan: _p2, _p3 ...) (tanpa audio; screenrecord tidak
+# Hasil: /sdcard/Movies/HSIN/Alpha_<tanggal>_<jam>.mp4 (potongan lanjutan: _p2, _p3 ...) (tanpa audio; screenrecord tidak
 # bisa merekam audio internal). Bitrate dari conf REC_BITRATE_MBPS (default 8, rentang 2-40).
 # Ada jeda sekitar setengah detik antar potongan.
 
@@ -15,7 +15,7 @@ CONF_FILE="$STATE_DIR/app.conf"
 PID_FILE="$STATE_DIR/.rec_pid"
 STOP_FILE="$STATE_DIR/.rec_stop"
 CUR_FILE="$STATE_DIR/.rec_file"
-OUT_DIR="${ALPHA_REC_DIR:-/sdcard/Movies/Alpha}"
+OUT_DIR="${ALPHA_REC_DIR:-/sdcard/Movies/HSIN}"
 SEG_SECS="${ALPHA_REC_SEG:-3600}"
 SELF="$(readlink -f "$0")"
 
@@ -48,7 +48,7 @@ rec_loop() {
     _seg="$SEG_SECS"
     while [ ! -f "$STOP_FILE" ]; do
         # satu sesi = satu nama dasar; potongan hanya muncul kalau batas waktu tercapai
-        if [ "$_n" -eq 1 ]; then _f="$OUT_DIR/Alpha_${_sid}.mp4"; else _f="$OUT_DIR/Alpha_${_sid}_p$_n.mp4"; fi
+        if [ "$_n" -eq 1 ]; then _f="$OUT_DIR/HSIN_${_sid}.mp4"; else _f="$OUT_DIR/HSIN_${_sid}_p$_n.mp4"; fi
         printf '%s\n' "$_f" > "$CUR_FILE"
         _t0=$(cut -d. -f1 /proc/uptime 2>/dev/null)
         screenrecord --bit-rate "$_br" --time-limit "$_seg" "$_f" >/dev/null 2>&1

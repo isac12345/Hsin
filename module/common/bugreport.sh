@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # Alpha Fusion - bugreport: kumpulkan satu arsip untuk dilaporkan.
-#   bugreport.sh            -> /sdcard/Download/Alpha_bugreport_<tanggal>.tar.gz (atau folder bila tar tidak ada)
+#   bugreport.sh            -> /sdcard/Download/HSIN_bugreport_<tanggal>.tar.gz (atau folder bila tar tidak ada)
 # Isi: log Alpha (2000 baris terakhir), konfigurasi/state Alpha, status, kemampuan perangkat, versi modul,
 # model/SoC/Android, mode layar yang didukung, daftar game TERDAFTAR di Alpha.
 # TIDAK diambil: daftar semua app, akun, serial/IMEI, isi /sdcard, riwayat.
@@ -8,7 +8,7 @@ COMMON="${0%/*}"
 STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
 OUT_ROOT="${ALPHA_BUGREPORT_DIR:-/sdcard/Download}"
 TS=$(date '+%Y%m%d_%H%M%S' 2>/dev/null)
-NAME="Alpha_bugreport_$TS"
+NAME="HSIN_bugreport_$TS"
 W="${TMPDIR:-/data/local/tmp}/$NAME"
 mkdir -p "$W" "$OUT_ROOT" 2>/dev/null || { echo "ERROR: tidak bisa membuat folder kerja"; exit 1; }
 

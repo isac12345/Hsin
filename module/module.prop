@@ -1,7 +1,7 @@
 id=alpha_uperf_fasrs_fusion
 name=HSIN
-version=v6.0.0
-versionCode=60
+version=v6.1.0
+versionCode=61
 author=somwan
-description=HSIN game booster: mode Hemat/Seimbang/Performa/Gacor, floating FPS, rekam layar. Berbasis Alpha Fusion (Uperf + fas-rs), kredit di app.
+description=HSIN game booster: mode Hemat/Seimbang/Performa/Puncak, floating orb FPS, rekam layar, resolusi per game. Mesin Uperf + fas-rs, kredit di app.
 updateJson=

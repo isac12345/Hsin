@@ -238,7 +238,7 @@ fun ToolsScreen(vm: AppViewModel) {
 
     AlphaCard {
         Label("Performa & FPS")
-        txt("Rekam data FPS, riwayat sesi, dan bandingkan Performa vs Overdrive: semua di satu layar.", 11.sp, muted())
+        txt("Rekam data FPS, riwayat sesi, dan bandingkan Performa vs Puncak: semua di satu layar.", 11.sp, muted())
         Pill(if (FpsLog.on) "SEDANG MEREKAM FPS (${FpsLog.rows})" else "BUKA PERFORMA & FPS", { vm.go("perf") }, solid = FpsLog.on)
     }
 
@@ -287,7 +287,7 @@ fun ToolsScreen(vm: AppViewModel) {
         ToggleRow("HUD FPS saat game", "FPS, GPU, CPU, suhu. Butuh izin overlay", vm.hudOn) { vm.updateHudOn(it) }
         Spacer(Modifier.height(6.dp))
         Pill(if (vm.recOn) "STOP REKAM" else "MULAI REKAM", { vm.toggleRec() }, solid = vm.recOn)
-        txt("Hasil di Movies/Alpha, tanpa audio. Tombol REC juga ada di HUD.", 11.sp, muted())
+        txt("Hasil di Movies/HSIN, tanpa audio. Tombol REC juga ada di HUD.", 11.sp, muted())
     }
 
     AlphaCard {

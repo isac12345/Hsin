@@ -3,9 +3,16 @@ PROPFILE=true
 POSTFSDATA=false
 LATESTARTSERVICE=true
 
-ui_print "================================================="
-ui_print "  Alpha + Uperf Fusion (Safe Merge)"
-ui_print "  Governor/Freq: 100% dipegang fas-rs (bukan Alpha/Uperf)"
+ui_print " "
+ui_print "   _   _  ____ ___ _   _ "
+ui_print "  | | | |/ ___|_ _| \\ | |"
+ui_print "  | |_| |\\___ \\| ||  \\| |"
+ui_print "  |  _  | ___) | || |\\  |"
+ui_print "  |_| |_||____/___|_| \\_|"
+ui_print " "
+ui_print "  HSIN v6  -  game booster"
+ui_print "  Mode: Hemat / Seimbang / Performa / Puncak"
+ui_print "  CPU/frekuensi dipegang fas-rs, bukan Uperf"
 ui_print "================================================="
 
 # ---------------------------------------------------------
@@ -33,7 +40,7 @@ esac
 # 2. Setup direktori kerja Alpha
 # ---------------------------------------------------------
 WORK_DIR="/data/adb/alpha"
-ui_print "- Menyiapkan direktori kerja Alpha: $WORK_DIR"
+ui_print "- Menyiapkan direktori kerja HSIN: $WORK_DIR"
 mkdir -p "$WORK_DIR"
 chmod 0755 "$WORK_DIR"
 # M6: tulis penanda Alpha — uninstall.sh pakai ini untuk menentukan
@@ -123,7 +130,7 @@ if [ -f "$MODPATH/uperf/script/libsysinfo.sh" ]; then
                 [ "$_opens" -gt 0 ] 2>/dev/null && [ "$_opens" = "$_closes" ] 2>/dev/null && _json_ok=1
             fi
             if [ "$_json_ok" = "1" ]; then
-                ui_print "- Uperf cpu.enable dinonaktifkan (Alpha/fas-rs pegang CPU)."
+                ui_print "- Uperf cpu.enable dinonaktifkan (fas-rs pegang CPU)."
             else
                 cp -f "$_uperf_cpu_tmp" "$UPERF_USER_PATH/uperf.json" 2>/dev/null
                 ui_print "! Peringatan: uperf.json corrupt setelah edit, file asli dipertahankan."
@@ -196,7 +203,7 @@ if [ -f "$MODPATH/uperf/script/libsysinfo.sh" ]; then
         ui_print "- Profil Uperf cocok: $UPERF_CFGNAME.json (thread/cgroup classifier akan aktif)"
     else
         ui_print "! Chipset [$UPERF_TARGET] belum ada profil Uperf."
-        ui_print "! Backend Uperf (thread classifier) akan DINONAKTIFKAN, Alpha tetap jalan normal."
+        ui_print "! Backend Uperf (thread classifier) akan DINONAKTIFKAN, HSIN tetap jalan normal."
     fi
 else
     ui_print "! libsysinfo.sh Uperf tidak ditemukan, backend Uperf dilewati."
@@ -344,4 +351,4 @@ if [ -f "$MODPATH/common/companion_install.sh" ] && [ -f "$MODPATH/companion/Alp
     fi
 fi
 
-ui_print "- Instalasi Alpha + Uperf + fas-rs Fusion selesai. Reboot untuk mengaktifkan."
+ui_print "- Instalasi HSIN selesai. Reboot, lalu buka aplikasi HSIN."

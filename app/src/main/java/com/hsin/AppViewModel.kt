@@ -46,6 +46,13 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val tab: String get() = parents[route] ?: route
 
     fun go(r: String) {
+        if (r == "tools" || r == "games" || r == "custom") {
+            route = "dash"
+            UiState.tab = when (r) { "games" -> 1; "tools" -> 3; else -> 4 }
+            if (r == "tools") viewModelScope.launch { refreshTools() }
+            if (r == "games") viewModelScope.launch { games = Alpha.games(); sessions = Alpha.sessions() }
+            return
+        }
         route = r
         when (r) {
             "games", "stats" -> viewModelScope.launch { games = Alpha.games(); sessions = Alpha.sessions() }
@@ -63,7 +70,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun back(): Boolean {
         val p = parents[route] ?: return false
-        route = p
+        go(p)
         return true
     }
 
@@ -161,7 +168,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             fpsLoading = true
             val r = Root.exec(
-                "for f in \$(ls -t /sdcard/Download/Alpha_fps_*.csv 2>/dev/null | head -6); do echo \"@@FILE \$f\"; cat \"\$f\"; done",
+                "for f in \$(ls -t /sdcard/Download/HSIN_fps_*.csv 2>/dev/null | head -6); do echo \"@@FILE \$f\"; cat \"\$f\"; done",
                 40_000L,
             )
             val blocks = r.out.split("@@FILE ").drop(1)
@@ -739,6 +746,20 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             busy = null
             toast(if (mb > 0) "RAM bebas bertambah sekitar $mb MB" else "Selesai, tidak ada RAM tambahan yang bisa dibebaskan")
         }
+    }
+
+    /** Seperti cleanRam tapi diam (tanpa dialog/toast): dipakai ritual luncur. Mengembalikan MB yang bebas. */
+    suspend fun cleanRamQuiet(): Int {
+        val prot = protectedPackages()
+        val keep = prefs.ramKeep
+        val front = setOf(status.hudPkg, status.gamePkg).filter { it.isNotEmpty() }.toSet()
+        val targets = withContext(Dispatchers.IO) {
+            pm.getInstalledApplications(0)
+                .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
+                .map { it.packageName }
+                .filter { !isProtected(it, prot) && it !in keep && it !in front }
+        }
+        return Alpha.cleanRam(targets)
     }
 
     private fun closeApps(includeSystem: Boolean) {
