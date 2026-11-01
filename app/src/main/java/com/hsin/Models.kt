@@ -97,17 +97,17 @@ sealed class Dlg {
 }
 
 fun profileLabel(p: String): String = when (p) {
-    "battery" -> "DAILY"
-    "balanced" -> "BALANCED"
-    "performance" -> "PERF"
-    "overdrive" -> "OVERDRIVE"
+    "battery" -> "Hemat"
+    "balanced" -> "Seimbang"
+    "performance" -> "Performa"
+    "overdrive" -> "Puncak"
     else -> "—"
 }
 
 fun profileShort(p: String): String = when (p) {
-    "battery" -> "DAY"
-    "balanced" -> "BAL"
-    "performance" -> "PERF"
+    "battery" -> "HEM"
+    "balanced" -> "SEI"
+    "performance" -> "PRF"
     else -> "…"
 }
 
@@ -158,7 +158,7 @@ object FpsLog {
     var saved by mutableStateOf(0)   // naik tiap berkas tersimpan -> daftar dimuat ulang
 }
 
-/** Ringkasan satu berkas CSV rekaman FPS (Download/Alpha_fps_*.csv). */
+/** Ringkasan satu berkas CSV rekaman FPS (Download/HSIN_fps_*.csv). */
 data class FpsFile(
     val name: String,
     val pkg: String,

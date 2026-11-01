@@ -375,7 +375,7 @@ fun EditScreen(vm: AppViewModel) {
             vm.setGameOpt(pkg, "LITE", if (it) "1" else "default")
         }
         if (!lite) {
-            ToggleRow("Overdrive otomatis", "mesin sendiri tanpa Uperf/fas-rs tiap game ini dibuka; berhenti saat panas, baterai <15%, layar mati, atau game ditutup", opts["OVD"] == "on") {
+            ToggleRow("Mode Puncak otomatis", "mesin sendiri tanpa Uperf/fas-rs tiap game ini dibuka; berhenti saat panas, baterai <15%, layar mati, atau game ditutup", opts["OVD"] == "on") {
                 opts = if (it) opts + ("OVD" to "on") else opts - "OVD"
                 vm.setGameOpt(pkg, "OVD", if (it) "on" else "default")
             }

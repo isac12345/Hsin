@@ -115,7 +115,7 @@ class BubbleService : Service() {
                 val gp = try { Alpha.games().firstOrNull { it.pkg == st0.pkg }?.profile.orEmpty() } catch (_: Exception) { "" }
                 val st = if (rank(gp) > rank(st0.profile)) st0.copy(profile = gp) else st0
                 prefs.fpsSessions = listOf(st) + prefs.fpsSessions
-                val mode = if (st.ovdPct >= 50) "Overdrive" else profileLabel(st.profile)
+                val mode = if (st.ovdPct >= 50) "Puncak" else profileLabel(st.profile)
                 Toast.makeText(this@BubbleService, "Sesi selesai ($mode): rata-rata ${st.avg} FPS, 1% terendah ${st.low1} FPS", Toast.LENGTH_LONG).show()
             }
         }
@@ -260,7 +260,7 @@ class BubbleService : Service() {
         scope.launch {
             val r = if (on) Alpha.ovdStart() else Alpha.ovdStop()
             if (on && !r.ok) {
-                val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Overdrive gagal"
+                val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                 Toast.makeText(this@BubbleService, msg, Toast.LENGTH_LONG).show()
             }
             Alpha.status()?.let { floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()) }

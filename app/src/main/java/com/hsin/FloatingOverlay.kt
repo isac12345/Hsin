@@ -42,10 +42,10 @@ import kotlin.math.min
 class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     companion object {
-        private const val PANEL = 0xE00E131E.toInt()
+        private const val PANEL = 0xE0141416.toInt()
         private const val CARD = 0x0FFFFFFF
         private const val BORDER = 0x1FFFFFFF
-        private const val TEXT = 0xFFE8ECF4.toInt()
+        private const val TEXT = 0xFFF4F1EA.toInt()
         private const val LABEL = 0xFFA6B0C3.toInt()
         private const val HINT = 0xFF98A2B3.toInt()
         private const val SEG_TEXT = 0xFFB4BDCE.toInt()
@@ -56,17 +56,21 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         private const val GPU = 0xFFF5A524.toInt()
         private const val RAM = 0xFF34D399.toInt()
         private const val TEMP = 0xFFFB7185.toInt()
-        private const val P_BATTERY = 0xFF34D399.toInt()
-        private const val P_BALANCED = 0xFF60A5FA.toInt()
-        private const val P_PERF = 0xFFF5A524.toInt()
-        private const val OD = 0xFFD946EF.toInt()
-        private const val OD_TEXT = 0xFFF0ABFC.toInt()
-        private const val OD_END = 0xFF9333EA.toInt()
-        private const val OD_GLOW = 0xB3D946EF.toInt()
+        private const val P_BATTERY = 0xFF4FE3C1.toInt()
+        private const val P_BALANCED = 0xFFE8B95A.toInt()
+        private const val P_PERF = 0xFFFF9A3C.toInt()
+        private const val OD = 0xFFFF4D5E.toInt()
+        private const val OD_TEXT = 0xFFFF9AA0.toInt()
+        private const val OD_END = 0xFFB82E3C.toInt()
+        private const val OD_GLOW = 0xB3FF4D5E.toInt()
         private const val MODE_PILL = 0
         private const val MODE_PANEL = 1
         private const val MODE_THIN = 2
-        private val PROFILE_TEXT = listOf("Baterai", "Seimbang", "Performa")
+        private const val MODE_MENU = 3
+        private const val MENU_BOX = 216
+        private const val ORB = 60
+        private const val MENU_R = 86
+        private val PROFILE_TEXT = listOf("Hemat", "Seimbang", "Performa")
     }
 
     var onProfile: ((String) -> Unit)? = null
@@ -96,6 +100,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var thin: View? = null
 
     private var fpsPill: TextView? = null
+    private var fpsMenu: TextView? = null
+    private var menu: FrameLayout? = null
+    private var menuInfo: TextView? = null
+    private val menuBtns = ArrayList<TextView>()
+    private val orbs = ArrayList<OrbView>()
     private var fpsBig: TextView? = null
     private var fpsThin: TextView? = null
     private var fpsPillLbl: TextView? = null
@@ -137,6 +146,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun paintCsv() {
         paintThinBtns()
+        paintMenu()
         csvBtnLbl?.text = if (csvOn) "Stop FPS" else "Rekam FPS"
         csvDot?.background = GradientDrawable().apply {
             shape = if (csvOn) GradientDrawable.RECTANGLE else GradientDrawable.OVAL
@@ -169,7 +179,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         csvBuf.setLength(0)
         scope.launch(Dispatchers.IO) {
             val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
-            val name = "Alpha_fps_$ts.csv"
+            val name = "HSIN_fps_$ts.csv"
             val tmp = java.io.File(ctx.cacheDir, name)
             val ok = try {
                 tmp.writeText(text)
@@ -294,6 +304,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         thinVals.fill(null)
         thinGroups.fill(null)
         rings.clear()
+        orbs.clear()
+        menuBtns.clear()
+        menu = null
+        menuInfo = null
+        fpsMenu = null
         segButtons = ArrayList()
         graph = null
         segRow = null
@@ -486,18 +501,21 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         // Layar diam (tidak ada frame baru) memang 0 FPS; 3 detik berturut-turut ditandai IDLE supaya tidak dikira error.
         idleRun = if (s.fps != null && s.fps < 0.5f) idleRun + 1 else 0
+        if (fv != null) { for (o in orbs) o.setFps(fv) }
+        if (mode == MODE_MENU) updateMenuInfo(s.tempC)
         val lbl = if (idleRun >= 3) "IDLE" else "FPS"
         setText(fpsPillLbl, lbl)
         setText(fpsThinLbl, lbl)
         setText(fpsBigLbl, lbl)
         if (fpsText != null) {
             setText(fpsPill, fpsText)
+            setText(fpsMenu, fpsText)
             setText(fpsThin, fpsText)
             if (mode == MODE_PANEL) setText(fpsBig, fpsText)
         }
-        if (mode != MODE_PILL && s.fps != null && prefs.flGraph) graph?.add(s.fps)
+        if (mode != MODE_PILL && mode != MODE_MENU && s.fps != null && prefs.flGraph) graph?.add(s.fps)
 
-        if (mode == MODE_PILL) return
+        if (mode == MODE_PILL || mode == MODE_MENU) return
         // String hanya dibuat kalau angka berubah (tidak ada alokasi tiap tick).
         val cpuV = s.cpu
         if (prefs.flMCpu && cpuV != null && lastInt[0] != cpuV) metric(0, cpuV, cpuV.toString() + "%", cpuV / 100f)
@@ -561,11 +579,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         val f = FrameLayout(ctx)
         pill = buildPill()
+        menu = buildMenu()
         panel = buildPanel()
         thin = buildThin()
         pill?.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
         thin?.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
         f.addView(pill)
+        f.addView(menu)
         f.addView(panel)
         f.addView(thin)
         root = f
@@ -690,12 +710,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun savePos() {
         val p = lp ?: return
+        val off = if (mode == MODE_MENU) menuPad() else 0
         if (landscape()) {
-            prefs.flXl = p.x
-            prefs.flYl = p.y
+            prefs.flXl = p.x + off
+            prefs.flYl = p.y + off
         } else {
-            prefs.flXp = p.x
-            prefs.flYp = p.y
+            prefs.flXp = p.x + off
+            prefs.flYp = p.y + off
         }
     }
 
@@ -769,20 +790,150 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    private fun toggle() {
-        mode = if (mode == MODE_PILL) (if (prefs.flStartThin) MODE_THIN else MODE_PANEL) else MODE_PILL
-        applyMode()
-        root?.post { clamp() }
-    }
-
     private fun hide() {
         prefs.bubbleHidden = true
         onHidden?.invoke()
-        Toast.makeText(ctx, "Floating disembunyikan. Munculkan lagi lewat notifikasi.", Toast.LENGTH_LONG).show()
+        Toast.makeText(ctx, "Orb disembunyikan. Munculkan lagi lewat notifikasi.", Toast.LENGTH_LONG).show()
+    }
+
+    private fun menuPad(): Int = (px(MENU_BOX) - px(ORB)) / 2
+
+    private fun setMode(n: Int) {
+        val old = mode
+        if (old == n) return
+        val p = lp
+        if (p != null && attached) {
+            if (old == MODE_MENU) { p.x += menuPad(); p.y += menuPad() }
+            if (n == MODE_MENU) { p.x -= menuPad(); p.y -= menuPad() }
+        }
+        mode = n
+        applyMode()
+        if (n == MODE_MENU) layoutMenu()
+        root?.post { clamp() }
+    }
+
+    private fun toggle() {
+        setMode(if (mode == MODE_PILL) MODE_MENU else MODE_PILL)
+    }
+
+    private fun openDetail() {
+        setMode(if (prefs.flStartThin) MODE_THIN else MODE_PANEL)
+    }
+
+    /** Putar mode: Hemat > Seimbang > Performa > Puncak > Hemat. */
+    private fun cycleMode() {
+        if (odOn) {
+            onOvd?.invoke(false)
+            onProfile?.invoke("battery")
+            return
+        }
+        when (profile) {
+            "battery" -> onProfile?.invoke("balanced")
+            "balanced" -> onProfile?.invoke("performance")
+            "performance" -> if (odAvail) onOvd?.invoke(true) else onProfile?.invoke("battery")
+            else -> onProfile?.invoke("balanced")
+        }
+    }
+
+    private fun modeName(): String = if (odOn) "Puncak" else when (profile) {
+        "battery" -> "Hemat"; "balanced" -> "Seimbang"; "performance" -> "Performa"; else -> "—"
+    }
+
+    private fun updateMenuInfo(tempC: Float?) {
+        val t = if (tempC != null) " \u00B7 " + tempC.toInt() + "\u00B0" else ""
+        setText(menuInfo, modeName() + t)
+    }
+
+    /** Tombol melingkar di sisi yang lega (kiri/kanan layar). */
+    private fun layoutMenu() {
+        val m = menu ?: return
+        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val cxScreen = (lp?.x ?: 0) + px(MENU_BOX) / 2
+        val right = cxScreen < sw / 2
+        val base = if (right) 0.0 else 180.0
+        val angs = doubleArrayOf(-62.0, -21.0, 21.0, 62.0)
+        val c = px(MENU_BOX) / 2f
+        val r = pf(MENU_R)
+        for ((i, b) in menuBtns.withIndex()) {
+            val a = Math.toRadians(base + (if (right) angs[i] else -angs[i]))
+            val half = px(44) / 2f
+            val lpb = b.layoutParams as FrameLayout.LayoutParams
+            lpb.leftMargin = (c + r * Math.cos(a) - half).toInt()
+            lpb.topMargin = (c + r * Math.sin(a) - half).toInt()
+            b.layoutParams = lpb
+        }
+        val ib = menuInfo
+        if (ib != null) {
+            val lpi = ib.layoutParams as FrameLayout.LayoutParams
+            lpi.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            lpi.topMargin = (c + pf(ORB) / 2f + pf(8)).toInt()
+            ib.layoutParams = lpi
+        }
+        paintMenu()
+        m.requestLayout()
+    }
+
+    private fun paintMenu() {
+        if (menuBtns.size < 4) return
+        val acc = accentColor()
+        menuBtns[0].apply {
+            text = when { odOn -> "PUN"; profile == "battery" -> "HEM"; profile == "balanced" -> "SEI"; profile == "performance" -> "PRF"; else -> "..." }
+            setTextColor(Color.BLACK)
+            background = roundBg(acc, pf(22), 0)
+        }
+        menuBtns[1].apply {
+            text = "FPS"
+            setTextColor(if (csvOn) Color.WHITE else TEXT)
+            background = roundBg(if (csvOn) 0xFFE5484D.toInt() else 0xE61B1B1E.toInt(), pf(22), if (csvOn) 0 else acc)
+        }
+        menuBtns[2].apply {
+            text = if (recOn) "STOP" else "REC"
+            setTextColor(Color.WHITE)
+            background = roundBg(if (recOn) 0xFFE5484D.toInt() else 0xE61B1B1E.toInt(), pf(22), 0xFFE5484D.toInt())
+        }
+        menuBtns[3].apply {
+            text = "INFO"
+            setTextColor(TEXT)
+            background = roundBg(0xE61B1B1E.toInt(), pf(22), BORDER)
+        }
+        for (o in orbs) { o.accent = acc; o.invalidate() }
+    }
+
+    private fun menuBtn(onClick: () -> Unit): TextView =
+        textView("", 10f, TEXT, true).apply {
+            gravity = Gravity.CENTER
+            letterSpacing = 0.04f
+            isClickable = true
+            setOnClickListener { onClick() }
+        }
+
+    private fun buildMenu(): FrameLayout {
+        val m = FrameLayout(ctx)
+        m.layoutParams = FrameLayout.LayoutParams(px(MENU_BOX), px(MENU_BOX))
+        val acts = listOf<() -> Unit>({ cycleMode() }, { toggleFpsLog() }, { onRec?.invoke() }, { openDetail() })
+        for (a in acts) {
+            val b = menuBtn(a)
+            m.addView(b, FrameLayout.LayoutParams(px(44), px(44)))
+            menuBtns.add(b)
+        }
+        val info = textView("", 11f, TEXT, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(px(10), px(3), px(10), px(3))
+            background = roundBg(0xCC141416.toInt(), pf(10), 0)
+        }
+        menuInfo = info
+        m.addView(info, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        val orb = buildOrb(true)
+        val olp = FrameLayout.LayoutParams(px(ORB), px(ORB))
+        olp.leftMargin = (px(MENU_BOX) - px(ORB)) / 2
+        olp.topMargin = olp.leftMargin
+        m.addView(orb, olp)
+        return m
     }
 
     private fun applyMode() {
         pill?.visibility = if (mode == MODE_PILL) View.VISIBLE else View.GONE
+        menu?.visibility = if (mode == MODE_MENU) View.VISIBLE else View.GONE
         panel?.visibility = if (mode == MODE_PANEL) View.VISIBLE else View.GONE
         thin?.visibility = if (mode == MODE_THIN) View.VISIBLE else View.GONE
         for (i in lastInt.indices) lastInt[i] = -1
@@ -793,7 +944,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun panelColor(): Int {
         val a = (prefs.flAlpha / 100f * 255).toInt().coerceIn(0, 255)
-        return Color.argb(a, 14, 19, 30)
+        return Color.argb(a, 20, 20, 22)
     }
 
     private fun accentColor(): Int {
@@ -831,24 +982,19 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun fpsLabel(sizePx: Float, spacing: Float): TextView =
         textView("FPS", sizePx, LABEL, true).apply { letterSpacing = spacing }
 
-    private fun buildPill(): View {
-        val row = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(px(8), 0, px(16), 0)
-            background = roundBg(panelColor(), pf(24), BORDER)
-            minimumHeight = px(48)
-        }
-        val ring = RingView(32, accentColor())
-        rings.add(ring)
-        row.addView(ring)
-        val b = textView("--", 24f, TEXT, true).apply { letterSpacing = -0.02f }
-        fpsPill = b
-        row.addView(b, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(12) })
-        val l1 = fpsLabel(11f, 0.08f)
-        fpsPillLbl = l1
-        row.addView(l1, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(5) })
-        return row
+    private fun buildPill(): View = buildOrb(false)
+
+    /** Orb HSIN: cincin FPS (penuh = 90 FPS) berwarna sesuai mode, angka FPS di tengah. */
+    private fun buildOrb(forMenu: Boolean): View {
+        val f = FrameLayout(ctx)
+        val orb = OrbView()
+        orbs.add(orb)
+        f.addView(orb, FrameLayout.LayoutParams(px(ORB), px(ORB)))
+        val b = textView("--", 18f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.02f }
+        if (forMenu) fpsMenu = b else fpsPill = b
+        f.addView(b, FrameLayout.LayoutParams(px(ORB), px(ORB)))
+        f.layoutParams = FrameLayout.LayoutParams(px(ORB), px(ORB))
+        return f
     }
 
     private fun buildThin(): View {
@@ -915,14 +1061,14 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun paintThinBtns() {
         thinProf?.apply {
-            text = when (profile) { "battery" -> "DAY"; "balanced" -> "BAL"; "performance" -> "PERF"; else -> "..." }
+            text = when (profile) { "battery" -> "HEMAT"; "balanced" -> "SEIMBANG"; "performance" -> "PERFORMA"; else -> "..." }
             background = roundBg(0x33FFFFFF, pf(20), 0)
         }
         thinOd?.apply {
-            text = "OD"
+            text = "PUNCAK"
             setTextColor(if (odOn) Color.WHITE else OD_TEXT)
             background = if (odOn) GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(OD, OD_END)).apply { cornerRadius = pf(20) }
-                         else roundBg(0x1AD946EF, pf(20), 0x8CD946EF.toInt())
+                         else roundBg(0x1AFF4D5E, pf(20), 0x8CFF4D5E.toInt())
             alpha = if (!odOn && !odAvail) 0.5f else 1f
         }
         thinCsv?.apply {
@@ -1112,14 +1258,14 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             minimumHeight = px(44)
             isClickable = true
             setOnClickListener {
-                if (!odAvail && !odOn) Toast.makeText(ctx, "Buka game terdaftar dulu, Overdrive hanya untuk game", Toast.LENGTH_SHORT).show()
+                if (!odAvail && !odOn) Toast.makeText(ctx, "Buka game terdaftar dulu, Puncak hanya untuk game", Toast.LENGTH_SHORT).show()
                 else onOvd?.invoke(!odOn)
             }
         }
         val fl = FlameView(OD_TEXT)
         odFlame = fl
         row.addView(fl, LinearLayout.LayoutParams(px(18), px(18)))
-        val nm = textView("Overdrive", 14f, OD_TEXT, true)
+        val nm = textView("Puncak", 14f, OD_TEXT, true)
         odName = nm
         row.addView(nm, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(8) })
         row.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f))
@@ -1156,7 +1302,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 odSmall?.setTextColor(0xD9FFFFFF.toInt())
                 setText(odSmall, if (odLevel == "safe") "AKTIF \u00B7 AMAN (PANAS)" else if (odLevel == "mid") "AKTIF \u00B7 TURUN SEDIKIT" else "AKTIF")
             } else {
-                row.background = roundBg(0x1AD946EF, pf(22), 0x8CD946EF.toInt())
+                row.background = roundBg(0x1AFF4D5E, pf(22), 0x8CFF4D5E.toInt())
                 odFlame?.color = OD_TEXT; odFlame?.invalidate()
                 odName?.setTextColor(OD_TEXT)
                 odSmall?.setTextColor(HINT)
@@ -1195,6 +1341,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private fun paintSeg() {
+        paintMenu()
         paintThinBtns()
         if (segButtons.size < 3) return
         val acc = accentColor()
@@ -1208,6 +1355,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private fun applyRec() {
+        paintMenu()
         segRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         odRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         topRow?.visibility = if (recOn) View.VISIBLE else View.GONE
@@ -1280,6 +1428,39 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             p.strokeCap = Paint.Cap.ROUND
             canvas.drawPath(path, p)
             canvas.restore()
+        }
+    }
+
+    private inner class OrbView : View(ctx) {
+        var accent = accentColor()
+        private var frac = 0f
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rect = android.graphics.RectF()
+
+        fun setFps(v: Float) {
+            val f = (v / 90f).coerceIn(0f, 1f)
+            if (kotlin.math.abs(f - frac) > 0.01f) { frac = f; invalidate() }
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat()
+            val c = w / 2f
+            val st = pf(4f)
+            p.style = Paint.Style.FILL
+            p.color = Color.argb(235, 20, 20, 22)
+            canvas.drawCircle(c, c, c - pf(1), p)
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = pf(1.5f)
+            p.color = Color.argb(70, Color.red(accent), Color.green(accent), Color.blue(accent))
+            canvas.drawCircle(c, c, c - pf(1), p)
+            p.strokeWidth = st
+            p.color = 0x24FFFFFF
+            val pad = pf(6f) + st / 2f
+            rect.set(pad, pad, w - pad, w - pad)
+            canvas.drawArc(rect, 0f, 360f, false, p)
+            p.color = accent
+            p.strokeCap = Paint.Cap.ROUND
+            canvas.drawArc(rect, -90f, 360f * frac, false, p)
         }
     }
 

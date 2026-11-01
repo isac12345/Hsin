@@ -56,7 +56,7 @@ fun PerfScreen(vm: AppViewModel) {
         if (FpsLog.on) {
             txt("Merekam... ${FpsLog.rows} baris (1 baris per detik).", 13.sp, Mint)
         } else {
-            txt("Buka game, lalu tekan MULAI. Data FPS, GPU, CPU, suhu, profil, dan status Overdrive disimpan ke Download/Alpha_fps_*.csv.", 12.sp, muted())
+            txt("Buka game, lalu tekan MULAI. Data FPS, GPU, CPU, suhu, profil, dan status Puncak disimpan ke Download/HSIN_fps_*.csv.", 12.sp, muted())
         }
         Pill(if (FpsLog.on) "STOP & SIMPAN" else "MULAI REKAM FPS", { vm.toggleFpsLog() }, solid = !FpsLog.on)
         txt("Tombol yang sama ada di floating (Rekam FPS). Hasilnya muncul di daftar di bawah.", 11.sp, muted(), modifier = Modifier.padding(top = 8.dp))
@@ -96,20 +96,20 @@ fun PerfScreen(vm: AppViewModel) {
     } else {
         AlphaCard {
             Label("Perbandingan")
-            txt("Pilih 2 rekaman di bawah (tekan BANDINGKAN) untuk membandingkan, mis. Performa vs Overdrive di game yang sama.", 12.sp, muted())
+            txt("Pilih 2 rekaman di bawah (tekan BANDINGKAN) untuk membandingkan, mis. Performa vs Puncak di game yang sama.", 12.sp, muted())
         }
     }
 
     AlphaCard {
         Label("Rekaman tersimpan")
         if (vm.fpsLoading) txt("Membaca...", 12.sp, muted())
-        else if (vm.fpsFiles.isEmpty()) txt("Belum ada rekaman di Download/Alpha_fps_*.csv.", 12.sp, muted())
+        else if (vm.fpsFiles.isEmpty()) txt("Belum ada rekaman di Download/HSIN_fps_*.csv.", 12.sp, muted())
         if (vm.fpsSkipped > 0) txt("${vm.fpsSkipped} rekaman tidak punya data FPS: ROM ini tidak menyediakan sumber FPS untuk game tersebut (GPU/CPU/suhu tetap terekam).", 11.sp, Coral, modifier = Modifier.padding(top = 6.dp))
         vm.fpsFiles.forEach { f ->
             val on = f.name in vm.fpsSel
             val tag = when (vm.fpsSel.indexOf(f.name)) { 0 -> "A"; 1 -> "B"; else -> "" }
             Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                txt(f.name.removePrefix("Alpha_fps_").removeSuffix(".csv").replace('_', ' ') + "  ·  " + f.mode, 13.sp, maxLines = 1, weight = FontWeight.Medium)
+                txt(f.name.removePrefix("HSIN_fps_").removeSuffix(".csv").replace('_', ' ') + "  ·  " + f.mode, 13.sp, maxLines = 1, weight = FontWeight.Medium)
                 txt("rata-rata ${"%.1f".format(f.avg)} · 1% ${"%.1f".format(f.low1)} · mulus ${f.pctOk}% · ${dur(f.secs)}", 11.sp, muted(), maxLines = 1)
                 txt("suhu ${f.tMin}-${f.tMax}°" + (if (f.pkg.isNotEmpty()) " · ${vm.label(f.pkg)}" else ""), 11.sp, muted(), maxLines = 1)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

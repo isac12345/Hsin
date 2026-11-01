@@ -209,6 +209,9 @@ object UiState {
     var portrait by mutableStateOf(false)
     var tab by mutableIntStateOf(0)
     var gameIdx by mutableIntStateOf(0)
+    var splashDone = false          // loading hanya sekali per pembukaan app (bukan tiap kembali ke Beranda)
+    var ritual by mutableStateOf("")   // paket game yang sedang diluncurkan lewat ritual
+    fun startRitual(pkg: String) { if (ritual.isEmpty()) ritual = pkg }
     private var inited = false
     fun init(p: Prefs) {
         if (inited) return
@@ -221,47 +224,47 @@ object UiState {
 }
 
 // ===================== mode =====================
-private class MInfo(val key: String, val nameId: String, val nameEn: String, val stars: Int, val tagId: String, val tagEn: String, val detId: String, val detEn: String)
+internal class MInfo(val key: String, val nameId: String, val nameEn: String, val stars: Int, val color: Color, val tagId: String, val tagEn: String, val detId: String, val detEn: String)
 
-private val MODES = listOf(
-    MInfo("hemat", "Hemat", "Saver", 1, "Irit baterai, tetap lancar", "Saves battery, still smooth",
-        "Profil harian Alpha: hemat tapi tidak ngelag. Cocok untuk game ringan dan pemakaian harian.",
-        "Alpha daily profile: efficient without lag. Good for light games and everyday use."),
-    MInfo("seimbang", "Seimbang", "Balanced", 2, "Lancar dan adem untuk sesi panjang", "Smooth and cool for long sessions",
-        "Profil balanced: performa cukup untuk kebanyakan game, suhu dan baterai tetap terjaga.",
-        "Balanced profile: enough power for most games while keeping heat and battery in check."),
-    MInfo("performa", "Performa", "Performance", 3, "Tenaga tinggi untuk game berat", "High power for heavy games",
-        "Profil performa Alpha: CPU/GPU agresif, tetap dijaga pengaman panas.",
-        "Alpha performance profile: aggressive CPU/GPU, still protected by the thermal guard."),
-    MInfo("gacor", "Gacor", "Gacor", 4, "Tanpa batas, CPU/GPU dikunci penuh", "No limits, CPU/GPU locked at full speed",
-        "Overdrive Alpha: CPU dan GPU dikunci frekuensi tertinggi, batas panas dilonggarkan. Paling kencang, HP lebih hangat.",
-        "Alpha Overdrive: CPU and GPU locked at top frequency, thermal limit relaxed. Fastest, phone runs warmer.")
+internal val MODES = listOf(
+    MInfo("hemat", "Hemat", "Saver", 1, Color(0xFF4FE3C1), "Irit baterai, tetap lancar", "Saves battery, stays smooth",
+        "Hemat daya tanpa ngelag. Cocok untuk game ringan dan pemakaian harian.",
+        "Efficient without lag. Good for light games and everyday use."),
+    MInfo("seimbang", "Seimbang", "Balanced", 2, Color(0xFFE8B95A), "Lancar dan adem untuk sesi panjang", "Smooth and cool for long sessions",
+        "Cukup kencang untuk kebanyakan game, suhu dan baterai tetap terjaga.",
+        "Fast enough for most games while keeping heat and battery in check."),
+    MInfo("performa", "Performa", "Performance", 3, Color(0xFFFF9A3C), "Tenaga tinggi untuk game berat", "High power for heavy games",
+        "CPU dan GPU agresif, tetap dijaga pengaman panas.",
+        "Aggressive CPU and GPU, still protected by the thermal guard."),
+    MInfo("puncak", "Puncak", "Peak", 4, Color(0xFFFF4D5E), "Tenaga penuh, CPU dan GPU dikunci tertinggi", "Full power, CPU and GPU locked at top speed",
+        "CPU dan GPU dikunci frekuensi tertinggi, batas panas dilonggarkan. Paling kencang, HP lebih hangat.",
+        "CPU and GPU locked at top frequency, thermal limit relaxed. Fastest, phone runs warmer.")
 )
 
-private fun info(k: String): MInfo = MODES.firstOrNull { it.key == k } ?: MODES[1]
+internal fun info(k: String): MInfo = MODES.firstOrNull { it.key == k } ?: MODES[1]
 
 @Composable
-private fun mname(m: MInfo): String = if (LocalEn.current) m.nameEn else m.nameId
+internal fun mname(m: MInfo): String = if (LocalEn.current) m.nameEn else m.nameId
 
-private fun starText(n: Int): String = "★".repeat(n) + "☆".repeat(4 - n)
+internal fun starText(n: Int): String = "★".repeat(n) + "☆".repeat(4 - n)
 
-private fun curMode(vm: AppViewModel): String {
-    if (vm.status.ovd) return "gacor"
+internal fun curMode(vm: AppViewModel): String {
+    if (vm.status.ovd) return "puncak"
     return when (vm.status.profile) { "battery" -> "hemat"; "performance" -> "performa"; "balanced" -> "seimbang"; else -> "" }
 }
 
-private fun profMode(profile: String, ovd: Boolean): String =
-    if (ovd) "gacor" else when (profile) { "battery" -> "hemat"; "performance" -> "performa"; else -> "seimbang" }
+internal fun profMode(profile: String, ovd: Boolean): String =
+    if (ovd) "puncak" else when (profile) { "battery" -> "hemat"; "performance" -> "performa"; else -> "seimbang" }
 
 fun AppViewModel.chooseMode(key: String) {
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
-    status = status.copy(profile = prof, active = prof, ovd = key == "gacor")
+    status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
     viewModelScope.launch {
-        if (key != "gacor") Alpha.ovdStop()
+        if (key != "puncak") Alpha.ovdStop()
         val r = Alpha.setProfile(prof)
-        if (key == "gacor") {
+        if (key == "puncak") {
             val o = Alpha.ovdStart()
-            toast(if (o.ok) (if (UiState.en) "Gacor on" else "Gacor aktif") else o.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
+            toast(if (o.ok) (if (UiState.en) "Peak mode on" else "Mode Puncak aktif") else o.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         } else {
             toast(if (r.ok) (if (UiState.en) "Mode applied" else "Mode diterapkan") else r.out.take(60))
         }
@@ -273,11 +276,13 @@ fun AppViewModel.chooseMode(key: String) {
 @Composable
 fun SpaceRoot(vm: AppViewModel) {
     val clock = LocalClock.current
-    var splashDone by remember { mutableStateOf(false) }
+    var splashDone by remember { mutableStateOf(UiState.splashDone) }
     LaunchedEffect(Unit) {
+        if (UiState.splashDone) return@LaunchedEffect
         delay(1500)
         var n = 0
         while (!vm.loaded && n < 100) { delay(100); n++ }
+        UiState.splashDone = true
         splashDone = true
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF0C0C0E))) {
@@ -315,8 +320,9 @@ private fun SpaceContent(vm: AppViewModel, land: Boolean, modifier: Modifier) {
             NoticeCard(tx("Modul HSIN belum aktif", "HSIN module is not active"), tx("Flash modul HSIN lewat manager root, reboot, lalu buka app ini lagi.", "Flash the HSIN module in your root manager, reboot, then open this app again."), vm)
         } else when (UiState.tab) {
             0 -> HomeTab(vm, land)
-            1 -> GameTab(vm)
+            1 -> GameTab(vm, land)
             2 -> RecTab(vm)
+            3 -> AlatTab(vm, land)
             else -> SettingsTab(vm)
         }
     }
@@ -384,7 +390,7 @@ private fun Embers() {
 // ===================== navigasi =====================
 @Composable
 private fun navName(i: Int): String = when (i) {
-    0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); else -> tx("Pengaturan", "Settings")
+    0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); 3 -> tx("Alat", "Tools"); else -> tx("Pengaturan", "Settings")
 }
 
 @Composable
@@ -409,6 +415,12 @@ private fun NavIcon(i: Int, color: Color, modifier: Modifier = Modifier) {
                 drawCircle(color, w * 0.40f, Offset(w / 2, h / 2), style = st)
                 drawCircle(color, w * 0.16f, Offset(w / 2, h / 2))
             }
+            3 -> {
+                // kunci pas
+                drawLine(color, Offset(w * 0.22f, h * 0.80f), Offset(w * 0.60f, h * 0.42f), st.width * 1.4f, StrokeCap.Round)
+                drawCircle(color, w * 0.22f, Offset(w * 0.68f, h * 0.32f), style = st)
+                drawCircle(SP.ink, w * 0.07f, Offset(w * 0.74f, h * 0.26f))
+            }
             else -> {
                 for (k in 0 until 3) {
                     val y = h * (0.24f + 0.26f * k)
@@ -430,14 +442,14 @@ private fun NavRail(compact: Boolean) {
         verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp)
     ) {
         Logo(if (compact) 36 else 44)
-        for (i in 0 until 4) NavItem(i, compact)
+        for (i in 0 until 5) NavItem(i, compact)
     }
 }
 
 @Composable
 private fun NavBar() {
     Row(Modifier.fillMaxWidth().background(Color(0xCC000000)).padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        for (i in 0 until 4) NavItem(i, false)
+        for (i in 0 until 5) NavItem(i, false)
     }
 }
 
@@ -465,16 +477,16 @@ private fun NavItem(i: Int, compact: Boolean) {
     }
 }
 
-private fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
+internal fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
     red = a.red + (b.red - a.red) * t, green = a.green + (b.green - a.green) * t,
     blue = a.blue + (b.blue - a.blue) * t, alpha = a.alpha + (b.alpha - a.alpha) * t
 )
 
 // ===================== data live (CPU/GPU/suhu) =====================
-private class Live(val cpu: Int, val gpuMhz: Int, val gpuPct: Int, val tempC: Int)
+internal class Live(val cpu: Int, val gpuMhz: Int, val gpuPct: Int, val tempC: Int)
 
 @Composable
-private fun rememberLive(vm: AppViewModel, active: Boolean): Live {
+internal fun rememberLive(vm: AppViewModel, active: Boolean): Live {
     var live by remember { mutableStateOf(Live(-1, -1, -1, -1)) }
     LaunchedEffect(active, vm.modPath) {
         if (!active || vm.modPath.isEmpty()) return@LaunchedEffect
@@ -502,305 +514,11 @@ private fun rememberLive(vm: AppViewModel, active: Boolean): Live {
     return live
 }
 
-private fun ramInfo(ctx: Context): Pair<Float, Float> {
+internal fun ramInfo(ctx: Context): Pair<Float, Float> {
     val mi = ActivityManager.MemoryInfo()
     (ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(mi)
     val tot = mi.totalMem / 1073741824f
     return Pair(tot - mi.availMem / 1073741824f, tot)
-}
-
-// ===================== BERANDA =====================
-@Composable
-private fun HomeTab(vm: AppViewModel, land: Boolean) {
-    val live = rememberLive(vm, true)
-    if (land) {
-        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(Modifier.weight(1.15f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModeHeader(vm)
-                ModeTiles(vm)
-                StatTiles(vm, live)
-            }
-            Column(Modifier.weight(0.85f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
-                Chips(vm, live)
-                Spacer(Modifier.weight(1f))
-                QuickButtons(vm)
-                GameCarousel(vm)
-                StartButton(vm)
-            }
-        }
-    } else {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Chips(vm, live) }
-            ModeHeader(vm)
-            ModeTiles(vm)
-            StatTiles(vm, live)
-            QuickButtons(vm)
-            GameCarousel(vm)
-            StartButton(vm)
-        }
-    }
-}
-
-@Composable
-private fun Chips(vm: AppViewModel, live: Live) {
-    val ctx = LocalContext.current
-    val (u, t) = ramInfo(ctx)
-    val tmp = if (live.tempC > 0) "${live.tempC}°" else "--"
-    val bat = if (vm.status.batt >= 0) "${vm.status.batt}%" else "--"
-    Row(Modifier.rise(0), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip(SP.gold, String.format(Locale.US, "%.1f/%.1fG", u, t)); Chip(SP.red, tmp); Chip(Color(0xFF4FC3A1), bat)
-    }
-}
-
-@Composable
-private fun Chip(dot: Color, t: String) {
-    Glass(radius = 8, alt = true) {
-        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).background(dot))
-            Spacer(Modifier.width(6.dp))
-            SText(t, 12.sp, SP.text, FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun ModeHeader(vm: AppViewModel) {
-    val cm = curMode(vm)
-    val m = info(cm)
-    val pop = popKey(cm)
-    var showDetail by remember { mutableStateOf(false) }
-    val playing = vm.status.gamePkg.isNotEmpty()
-    Glass(Modifier.fillMaxWidth().rise(60)) {
-        Row {
-            Box(Modifier.width(3.dp).height(if (showDetail) 150.dp else 104.dp).background(SP.gold))
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    SText(tx("MODE SAAT INI", "CURRENT MODE"), 11.sp, SP.dim, spacing = 1.6.sp)
-                    SText(if (playing) tx("SEDANG MAIN", "PLAYING") else tx("DIPILIH", "SELECTED"), 11.sp, SP.gold, spacing = 1.6.sp)
-                }
-                Row(Modifier.graphicsLayer { alpha = pop; translationX = (1f - pop) * 18.dp.toPx() }, verticalAlignment = Alignment.Bottom) {
-                    SText(if (cm.isEmpty()) "—" else mname(m), 30.sp, SP.goldHi, FontWeight.Bold)
-                    Spacer(Modifier.width(10.dp))
-                    SText(starText(if (cm.isEmpty()) 0 else m.stars), 15.sp, SP.gold, modifier = Modifier.padding(bottom = 5.dp))
-                }
-                SText(if (LocalEn.current) m.tagEn else m.tagId, 13.sp, SP.dim)
-                Box(Modifier.tap { showDetail = !showDetail }.padding(vertical = 6.dp)) {
-                    SText(if (showDetail) tx("Tutup ▴", "Close ▴") else tx("Detail ▾", "Details ▾"), 13.sp, SP.gold)
-                }
-                if (showDetail) Text(if (LocalEn.current) m.detEn else m.detId, color = SP.dim, fontSize = 12.sp, lineHeight = 16.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModeTiles(vm: AppViewModel) {
-    val clock = LocalClock.current
-    val cm = curMode(vm)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MODES.forEachIndexed { i, m ->
-            val sel = cm == m.key
-            val a = ownAnim(if (sel) 1f else 0f, 240)
-            Box(
-                Modifier
-                    .weight(1f)
-                    .rise(120 + i * 60)
-                    .tap { vm.chooseMode(m.key) }
-                    .drawBehind {
-                        if (sel) {
-                            val g = 0.22f + 0.16f * sin(clock.floatValue * 2.6f)
-                            drawRoundRect(SP.gold.copy(alpha = g), Offset(-3.dp.toPx(), -3.dp.toPx()), Size(size.width + 6.dp.toPx(), size.height + 6.dp.toPx()), CornerRadius(14.dp.toPx()), style = Stroke(5.dp.toPx()))
-                        }
-                    }
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(lerpColor(SP.glass, Color(0xCC2A2214), a))
-                    .border(1.dp, lerpColor(SP.line, SP.gold, a), RoundedCornerShape(11.dp))
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    SText(mname(m), 14.sp, lerpColor(SP.text, SP.goldHi, a), FontWeight.SemiBold)
-                    Spacer(Modifier.height(3.dp))
-                    SText("★".repeat(m.stars), 10.sp, SP.gold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatTiles(vm: AppViewModel, live: Live) {
-    val ctx = LocalContext.current
-    val (u, _) = ramInfo(ctx)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Stat("CPU", live.cpu.toFloat(), "%", 0, Modifier.weight(1f).rise(380))
-        if (live.gpuPct >= 0) Stat("GPU", live.gpuPct.toFloat(), "%", 0, Modifier.weight(1f).rise(430))
-        else Stat("GPU", live.gpuMhz.toFloat(), " MHz", 0, Modifier.weight(1f).rise(430))
-        Stat(tx("Suhu", "Temp"), live.tempC.toFloat(), "°C", 0, Modifier.weight(1f).rise(480))
-        Stat("RAM", u, " GB", 1, Modifier.weight(1f).rise(530))
-    }
-}
-
-@Composable
-private fun Stat(name: String, v: Float, unit: String, dec: Int, modifier: Modifier) {
-    val shown = ownAnim(if (v < 0f) 0f else v, 500)
-    Glass(modifier, radius = 10, alt = true) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
-            SText(name, 11.sp, SP.dim)
-            SText(if (v < 0f) "--" else (if (dec == 0) shown.toInt().toString() else String.format(Locale.US, "%.${dec}f", shown)) + unit, 17.sp, SP.text, FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun QuickButtons(vm: AppViewModel) {
-    val dnd = vm.flag("GAME_DND_ON")
-    Row(Modifier.fillMaxWidth().rise(300), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        QBtn(tx("Bersihkan RAM", "Clean RAM"), false, Modifier.weight(1f)) { vm.cleanRam() }
-        QBtn(tx("Jangan ganggu", "Do not disturb"), dnd, Modifier.weight(1f)) { vm.setFlag("GAME_DND_ON", !dnd) }
-    }
-}
-
-@Composable
-private fun QBtn(t: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val a = ownAnim(if (on) 1f else 0f, 220)
-    Box(
-        modifier.tap(onClick).clip(RoundedCornerShape(10.dp)).background(lerpColor(SP.glass, SP.gold, a * 0.9f))
-            .border(0.6.dp, lerpColor(SP.line, SP.gold, a), RoundedCornerShape(10.dp)).padding(vertical = 13.dp),
-        contentAlignment = Alignment.Center
-    ) { SText(t, 13.sp, lerpColor(SP.text, SP.ink, a), FontWeight.Medium) }
-}
-
-@Composable
-private fun gameModeText(vm: AppViewModel, g: GameEntry): String {
-    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Alpha.gameOpts(g.pkg) }
-    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Alpha.gamefx(g.pkg) }
-    val m = info(profMode(g.profile, opts["OVD"] == "on"))
-    val ds = fx["downscale"].orEmpty()
-    val res = ds.toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%"
-    return if (LocalEn.current) "${m.nameEn} mode · Resolution $res" else "Mode ${m.nameId} · Resolusi $res"
-}
-
-@Composable
-private fun GameCarousel(vm: AppViewModel) {
-    val gs = vm.games
-    Glass(Modifier.fillMaxWidth().rise(340)) {
-        if (gs.isEmpty()) {
-            Box(Modifier.fillMaxWidth().tap { vm.go("addgame") }.padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
-                SText(tx("+ Tambah game dulu", "+ Add a game first"), 14.sp, SP.gold, FontWeight.Medium)
-            }
-        } else {
-            val idx = UiState.gameIdx.coerceIn(0, gs.size - 1)
-            val g = gs[idx]
-            val pop = popKey(g.pkg)
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.tap { UiState.gameIdx = (idx - 1 + gs.size) % gs.size }.padding(horizontal = 14.dp, vertical = 8.dp)) { SText("‹", 22.sp, SP.dim) }
-                Column(Modifier.weight(1f).graphicsLayer { alpha = pop; translationX = (1f - pop) * 20.dp.toPx() }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    SText(vm.label(g.pkg), 17.sp, SP.text, FontWeight.SemiBold)
-                    SText(gameModeText(vm, g), 12.sp, SP.dim)
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        for (k in gs.indices) Box(Modifier.size(width = if (k == idx) 16.dp else 6.dp, height = 3.dp).clip(CircleShape).background(if (k == idx) SP.gold else SP.faint))
-                    }
-                }
-                Box(Modifier.tap { UiState.gameIdx = (idx + 1) % gs.size }.padding(horizontal = 14.dp, vertical = 8.dp)) { SText("›", 22.sp, SP.dim) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StartButton(vm: AppViewModel) {
-    val clock = LocalClock.current
-    val gs = vm.games
-    val sh = RoundedCornerShape(10.dp)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .rise(400)
-            .tap { if (gs.isNotEmpty()) vm.launchGame(gs[UiState.gameIdx.coerceIn(0, gs.size - 1)].pkg) else vm.go("addgame") }
-            .clip(sh)
-            .background(Brush.horizontalGradient(listOf(SP.red, Color(0xFFE08A4E), SP.gold)))
-            .drawBehind {
-                val x = (((clock.floatValue % 2.6f) / 2.6f) * 1.7f - 0.3f) * size.width
-                drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color(0x55FFFFFF), Color.Transparent), startX = x, endX = x + size.width * 0.3f))
-            }
-            .padding(vertical = 15.dp),
-        contentAlignment = Alignment.Center
-    ) { SText(tx("▶  MULAI GAME", "▶  START GAME"), 16.sp, Color.White, FontWeight.Bold, 2.sp) }
-}
-
-// ===================== GAME =====================
-private val GCHIPS = listOf("hemat", "seimbang", "performa", "gacor")
-
-@Composable
-private fun GameTab(vm: AppViewModel) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { SText(tx("GAME", "GAMES"), 12.sp, SP.gold, spacing = 2.sp, modifier = Modifier.rise(0)) }
-        items(vm.games, key = { it.pkg }) { g -> GameCard(vm, g) }
-        item {
-            Box(
-                Modifier.fillMaxWidth().tap { vm.go("addgame") }.clip(RoundedCornerShape(10.dp)).border(1.dp, SP.gold, RoundedCornerShape(10.dp)).padding(vertical = 13.dp),
-                contentAlignment = Alignment.Center
-            ) { SText(tx("+ Tambah game", "+ Add game"), 14.sp, SP.gold, FontWeight.Medium) }
-        }
-    }
-}
-
-@Composable
-private fun GameCard(vm: AppViewModel, g: GameEntry) {
-    var ver by remember { mutableIntStateOf(0) }
-    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, ver, vm.games) { value = Alpha.gameOpts(g.pkg) }
-    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Alpha.gamefx(g.pkg) }
-    val cur = profMode(g.profile, opts["OVD"] == "on")
-    var res by remember(g.pkg, fx["downscale"]) { mutableFloatStateOf(((fx["downscale"]?.toDoubleOrNull() ?: 1.0) * 100).toFloat().coerceIn(50f, 100f)) }
-    Glass(Modifier.fillMaxWidth().rise(80, g.pkg)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SText(vm.label(g.pkg), 16.sp, SP.text, FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                for (k in GCHIPS) {
-                    val m = info(k)
-                    val sel = cur == k
-                    val a = ownAnim(if (sel) 1f else 0f, 200)
-                    Box(
-                        Modifier.weight(1f).tap {
-                            val prof = when (k) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
-                            vm.addGame(g.pkg, g.fps, prof) { ver++ }
-                            vm.setGameOpt(g.pkg, "OVD", if (k == "gacor") "on" else "off")
-                            ver++
-                        }.clip(RoundedCornerShape(8.dp)).background(lerpColor(Color(0x22FFFFFF), SP.gold, a)).padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) { SText(mname(m), 11.sp, lerpColor(SP.text, SP.ink, a), FontWeight.Medium) }
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SText(tx("Resolusi", "Resolution"), 12.sp, SP.dim, modifier = Modifier.width(66.dp))
-                Slider(
-                    value = res, onValueChange = { res = it },
-                    onValueChangeFinished = {
-                        val v = if (res >= 99.5f) "off" else String.format(Locale.US, "%.2f", res / 100f)
-                        vm.setGameFx(g.pkg, "downscale", v)
-                    },
-                    valueRange = 50f..100f, steps = 9,
-                    colors = SliderDefaults.colors(thumbColor = SP.gold, activeTrackColor = SP.gold, inactiveTrackColor = Color(0x33FFFFFF), activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
-                    modifier = Modifier.weight(1f)
-                )
-                SText("${res.toInt()}%", 13.sp, SP.text, modifier = Modifier.width(46.dp))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    Modifier.weight(1f).tap { vm.launchGame(g.pkg) }.clip(RoundedCornerShape(8.dp)).background(Brush.horizontalGradient(listOf(SP.red, SP.gold))).padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) { SText(tx("▶ LUNCURKAN", "▶ LAUNCH"), 12.sp, Color.White, FontWeight.Bold, 1.sp) }
-                Box(Modifier.tap { vm.editPkg = g.pkg; vm.go("edit") }.clip(RoundedCornerShape(8.dp)).border(0.6.dp, SP.line, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                    SText(tx("DETAIL", "MORE"), 12.sp, SP.text)
-                }
-                Box(Modifier.tap { vm.removeGame(g.pkg) }.clip(RoundedCornerShape(8.dp)).border(0.6.dp, SP.line, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                    SText(tx("HAPUS", "DELETE"), 12.sp, SP.dim)
-                }
-            }
-        }
-    }
 }
 
 // ===================== REKAMAN =====================
@@ -820,7 +538,7 @@ private fun RecTab(vm: AppViewModel) {
             Glass(Modifier.fillMaxWidth().rise(40)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SText(tx("Rekam layar", "Screen recording"), 14.sp, SP.text, FontWeight.SemiBold)
-                    Text(tx("Hasil disimpan di Movies/Alpha (tanpa suara sistem).", "Saved to Movies/Alpha (no system audio)."), color = SP.dim, fontSize = 12.sp)
+                    Text(tx("Hasil disimpan di Movies/HSIN (tanpa suara sistem).", "Saved to Movies/HSIN (no system audio)."), color = SP.dim, fontSize = 12.sp)
                     Box(
                         Modifier.fillMaxWidth().tap { vm.toggleRec() }.clip(RoundedCornerShape(10.dp)).background(if (vm.recOn) SP.red else SP.gold).padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
@@ -833,7 +551,7 @@ private fun RecTab(vm: AppViewModel) {
             Glass(Modifier.fillMaxWidth().rise(80)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SText(tx("Rekam FPS", "FPS recording"), 14.sp, SP.text, FontWeight.SemiBold)
-                    Text(tx("Mulai game dari HSIN, ketuk logo floating, lalu REKAM FPS. Atau tombol di bawah. Hasil CSV di folder Download.", "Start a game from HSIN, tap the floating logo, then record FPS. Or use the button below. CSV goes to Downloads."), color = SP.dim, fontSize = 12.sp, lineHeight = 16.sp)
+                    Text(tx("Mulai game dari HSIN, ketuk orb, lalu pilih FPS. Atau pakai tombol di bawah. Hasil CSV di folder Download.", "Start a game from HSIN, tap the orb, then pick FPS. Or use the button below. CSV goes to Downloads."), color = SP.dim, fontSize = 12.sp, lineHeight = 16.sp)
                     Box(
                         Modifier.fillMaxWidth().tap { vm.toggleFpsLog() }.clip(RoundedCornerShape(10.dp)).border(1.dp, SP.gold, RoundedCornerShape(10.dp)).padding(vertical = 11.dp),
                         contentAlignment = Alignment.Center
@@ -848,7 +566,7 @@ private fun RecTab(vm: AppViewModel) {
 
 @Composable
 private fun RecCard(vm: AppViewModel, r: FpsFile) {
-    Glass(Modifier.fillMaxWidth().rise(60, r.name)) {
+    Glass(Modifier.fillMaxWidth().rise(60, r.name).tap { vm.fpsView = r.name; vm.go("perf") }) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SText(vm.label(r.pkg), 14.sp, SP.text, FontWeight.SemiBold)
             SText("${r.secs / 60} ${tx("mnt", "min")} ${r.secs % 60} ${tx("dtk", "s")}", 11.sp, SP.faint)
@@ -893,7 +611,7 @@ private fun SettingsTab(vm: AppViewModel) {
                 Seg(listOf(tx("Landscape", "Landscape"), tx("Potret", "Portrait")), if (UiState.portrait) 1 else 0) { UiState.setPortrait(vm.prefs, it == 1) }
             }
         }
-        SwitchRow(tx("Floating (logo FPS)", "Floating (FPS logo)"), tx("Logo melayang di game: ketuk untuk panel, ganti mode, rekam.", "Floating logo in games: tap for panel, mode switch, recording."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
+        SwitchRow(tx("Floating orb", "Floating orb"), tx("Cincin FPS melayang di game: ketuk untuk menu ganti mode, rekam, dan detail.", "FPS ring floating in games: tap for the menu to switch mode, record and see details."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
         SwitchRow(tx("Tampilkan FPS di floating", "Show FPS in floating"), tx("Angka FPS, CPU, GPU, dan suhu.", "FPS, CPU, GPU and temperature readout."), vm.hudOn, 90) { vm.updateHudOn(it) }
         SwitchRow(tx("Jangan ganggu saat game", "Do not disturb in games"), tx("Notifikasi dibisukan selama game, balik normal setelah ditutup.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON"), 120) { vm.setFlag("GAME_DND_ON", it) }
         if (vm.refreshRates.isNotEmpty()) {
@@ -906,12 +624,12 @@ private fun SettingsTab(vm: AppViewModel) {
             }
         }
         Row(Modifier.fillMaxWidth().rise(180), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QBtn(tx("Semua alat Alpha", "All Alpha tools"), false, Modifier.weight(1f)) { vm.go("tools") }
-            QBtn(tx("Tampilan floating", "Floating look"), false, Modifier.weight(1f)) { vm.go("bubble") }
+            HBtn(tx("Tampilan orb", "Orb look"), Modifier.weight(1f)) { vm.go("bubble") }
+            HBtn(tx("Tema dan warna", "Theme and color"), Modifier.weight(1f)) { vm.go("theme") }
         }
         Row(Modifier.fillMaxWidth().rise(210), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QBtn(tx("Suhu & pengaman", "Thermal guard"), false, Modifier.weight(1f)) { vm.go("therm") }
-            QBtn(tx("Log", "Logs"), false, Modifier.weight(1f)) { vm.go("fulllog") }
+            HBtn(tx("Latar dan banner", "Background and banner"), Modifier.weight(1f)) { vm.go("bgbanner") }
+            HBtn(tx("Statistik sesi", "Session stats"), Modifier.weight(1f)) { vm.go("stats") }
         }
         Spacer(Modifier.height(8.dp))
     }

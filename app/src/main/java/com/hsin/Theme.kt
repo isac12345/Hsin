@@ -49,9 +49,9 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-val Ink = Color(0xFF0B0C0E)
-val Paper = Color(0xFFE8E6E1)
-val Mint = Color(0xFF5DCAA5)
+val Ink = Color(0xFF141416)
+val Paper = Color(0xFFF4F1EA)
+val Mint = Color(0xFF4FE3C1)
 val Amber = Color(0xFFEF9F27)
 val Coral = Color(0xFFE5766B)
 
@@ -64,7 +64,7 @@ class UiCfg(
 
 val LocalUi = compositionLocalOf { UiCfg() }
 
-val Mono = FontFamily.Monospace
+val Mono = FontFamily.Default
 
 @Composable
 fun muted(): Color = Color.White.copy(alpha = 0.35f + 0.5f * LocalUi.current.contrast)
@@ -89,7 +89,7 @@ fun txt(
 
 @Composable
 fun Label(s: String, modifier: Modifier = Modifier) {
-    txt(s.uppercase(), 12.sp, muted(), modifier = modifier.padding(bottom = 6.dp), spacing = 1.6.sp)
+    txt(s, 12.sp, LocalUi.current.accent, FontWeight.SemiBold, modifier = modifier.padding(bottom = 6.dp), spacing = 0.6.sp)
 }
 
 @Composable
@@ -100,12 +100,12 @@ fun AlphaCard(
     content: @Composable () -> Unit,
 ) {
     val ui = LocalUi.current
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(16.dp)
     var m = modifier
         .fillMaxWidth()
         .padding(bottom = 10.dp)
         .clip(shape)
-        .background(Ink.copy(alpha = ui.cardAlpha))
+        .background(Color(0xFF141416).copy(alpha = ui.cardAlpha.coerceAtLeast(0.7f)))
         .border(BorderStroke(0.6.dp, if (isNew) Mint else Color.White.copy(alpha = 0.14f)), shape)
     if (onClick != null) m = m.clickable(onClick = onClick)
     Column(m.padding(14.dp)) { content() }
@@ -130,19 +130,19 @@ fun Divider() {
 fun Seg(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val ui = LocalUi.current
     Row(
-        modifier.fillMaxWidth().padding(vertical = 4.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(4.dp),
+        modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEachIndexed { i, o ->
             val on = i == selected
             Box(
-                Modifier.weight(1f).clip(CircleShape)
+                Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
                     .background(if (on) ui.accent else Color.Transparent)
                     .clickable { onSelect(i) }.padding(vertical = 10.dp, horizontal = 1.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 val many = options.size > 4
-                txt(o, if (many) 10.sp else 12.sp, if (on) Ink else muted(), spacing = if (many) 0.2.sp else 1.sp, maxLines = 1)
+                txt(o, if (many) 11.sp else 12.sp, if (on) Ink else muted(), if (on) FontWeight.SemiBold else FontWeight.Normal, spacing = 0.sp, maxLines = 1)
             }
         }
     }
@@ -161,11 +161,11 @@ fun Pill(
     val bg = if (solid) ui.accent else Color.Transparent
     val fg = if (solid) Ink else if (enabled) Paper else muted()
     Box(
-        modifier.fillMaxWidth().padding(top = 8.dp).clip(CircleShape).background(bg)
-            .border(BorderStroke(0.6.dp, if (highlight) Mint else Color.White.copy(alpha = 0.25f)), CircleShape)
+        modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(bg)
+            .border(BorderStroke(0.6.dp, if (highlight) Mint else if (solid) ui.accent else Color.White.copy(alpha = 0.22f)), RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, onClick = onClick).padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
-    ) { txt(text, 12.sp, fg, spacing = 1.6.sp, maxLines = 1) }
+    ) { txt(text, 12.sp, fg, FontWeight.SemiBold, spacing = 0.8.sp, maxLines = 1) }
 }
 
 @Composable
@@ -187,7 +187,7 @@ fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
     val ui = LocalUi.current
     Box(
         Modifier.width(44.dp).height(26.dp).clip(CircleShape)
-            .background(if (on) ui.accent else Color(0xFF2A2D33))
+            .background(if (on) ui.accent else Color(0x33FFFFFF))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onChange(!on) }
             .padding(3.dp),
         contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
@@ -251,19 +251,15 @@ fun Field(value: String, onChange: (String) -> Unit, hint: String, modifier: Mod
 fun Chip(text: String, on: Boolean, onClick: () -> Unit) {
     val ui = LocalUi.current
     Box(
-        Modifier.clip(CircleShape).background(if (on) ui.accent else Color.Transparent)
-            .border(BorderStroke(0.6.dp, Color.White.copy(alpha = 0.25f)), CircleShape)
+        Modifier.clip(RoundedCornerShape(10.dp)).background(if (on) ui.accent else Color.Transparent)
+            .border(BorderStroke(0.6.dp, Color.White.copy(alpha = 0.25f)), RoundedCornerShape(10.dp))
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
     ) { txt(text, 12.sp, if (on) Ink else muted(), maxLines = 1) }
 }
 
 @Composable
 fun BackBtn(onClick: () -> Unit) {
-    Box(
-        Modifier.padding(bottom = 10.dp).clip(CircleShape)
-            .border(BorderStroke(0.6.dp, Color.White.copy(alpha = 0.25f)), CircleShape)
-            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp),
-    ) { txt("‹ KEMBALI", 12.sp, Paper, spacing = 1.2.sp) }
+    // tombol kembali ada di Host (satu saja)
 }
 
 @Composable

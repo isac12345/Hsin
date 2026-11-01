@@ -215,7 +215,8 @@ fun DialogHost(vm: AppViewModel) {
 fun AlphaApp(vm: AppViewModel) {
     val ctx = LocalContext.current
     UiState.init(vm.prefs)
-    val ui = UiCfg(Color(vm.accent), vm.cardAlpha, vm.contrast / 100f, vm.saver)
+    val cmode = curMode(vm)
+    val ui = UiCfg(if (cmode.isEmpty()) SP.gold else info(cmode).color, vm.cardAlpha, vm.contrast / 100f, vm.saver)
     val clock = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         val t0 = withFrameNanos { it }
@@ -252,7 +253,7 @@ fun AlphaApp(vm: AppViewModel) {
                                 Modifier.clip(CircleShape).background(SP.gold).tap {
                                     if (vm.route in setOf("games", "custom", "tools")) vm.go("dash") else if (!vm.back()) vm.go("dash")
                                 }.padding(horizontal = 14.dp, vertical = 8.dp)
-                            ) { SText("‹ " + tx("KEMBALI", "BACK"), 11.sp, SP.ink, FontWeight.Bold, 1.sp) }
+                            ) { SText("‹ " + tx("Kembali", "Back"), 13.sp, SP.ink, FontWeight.Bold) }
                         }
                         key(vm.route) {
                             val scroll = rememberScrollState()
@@ -303,6 +304,7 @@ fun AlphaApp(vm: AppViewModel) {
                         }
                     }
                 }
+                RitualOverlay(vm)
                 DialogHost(vm)
             }
         }
