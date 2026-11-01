@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        setContent { AlphaApp(vm) }
+        setContent { HsinApp(vm) }
         handleLaunchIntent(intent)
         if (!vm.prefs.permAsked) {
             vm.prefs.permAsked = true
@@ -165,7 +165,7 @@ fun Banner(vm: AppViewModel) {
         }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-            txt("ALPHA CONTROL", 21.sp, Paper, FontWeight.Medium, spacing = 4.sp)
+            txt("HSIN", 21.sp, Paper, FontWeight.Medium, spacing = 4.sp)
             txt("V2 · FUSION", 11.sp, Color.White.copy(alpha = 0.7f), spacing = 3.sp)
         }
     }
@@ -229,7 +229,7 @@ fun DialogHost(vm: AppViewModel) {
 }
 
 @Composable
-fun AlphaApp(vm: AppViewModel) {
+fun HsinApp(vm: AppViewModel) {
     val ctx = LocalContext.current
     UiState.init(vm.prefs)
     val cmode = curMode(vm)

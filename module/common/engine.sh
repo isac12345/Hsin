@@ -1,40 +1,40 @@
 #!/system/bin/sh
-# Alpha v1 - Core Execution Engine
+# HSIN v1 - Core Execution Engine
 # Sintesis fitur teruji dari RaiRin-AI, Uperf, RaiRin-Liquid, fas-rs
 
-LOG_FILE="${ALPHA_LOG_FILE:-/data/adb/alpha/alpha.log}"
+LOG_FILE="${HSIN_LOG_FILE:-/data/adb/hsin/hsin.log}"
 SYSFS_CPU_PREFIX="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
 SYSFS_BLOCK_PREFIX="${SYSFS_BLOCK_PREFIX:-/sys/block}"
 SYSFS_DEVFREQ_PREFIX="${SYSFS_DEVFREQ_PREFIX:-/sys/class/devfreq}"
 SYSFS_THERMAL_PREFIX="${SYSFS_THERMAL_PREFIX:-/sys/devices/virtual/thermal}"
 PROC_SYS_PREFIX="${PROC_SYS_PREFIX:-/proc/sys}"
 SYSFS_MODULE_PREFIX="${SYSFS_MODULE_PREFIX:-/sys/module}"
-GPU_PERF_POLLING_MS="${ALPHA_GPU_POLLING_MS:-10}"
+GPU_PERF_POLLING_MS="${HSIN_GPU_POLLING_MS:-10}"
 case "$GPU_PERF_POLLING_MS" in
     ''|*[!0-9]*) GPU_PERF_POLLING_MS=10 ;;
 esac
 [ "$GPU_PERF_POLLING_MS" -gt 0 ] 2>/dev/null || GPU_PERF_POLLING_MS=10
 
 # Direktori log dihitung SEKALI (tanpa fork dirname per baris log).
-ALPHA_LOG_DIR="${LOG_FILE%/*}"
-case "$LOG_FILE" in */*) ;; *) ALPHA_LOG_DIR=. ;; esac
+HSIN_LOG_DIR="${LOG_FILE%/*}"
+case "$LOG_FILE" in */*) ;; *) HSIN_LOG_DIR=. ;; esac
 # Timestamp di-cache: dihitung 1x per seksi tune_* lewat log_ts, bukan
 # 1x per baris log (date = 1 subproses per baris sebelumnya).
-ALPHA_TS=""
+HSIN_TS=""
 log_ts() {
-    ALPHA_TS=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)
+    HSIN_TS=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)
 }
 
 # Baca 1 baris node TANPA fork ($(cat) = 1 subshell + 1 exec tiap baca).
-# Hasil di ALPHA_RD. rc 0 = terbaca; node tanpa newline akhir tetap terbaca.
+# Hasil di HSIN_RD. rc 0 = terbaca; node tanpa newline akhir tetap terbaca.
 # Beda dari cat: hanya baris pertama (semua node di apply_tweak 1 baris).
-alpha_rd() {
+hsin_rd() {
     # Pakai cat, bukan builtin read: read dari node /proc/sys di beberapa kernel
     # hanya mengembalikan 1 karakter ("300" terbaca "3") sehingga verifikasi salah.
-    ALPHA_RD=""
+    HSIN_RD=""
     [ -r "$1" ] || return 1
-    ALPHA_RD=$(cat "$1" 2>/dev/null) || return 1
-    ALPHA_RD=$(printf '%s\n' "$ALPHA_RD" | head -n 1)
+    HSIN_RD=$(cat "$1" 2>/dev/null) || return 1
+    HSIN_RD=$(printf '%s\n' "$HSIN_RD" | head -n 1)
     return 0
 }
 
@@ -47,14 +47,14 @@ log_msg() {
     local status="$1"
     local category="$2"
     local detail="$3"
-    [ -n "$ALPHA_TS" ] || log_ts
+    [ -n "$HSIN_TS" ] || log_ts
     
-    if [ "${ALPHA_DRYRUN:-0}" = "1" ]; then
-        echo "[$ALPHA_TS] [$category] [$status] (DRY-RUN) $detail"
+    if [ "${HSIN_DRYRUN:-0}" = "1" ]; then
+        echo "[$HSIN_TS] [$category] [$status] (DRY-RUN) $detail"
     fi
     
-    if [ -d "$ALPHA_LOG_DIR" ]; then
-        echo "[$ALPHA_TS] [$category] [$status] $detail" >> "$LOG_FILE" 2>/dev/null
+    if [ -d "$HSIN_LOG_DIR" ]; then
+        echo "[$HSIN_TS] [$category] [$status] $detail" >> "$LOG_FILE" 2>/dev/null
     fi
 }
 
@@ -79,7 +79,7 @@ apply_tweak() {
     fi
     
     # Mode dry-run untuk testing/simulasi tanpa menyentuh kernel
-    if [ "${ALPHA_DRYRUN:-0}" = "1" ]; then
+    if [ "${HSIN_DRYRUN:-0}" = "1" ]; then
         APPLIED_COUNT=$((APPLIED_COUNT + 1))
         log_msg "APPLIED" "$category" "path=$path value=$value"
         return 0
@@ -97,17 +97,17 @@ apply_tweak() {
         # diam-diam" (tidak berubah sama sekali meski echo exit 0).
         local before_val=""
         local before_rc=1
-        alpha_rd "$path"
+        hsin_rd "$path"
         before_rc=$?
-        before_val="$ALPHA_RD"
+        before_val="$HSIN_RD"
         if echo "$value" > "$path" 2>/dev/null; then
             local after_val=""
-            if ! alpha_rd "$path"; then
+            if ! hsin_rd "$path"; then
                 APPLIED_COUNT=$((APPLIED_COUNT + 1))
                 log_msg "APPLIED" "$category" "path=$path value=$value (tidak diverifikasi, node tulis-saja)"
                 return 0
             fi
-            after_val="$ALPHA_RD"
+            after_val="$HSIN_RD"
             # Node pilihan seperti scheduler menandai yang aktif dengan [nama].
             case "$after_val" in
                 *"[$value]"*) after_val="$value" ;;
@@ -204,7 +204,7 @@ tune_cpu_freq() {
             if [ -f "$avail_freq_file" ]; then
                 local max_freqs
                 max_freqs=$(tr ' ' '\n' < "$avail_freq_file" 2>/dev/null | grep -E '^[0-9]+$' | sort -n)
-                target_max=$(alpha_opp_snap_nearest "$target_max" "$max_freqs")
+                target_max=$(hsin_opp_snap_nearest "$target_max" "$max_freqs")
             fi
         fi
 
@@ -219,13 +219,13 @@ tune_cpu_freq() {
                 if [ -f "$avail_freq_file" ]; then
                     local min_freqs
                     min_freqs=$(tr ' ' '\n' < "$avail_freq_file" 2>/dev/null | grep -E '^[0-9]+$' | sort -n)
-                    min_target=$(alpha_opp_snap_nearest "$min_target" "$min_freqs")
+                    min_target=$(hsin_opp_snap_nearest "$min_target" "$min_freqs")
                 fi
                 [ -n "$min_target" ] && apply_tweak "$category" "$min_node" "$min_target"
             fi
             
             # Verifikasi pembacaan ulang (pola RaiRin-AI)
-            if [ "${ALPHA_DRYRUN:-0}" != "1" ] && [ -f "$max_node" ]; then
+            if [ "${HSIN_DRYRUN:-0}" != "1" ] && [ -f "$max_node" ]; then
                 local current_max
                 current_max=$(cat "$max_node" 2>/dev/null)
                 if [ "$current_max" != "$target_max" ]; then
@@ -319,7 +319,7 @@ tune_gpu_adreno_kgsl() {
     local down_target=""
 
     [ -f "$gov_file" ] || { log_msg "SKIPPED" "$category" "kgsl governor tidak terbaca, ramp tuning skip"; return 0; }
-    gov=$(alpha_safe_read "$gov_file" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    gov=$(hsin_safe_read "$gov_file" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     [ -n "$gov" ] || { log_msg "SKIPPED" "$category" "kgsl governor kosong, ramp tuning skip"; return 0; }
 
     case "$gov" in
@@ -354,7 +354,7 @@ tune_gpu_adreno_kgsl() {
 
     # Thermal gate HANYA untuk tier agresif (performance) - filosofi sama
     # seperti Mali (ceiling ditahan saat panas). Di performance SOFTWARE
-    # gate Alpha digeser ke 95C: user oke panas, proteksi thermal HARDWARE
+    # gate HSIN digeser ke 95C: user oke panas, proteksi thermal HARDWARE
     # kernel tetap utuh. Tier konservatif balanced/battery selalu diterapkan
     # (aman secara termal).
     if [ "${ACTIVE_PROFILE:-balanced}" = "performance" ] && gpu_thermal_is_hot 95000; then
@@ -392,7 +392,7 @@ tune_gpu_adreno_kgsl() {
     fi
 }
 
-alpha_safe_read() {
+hsin_safe_read() {
     # cat biasa, tapi dikasih timeout kalau tersedia - beberapa driver
     # thermal vendor bisa nge-block selamanya pas node sensornya lagi
     # bermasalah, dan itu bikin apply_now.sh (dan pemanggil yang nunggunya)
@@ -405,7 +405,7 @@ alpha_safe_read() {
     fi
 }
 
-ALPHA_GPU_HOT_THRESHOLD_PERFORMANCE=75000
+HSIN_GPU_HOT_THRESHOLD_PERFORMANCE=75000
 
 gpu_thermal_is_hot() {
     local gpu_hot=0
@@ -415,7 +415,7 @@ gpu_thermal_is_hot() {
     # detect.sh (path dari cache, bukan scan ulang). Nilai suhu tetap live.
     if [ "${THERMAL_SUPPORTED:-0}" = "1" ] && [ -r "${THERMAL_PATH:-}" ]; then
         local cached_temp
-        cached_temp=$(alpha_safe_read "$THERMAL_PATH" | tr -d '[:space:]')
+        cached_temp=$(hsin_safe_read "$THERMAL_PATH" | tr -d '[:space:]')
         case "$cached_temp" in
             ''|*[!0-9]*) ;;
             *)
@@ -431,12 +431,12 @@ gpu_thermal_is_hot() {
         local type_file="$gpu_zone/type"
         [ -f "$type_file" ] || continue
         local zone_type
-        zone_type=$(alpha_safe_read "$type_file" | tr '[:upper:]' '[:lower:]')
+        zone_type=$(hsin_safe_read "$type_file" | tr '[:upper:]' '[:lower:]')
         case "$zone_type" in
             *gpu*|*soc*|*tsens*|*cpu*)
                 found_specific=1
                 local gpu_temp
-                gpu_temp=$(alpha_safe_read "$gpu_zone/temp" | tr -d '[:space:]')
+                gpu_temp=$(hsin_safe_read "$gpu_zone/temp" | tr -d '[:space:]')
                 case "$gpu_temp" in
                     ''|*[!0-9]*) continue ;;
                 esac
@@ -452,7 +452,7 @@ gpu_thermal_is_hot() {
         for gpu_zone in "$SYSFS_THERMAL_PREFIX"/thermal_zone*/temp; do
             [ -f "$gpu_zone" ] || continue
             local gpu_temp
-            gpu_temp=$(alpha_safe_read "$gpu_zone" | tr -d '[:space:]')
+            gpu_temp=$(hsin_safe_read "$gpu_zone" | tr -d '[:space:]')
             case "$gpu_temp" in
                 ''|*[!0-9]*) continue ;;
             esac
@@ -470,10 +470,10 @@ tune_gpu_adreno_cap() {
     local kgsl_dir="$2"
     local gpu_table=""
     if [ -f "$kgsl_dir/devfreq/available_frequencies" ]; then
-        gpu_table=$(alpha_safe_read "$kgsl_dir/devfreq/available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
+        gpu_table=$(hsin_safe_read "$kgsl_dir/devfreq/available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
     fi
     if [ -z "$gpu_table" ] && [ -f "$kgsl_dir/gpu_available_frequencies" ]; then
-        gpu_table=$(alpha_safe_read "$kgsl_dir/gpu_available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
+        gpu_table=$(hsin_safe_read "$kgsl_dir/gpu_available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
     fi
     if [ -z "$gpu_table" ]; then
         log_msg "SKIPPED" "$category" "cap mode but no readable GPU frequency table"
@@ -499,7 +499,7 @@ tune_gpu_adreno_cap() {
     esac
     [ "$gpu_percent" -gt 100 ] 2>/dev/null && gpu_percent=100
     local gpu_target=$(( (gpu_hw_max / 100) * gpu_percent ))
-    gpu_target=$(alpha_opp_cap_pick "$gpu_target" "$(printf '%s\n' "$gpu_table" | sort -n)")
+    gpu_target=$(hsin_opp_cap_pick "$gpu_target" "$(printf '%s\n' "$gpu_table" | sort -n)")
     if [ -z "$gpu_target" ]; then
         log_msg "SKIPPED" "$category" "cap target invalid"
         return 0
@@ -621,7 +621,7 @@ tune_gpu_mali() {
         return 0
     fi
     local mali_table
-    mali_table=$(alpha_safe_read "$mali_dev/available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
+    mali_table=$(hsin_safe_read "$mali_dev/available_frequencies" | tr ' ' '\n' | grep -E '^[0-9]+$')
     if [ -z "$mali_table" ]; then
         log_msg "SKIPPED" "$category" "Mali frequency table tidak terbaca"
         return 0
@@ -649,7 +649,7 @@ tune_gpu_mali() {
     # kali dulu baru bagi bisa overflow arithmetic shell dan balik jadi
     # angka negatif -> gpu_target invalid -> selalu SKIPPED walau node valid.
     local mali_target=$(( (mali_hw_max / 100) * mali_percent ))
-    mali_target=$(alpha_opp_cap_pick "$mali_target" "$(printf '%s\n' "$mali_table" | sort -n)")
+    mali_target=$(hsin_opp_cap_pick "$mali_target" "$(printf '%s\n' "$mali_table" | sort -n)")
     if [ -z "$mali_target" ]; then
         log_msg "SKIPPED" "$category" "Mali cap target invalid"
         return 0
@@ -686,7 +686,7 @@ tune_gpu_mali() {
         local mali_min_target=$(( (mali_hw_max / 100) * mali_min_pct ))
         # cap_pick: bila target di bawah rung terendah, jatuh ke terendah =
         # sama dengan default (jinak), bukan error.
-        mali_floor=$(alpha_opp_cap_pick "$mali_min_target" "$(printf '%s\n' "$mali_table" | sort -n)")
+        mali_floor=$(hsin_opp_cap_pick "$mali_min_target" "$(printf '%s\n' "$mali_table" | sort -n)")
     fi
     [ -n "$mali_floor" ] && apply_tweak "$category" "$mali_dev/min_freq" "$mali_floor"
 }
@@ -779,7 +779,7 @@ tune_input() {
     log_ts
     local category="INPUT"
     local input_base="${SYSFS_INPUT_PREFIX:-/sys}/class/input"
-    local snap_file="${ALPHA_CONF_DIR:-/data/adb/alpha}/input_native.conf"
+    local snap_file="${HSIN_CONF_DIR:-/data/adb/hsin}/input_native.conf"
     local input_nodes=""
     local _cand
     for _cand in "$input_base"/input*/sampling_rate "$input_base"/input*/poll_delay; do
@@ -897,7 +897,7 @@ tune_devfreq() {
 
             if [ -f "$avail_node" ]; then
                 local available_freqs
-                available_freqs=$(alpha_safe_read "$avail_node" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -n)
+                available_freqs=$(hsin_safe_read "$avail_node" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -n)
                 local hardware_max
                 hardware_max=$(printf '%s\n' "$available_freqs" | tail -n 1)
                 local max_percent="${DEVFREQ_MAX_PERCENT:-100}"
@@ -907,7 +907,7 @@ tune_devfreq() {
                 [ "$max_percent" -gt 100 ] 2>/dev/null && max_percent=100
                 if [ -n "$hardware_max" ]; then
                     target_freq=$(( (hardware_max / 100) * max_percent ))
-                    target_freq=$(alpha_opp_cap_pick "$target_freq" "$available_freqs")
+                    target_freq=$(hsin_opp_cap_pick "$target_freq" "$available_freqs")
                 fi
             fi
 
@@ -983,7 +983,7 @@ tune_vm() {
         if [ "$zram_active" = "1" ] && [ -n "${VM_SWAPPINESS:-}" ]; then
             local stock_swap="${VM_SWAPPINESS:-60}"
             # defaults.conf bawaan; fallback 60 bila belum ada
-            local conf_dir="${ALPHA_CONF_DIR:-/data/adb/alpha}"
+            local conf_dir="${HSIN_CONF_DIR:-/data/adb/hsin}"
             if [ -f "$conf_dir/defaults.conf" ]; then
                 local stock_from_conf
                 stock_from_conf=$(grep '^VM_SWAPPINESS=' "$conf_dir/defaults.conf" 2>/dev/null | cut -d= -f2)
@@ -1062,7 +1062,7 @@ tune_thermal() {
 tune_render() {
     log_ts
     local category="RENDER"
-    local render_conf="${ALPHA_RENDER_CONF:-/data/adb/alpha/render_backend.conf}"
+    local render_conf="${HSIN_RENDER_CONF:-/data/adb/hsin/render_backend.conf}"
     local render_want=""
     [ -f "$render_conf" ] && render_want=$(tr -d '[:space:]' < "$render_conf" 2>/dev/null)
     [ -z "$render_want" ] && render_want="default"
@@ -1103,7 +1103,7 @@ tune_render() {
         # M7: resetprop -d diganti — setprop tidak bisa hapus debug.* prop.
         # Log bahwa reboot + restart aplikasi diperlukan.
         log_msg "INFO" "$category" "$render_prop=default → log 'perlu reboot' + restart aplikasi (setprop tidak bisa hapus prop secara sempurna)"
-        echo "[M7] RENDER: $render_prop=dipulihkan ke default → perlu reboot + restart aplikasi" >> "${ALPHA_LOG_FILE:-/data/adb/alpha/alpha.log}" 2>/dev/null
+        echo "[M7] RENDER: $render_prop=dipulihkan ke default → perlu reboot + restart aplikasi" >> "${HSIN_LOG_FILE:-/data/adb/hsin/hsin.log}" 2>/dev/null
         return 0
     fi
     if setprop "$render_prop" "$render_want" 2>/dev/null; then
@@ -1125,7 +1125,7 @@ tune_render() {
 # yang LEBIH RENDAH.  Driver cpufreq sering menolak/membulatkan nilai yang
 # tidak ada di tabel OPP, jadi nearest lebih aman daripada cap_pick yang
 # hanya mencari <= target.
-alpha_opp_snap_nearest() {
+hsin_opp_snap_nearest() {
     local target="$1"
     local avail="$2"
 
@@ -1161,7 +1161,7 @@ alpha_opp_snap_nearest() {
 # --- 9. OPP CAP PICKER (Helper untuk tuning frekuensi berbasis persentase) ---
 # Memilih frekuensi terdekat yang <= target dari daftar frekuensi kernel yang valid
 # Murni POSIX integer arithmetic tanpa awk/bc/python
-alpha_opp_cap_pick() {
+hsin_opp_cap_pick() {
     local target="$1"
     local avail="$2"
     

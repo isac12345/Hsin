@@ -1,27 +1,27 @@
 #!/system/bin/sh
-# Alpha v1 - Screen-aware foreground profile monitor
+# HSIN v1 - Screen-aware foreground profile monitor
 
 MODDIR="${0%/*}"
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 PID_FILE="$STATE_DIR/monitor.pid"
 MAP_FILE="$STATE_DIR/game_profile_map.conf"
 ACTIVE_PROFILE_FILE="$STATE_DIR/active_profile"
 CURRENT_STATE_FILE="$STATE_DIR/current_state"
-LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
-SCREEN_ON_INTERVAL="${ALPHA_SCREEN_ON_INTERVAL:-7}"
-SCREEN_OFF_INTERVAL="${ALPHA_SCREEN_OFF_INTERVAL:-60}"
-GAME_POLL_INTERVAL_SECS="${ALPHA_GAME_POLL_INTERVAL_SECS:-2}"
+LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
+SCREEN_ON_INTERVAL="${HSIN_SCREEN_ON_INTERVAL:-7}"
+SCREEN_OFF_INTERVAL="${HSIN_SCREEN_OFF_INTERVAL:-60}"
+GAME_POLL_INTERVAL_SECS="${HSIN_GAME_POLL_INTERVAL_SECS:-2}"
 case "$GAME_POLL_INTERVAL_SECS" in
     ''|*[!0-9]*) GAME_POLL_INTERVAL_SECS="$SCREEN_ON_INTERVAL" ;;
     *) [ "$GAME_POLL_INTERVAL_SECS" -gt 0 ] 2>/dev/null || GAME_POLL_INTERVAL_SECS="$SCREEN_ON_INTERVAL" ;;
 esac
-MAX_CYCLES="${ALPHA_MONITOR_MAX_CYCLES:-0}"
+MAX_CYCLES="${HSIN_MONITOR_MAX_CYCLES:-0}"
 # Health-check event stream: kalau layar sudah nyala selama
 # EVENT_HEALTH_SECS tapi NOL event ter-parse jadi package, filter event
 # dianggap tidak cocok dengan ROM ini -> turun ke polling permanen
 # untuk sisa proses (satu keputusan per boot, hemat resource).
-EVENT_HEALTH_SECS="${ALPHA_EVENT_HEALTH_SECS:-45}"
-EVENT_PRECHECK_LINES="${ALPHA_EVENT_PRECHECK_LINES:-100}"
+EVENT_HEALTH_SECS="${HSIN_EVENT_HEALTH_SECS:-45}"
+EVENT_PRECHECK_LINES="${HSIN_EVENT_PRECHECK_LINES:-100}"
 EVENT_COUNT_FILE="$STATE_DIR/.foreground-events.$$.count"
 EVENT_ON_SECS=0
 EVENT_FALLBACK_DONE=0
@@ -34,8 +34,8 @@ EVENT_TAG_PATTERN='wm_set_resumed_activity,wm_set_top_resumed_activity,wm_top_re
 # saat testing mode event-driven, pakai kill <pid> langsung (trap akan
 # membersihkan stream logcat/reader lewat stop_event_stream).
 STOP_MONITOR=0
-NOTIFY_MODE_SWITCH="${ALPHA_NOTIFY_MODE_SWITCH:-1}"
-NOTIFY_TAG="alpha_mode_switch"
+NOTIFY_MODE_SWITCH="${HSIN_NOTIFY_MODE_SWITCH:-1}"
+NOTIFY_TAG="hsin_mode_switch"
 NOTIFY_AVAILABLE=0
 MONITOR_METHOD="polling"
 LOGCAT_PID=""
@@ -45,7 +45,7 @@ LAST_EVENT_PKG_FILE="$STATE_DIR/.foreground_last_pkg"
 HUD_FOREGROUND_FILE="$STATE_DIR/.hud_foreground_pkg"
 
 # GameBoost integration
-GB_GRACE="${ALPHA_GB_GRACE:-12}"
+GB_GRACE="${HSIN_GB_GRACE:-12}"
 GB_PENDING_FILE="$STATE_DIR/.gb_pending"
 GB_ACTIVE_FILE="$STATE_DIR/.gb_active"
 GB_SAFETY_INTERVAL=15
@@ -63,13 +63,13 @@ GAME_SNAP_DONE_FILE="$STATE_DIR/.game_snap_done"
 GAME_SNAP_AFTER_SECS=60
 # Snapshot berulang tiap N dtk selama game foreground (visibilitas sesi panjang:
 # tren suhu, step-down termal, frekuensi, mode fas-rs). 0 = hanya sekali.
-GAME_SNAP_EVERY_SECS="${ALPHA_GAME_SNAP_EVERY_SECS:-300}"
+GAME_SNAP_EVERY_SECS="${HSIN_GAME_SNAP_EVERY_SECS:-300}"
 case "$GAME_SNAP_EVERY_SECS" in ''|*[!0-9]*) GAME_SNAP_EVERY_SECS=300 ;; esac
 
-# Kadensi loop: default 2 dtk (perilaku lama). Override: env ALPHA_EVENT_LOOP_SECS
+# Kadensi loop: default 2 dtk (perilaku lama). Override: env HSIN_EVENT_LOOP_SECS
 # atau file $STATE_DIR/MONITOR_LOOP_SECS (angka 1-8, dibaca tiap putaran).
 # Maks 8 supaya cek termal tiap 15 dtk tidak melambat jauh (termal tetap menang).
-EVENT_LOOP_SECS_DEFAULT="${ALPHA_EVENT_LOOP_SECS:-2}"
+EVENT_LOOP_SECS_DEFAULT="${HSIN_EVENT_LOOP_SECS:-2}"
 case "$EVENT_LOOP_SECS_DEFAULT" in ''|*[!0-9]*) EVENT_LOOP_SECS_DEFAULT=2 ;; esac
 [ "$EVENT_LOOP_SECS_DEFAULT" -ge 1 ] 2>/dev/null || EVENT_LOOP_SECS_DEFAULT=2
 [ "$EVENT_LOOP_SECS_DEFAULT" -le 8 ] 2>/dev/null || EVENT_LOOP_SECS_DEFAULT=8
@@ -111,8 +111,8 @@ fi
 # CPU_POLICIES untuk gb_apply: service.sh tidak mengekspornya ke proses
 # ini; tanpa ini lantai CPU diam-diam skip (for kosong, tanpa log).
 # detected.conf murni assignment (dari detect.sh sendiri) jadi aman.
-if [ -z "$CPU_POLICIES" ] && [ -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/detected.conf" ]; then
-    . "${ALPHA_CONF_DIR:-/data/adb/alpha}/detected.conf" 2>/dev/null
+if [ -z "$CPU_POLICIES" ] && [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/detected.conf" ]; then
+    . "${HSIN_CONF_DIR:-/data/adb/hsin}/detected.conf" 2>/dev/null
     LOG_FILE="$_gb_monitor_save_log"
 fi
 if [ -z "$CPU_POLICIES" ]; then
@@ -213,7 +213,7 @@ get_foreground_package() {
     fi
 
     rm -f "$monitor_dump_file"
-    if [ "${ALPHA_DEBUG_MONITOR:-0}" = "1" ]; then
+    if [ "${HSIN_DEBUG_MONITOR:-0}" = "1" ]; then
         monitor_log "DEBUG" "gagal ekstrak foreground pkg, raw dump 5 baris pertama tersimpan"
         head -n 5 "$monitor_dump_file" >> "$LOG_FILE" 2>/dev/null
     fi
@@ -331,13 +331,13 @@ gb_safety_check() {
     # atasnya HARUS lolos korroborasi. (110000/105000 membiarkan bacaan palsu
     # 95-110C, mis. zona konstan 100C di Poco, tetap memicu CRITICAL.)
     # Gerbang hanya bisa di-override lewat FILE $STATE_DIR/GB_OUTLIER_MIN_MC
-    # (isi: angka mC). Env ALPHA_GB_OUTLIER_MIN_MC sengaja DIBUANG (v46):
+    # (isi: angka mC). Env HSIN_GB_OUTLIER_MIN_MC sengaja DIBUANG (v46):
     # env tidak pernah sampai ke proses monitor di device (dijalankan dari
     # service.sh), dan knob yang sama sudah ada lewat file — jadi env cuma
     # entry mati yang menyesatkan (user set env, tidak ada efek, tidak tahu).
     local outlier_min=95000
-    if [ -f "${STATE_DIR:-/data/adb/alpha}/GB_OUTLIER_MIN_MC" ] && \
-        monitor_rd "${STATE_DIR:-/data/adb/alpha}/GB_OUTLIER_MIN_MC"; then
+    if [ -f "${STATE_DIR:-/data/adb/hsin}/GB_OUTLIER_MIN_MC" ] && \
+        monitor_rd "${STATE_DIR:-/data/adb/hsin}/GB_OUTLIER_MIN_MC"; then
         outlier_min="$MONITOR_RD"
     fi
     case "$outlier_min" in ''|*[!0-9]*) outlier_min=95000 ;; esac
@@ -477,17 +477,19 @@ notify_mode_change() {
     notify_profile="$2"
     [ "$NOTIFY_MODE_SWITCH" = "1" ] || return 0
     [ "$NOTIFY_AVAILABLE" = "1" ] || return 0
+    # Notifikasi mode dikirim oleh app HSIN (ongoing, tombol mode); modul tidak mengirim yang kedua.
+    [ -f /data/adb/hsin/.companion_installed ] && return 0
     if [ -n "$notify_pkg" ]; then
-        notify_title="Alpha: $notify_profile"
+        notify_title="HSIN: $notify_profile"
         notify_text="$notify_pkg aktif - profile $notify_profile"
     else
-        notify_title="Alpha: $notify_profile"
+        notify_title="HSIN: $notify_profile"
         notify_text="Keluar dari game - kembali ke manual ($notify_profile)"
     fi
     if cmd notification post -S bigtext -t "$notify_title" "$NOTIFY_TAG" "$notify_text" >/dev/null 2>&1; then
         return 0
     fi
-    monitor_log "WARNING" "notification failed tag=$NOTIFY_TAG profile=$notify_profile"
+    monitor_log "INFO" "notifikasi modul tidak terkirim (ROM menolak), diabaikan: profile=$notify_profile"
     return 0
 }
 
@@ -587,7 +589,7 @@ handle_foreground_event() {
         fi
         if [ "$gb_active" != "1" ]; then
             # Check DISABLE_GAMEBOOST gate
-            if [ -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/DISABLE_GAMEBOOST" ]; then
+            if [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/DISABLE_GAMEBOOST" ]; then
                 monitor_log "GAMEBOOST" "DISABLED by DISABLE_GAMEBOOST file"
             else
                 # Check battery status
@@ -602,7 +604,7 @@ handle_foreground_event() {
                 # menganggapnya forced dan mematikan boost setelah 60 dtk.
                 GB_BATT_LEVEL=""
                 if [ "$battery_status" = "WARNING" ] && \
-                    [ -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GB_WARN_BOOST" ]; then
+                    [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GB_WARN_BOOST" ]; then
                     GB_BATT_LEVEL="performance"
                     battery_status="OK"
                     monitor_log "GAMEBOOST" "BATTERY WARNING: <30% without charging, flag GB_WARN_BOOST -> boost level performance"
@@ -651,20 +653,20 @@ handle_foreground_event() {
                         # DAN non-forced (extreme eksplisit supaya
                         # _gb_level tidak jatuh ke fail-safe balanced).
                         local orig_level
-                        orig_level=$(cat "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null)
+                        orig_level=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null)
                         local _target_level="${GB_FORCED_LEVEL:-${GB_BATT_LEVEL:-extreme}}"
-                        printf '%s\n' "$_target_level" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                        printf '%s\n' "$_target_level" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                         gb_apply
                         if [ -n "$orig_level" ]; then
-                            printf '%s\n' "$orig_level" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                            printf '%s\n' "$orig_level" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                         else
-                            rm -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                            rm -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                         fi
                         # Log level BENAR-BENAR diterapkan (baca boost_level
                         # sesudah gb_apply, sebelum orig restore di atas
                         # sudah mengembalikan GAMEBOOST_LEVEL ke user).
                         local _applied
-                        _applied=$(cat "${ALPHA_CONF_DIR:-/data/adb/alpha}/boost_level" 2>/dev/null)
+                        _applied=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/boost_level" 2>/dev/null)
                         [ -z "$_applied" ] && _applied="$_target_level"
                         printf '%s\n' "1" > "$GB_ACTIVE_FILE" 2>/dev/null
                         monitor_log "GAMEBOOST" "APPLIED ${_applied} for $handle_pkg (temp=${current_temp}mC)"
@@ -833,14 +835,14 @@ check_daily_loadavg_guard() {
 # tulis performance sementara, kembalikan saat cooldown/restore.
 _gb_force_level() {
     [ -f "$STATE_DIR/.gb_level_orig" ] || {
-        if [ -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" ]; then
-            cat "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" \
+        if [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" ]; then
+            cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" \
                 > "$STATE_DIR/.gb_level_orig" 2>/dev/null
         else
             printf '%s\n' "__ABSENT__" > "$STATE_DIR/.gb_level_orig" 2>/dev/null
         fi
     }
-    printf '%s\n' "performance" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+    printf '%s\n' "performance" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
 }
 
 _gb_unforce_level() {
@@ -849,9 +851,9 @@ _gb_unforce_level() {
         local _o
         _o=$(cat "$STATE_DIR/.gb_level_orig" 2>/dev/null)
         if [ "$_o" = "__ABSENT__" ]; then
-            rm -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+            rm -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
         elif [ -n "$_o" ]; then
-            printf '%s\n' "$_o" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+            printf '%s\n' "$_o" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
         fi
         rm -f "$STATE_DIR/.gb_level_orig" 2>/dev/null
     fi
@@ -911,7 +913,7 @@ log_game_snapshot() {
     fi
     printf '%s\n' "$_now" > "$GAME_SNAP_DONE_FILE" 2>/dev/null
 
-    local _cdir="${ALPHA_CONF_DIR:-/data/adb/alpha}"
+    local _cdir="${HSIN_CONF_DIR:-/data/adb/hsin}"
     local _state="?" _boost="none" _gbact="0" _cap="?" _bst="?" _flags="" _f _io="" _d _n _ra _sc _tfo="?" _tmax="?"
     monitor_rd "$CURRENT_STATE_FILE" && _state="$MONITOR_RD"
     monitor_rd "$_cdir/boost_level" && _boost="$MONITOR_RD"
@@ -943,7 +945,7 @@ log_game_snapshot() {
         monitor_rd "$_p/scaling_max_freq"; _mx="$MONITOR_RD"
         _cpu="$_cpu $_pn:cur=$_c,min=$_mn,max=$_mx"
     done
-    monitor_rd "${ALPHA_FASRS_MODE_NODE:-/dev/fas_rs/mode}" && _fm="$MONITOR_RD"
+    monitor_rd "${HSIN_FASRS_MODE_NODE:-/dev/fas_rs/mode}" && _fm="$MONITOR_RD"
     command -v gb_safety_check >/dev/null 2>&1 && _tmax=$(gb_safety_check)
     monitor_log "GAME-SNAPSHOT" "pkg=${_pkg:-?} t=+${_el}s method=${MONITOR_METHOD} profile=${_state} gb_active=${_gbact} boost_level=${_boost} batt=${_cap}%(${_bst}) temp_max=${_tmax}mC tfo=${_tfo} fasrs_mode=${_fm} forced=${GB_FORCED_LEVEL:-none} batt_lv=${GB_BATT_LEVEL:-none} cpu:${_cpu} io:${_io} flags:${_flags:- none}"
     return 0
@@ -1112,7 +1114,7 @@ check_gb_grace_period() {
                         rm -f "$GB_COOLDOWN_COUNT_FILE"
                         local _cool_level=""
                         if command -v gb_apply >/dev/null 2>&1; then
-                            if [ -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GB_COOLDOWN_EXTREME" ]; then
+                            if [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GB_COOLDOWN_EXTREME" ]; then
                                 # Legacy: gb_apply tanpa level eksplisit -> _gb_level
                                 # fail-safe "balanced" (GAMEBOOST_LEVEL dihapus saat
                                 # boot) = restore-only, boost mati diam-diam. Flag ini:
@@ -1121,20 +1123,20 @@ check_gb_grace_period() {
                                 # Hanya tercapai setelah suhu <70C 60 dtk; thermal
                                 # tetap menang (naik lagi -> tangga step-down jalan).
                                 local _cd_orig _cd_target
-                                _cd_orig=$(cat "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null)
+                                _cd_orig=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null)
                                 _cd_target="${GB_BATT_LEVEL:-extreme}"
-                                printf '%s\n' "$_cd_target" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                                printf '%s\n' "$_cd_target" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                                 gb_apply
                                 if [ -n "$_cd_orig" ]; then
-                                    printf '%s\n' "$_cd_orig" > "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                                    printf '%s\n' "$_cd_orig" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                                 else
-                                    rm -f "${ALPHA_CONF_DIR:-/data/adb/alpha}/GAMEBOOST_LEVEL" 2>/dev/null
+                                    rm -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                                 fi
                                 monitor_log "GB-COOLDOWN" "re-apply level=${_cd_target} (flag GB_COOLDOWN_EXTREME)"
                             else
                                 gb_apply
                             fi
-                            _cool_level=$(cat "${ALPHA_CONF_DIR:-/data/adb/alpha}/boost_level" 2>/dev/null)
+                            _cool_level=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/boost_level" 2>/dev/null)
                         else
                             monitor_log "GAMEBOOST" "WARN: gb_apply unavailable during cooldown complete"
                         fi

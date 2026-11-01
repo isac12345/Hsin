@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# memfx.sh — tweak memori Alpha: PSI memori (baca), MGLRU opt-in (eksperimental), pembersih adaptif opt-in.
+# memfx.sh — tweak memori HSIN: PSI memori (baca), MGLRU opt-in (eksperimental), pembersih adaptif opt-in.
 # Library fungsi (di-source), gaya sama dengan gamehooks.sh. Semua jalur bisa di-override lewat env
 # supaya bisa diuji di Linux biasa tanpa HP (lihat test_memfx.sh).
 #
@@ -11,12 +11,12 @@
 #   mf_mglru_restore            kembalikan nilai asli yang disimpan sebelum diubah
 #   mf_relief_tick <pkg>        dipanggil tiap siklus monitor SAAT game aktif; pembersih adaptif (opt-in)
 
-MF_STATE="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+MF_STATE="${HSIN_STATE_DIR:-/data/adb/hsin}"
 MF_CONF="$MF_STATE/app.conf"
-MF_LOG="${ALPHA_LOG_FILE:-$MF_STATE/alpha.log}"
-MF_PSI="${ALPHA_PSI_FILE:-/proc/pressure/memory}"
-MF_LRU="${ALPHA_LRUGEN_DIR:-/sys/kernel/mm/lru_gen}"
-MF_MEMINFO="${ALPHA_MEMINFO:-/proc/meminfo}"
+MF_LOG="${HSIN_LOG_FILE:-$MF_STATE/hsin.log}"
+MF_PSI="${HSIN_PSI_FILE:-/proc/pressure/memory}"
+MF_LRU="${HSIN_LRUGEN_DIR:-/sys/kernel/mm/lru_gen}"
+MF_MEMINFO="${HSIN_MEMINFO:-/proc/meminfo}"
 MF_LRU_PREV="$MF_STATE/.mf_mglru_prev"
 MF_HITS="$MF_STATE/.mf_hits"
 MF_LAST="$MF_STATE/.mf_last"
@@ -159,7 +159,7 @@ mf_relief_tick() {
     # ROM ini bisa tidak punya `am kill-all` (terbukti di itel P65): jangan pura-pura bertindak.
     if ! am help 2>&1 | grep -q 'kill-all'; then
         printf '%s\n' "$_mn" > "$MF_LAST"; rm -f "$MF_HITS"
-        _mf_log WARN "am kill-all tidak tersedia di ROM ini, pembersih adaptif dilewati"
+        _mf_log INFO "am kill-all tidak ada di ROM ini; pembersihan RAM dilakukan app HSIN (Ritual / tombol Bersihkan RAM)"
         return 0
     fi
     am kill-all >/dev/null 2>&1
@@ -183,7 +183,7 @@ mf_caps() {
 mf_start_clean() {
     [ "$(_mf_conf MEMCLEAN_ON_START 0)" = 1 ] || return 0
     _mf_ok memclean || return 0
-    am help 2>&1 | grep -q 'kill-all' || { _mf_log WARN "am kill-all tidak tersedia, free RAM saat game mulai dilewati"; return 0; }
+    am help 2>&1 | grep -q 'kill-all' || { _mf_log INFO "am kill-all tidak ada di ROM ini; RAM dibersihkan oleh app HSIN saat Ritual"; return 0; }
     am kill-all >/dev/null 2>&1
     _mf_log APPLIED "am kill-all saat game mulai${1:+: $1}"
 }

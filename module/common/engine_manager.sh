@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha + Uperf + fas-rs Fusion
+# HSIN + Uperf + fas-rs Fusion
 # Kelola [game_list] di fasrs/games.toml dari APK - ini SATU-SATUNYA titik
 # pilih engine per-game: package yang di-add di sini otomatis dipegang fas-rs
 # dan otomatis di-exclude dari classifier cpuset uperf (lihat
@@ -76,8 +76,8 @@ apply_and_restart() {
     # Restart backend uperf supaya exclusion rule yang baru langsung terbaca
     if [ -f "$MODDIR/uperf/script/run_uperf.sh" ]; then
         killall uperf 2>/dev/null
-        WORK_DIR="${ALPHA_WORK_DIR:-/data/adb/alpha}"
-        nohup sh "$MODDIR/uperf/script/run_uperf.sh" >> "$WORK_DIR/alpha.log" 2>&1 &
+        WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
+        nohup sh "$MODDIR/uperf/script/run_uperf.sh" >> "$WORK_DIR/hsin.log" 2>&1 &
     fi
 }
 

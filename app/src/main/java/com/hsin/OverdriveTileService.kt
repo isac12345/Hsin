@@ -18,29 +18,29 @@ class OverdriveTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
-        scope.launch { render(Alpha.status()) }
+        scope.launch { render(Hsin.status()) }
     }
 
     override fun onClick() {
         super.onClick()
         scope.launch {
-            val s = Alpha.status()
+            val s = Hsin.status()
             if (s == null) {
-                Toast.makeText(applicationContext, "Modul Alpha tidak terbaca", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Modul HSIN tidak terbaca", Toast.LENGTH_SHORT).show()
                 return@launch
             }
             if (s.ovd) {
-                Alpha.ovdStop()
+                Hsin.ovdStop()
             } else if (s.gamePkg.isEmpty()) {
                 Toast.makeText(applicationContext, "Buka game terdaftar dulu, Puncak hanya untuk game", Toast.LENGTH_LONG).show()
             } else {
-                val r = Alpha.ovdStart()
+                val r = Hsin.ovdStart()
                 if (!r.ok) {
                     val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                     Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show()
                 }
             }
-            render(Alpha.status())
+            render(Hsin.status())
         }
     }
 

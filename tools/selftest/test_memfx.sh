@@ -19,7 +19,7 @@ cat > "$T/bin/device_config" <<'S'
 echo "true"
 S
 chmod +x "$T/bin/"*
-export T PATH="$T/bin:$PATH" ALPHA_STATE_DIR="$T/st" ALPHA_LOG_FILE="$T/log" ALPHA_PSI_FILE="$T/psi" ALPHA_LRUGEN_DIR="$T/lru" ALPHA_MEMINFO="$T/meminfo"
+export T PATH="$T/bin:$PATH" HSIN_STATE_DIR="$T/st" HSIN_LOG_FILE="$T/log" HSIN_PSI_FILE="$T/psi" HSIN_LRUGEN_DIR="$T/lru" HSIN_MEMINFO="$T/meminfo"
 . "${MEMFX:-$D/memfx.sh}"
 psi() { printf 'some avg10=%s avg60=1.00 avg300=0.50 total=12345\nfull avg10=%s avg60=0.10 avg300=0.00 total=99\n' "$1" "$2" > "$T/psi"; }
 

@@ -95,7 +95,7 @@ fun Label(s: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AlphaCard(
+fun HsinCard(
     modifier: Modifier = Modifier,
     isNew: Boolean = false,
     onClick: (() -> Unit)? = null,

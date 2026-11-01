@@ -1,12 +1,12 @@
 #!/system/bin/sh
-# Alpha + Uperf Fusion - Uninstall Cleanup
+# HSIN - Uninstall Cleanup
 
-# --- Alpha cleanup ---
-WORK_DIR="${ALPHA_WORK_DIR:-/data/adb/alpha}"
+# --- HSIN cleanup ---
+WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
 
-# modul31: hentikan daemon Alpha (monitor + watchdog + pgr-log) via
+# modul31: hentikan daemon HSIN (monitor + watchdog + pgr-log) via
 # kecocokan cmdline, JANGAN bunuh PID buta (pid bisa dipakai ulang).
-_alpha_kill_pat() {
+_hsin_kill_pat() {
     _pat="$1"
     for _pidf in "$WORK_DIR/monitor.pid" "$WORK_DIR/watchdog.pid" "$WORK_DIR/autoctl.pid"; do
         [ -f "$_pidf" ] || continue
@@ -24,20 +24,20 @@ _alpha_kill_pat() {
     done
     unset _pat _pidf _p _cmd
 }
-_alpha_kill_pat "monitor.sh"
-_alpha_kill_pat "watchdog.sh"
-_alpha_kill_pat "autoctl.sh"
-_alpha_kill_pat "pgr-log"
+_hsin_kill_pat "monitor.sh"
+_hsin_kill_pat "watchdog.sh"
+_hsin_kill_pat "autoctl.sh"
+_hsin_kill_pat "pgr-log"
 
 # Pulihkan ekstra game (DND, refresh rate, render per game) dan hentikan rekaman layar bila ada.
-_alpha_mod_u="${0%/*}"
-if [ -f "$_alpha_mod_u/common/gamehooks.sh" ]; then
-    ALPHA_STATE_DIR="$WORK_DIR" ALPHA_MOD_DIR="$_alpha_mod_u" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$_alpha_mod_u" >/dev/null 2>&1
+_hsin_mod_u="${0%/*}"
+if [ -f "$_hsin_mod_u/common/gamehooks.sh" ]; then
+    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$_hsin_mod_u" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$_hsin_mod_u" >/dev/null 2>&1
 fi
-[ -f "$_alpha_mod_u/common/memfx.sh" ] && ALPHA_STATE_DIR="$WORK_DIR" sh -c '. "$1/common/memfx.sh"; mf_mglru_restore' _ "$_alpha_mod_u" >/dev/null 2>&1
-[ -f "$_alpha_mod_u/common/shield.sh" ] && ALPHA_STATE_DIR="$WORK_DIR" sh "$_alpha_mod_u/common/shield.sh" off >/dev/null 2>&1
-[ -f "$_alpha_mod_u/common/screenrec.sh" ] && ALPHA_STATE_DIR="$WORK_DIR" sh "$_alpha_mod_u/common/screenrec.sh" stop >/dev/null 2>&1
-unset _alpha_mod_u
+[ -f "$_hsin_mod_u/common/memfx.sh" ] && HSIN_STATE_DIR="$WORK_DIR" sh -c '. "$1/common/memfx.sh"; mf_mglru_restore' _ "$_hsin_mod_u" >/dev/null 2>&1
+[ -f "$_hsin_mod_u/common/shield.sh" ] && HSIN_STATE_DIR="$WORK_DIR" sh "$_hsin_mod_u/common/shield.sh" off >/dev/null 2>&1
+[ -f "$_hsin_mod_u/common/screenrec.sh" ] && HSIN_STATE_DIR="$WORK_DIR" sh "$_hsin_mod_u/common/screenrec.sh" stop >/dev/null 2>&1
+unset _hsin_mod_u
 rm -f "$WORK_DIR/monitor.pid" "$WORK_DIR/watchdog.pid" "$WORK_DIR/autoctl.pid" 2>/dev/null
 rm -f "$WORK_DIR"/.gh_* "$WORK_DIR"/.rec_* "$WORK_DIR/.hud_layer" 2>/dev/null
 echo "[UNINSTALL] pid files removed"
@@ -46,22 +46,22 @@ echo "[UNINSTALL] pid files removed"
 # Setelah uninstall + reboot kernel kembali default sendiri; ini hanya
 # melepas kunci boost SEKARANG supaya tidak nyangkut sampai reboot.
 if [ -f "${0%/*}/common/detect.sh" ]; then
-    ALPHA_CONF_DIR="$WORK_DIR"
-    export ALPHA_CONF_DIR
+    HSIN_CONF_DIR="$WORK_DIR"
+    export HSIN_CONF_DIR
     . "${0%/*}/common/detect.sh" 2>/dev/null
 fi
 if [ -f "${0%/*}/common/gameboost.sh" ]; then
-    ALPHA_CONF_DIR="$WORK_DIR" ALPHA_LOG_FILE="/dev/null"
-    export ALPHA_CONF_DIR ALPHA_LOG_FILE
+    HSIN_CONF_DIR="$WORK_DIR" HSIN_LOG_FILE="/dev/null"
+    export HSIN_CONF_DIR HSIN_LOG_FILE
     . "${0%/*}/common/gameboost.sh" 2>/dev/null
     if command -v gb_restore >/dev/null 2>&1; then
         gb_restore >/dev/null 2>&1
         echo "[UNINSTALL] native values restored (best-effort)"
     fi
-    unset ALPHA_CONF_DIR ALPHA_LOG_FILE
+    unset HSIN_CONF_DIR HSIN_LOG_FILE
 fi
 
-# modul31: bersih total state Alpha. DIPERTAHANKAN hanya daftar game user
+# modul31: bersih total state HSIN. DIPERTAHANKAN hanya daftar game user
 # (game_profile_map.conf = mahal dibangun ulang); sisanya transient,
 # snapshot, log, cache, penanda -> hapus supaya install berikutnya fresh.
 rm -f "$WORK_DIR/boost_level" "$WORK_DIR/GAMEBOOST_LEVEL" \
@@ -73,22 +73,22 @@ rm -f "$WORK_DIR/boost_level" "$WORK_DIR/GAMEBOOST_LEVEL" \
     "$WORK_DIR/.hud_foreground_pkg" "$WORK_DIR/native_boost.conf" \
     "$WORK_DIR/.ovd_active" "$WORK_DIR/.ovd_prev" "$WORK_DIR/.ovd_pid" \
     "$WORK_DIR/.ovd_stopped" "$WORK_DIR/.ovd_last" \
-    "$WORK_DIR/detected.conf" "$WORK_DIR/alpha.log" \
+    "$WORK_DIR/detected.conf" "$WORK_DIR/hsin.log" \
     "$WORK_DIR/.boot_fail_count" "$WORK_DIR/active_profile" \
     "$WORK_DIR/current_state" 2>/dev/null
 rm -f "$WORK_DIR"/.monitor-dumpsys.* 2>/dev/null
-echo "[UNINSTALL] Alpha state cleaned (game list preserved)"
+echo "[UNINSTALL] HSIN state cleaned (game list preserved)"
 
 # --- Uperf backend cleanup (kept minimal & non-blocking) ---
-# M6: hanya hapus config uperf/fas-rs/AsoulOpt bila penanda Alpha ada.
+# M6: hanya hapus config uperf/fas-rs/AsoulOpt bila penanda HSIN ada.
 # JANGAN pernah hapus config modul lain.
 UPERF_USER_PATH="/sdcard/Android/yc/uperf"
-ALPHA_MARKER="/data/adb/alpha/.alpha_installed"
+HSIN_MARKER="/data/adb/hsin/.hsin_installed"
 
-# Pastikan penanda Alpha ada (ditulis oleh customize.sh saat install)
-ALPHA_OWNED=0
-if [ -f "$ALPHA_MARKER" ]; then
-    ALPHA_OWNED=1
+# Pastikan penanda HSIN ada (ditulis oleh customize.sh saat install)
+HSIN_OWNED=0
+if [ -f "$HSIN_MARKER" ]; then
+    HSIN_OWNED=1
 fi
 
 uperf_on_remove() {
@@ -110,8 +110,8 @@ uperf_on_remove() {
     rm -f "$test_file"
     unset _n
 
-    # M6: hapus config hanya jika Alpha adalah pemilik
-    if [ "$ALPHA_OWNED" = "1" ]; then
+    # M6: hapus config hanya jika HSIN adalah pemilik
+    if [ "$HSIN_OWNED" = "1" ]; then
         killall uperf 2>/dev/null
         # simpan perapp config user, hapus sisanya
         if [ -d "$UPERF_USER_PATH" ]; then
@@ -121,9 +121,9 @@ uperf_on_remove() {
             mv -f /sdcard/perapp_powermode.txt "$UPERF_USER_PATH/" 2>/dev/null
         fi
         # hapus marker supaya tidak double-cleanup di boot berikutnya
-        rm -f "$ALPHA_MARKER" 2>/dev/null
+        rm -f "$HSIN_MARKER" 2>/dev/null
     else
-        echo "[UNINSTALL] uperf config dilewati (bukan pemilik Alpha)"
+        echo "[UNINSTALL] uperf config dilewati (bukan pemilik HSIN)"
     fi
 }
 # jangan blokir proses uninstall/boot
@@ -140,8 +140,8 @@ fasrs_on_remove() {
         _n=$((_n + 1))
     done
     unset _n
-    # M6: hapus config fas-rs HANYA bila penanda Alpha ada
-    if [ "$ALPHA_OWNED" = "1" ]; then
+    # M6: hapus config fas-rs HANYA bila penanda HSIN ada
+    if [ "$HSIN_OWNED" = "1" ]; then
         killall fas-rs 2>/dev/null
         rm -rf "$FASRS_DIR"
         rm -f /data/powercfg.json
@@ -150,4 +150,4 @@ fasrs_on_remove() {
 }
 (fasrs_on_remove &)
 
-echo "[UNINSTALL] Alpha + Uperf + fas-rs Fusion cleanup complete"
+echo "[UNINSTALL] HSIN + Uperf + fas-rs Fusion cleanup complete"

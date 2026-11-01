@@ -50,21 +50,21 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             route = "dash"
             UiState.tab = when (r) { "games" -> 1; "tools" -> 3; else -> 4 }
             if (r == "tools") viewModelScope.launch { refreshTools() }
-            if (r == "games") viewModelScope.launch { games = Alpha.games(); sessions = Alpha.sessions() }
+            if (r == "games") viewModelScope.launch { games = Hsin.games(); sessions = Hsin.sessions() }
             return
         }
         route = r
         when (r) {
-            "games", "stats" -> viewModelScope.launch { games = Alpha.games(); sessions = Alpha.sessions() }
+            "games", "stats" -> viewModelScope.launch { games = Hsin.games(); sessions = Hsin.sessions() }
             "tools" -> viewModelScope.launch { refreshTools() }
-            "batlab" -> viewModelScope.launch { battery = Alpha.battery() }
+            "batlab" -> viewModelScope.launch { battery = Hsin.battery() }
             "fulllog" -> viewModelScope.launch { loadFullLog() }
             "addgame", "detect" -> ensureApps()
             "dexopt", "ramkeep" -> ensureThirdParty()
-            "memfx" -> viewModelScope.launch { conf = Alpha.conf(); loadMem() }
+            "memfx" -> viewModelScope.launch { conf = Hsin.conf(); loadMem() }
             "perf" -> loadFpsFiles()
-            "dash", "therm" -> viewModelScope.launch { flags = Alpha.flags() }
-            "auto" -> viewModelScope.launch { conf = Alpha.conf() }
+            "dash", "therm" -> viewModelScope.launch { flags = Hsin.flags() }
+            "auto" -> viewModelScope.launch { conf = Hsin.conf() }
         }
     }
 
@@ -147,7 +147,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             liveBusy = true; liveNote = ""; liveRes = emptyList()
             try {
-                val (rows, raw) = Alpha.livecheck()
+                val (rows, raw) = Hsin.livecheck()
                 liveRes = rows
                 liveNote = if (rows.isEmpty()) "Tidak ada hasil. Detail: $raw" else ""
             } catch (e: Exception) {
@@ -208,18 +208,18 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun updateRefreshHz(v: String) {
         viewModelScope.launch {
-            val r = Alpha.setRefresh(v)
+            val r = Hsin.setRefresh(v)
             if (r.code == 0) {
                 refreshHz = v
                 toast(if (v == "off") "Refresh rate game: ikut sistem" else "Refresh rate game: $v Hz")
             } else toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
-            refreshHz = Alpha.refreshGet()
+            refreshHz = Hsin.refreshGet()
         }
     }
 
     fun toggleRec() {
         viewModelScope.launch {
-            val r = if (recOn) Alpha.recStop() else Alpha.recStart()
+            val r = if (recOn) Hsin.recStop() else Hsin.recStart()
             toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
             refreshStatus()
             recOn = status.rec
@@ -228,14 +228,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun launchGame(pkg: String) {
         viewModelScope.launch {
-            val r = Alpha.launchGame(pkg)
+            val r = Hsin.launchGame(pkg)
             toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         }
     }
 
     fun setGameRender(pkg: String, v: String, onDone: () -> Unit = {}) {
         viewModelScope.launch {
-            val r = Alpha.setGameRender(pkg, v)
+            val r = Hsin.setGameRender(pkg, v)
             if (r.code != 0) toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
             onDone()
         }
@@ -243,7 +243,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun setGameOpt(pkg: String, key: String, v: String) {
         viewModelScope.launch {
-            val r = Alpha.setGameOpt(pkg, key, v)
+            val r = Hsin.setGameOpt(pkg, key, v)
             if (r.code != 0) toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         }
     }
@@ -293,8 +293,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                 tick++
                 refreshStatus()
                 when (route) {
-                    "batlab" -> battery = Alpha.battery()
-                    "tools" -> if (tick % 2 == 0) { Alpha.health()?.let { health = it }; loadRecentLog() }
+                    "batlab" -> battery = Hsin.battery()
+                    "tools" -> if (tick % 2 == 0) { Hsin.health()?.let { health = it }; loadRecentLog() }
                 }
             }
         }
@@ -312,46 +312,46 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     suspend fun refreshAll() {
         refreshStatus()
-        conf = Alpha.conf()
-        flags = Alpha.flags()
-        games = Alpha.games()
-        sessions = Alpha.sessions()
-        Alpha.health()?.let { health = it }
-        device = Alpha.device()
-        Alpha.render()?.let { render = it; renderChoice = it.current }
-        refreshRates = Alpha.refreshList()
-        refreshHz = Alpha.refreshGet()
+        conf = Hsin.conf()
+        flags = Hsin.flags()
+        games = Hsin.games()
+        sessions = Hsin.sessions()
+        Hsin.health()?.let { health = it }
+        device = Hsin.device()
+        Hsin.render()?.let { render = it; renderChoice = it.current }
+        refreshRates = Hsin.refreshList()
+        refreshHz = Hsin.refreshGet()
         recOn = status.rec
         refreshRes()
         loadRecentLog()
     }
 
     private suspend fun refreshTools() {
-        Alpha.health()?.let { health = it }
-        flags = Alpha.flags()
-        device = Alpha.device()
+        Hsin.health()?.let { health = it }
+        flags = Hsin.flags()
+        device = Hsin.device()
         refreshRes()
         loadRecentLog()
     }
 
     suspend fun refreshStatus() {
-        val s = Alpha.status() ?: return
+        val s = Hsin.status() ?: return
         status = s
         statusOk = true
         if (!s.auto && !autoEnsured) {
             autoEnsured = true
-            Alpha.autoStart()
+            Hsin.autoStart()
         } else if (s.auto) autoEnsured = true
     }
 
-    private suspend fun loadRecentLog() { logs = Alpha.parseLog(Alpha.logRaw(300)) }
-    private suspend fun loadFullLog() { logs = Alpha.parseLog(Alpha.logRaw(800)) }
+    private suspend fun loadRecentLog() { logs = Hsin.parseLog(Hsin.logRaw(300)) }
+    private suspend fun loadFullLog() { logs = Hsin.parseLog(Hsin.logRaw(800)) }
 
     // ---------- profil ----------
     fun setProfile(p: String) {
         viewModelScope.launch {
             status = status.copy(profile = p, active = p)
-            val r = Alpha.setProfile(p)
+            val r = Hsin.setProfile(p)
             val locked = status.gamePkg.isNotEmpty()
             toast(
                 if (!r.ok) "Gagal ganti profil: ${r.out.take(60)}"
@@ -368,14 +368,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setFlag(name: String, on: Boolean) {
         viewModelScope.launch {
             flags = flags + (name to on)
-            if (!Alpha.setFlag(name, on)) toast("Gagal menyimpan pengaturan")
-            flags = Alpha.flags()
+            if (!Hsin.setFlag(name, on)) toast("Gagal menyimpan pengaturan")
+            flags = Hsin.flags()
         }
     }
 
     fun setThermalWarm(c: Int) {
         viewModelScope.launch {
-            if (Alpha.setThermalWarm(c)) { status = status.copy(thermalWarmC = c); toast("Batas suhu $c°C disimpan") }
+            if (Hsin.setThermalWarm(c)) { status = status.copy(thermalWarmC = c); toast("Batas suhu $c°C disimpan") }
             else toast("Gagal menyimpan batas suhu")
         }
     }
@@ -383,8 +383,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setBootGuard(on: Boolean) {
         viewModelScope.launch {
             health = health.copy(bootGuard = on)
-            Alpha.setFlag("BOOT_GUARD_OFF", !on)
-            Alpha.health()?.let { health = it }
+            Hsin.setFlag("BOOT_GUARD_OFF", !on)
+            Hsin.health()?.let { health = it }
             toast(if (on) "Boot guard aktif" else "Boot guard dimatikan")
         }
     }
@@ -393,13 +393,13 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun saveAuto(battOn: Boolean, pct: Int, battProf: String, chgOn: Boolean, chgProf: String) {
         viewModelScope.launch {
-            val ok = Alpha.setConf("AUTO_BATT_ON", if (battOn) "1" else "0") &&
-                Alpha.setConf("AUTO_BATT_PCT", pct.toString()) &&
-                Alpha.setConf("AUTO_BATT_PROFILE", battProf) &&
-                Alpha.setConf("AUTO_CHG_ON", if (chgOn) "1" else "0") &&
-                Alpha.setConf("AUTO_CHG_PROFILE", chgProf)
-            conf = Alpha.conf()
-            Alpha.autoStart()
+            val ok = Hsin.setConf("AUTO_BATT_ON", if (battOn) "1" else "0") &&
+                Hsin.setConf("AUTO_BATT_PCT", pct.toString()) &&
+                Hsin.setConf("AUTO_BATT_PROFILE", battProf) &&
+                Hsin.setConf("AUTO_CHG_ON", if (chgOn) "1" else "0") &&
+                Hsin.setConf("AUTO_CHG_PROFILE", chgProf)
+            conf = Hsin.conf()
+            Hsin.autoStart()
             toast(if (ok) "Aturan auto-profile tersimpan" else "Sebagian gagal disimpan")
         }
     }
@@ -408,8 +408,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun addGame(pkg: String, fps: String, profile: String, after: () -> Unit = {}) {
         viewModelScope.launch {
             busy = "Menyimpan game..."
-            val r = Alpha.addGame(pkg, fps, profile)
-            games = Alpha.games()
+            val r = Hsin.addGame(pkg, fps, profile)
+            games = Hsin.games()
             busy = null
             if (r.out.startsWith("OK")) { toast("${label(pkg)} disimpan"); after() }
             else toast(r.out.lineSequence().firstOrNull { it.startsWith("ERROR") } ?: "Gagal menyimpan game")
@@ -420,8 +420,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             busy = "Menambah ${pkgs.size} game..."
             var ok = 0
-            for (p in pkgs) if (Alpha.addGame(p, "", profile).out.startsWith("OK")) ok++
-            games = Alpha.games()
+            for (p in pkgs) if (Hsin.addGame(p, "", profile).out.startsWith("OK")) ok++
+            games = Hsin.games()
             busy = null
             toast("$ok game ditambahkan")
             after()
@@ -431,8 +431,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun removeGame(pkg: String) {
         viewModelScope.launch {
             busy = "Menghapus..."
-            Alpha.removeGame(pkg)
-            games = Alpha.games()
+            Hsin.removeGame(pkg)
+            games = Hsin.games()
             busy = null
             toast("${label(pkg)} dihapus")
         }
@@ -504,9 +504,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun applyRender() {
         viewModelScope.launch {
             busy = "Mengganti render..."
-            val r = Alpha.setRender(renderChoice)
+            val r = Hsin.setRender(renderChoice)
             busy = null
-            Alpha.render()?.let { render = it }
+            Hsin.render()?.let { render = it }
             dialog = Dlg.Info(
                 "Render", r.out.ifEmpty { "Selesai" },
                 if (r.out.startsWith("OK")) "TUTUP SEMUA APP" else null,
@@ -516,14 +516,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- resolusi ----------
-    var resInfo by mutableStateOf<Alpha.ResInfo?>(null)
+    var resInfo by mutableStateOf<Hsin.ResInfo?>(null)
     var resPct by mutableStateOf(100)
     var resCountdown by mutableStateOf(0)
     private var resJob: Job? = null
     private var resRestore: String = ""
 
     suspend fun refreshRes() {
-        val r = Alpha.resolution() ?: return
+        val r = Hsin.resolution() ?: return
         resInfo = r
         if (resCountdown == 0) {
             val pct = Math.round(r.act.w * 100f / r.nat.w)
@@ -534,11 +534,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun applyRes() {
         val info = resInfo ?: run { toast("Info layar belum terbaca"); return }
         resJob?.cancel()
-        resRestore = Alpha.restoreCommand(info)
-        val target = Alpha.resCommand(info.nat, resPct)
+        resRestore = Hsin.restoreCommand(info)
+        val target = Hsin.resCommand(info.nat, resPct)
         resJob = viewModelScope.launch {
             resCountdown = 10
-            Alpha.applyResWithGuard(target, resRestore, 13)
+            Hsin.applyResWithGuard(target, resRestore, 13)
             refreshRes()
             var n = 10
             while (n > 0 && resCountdown > 0) {
@@ -547,7 +547,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                 resCountdown = n
             }
             if (resCountdown == 0 && n == 0) {
-                Alpha.revertRes(resRestore)
+                Hsin.revertRes(resRestore)
                 refreshRes()
                 toast("Tidak dikonfirmasi, resolusi dikembalikan")
             }
@@ -557,19 +557,19 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun keepRes() {
         resJob?.cancel()
         resCountdown = 0
-        viewModelScope.launch { Alpha.keepRes(); refreshRes(); toast("Resolusi dipertahankan") }
+        viewModelScope.launch { Hsin.keepRes(); refreshRes(); toast("Resolusi dipertahankan") }
     }
 
     fun revertRes() {
         resJob?.cancel()
         resCountdown = 0
-        viewModelScope.launch { Alpha.revertRes(resRestore.ifEmpty { "wm size reset; wm density reset" }); refreshRes(); toast("Resolusi dikembalikan") }
+        viewModelScope.launch { Hsin.revertRes(resRestore.ifEmpty { "wm size reset; wm density reset" }); refreshRes(); toast("Resolusi dikembalikan") }
     }
 
     fun resetRes() {
         resJob?.cancel()
         resCountdown = 0
-        viewModelScope.launch { Alpha.resetRes(); refreshRes(); toast("Resolusi direset") }
+        viewModelScope.launch { Hsin.resetRes(); refreshRes(); toast("Resolusi direset") }
     }
 
     // ---------- tutup semua app ----------
@@ -630,16 +630,16 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun loadMem() {
         viewModelScope.launch {
-            memInfo = Alpha.memStatus()
-            mglru = Alpha.mglruStatus()
+            memInfo = Hsin.memStatus()
+            mglru = Hsin.mglruStatus()
         }
     }
 
     fun setMglru(on: Boolean) {
         viewModelScope.launch {
             busy = "Mengatur MGLRU..."
-            mglru = Alpha.setMglru(on)
-            conf = Alpha.conf()
+            mglru = Hsin.setMglru(on)
+            conf = Hsin.conf()
             busy = null
             val real = mglru["enabled"] == "1"
             toast(if (on && !real) "MGLRU gagal menyala (kernel tidak mendukung)" else if (on) "MGLRU menyala" else "MGLRU dikembalikan ke semula")
@@ -648,22 +648,22 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun setMemclean(on: Boolean) {
         viewModelScope.launch {
-            Alpha.setMemclean(on)
-            conf = Alpha.conf()
+            Hsin.setMemclean(on)
+            conf = Hsin.conf()
         }
     }
 
     fun setConfKey(k: String, v: String) {
         viewModelScope.launch {
-            Alpha.setConf(k, v)
-            conf = Alpha.conf()
+            Hsin.setConf(k, v)
+            conf = Hsin.conf()
         }
     }
 
     fun runTrim() {
         viewModelScope.launch {
             busy = "Menjalankan TRIM..."
-            val r = Alpha.trim()
+            val r = Hsin.trim()
             busy = null
             toast(r.ifEmpty { "Selesai" })
         }
@@ -672,7 +672,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun scanGames() {
         viewModelScope.launch {
             busy = "Mencari game terpasang..."
-            scanList = Alpha.gameScan()
+            scanList = Hsin.gameScan()
             busy = null
             toast(if (scanList.isNullOrEmpty()) "Tidak ada game baru yang dikenal" else "${scanList!!.size} game baru ditemukan")
         }
@@ -681,9 +681,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun scanAdd() {
         viewModelScope.launch {
             busy = "Mendaftarkan game..."
-            val r = Alpha.gameScanAdd()
+            val r = Hsin.gameScanAdd()
             scanList = null
-            games = Alpha.games()
+            games = Hsin.games()
             busy = null
             toast(r.removePrefix("OK: ").ifEmpty { "Selesai" })
         }
@@ -692,7 +692,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun makeBugreport() {
         viewModelScope.launch {
             busy = "Membuat arsip laporan..."
-            val path = Alpha.bugreport()
+            val path = Hsin.bugreport()
             busy = null
             toast(if (path != null) "Disimpan: $path" else "Gagal membuat laporan")
         }
@@ -702,22 +702,22 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var gameFx by mutableStateOf<Map<String, String>>(emptyMap())
 
     fun loadGameFx(pkg: String) {
-        viewModelScope.launch { gameFx = Alpha.gamefx(pkg) }
+        viewModelScope.launch { gameFx = Hsin.gamefx(pkg) }
     }
 
     fun setGameFx(pkg: String, key: String, v: String) {
         gameFx = gameFx + (key to v)
         viewModelScope.launch {
-            val r = Alpha.setGamefx(pkg, key, v)
+            val r = Hsin.setGamefx(pkg, key, v)
             if (r.code != 0) toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
-            gameFx = Alpha.gamefx(pkg)
+            gameFx = Hsin.gamefx(pkg)
         }
     }
 
     fun exportLog() {
         viewModelScope.launch {
             busy = "Mengekspor log..."
-            val path = Alpha.exportLog()
+            val path = Hsin.exportLog()
             busy = null
             toast(if (path != null) "Log disimpan: $path" else "Gagal mengekspor log")
         }
@@ -742,7 +742,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                     .map { it.packageName }
                     .filter { !isProtected(it, prot) && it !in keep && it !in front }
             }
-            val mb = Alpha.cleanRam(targets)
+            val mb = Hsin.cleanRam(targets)
             busy = null
             toast(if (mb > 0) "RAM bebas bertambah sekitar $mb MB" else "Selesai, tidak ada RAM tambahan yang bisa dibebaskan")
         }
@@ -759,7 +759,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                 .map { it.packageName }
                 .filter { !isProtected(it, prot) && it !in keep && it !in front }
         }
-        return Alpha.cleanRam(targets)
+        return Hsin.cleanRam(targets)
     }
 
     private fun closeApps(includeSystem: Boolean) {
@@ -774,7 +774,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             val sys = if (includeSystem) withContext(Dispatchers.IO) { systemLaunchables(prot) } else emptyList()
             val all = third + sys
-            Alpha.forceStop(all)
+            Hsin.forceStop(all)
             busy = null
             toast("${all.size} app ditutup" + if (includeSystem) " (${sys.size} sistem)" else "")
         }
@@ -805,7 +805,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                 for (p in list) {
                     if (!isActive) break
                     dexCurrent = label(p)
-                    if (Alpha.dexopt(p, dexMode)) dexOk++ else dexFail++
+                    if (Hsin.dexopt(p, dexMode)) dexOk++ else dexFail++
                     dexDone++
                 }
                 toast("Dexopt selesai: $dexOk berhasil, $dexFail gagal")
@@ -825,7 +825,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun redetect() {
         viewModelScope.launch {
             busy = "Mendeteksi ulang..."
-            device = Alpha.device(redetect = true)
+            device = Hsin.device(redetect = true)
             busy = null
             toast("Deteksi ulang selesai")
         }
@@ -854,7 +854,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun checkHealth() {
         viewModelScope.launch {
-            Alpha.health()?.let { health = it }
+            Hsin.health()?.let { health = it }
             toast("Health check diperbarui")
         }
     }
@@ -862,7 +862,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun copyLog() {
         val text = logs.takeLast(200).joinToString("\n") { it.raw }
         val cm = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("alpha.log", text))
+        cm.setPrimaryClip(ClipData.newPlainText("hsin.log", text))
         toast("Log disalin")
     }
 

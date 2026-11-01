@@ -1,9 +1,9 @@
 #!/system/bin/sh
-# Alpha Fusion - alphactl: satu pintu CLI untuk aplikasi HSIN.
+# HSIN - hsinctl: satu pintu CLI untuk aplikasi HSIN.
 # Semua tombol di APK memanggil script ini (atau script modul yang sudah ada),
 # jadi logika ada di modul dan APK hanya remote.
 #
-# Pemakaian: alphactl.sh <perintah> [argumen]
+# Pemakaian: hsinctl.sh <perintah> [argumen]
 #   status                    key=value kondisi live (profil, suhu, baterai, game)
 #   profile <battery|balanced|performance>
 #   flag get|set|clear <NAMA> flag fitur di STATE_DIR (daftar putih)
@@ -35,23 +35,24 @@
 #   hud sample <pkg>          satu sampel metrik HUD (FPS, GPU, CPU, suhu)
 #   rec start|stop|status|list   rekam layar (screenrecord)
 #   autoctl start|stop|status daemon auto-profile
-#   log [N]                   N baris terakhir alpha.log
+#   log [N]                   N baris terakhir hsin.log
+#   restore                   kembalikan semua ke normal (Puncak, DND, refresh rate, render, resolusi, frekuensi game)
 #   modinfo                   module.prop
 
 COMMON="$(dirname "$(readlink -f "$0")")"
 MODDIR="$(dirname "$COMMON")"
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 CONF_FILE="$STATE_DIR/app.conf"
-LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
+LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
 SYS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 SYS_POWER="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}"
-FASRS_NODE="${ALPHA_FASRS_MODE_NODE:-/dev/fas_rs/mode}"
+FASRS_NODE="${HSIN_FASRS_MODE_NODE:-/dev/fas_rs/mode}"
 mkdir -p "$STATE_DIR" 2>/dev/null
-ALPHA_STATE_DIR="$STATE_DIR"
+HSIN_STATE_DIR="$STATE_DIR"
 [ -f "$COMMON/gamehooks.sh" ] && . "$COMMON/gamehooks.sh"
 [ -f "$COMMON/gamescan.sh" ] && . "$COMMON/gamescan.sh"
 
-FLAG_WHITELIST="GB_FASRS_FORCE_ALPHA GB_COOLDOWN_EXTREME NO_CPUSET THERMAL_GUARD_OFF BOOT_GUARD_OFF GAME_PRIO_OFF GAME_DND_ON"
+FLAG_WHITELIST="GB_FASRS_FORCE_HSIN GB_COOLDOWN_EXTREME NO_CPUSET THERMAL_GUARD_OFF BOOT_GUARD_OFF GAME_PRIO_OFF GAME_DND_ON"
 
 rd() { [ -r "$1" ] && tr -d '\r\n' < "$1" 2>/dev/null; }
 
@@ -122,7 +123,7 @@ conf_set() {
 }
 
 # memfx: tekanan memori (PSI) dan MGLRU opt-in. Default tidak menyentuh apa pun.
-ALPHA_STATE_DIR="$STATE_DIR"
+HSIN_STATE_DIR="$STATE_DIR"
 [ -f "$COMMON/memfx.sh" ] && . "$COMMON/memfx.sh"
 
 cmd_mem() {
@@ -166,7 +167,7 @@ cmd_status() {
     else
         echo fasrs_node=0
         echo fasrs_mode=
-        if pidof fas-rs >/dev/null 2>&1; then echo cpu_owner=fas-rs; else echo cpu_owner=alpha; fi
+        if pidof fas-rs >/dev/null 2>&1; then echo cpu_owner=fas-rs; else echo cpu_owner=hsin; fi
     fi
     printf 'temp_mc=%s\n' "$(batt_temp_mc)"
     printf 'soc_temp_mc=%s\n' "$(max_temp_mc)"
@@ -186,7 +187,7 @@ cmd_status() {
     pid_alive "$STATE_DIR/.rec_pid" screenrec.sh && echo rec=1 || echo rec=0
     printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
     if [ -f "$COMMON/overdrive.sh" ]; then
-        ALPHA_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status 2>/dev/null
+        HSIN_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status 2>/dev/null
     else
         printf 'ovd=0\novd_pkg=\novd_level=\novd_last=\n'
     fi
@@ -361,9 +362,9 @@ cmd_mitigation() {
 cmd_logexport() {
     _ld="/sdcard/Download"
     [ -d "$_ld" ] && [ -w "$_ld" ] || _ld="$STATE_DIR"
-    _lf="$_ld/alpha-log-$(date '+%Y%m%d-%H%M%S' 2>/dev/null).txt"
+    _lf="$_ld/hsin-log-$(date '+%Y%m%d-%H%M%S' 2>/dev/null).txt"
     {
-        echo "=== Alpha log export $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null) ==="
+        echo "=== HSIN log export $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null) ==="
         echo "module versionCode: $(sed -n 's/^versionCode=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
         echo "model: $(getprop ro.product.model 2>/dev/null)  android: $(getprop ro.build.version.release 2>/dev/null)  platform: $(getprop ro.board.platform 2>/dev/null)"
         echo "kernel: $(uname -r 2>/dev/null)"
@@ -372,7 +373,7 @@ cmd_logexport() {
         echo; echo "=== flags ==="; cmd_flags 2>/dev/null
         echo; echo "=== app.conf ==="; [ -f "$CONF_FILE" ] && cat "$CONF_FILE"
         echo; echo "=== opsi per game (game_opts.conf) ==="; [ -f "$STATE_DIR/game_opts.conf" ] && cat "$STATE_DIR/game_opts.conf"
-        echo; echo "=== overdrive ==="; [ -f "$COMMON/overdrive.sh" ] && ALPHA_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status
+        echo; echo "=== overdrive ==="; [ -f "$COMMON/overdrive.sh" ] && HSIN_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status
         echo; echo "=== frekuensi saat ini ==="
         for _p in /sys/devices/system/cpu/cpufreq/policy*; do
             [ -d "$_p" ] && echo "$(basename "$_p") gov=$(cat "$_p/scaling_governor" 2>/dev/null) min=$(cat "$_p/scaling_min_freq" 2>/dev/null) max=$(cat "$_p/scaling_max_freq" 2>/dev/null) cur=$(cat "$_p/scaling_cur_freq" 2>/dev/null)"
@@ -380,7 +381,7 @@ cmd_logexport() {
         for _g in /sys/class/devfreq/*gpu*; do
             [ -d "$_g" ] && echo "gpu $(basename "$_g") min=$(cat "$_g/min_freq" 2>/dev/null) max=$(cat "$_g/max_freq" 2>/dev/null) cur=$(cat "$_g/cur_freq" 2>/dev/null)"
         done
-        echo; echo "=== alpha.log (400 baris terakhir) ==="; tail -n 400 "$STATE_DIR/alpha.log" 2>/dev/null
+        echo; echo "=== hsin.log (400 baris terakhir) ==="; tail -n 400 "$STATE_DIR/hsin.log" 2>/dev/null
         echo; echo "=== hud_debug.log ==="; tail -n 120 "$STATE_DIR/hud_debug.log" 2>/dev/null
     } > "$_lf" 2>&1
     echo "OK: $_lf"
@@ -390,9 +391,9 @@ cmd_ovd() {
     [ -f "$COMMON/overdrive.sh" ] || { echo "ERROR: overdrive.sh tidak ada"; return 1; }
     case "$1" in
         start) [ -z "$2" ] || valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
-               ALPHA_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" start "$2" ;;
-        stop) ALPHA_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" stop "${2:-manual}" ;;
-        status) ALPHA_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status ;;
+               HSIN_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" start "$2" ;;
+        stop) HSIN_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" stop "${2:-manual}" ;;
+        status) HSIN_STATE_DIR="$STATE_DIR" sh "$COMMON/overdrive.sh" status ;;
         *) echo "Usage: ovd start [pkg] | ovd stop | ovd status"; return 1 ;;
     esac
 }
@@ -442,8 +443,22 @@ cmd_hud() {
             valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
             sh "$COMMON/hud_sample.sh" --once "$2"
             ;;
-        *) echo "Usage: hud sample <pkg>"; return 1 ;;
+        diag) valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }; sh "$COMMON/hud_sample.sh" --diag "$2" ;;
+        *) echo "Usage: hud sample|diag <pkg>"; return 1 ;;
     esac
+}
+
+cmd_restore() {
+    sh "$COMMON/overdrive.sh" stop darurat >/dev/null 2>&1
+    gh_recover >/dev/null 2>&1
+    (
+        HSIN_CONF_DIR="$STATE_DIR"; HSIN_LOG_FILE=/dev/null; export HSIN_CONF_DIR HSIN_LOG_FILE
+        [ -f "$COMMON/detect.sh" ] && . "$COMMON/detect.sh" 2>/dev/null
+        [ -f "$COMMON/gameboost.sh" ] && . "$COMMON/gameboost.sh" 2>/dev/null
+        command -v gb_restore >/dev/null 2>&1 && gb_restore
+    ) >/dev/null 2>&1
+    wm size reset >/dev/null 2>&1
+    echo "OK: semua dikembalikan ke normal"
 }
 
 cmd_sessions() {
@@ -469,7 +484,7 @@ cmd_device() { [ -f "$STATE_DIR/detected.conf" ] && cat "$STATE_DIR/detected.con
 
 cmd_redetect() {
     rm -f "$STATE_DIR/detected.conf" 2>/dev/null
-    ALPHA_FORCE_DETECT=1 sh "$COMMON/detect.sh" >/dev/null 2>&1
+    HSIN_FORCE_DETECT=1 sh "$COMMON/detect.sh" >/dev/null 2>&1
     cmd_device
 }
 
@@ -478,7 +493,7 @@ cmd_autoctl() {
         start)
             if pid_alive "$STATE_DIR/autoctl.pid" autoctl.sh; then echo "OK: sudah jalan"; return 0; fi
             rm -f "$STATE_DIR/autoctl.pid" 2>/dev/null
-            ALPHA_STATE_DIR="$STATE_DIR" nohup sh "$COMMON/autoctl.sh" >> "$LOG_FILE" 2>&1 &
+            HSIN_STATE_DIR="$STATE_DIR" nohup sh "$COMMON/autoctl.sh" >> "$LOG_FILE" 2>&1 &
             echo "OK: autoctl start pid=$!"
             ;;
         stop)
@@ -542,6 +557,7 @@ case "$1" in
     shield) shift; sh "$COMMON/shield.sh" "$@" ;;
     bugreport) sh "$COMMON/bugreport.sh" ;;
     log) cmd_log "$2" ;;
+    restore) cmd_restore ;;
     modinfo) cat "$MODDIR/module.prop" ;;
     *) sed -n '2,42p' "$0" ;;
 esac

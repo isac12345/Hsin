@@ -1,7 +1,7 @@
 #!/system/bin/sh
-# Alpha Fusion - hud_sample: metrik live untuk HUD di HSIN.
+# HSIN - hud_sample: metrik live untuk HUD di HSIN.
 #
-#   hud_sample.sh --once <pkg>   satu sampel (key=value), buat uji lewat `alphactl hud sample <pkg>`
+#   hud_sample.sh --once <pkg>   satu sampel (key=value), buat uji lewat `hsinctl hud sample <pkg>`
 #   hud_sample.sh --loop <pkg>   sampel tiap detik, tiap blok diakhiri baris "--"
 #                                (APK membaca stream ini lewat satu proses su; berhenti sendiri
 #                                 saat pembaca menutup pipa)
@@ -18,7 +18,7 @@
 #   cpu       baris pertama /proc/stat (APK menghitung persen dari selisih antar sampel)
 #   temp_mc   suhu baterai, soc_mc suhu zona termal terpanas (milli-derajat C)
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 LAYER_CACHE="$STATE_DIR/.hud_layer"
 SYS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 SYS_POWER="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}"
@@ -44,6 +44,10 @@ src_dead() {
 LIST_WAIT=0
 LR_OUT=""
 LR_N=0
+LR_LAST=""
+PL_LAST=""
+FL_PREVTS=""
+STALE_N=0
 PL_OUT=""
 FL_LAT=""
 TS_ON=0
@@ -104,6 +108,7 @@ layer_candidates() {
 lat_rows() {
     LR_OUT=""
     LR_N=0
+    LR_LAST=""
     _lr_out=$(dumpsys SurfaceFlinger --latency "$1" 2>/dev/null | tail -n 70)
     [ -n "$_lr_out" ] || return 1
     _lr_i=0
@@ -112,6 +117,7 @@ lat_rows() {
         [ "$_lr_i" -eq 1 ] && continue
         case "$_lr_b" in ''|0|9223372036854775807|*[!0-9]*) continue ;; esac
         LR_OUT="$LR_OUT $_lr_b"
+        LR_LAST="$_lr_b"
         LR_N=$((LR_N + 1))
     done <<EOF
 $_lr_out
@@ -130,7 +136,7 @@ first_int() {
 GPU_PATH=""
 gp_path() {
     [ -n "$GPU_PATH" ] && [ -d "$GPU_PATH" ] && return 0
-    # node resmi dari deteksi Alpha (mis. /sys/class/devfreq/23100000.gpu)
+    # node resmi dari deteksi HSIN (mis. /sys/class/devfreq/23100000.gpu)
     GPU_PATH=$(sed -n 's/^GPU_DEVFREQ_PATH="\(.*\)"/\1/p' "$STATE_DIR/detected.conf" 2>/dev/null | head -n 1)
     if [ -z "$GPU_PATH" ] || [ ! -d "$GPU_PATH" ]; then
         for _gp_d in /sys/class/devfreq/*gpu* /sys/class/kgsl/kgsl-3d0; do
@@ -190,18 +196,25 @@ batt_temp_mc() {
     case "$_bt" in ''|*[!0-9-]*) printf '0' ;; *) printf '%s' $((_bt * 100)) ;; esac
 }
 
-# Pilih layer terbaik: yang punya frame terbanyak (urutan prioritas menang bila seri).
+# a > b untuk timestamp 14+ digit: expr memakai 64-bit (shell ROM ini 32-bit, tidak boleh dibandingkan di sini).
+ts_newer() {
+    [ -n "$1" ] || return 1
+    [ -n "$2" ] || return 0
+    [ "$(expr "$1" '>' "$2" 2>/dev/null)" = 1 ]
+}
+
+# Pilih layer terbaik: yang frame TERBARU-nya paling baru (layer basi/diam kalah), lalu urutan prioritas.
 # Hasil lewat PL_LAYER / PL_OUT (bukan stdout, supaya state tidak hilang di subshell).
 pick_layer() {
     PL_LAYER=""
     PL_OUT=""
-    _pl_bn=0
+    PL_LAST=""
     _pl_cands=$(layer_candidates "$1") || return 1
     while IFS= read -r _pl_l; do
         [ -n "$_pl_l" ] || continue
         lat_rows "$_pl_l" || continue
-        if [ "$LR_N" -gt "$_pl_bn" ]; then
-            _pl_bn=$LR_N
+        if [ -z "$PL_LAYER" ] || ts_newer "$LR_LAST" "$PL_LAST"; then
+            PL_LAST=$LR_LAST
             PL_LAYER=$_pl_l
             PL_OUT=$LR_OUT
         fi
@@ -223,6 +236,18 @@ fps_layer() {
     fi
     if [ -n "$_fl_layer" ] && lat_rows "$_fl_layer"; then
         FL_LAT=$LR_OUT
+        # layer yang tidak menghasilkan frame baru 3 sampel berturut-turut = bukan layer game: cari ulang
+        if [ "$LR_LAST" = "$FL_PREVTS" ]; then STALE_N=$((STALE_N + 1)); else STALE_N=0; fi
+        FL_PREVTS=$LR_LAST
+        if [ "$STALE_N" -ge 3 ]; then
+            STALE_N=0
+            rm -f "$LAYER_CACHE" 2>/dev/null
+            LIST_WAIT=0
+            if pick_layer "$_fl_pkg" && [ "$PL_LAST" != "$FL_PREVTS" ]; then
+                printf '%s|%s\n' "$_fl_pkg" "$PL_LAYER" > "$LAYER_CACHE" 2>/dev/null
+                FL_LAT=$PL_OUT; FL_PREVTS=$PL_LAST
+            fi
+        fi
     else
         # layer basi (game restart ganti nomor layer) atau belum pernah dicari.
         # Mendaftar ulang layer itu berat: paling sering sekali per 3 sampel.
@@ -232,7 +257,7 @@ fps_layer() {
                 # app biasa: layer ketemu = jarang dicari ulang (hemat SurfaceFlinger); gagal = coba lagi cepat
                 [ "$LIGHT" = 1 ] && LIST_WAIT=15
                 printf '%s|%s\n' "$_fl_pkg" "$PL_LAYER" > "$LAYER_CACHE" 2>/dev/null
-                FL_LAT=$PL_OUT
+                FL_LAT=$PL_OUT; FL_PREVTS=$PL_LAST; STALE_N=0
             else
                 rm -f "$LAYER_CACHE" 2>/dev/null
             fi
@@ -351,7 +376,30 @@ sample() {
 # matikan timestats yang kita nyalakan sendiri (jangan dibiarkan aktif terus di SurfaceFlinger)
 trap '[ "$TS_ON" = 1 ] && dumpsys SurfaceFlinger --timestats -disable >/dev/null 2>&1; exit 0' EXIT HUP INT TERM
 
+# Diagnosa FPS: tiap sumber dicoba sekali, hasil ditulis rapi (dipakai tombol Diagnosa FPS di app).
+diag() {
+    _dg_pkg="$1"
+    echo "paket: ${_dg_pkg:-(kosong)}"
+    _dg_a=$(service call SurfaceFlinger 1013 2>&1 | head -n 1)
+    case "$_dg_a" in *"Parcel(00000000"*) echo "counter SurfaceFlinger: ADA" ;; *) echo "counter SurfaceFlinger: TIDAK ADA" ;; esac
+    _dg_l=$(layer_candidates "$_dg_pkg" 2>/dev/null)
+    _dg_n=$(printf '%s\n' "$_dg_l" | grep -c .)
+    echo "layer milik paket: $_dg_n"
+    printf '%s\n' "$_dg_l" | head -n 6
+    _dg_ok=0
+    while IFS= read -r _dg_x; do
+        [ -n "$_dg_x" ] || continue
+        if lat_rows "$_dg_x"; then echo "layer berisi frame ($LR_N): $_dg_x"; _dg_ok=1; fi
+    done <<EOF
+$_dg_l
+EOF
+    [ "$_dg_ok" = 1 ] || echo "jalur layer: TIDAK ADA layer yang berisi frame"
+    _dg_t=$(dumpsys SurfaceFlinger --timestats -dump 2>/dev/null | grep -c totalFrames)
+    echo "timestats: $_dg_t entri totalFrames"
+}
+
 case "$1" in
+    --diag) diag "$2" ;;
     --once) CNT_FAIL=3; sample "$2" ;;   # satu sampel: counter butuh dua titik, jadi langsung jalur layer
     --loop)
         # "--loop auto [cadangan]": paket diikuti otomatis dari app yang sedang di depan

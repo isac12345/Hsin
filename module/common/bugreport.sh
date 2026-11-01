@@ -1,18 +1,18 @@
 #!/system/bin/sh
-# Alpha Fusion - bugreport: kumpulkan satu arsip untuk dilaporkan.
+# HSIN - bugreport: kumpulkan satu arsip untuk dilaporkan.
 #   bugreport.sh            -> /sdcard/Download/HSIN_bugreport_<tanggal>.tar.gz (atau folder bila tar tidak ada)
-# Isi: log Alpha (2000 baris terakhir), konfigurasi/state Alpha, status, kemampuan perangkat, versi modul,
-# model/SoC/Android, mode layar yang didukung, daftar game TERDAFTAR di Alpha.
+# Isi: log HSIN (2000 baris terakhir), konfigurasi/state HSIN, status, kemampuan perangkat, versi modul,
+# model/SoC/Android, mode layar yang didukung, daftar game TERDAFTAR di HSIN.
 # TIDAK diambil: daftar semua app, akun, serial/IMEI, isi /sdcard, riwayat.
 COMMON="${0%/*}"
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
-OUT_ROOT="${ALPHA_BUGREPORT_DIR:-/sdcard/Download}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
+OUT_ROOT="${HSIN_BUGREPORT_DIR:-/sdcard/Download}"
 TS=$(date '+%Y%m%d_%H%M%S' 2>/dev/null)
 NAME="HSIN_bugreport_$TS"
 W="${TMPDIR:-/data/local/tmp}/$NAME"
 mkdir -p "$W" "$OUT_ROOT" 2>/dev/null || { echo "ERROR: tidak bisa membuat folder kerja"; exit 1; }
 
-tail -n 2000 "$STATE_DIR/alpha.log" > "$W/alpha.log" 2>/dev/null
+tail -n 2000 "$STATE_DIR/hsin.log" > "$W/hsin.log" 2>/dev/null
 for f in detected.conf defaults.conf app.conf game_profile_map.conf game_render.conf game_opts.conf \
          device_mitigation.conf active_profile current_state; do
     [ -f "$STATE_DIR/$f" ] && cp "$STATE_DIR/$f" "$W/$f" 2>/dev/null
@@ -36,10 +36,10 @@ ls -a "$STATE_DIR" > "$W/state_files.txt" 2>/dev/null
     dumpsys SurfaceFlinger 2>/dev/null | grep -E 'DisplayMode|activeMode' | head -n 24
     echo; echo "== modul root terpasang (nama saja)"; ls /data/adb/modules 2>/dev/null
 } > "$W/device.txt" 2>&1
-sh "$COMMON/alphactl.sh" status > "$W/status.txt" 2>&1
-sh "$COMMON/alphactl.sh" flags > "$W/flags.txt" 2>&1
-sh "$COMMON/alphactl.sh" features > "$W/features.txt" 2>&1
-sh "$COMMON/alphactl.sh" health > "$W/health.txt" 2>&1
+sh "$COMMON/hsinctl.sh" status > "$W/status.txt" 2>&1
+sh "$COMMON/hsinctl.sh" flags > "$W/flags.txt" 2>&1
+sh "$COMMON/hsinctl.sh" features > "$W/features.txt" 2>&1
+sh "$COMMON/hsinctl.sh" health > "$W/health.txt" 2>&1
 
 if command -v tar >/dev/null 2>&1; then
     ( cd "${W%/*}" && tar -czf "$OUT_ROOT/$NAME.tar.gz" "$NAME" ) 2>/dev/null && {

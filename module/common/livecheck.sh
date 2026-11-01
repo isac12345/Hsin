@@ -1,7 +1,7 @@
 #!/system/bin/sh
-# Alpha Fusion - cek fitur langsung (<= ~10 dtk, aman, tidak mengubah setelan permanen).
+# HSIN - cek fitur langsung (<= ~10 dtk, aman, tidak mengubah setelan permanen).
 # Keluaran: STATUS|nama|keterangan   (OK / GAGAL / LEWAT)
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 CPUFREQ=/sys/devices/system/cpu/cpufreq
 DEVFREQ=/sys/class/devfreq
 ln() { printf '%s|%s|%s\n' "$1" "$2" "$3"; }
@@ -49,7 +49,7 @@ mx=0
 for z in /sys/class/thermal/thermal_zone*/temp; do v=$(cat "$z" 2>/dev/null); case "$v" in ''|*[!0-9]*) continue ;; esac; [ "$v" -lt 150000 ] && [ "$v" -gt "$mx" ] && mx=$v; done
 [ "$mx" -gt 0 ] && ln OK "Suhu SoC" "$((mx / 1000)) C (zona terpanas)" || ln GAGAL "Suhu SoC" "tidak terbaca"
 
-# --- Game Mode Android: uji nyata pada app Alpha sendiri, lalu dibuang
+# --- Game Mode Android: uji nyata pada app HSIN sendiri, lalu dibuang
 if command -v cmd >/dev/null 2>&1 && cmd -l 2>/dev/null | grep -q '^[[:space:]]*game$'; then
     T=com.hsin
     cmd game reset "$T" >/dev/null 2>&1

@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = alphaVersionCode
-        versionName = "6.2-$alphaVersionCode"
+        versionName = "6.3-$alphaVersionCode"
     }
 
     // Keystore dan password TIDAK ada di repo. CI mengisinya dari GitHub Secrets

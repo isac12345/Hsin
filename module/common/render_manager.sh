@@ -1,6 +1,6 @@
 #!/system/bin/sh
 MODDIR="$(dirname "$(dirname "$(readlink -f "$0")")")"
-RENDER_CONF="${ALPHA_RENDER_CONF:-/data/adb/alpha/render_backend.conf}"
+RENDER_CONF="${HSIN_RENDER_CONF:-/data/adb/hsin/render_backend.conf}"
 
 render_api_level() {
     render_api=$(getprop ro.build.version.sdk 2>/dev/null)
@@ -65,7 +65,7 @@ render_set() {
         echo "OK: render backend -> $render_want (efek setelah restart aplikasi)"
         return 0
     fi
-    echo "ERROR: tune_render gagal, cek alpha.log kategori RENDER"
+    echo "ERROR: tune_render gagal, cek hsin.log kategori RENDER"
     return 1
 }
 

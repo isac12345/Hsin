@@ -50,7 +50,7 @@ object Root {
         if (!force && modCache.isNotEmpty()) return modCache
         val r = exec(
             "for d in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do " +
-                "[ -f \"\$d/alpha_uperf_fasrs_fusion/module.prop\" ] && echo \"\$d/alpha_uperf_fasrs_fusion\" && break; done"
+                "[ -f \"\$d/hsin/module.prop\" ] && echo \"\$d/hsin\" && break; done"
         )
         modCache = r.out.lines().lastOrNull { it.startsWith("/") }.orEmpty().trim()
         return modCache

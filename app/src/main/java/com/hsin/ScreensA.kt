@@ -58,11 +58,11 @@ fun renderName(k: String): String = when (k) {
 fun DashScreen(vm: AppViewModel) {
     val st = vm.status
     if (vm.loaded && (!vm.rootOk || vm.modPath.isEmpty())) {
-        AlphaCard {
+        HsinCard {
             Label("Perlu perhatian")
             txt(
                 if (!vm.rootOk) "Akses root belum diberikan. Buka manager root (KernelSU/Magisk) dan izinkan HSIN."
-                else "Modul Alpha Fusion tidak ditemukan. Flash modulnya dulu, lalu cari ulang.",
+                else "Modul HSIN tidak ditemukan. Flash modulnya dulu, lalu cari ulang.",
                 12.sp, Amber,
             )
             Pill("CARI ULANG", { vm.findModule() })
@@ -71,20 +71,20 @@ fun DashScreen(vm: AppViewModel) {
     if (vm.loaded && vm.rootOk && vm.modPath.isNotEmpty()) {
         val modVer = st.ver
         if (!vm.statusOk) {
-            AlphaCard {
+            HsinCard {
                 Label("Versi")
-                txt("Modul belum kompatibel dengan app ini (alphactl tidak ada). Flash Alpha Fusion v${vm.appVer}.", 12.sp, Amber)
+                txt("Modul belum kompatibel dengan app ini (hsinctl tidak ada). Flash HSIN v${vm.appVer}.", 12.sp, Amber)
             }
         } else if (modVer > 0 && modVer != vm.appVer) {
-            AlphaCard {
+            HsinCard {
                 Label("Versi")
                 txt("Modul v$modVer, app v${vm.appVer}. Pasang keduanya dari build yang sama.", 12.sp, Amber)
             }
         }
     }
-    AlphaCard { ToggleRow("Tampilkan bubble", null, vm.bubbleOn) { vm.updateBubbleOn(it) } }
+    HsinCard { ToggleRow("Tampilkan bubble", null, vm.bubbleOn) { vm.updateBubbleOn(it) } }
 
-    AlphaCard {
+    HsinCard {
         Label("Current profile")
         txt(profileLabel(st.profile), 28.sp, weight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
         Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(st.profile), { vm.setProfile(PROFILE_KEYS[it]) })
@@ -94,16 +94,16 @@ fun DashScreen(vm: AppViewModel) {
     }
 
     val nRules = (if (vm.confStr("AUTO_BATT_ON", "0") == "1") 1 else 0) + (if (vm.confStr("AUTO_CHG_ON", "0") == "1") 1 else 0)
-    AlphaCard(onClick = { vm.go("auto") }) {
+    HsinCard(onClick = { vm.go("auto") }) {
         Label("Auto-profile")
         KV(if (nRules == 0) "Belum ada aturan aktif" else "$nRules aturan aktif", "›")
     }
-    AlphaCard(onClick = { vm.go("therm") }) {
+    HsinCard(onClick = { vm.go("therm") }) {
         Label("Proteksi thermal")
         KV("Batas ${st.thermalWarmC}°C · " + if (vm.flag("THERMAL_GUARD_OFF")) "mati" else "aktif", "›")
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Status game")
         KV("Suhu baterai", "%.1f°C".format(st.tempC))
         Divider()
@@ -112,7 +112,7 @@ fun DashScreen(vm: AppViewModel) {
         KV("Sesi", if (st.gamePkg.isEmpty()) "—" else "${vm.label(st.gamePkg)} · ${fmtClock(st.gameSecs)}")
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Render")
         var open by remember { mutableStateOf(false) }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -143,18 +143,18 @@ fun AutoScreen(vm: AppViewModel) {
     var chgOn by remember(vm.conf) { mutableStateOf(vm.confStr("AUTO_CHG_ON", "0") == "1") }
     var chgProf by remember(vm.conf) { mutableStateOf(vm.confStr("AUTO_CHG_PROFILE", "balanced")) }
 
-    AlphaCard {
+    HsinCard {
         Label("Baterai rendah")
         ToggleRow("Aktif", null, battOn) { battOn = it }
         SliderRow("Batas baterai", pct, 5f..50f, "${pct.toInt()}%", { pct = it })
         Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(battProf), { battProf = PROFILE_KEYS[it] })
     }
-    AlphaCard {
+    HsinCard {
         Label("Lagi charging")
         ToggleRow("Aktif", null, chgOn) { chgOn = it }
         Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(chgProf), { chgProf = PROFILE_KEYS[it] })
     }
-    AlphaCard(onClick = { vm.go("games") }) {
+    HsinCard(onClick = { vm.go("games") }) {
         Label("Game dibuka")
         KV("Otomatis lewat profil per game", "›")
     }
@@ -178,7 +178,7 @@ fun ThermScreen(vm: AppViewModel) {
         else -> "AMAN"
     }
     val stateColor = when (state) { "AMAN" -> Mint; "HANGAT" -> Amber; else -> Coral }
-    AlphaCard {
+    HsinCard {
         Label("Suhu sensor terpanas")
         Row(verticalAlignment = Alignment.Bottom) {
             txt("%.1f°C".format(st.socTempC), 28.sp, weight = FontWeight.Medium)
@@ -191,7 +191,7 @@ fun ThermScreen(vm: AppViewModel) {
         ) { vm.setFlag("THERMAL_GUARD_OFF", !it) }
         if (vm.flag("THERMAL_GUARD_OFF")) txt("Proteksi mati. Batas kritis 95°C tetap jalan.", 12.sp, Amber)
     }
-    AlphaCard {
+    HsinCard {
         Label("Batas suhu")
         SliderRow("Hangat mulai dari", warm, 60f..90f, "$w°C", { warm = it }, { vm.setThermalWarm(warm.toInt()) })
         Divider()
@@ -208,7 +208,7 @@ fun ThermScreen(vm: AppViewModel) {
 // ---------------------------------------------------------------- GAMES
 @Composable
 fun GamesScreen(vm: AppViewModel) {
-    AlphaCard {
+    HsinCard {
         var q by remember { mutableStateOf("") }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { Label("Game · ${vm.games.size}") }
@@ -251,10 +251,10 @@ fun StatsScreen(vm: AppViewModel) {
     val fmt = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault())
     val last = vm.sessions.firstOrNull()
     if (last == null) {
-        AlphaCard { txt("Belum ada sesi game tercatat. Sesi dicatat setelah game dimainkan minimal 1 menit.", 12.sp, muted()) }
+        HsinCard { txt("Belum ada sesi game tercatat. Sesi dicatat setelah game dimainkan minimal 1 menit.", 12.sp, muted()) }
         return
     }
-    AlphaCard {
+    HsinCard {
         Label("Sesi terakhir · ${vm.label(last.pkg)}")
         KV("Durasi main", fmtDur(last.durSecs))
         Divider()
@@ -268,7 +268,7 @@ fun StatsScreen(vm: AppViewModel) {
         KV("Profil", profileLabel(last.profile))
     }
     val recent = vm.sessions.take(7).reversed()
-    AlphaCard {
+    HsinCard {
         Label("Suhu puncak ${recent.size} sesi")
         Row(Modifier.fillMaxWidth().height(90.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
             recent.forEachIndexed { i, s ->
@@ -283,7 +283,7 @@ fun StatsScreen(vm: AppViewModel) {
             txt("lama", 12.sp, muted()); txt("baru", 12.sp, muted())
         }
     }
-    AlphaCard {
+    HsinCard {
         Label("Riwayat")
         vm.sessions.take(15).forEach { s ->
             KV("${vm.label(s.pkg)} · ${fmt.format(Date(s.epoch * 1000))}", fmtDur(s.durSecs))
@@ -300,7 +300,7 @@ fun DetectScreen(vm: AppViewModel) {
     var sel by remember { mutableStateOf<Set<String>?>(null) }
     var prof by remember { mutableStateOf(2) }
     val chosen = (sel ?: found.map { it.pkg }.toSet()).filter { p -> found.any { it.pkg == p } }
-    AlphaCard {
+    HsinCard {
         Label("Game ditemukan · ${found.size}")
         if (vm.apps.isEmpty()) txt("Membaca daftar app...", 12.sp, muted())
         else if (found.isEmpty()) txt("Tidak ada game baru. Tambah manual lewat tombol + di tab Games.", 12.sp, muted())
@@ -324,7 +324,7 @@ fun DetectScreen(vm: AppViewModel) {
         }
     }
     if (found.isNotEmpty()) {
-        AlphaCard {
+        HsinCard {
             Label("Profil awal")
             Seg(PROFILE_LABELS, prof, { prof = it })
             Pill("TAMBAH ${chosen.size} GAME", {
@@ -342,7 +342,7 @@ fun EditScreen(vm: AppViewModel) {
     val g = vm.games.firstOrNull { it.pkg == pkg }
     var prof by remember(pkg) { mutableStateOf(PROFILE_KEYS.indexOf(g?.profile ?: "balanced").coerceAtLeast(0)) }
     var fps by remember(pkg) { mutableStateOf(g?.fps ?: "") }
-    AlphaCard {
+    HsinCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppIcon(pkg)
             Column(Modifier.padding(start = 10.dp)) {
@@ -360,7 +360,7 @@ fun EditScreen(vm: AppViewModel) {
 
     // Opsi khusus game: GLOBAL = ikut pengaturan umum, ON/OFF = timpa untuk game ini saja.
     var opts by remember(pkg) { mutableStateOf<Map<String, String>>(emptyMap()) }
-    LaunchedEffect(pkg) { opts = Alpha.gameOpts(pkg) }
+    LaunchedEffect(pkg) { opts = Hsin.gameOpts(pkg) }
     fun triIdx(k: String) = when (opts[k]) { "on" -> 1; "off" -> 2; else -> 0 }
     fun setTri(k: String, i: Int) {
         val v = when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }
@@ -368,7 +368,7 @@ fun EditScreen(vm: AppViewModel) {
         vm.setGameOpt(pkg, k, v)
     }
     val lite = opts["LITE"] == "1"
-    AlphaCard {
+    HsinCard {
         Label("Pengaturan game ini")
         ToggleRow("Mode ringan", "matikan prioritas, DND, dan refresh rate untuk game ini; hanya profil yang jalan", lite) {
             opts = if (it) opts + ("LITE" to "1") else opts - "LITE"
@@ -405,7 +405,7 @@ fun EditScreen(vm: AppViewModel) {
     LaunchedEffect(pkg) { vm.loadGameFx(pkg) }
     val fx = vm.gameFx
     fun fxIdx(k: String, keys: List<String>) = keys.indexOf(fx[k] ?: "off").coerceAtLeast(0)
-    AlphaCard {
+    HsinCard {
         Label("Game Mode Android")
         val gmKeys = listOf("off", "standard", "performance", "battery")
         Label("Mode")
@@ -424,8 +424,8 @@ fun EditScreen(vm: AppViewModel) {
 
     val rKeys = listOf("default") + vm.render.available.filter { it != "default" }
     var rend by remember(pkg) { mutableStateOf("default") }
-    LaunchedEffect(pkg) { rend = Alpha.gameRender(pkg) }
-    AlphaCard {
+    LaunchedEffect(pkg) { rend = Hsin.gameRender(pkg) }
+    HsinCard {
         Label("Render khusus game")
         Seg(
             rKeys.map { if (it == "default") "GLOBAL" else it.uppercase() },
@@ -447,7 +447,7 @@ fun AddGameScreen(vm: AppViewModel) {
     var fps by remember { mutableStateOf("") }
     val reg = vm.games.map { it.pkg }.toSet()
     val list = vm.apps.filter { it.pkg !in reg && (q.isBlank() || it.label.contains(q, true) || it.pkg.contains(q, true)) }
-    AlphaCard {
+    HsinCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { txt("GAMES", 16.sp, weight = FontWeight.Medium, spacing = 3.sp) }
             SmallPill("CLOSE", { vm.back() })

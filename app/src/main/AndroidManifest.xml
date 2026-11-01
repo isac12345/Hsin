@@ -41,7 +41,7 @@
         <service
             android:name=".ProfileTileService"
             android:exported="true"
-            android:icon="@drawable/ic_stat_alpha"
+            android:icon="@drawable/ic_stat_hsin"
             android:label="@string/tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -52,7 +52,7 @@
         <service
             android:name=".LastGameTileService"
             android:exported="true"
-            android:icon="@drawable/ic_stat_alpha"
+            android:icon="@drawable/ic_stat_hsin"
             android:label="@string/tile_last"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

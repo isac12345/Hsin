@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Fusion - Defaults Manager (M3/M4)
+# HSIN - Defaults Manager (M3/M4)
 # Catat nilai default hardware sekali saat pertama boot (idempotent).
 # File: $CONF_DIR/defaults.conf
 # Format key=value, mudah di-source.
@@ -11,9 +11,9 @@
 #       Bila sudah ada → source dan verifikasi (baca ulang + log bila berubah).
 
 defaults_ensure() {
-    local _conf="${ALPHA_CONF_DIR:-/data/adb/alpha}"
+    local _conf="${HSIN_CONF_DIR:-/data/adb/hsin}"
     local _defaults="$_conf/defaults.conf"
-    local _log="${LOG_FILE:-/data/adb/alpha/alpha.log}"
+    local _log="${LOG_FILE:-/data/adb/hsin/hsin.log}"
 
     _defaults_log() {
         local _ts
@@ -123,10 +123,10 @@ _defaults_init() {
     _defaults_init_gpu
     _defaults_init_vm
 
-    local _conf="${ALPHA_CONF_DIR:-/data/adb/alpha}"
+    local _conf="${HSIN_CONF_DIR:-/data/adb/hsin}"
     local _defaults="$_conf/defaults.conf"
     cat <<EOF > "$_defaults"
-# Alpha Fusion Hardware Defaults (auto-generated, jangan edit manual)
+# HSIN Hardware Defaults (auto-generated, jangan edit manual)
 GPU_MAX_FREQ="${GPU_MAX_FREQ:-0}"
 VM_SWAPPINESS="${VM_SWAPPINESS:-0}"
 VM_VFS_CACHE_PRESSURE="${VM_VFS_CACHE_PRESSURE:-0}"

@@ -260,10 +260,10 @@ fun AppViewModel.chooseMode(key: String) {
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
     viewModelScope.launch {
-        if (key != "puncak") Alpha.ovdStop()
-        val r = Alpha.setProfile(prof)
+        if (key != "puncak") Hsin.ovdStop()
+        val r = Hsin.setProfile(prof)
         if (key == "puncak") {
-            val o = Alpha.ovdStart()
+            val o = Hsin.ovdStart()
             toast(if (o.ok) (if (UiState.en) "Peak mode on" else "Mode Puncak aktif") else o.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         } else {
             toast(if (r.ok) (if (UiState.en) "Mode applied" else "Mode diterapkan") else r.out.take(60))
@@ -601,7 +601,7 @@ private fun RStat(k: String, v: String) {
 @Composable
 private fun SettingsTab(vm: AppViewModel) {
     val ctx = LocalContext.current
-    LaunchedEffect(vm.modPath) { vm.refreshRates = Alpha.refreshList(); vm.refreshHz = Alpha.refreshGet() }
+    LaunchedEffect(vm.modPath) { vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SText(tx("PENGATURAN", "SETTINGS"), 12.sp, SP.gold, spacing = 2.sp, modifier = Modifier.rise(0))
         Glass(Modifier.fillMaxWidth().rise(30)) {

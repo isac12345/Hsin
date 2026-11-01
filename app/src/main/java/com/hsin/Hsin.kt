@@ -5,14 +5,14 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-/** Jembatan ke modul: semua perintah lewat common/alphactl.sh (root). */
-object Alpha {
-    const val STATE = "/data/adb/alpha"
+/** Jembatan ke modul: semua perintah lewat common/hsinctl.sh (root). */
+object Hsin {
+    const val STATE = "/data/adb/hsin"
 
     private suspend fun ctl(args: String, timeout: Long = 20_000L): Root.Res {
         val m = Root.modPath()
         if (m.isEmpty()) return Root.Res(-3, "modul tidak ditemukan")
-        return Root.exec("sh $m/common/alphactl.sh $args 2>/dev/null", timeout)
+        return Root.exec("sh $m/common/hsinctl.sh $args 2>/dev/null", timeout)
     }
 
     fun kv(s: String): Map<String, String> {

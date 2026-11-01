@@ -1,11 +1,11 @@
 #!/system/bin/sh
-# Alpha PGR-Log — Performance/Game-Resource logger (POSIX sh, no model deps)
+# HSIN PGR-Log — Performance/Game-Resource logger (POSIX sh, no model deps)
 # Usage: pgr-log start | stop
-# Writes one CSV line/second to /sdcard/alpha/game-log.csv for up to 30 minutes.
+# Writes one CSV line/second to /sdcard/hsin/game-log.csv for up to 30 minutes.
 
-WORK_DIR="${ALPHA_WORK_DIR:-/data/adb/alpha}"
+WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
 PID_FILE="$WORK_DIR/pgr-log.pid"
-CSV_FILE="/sdcard/alpha/game-log.csv"
+CSV_FILE="/sdcard/hsin/game-log.csv"
 MAX_ITERATIONS=1800
 
 pgr_log_stop() {

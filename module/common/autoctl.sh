@@ -1,23 +1,23 @@
 #!/system/bin/sh
-# Alpha Fusion - autoctl: daemon ringan untuk fitur aplikasi.
+# HSIN - autoctl: daemon ringan untuk fitur aplikasi.
 #  1. Auto-profile: aturan baterai rendah / sedang charging (dari app.conf)
 #  2. Statistik sesi game: durasi, suhu puncak, baterai -> sessions.log
 # Satu loop sleep (default 10 dtk), tanpa fork berat saat tidak ada game.
 # Game sendiri tetap diurus monitor.sh; di sini profil TIDAK diganti selama game aktif.
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 COMMON="${0%/*}"
 PID_FILE="$STATE_DIR/autoctl.pid"
 CONF_FILE="$STATE_DIR/app.conf"
-LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
+LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
 SES_FILE="$STATE_DIR/sessions.log"
 PREV_FILE="$STATE_DIR/.auto_prev"
 MARK_FILE="$STATE_DIR/.auto_applied"
-INTERVAL="${ALPHA_AUTOCTL_INTERVAL:-10}"
+INTERVAL="${HSIN_AUTOCTL_INTERVAL:-10}"
 SYS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 SYS_POWER="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}"
-MAX_TICKS="${ALPHA_AUTOCTL_MAX_TICKS:-0}"
-SES_MIN_SECS="${ALPHA_SES_MIN_SECS:-60}"
+MAX_TICKS="${HSIN_AUTOCTL_MAX_TICKS:-0}"
+SES_MIN_SECS="${HSIN_SES_MIN_SECS:-60}"
 STOP=0
 
 alog() {

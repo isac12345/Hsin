@@ -1,13 +1,13 @@
 #!/system/bin/sh
-# Alpha v1 - Apply one profile immediately
+# HSIN v1 - Apply one profile immediately
 
 MODDIR="${0%/*}"
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 CURRENT_STATE_FILE="$STATE_DIR/current_state"
 ACTIVE_PROFILE_FILE="$STATE_DIR/active_profile"
 LOCK_DIR="$STATE_DIR/apply.lock"
 LOCK_OWNER_FILE="$LOCK_DIR/owner.pid"
-LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
+LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
 LOCK_TIMEOUT=10
 PROFILE_TRANSITION_FILE="$STATE_DIR/.profile_transitions.log"
 
