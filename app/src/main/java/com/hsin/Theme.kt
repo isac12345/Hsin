@@ -26,6 +26,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -81,7 +83,7 @@ fun txt(
     maxLines: Int = Int.MAX_VALUE,
 ) {
     Text(
-        text = s, modifier = modifier, color = color, fontSize = size, fontFamily = Mono,
+        text = tr(s), modifier = modifier, color = color, fontSize = size, fontFamily = Mono,
         fontWeight = weight, textAlign = align, letterSpacing = spacing, maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )
@@ -283,9 +285,11 @@ private val iconCache = HashMap<String, Bitmap>()
 @Composable
 fun AppIcon(pkg: String, size: Dp = 42.dp) {
     val ctx = LocalContext.current
-    val bmp by produceState<Bitmap?>(iconCache[pkg], pkg) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) {
+    // pakai remember(pkg) supaya tiap game punya ikon sendiri (produceState menahan nilai lama saat key berganti)
+    var bmp by remember(pkg) { mutableStateOf<Bitmap?>(iconCache[pkg]) }
+    androidx.compose.runtime.LaunchedEffect(pkg) {
+        if (bmp == null) {
+            bmp = withContext(Dispatchers.IO) {
                 try {
                     val b = ctx.packageManager.getApplicationIcon(pkg).toBitmap(96, 96)
                     iconCache[pkg] = b

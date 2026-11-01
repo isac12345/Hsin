@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent { AlphaApp(vm) }
+        handleLaunchIntent(intent)
         if (!vm.prefs.permAsked) {
             vm.prefs.permAsked = true
             vm.dialog = Dlg.Confirm(
@@ -84,6 +85,18 @@ class MainActivity : ComponentActivity() {
                 okLabel = "BERIKAN",
             ) { requestPerms() }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLaunchIntent(intent)
+    }
+
+    /** Tile "Game terakhir" membuka app dengan paket game: langsung jalankan ritual luncur. */
+    private fun handleLaunchIntent(i: Intent?) {
+        val pkg = i?.getStringExtra("ritual").orEmpty()
+        if (pkg.isNotEmpty()) { i?.removeExtra("ritual"); UiState.startRitual(pkg) }
     }
 
     private fun requestPerms() {
@@ -134,6 +147,10 @@ fun Backdrop(vm: AppViewModel) {
         if (vm.blur > 0 && Build.VERSION.SDK_INT >= 31) m = m.blur((vm.blur * 0.24f).dp)
         Image(bmp.asImageBitmap(), null, m, contentScale = scale)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+    } else {
+        // tanpa background pilihan: pakai wallpaper bawaan HSIN supaya tidak ada layar kosong/hitam
+        Image(painterResource(R.drawable.wallpaper_default), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xCC0A0A0C), Color(0xE60A0A0C)))))
     }
 }
 
@@ -242,6 +259,8 @@ fun AlphaApp(vm: AppViewModel) {
             BackHandler(enabled = vm.route != "dash") {
                 if (vm.route in setOf("games", "custom", "tools")) vm.go("dash") else if (!vm.back()) vm.go("dash")
             }
+            BackHandler(enabled = vm.route == "dash" && UiState.tab != 0 && UiState.ritual.isEmpty()) { UiState.tab = 0 }
+            BackHandler(enabled = UiState.ritual.isNotEmpty()) { UiState.ritual = "" }
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 if (vm.route == "dash") {
                     SpaceRoot(vm)

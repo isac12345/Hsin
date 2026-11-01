@@ -2,5 +2,6 @@
 <resources>
     <string name="app_name">HSIN</string>
     <string name="tile_label">HSIN mode</string>
-    <string name="tile_overdrive">Overdrive</string>
+    <string name="tile_overdrive">Puncak</string>
+    <string name="tile_last">Game terakhir</string>
 </resources>

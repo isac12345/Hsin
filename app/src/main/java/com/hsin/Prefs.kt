@@ -10,6 +10,9 @@ class Prefs(ctx: Context) {
     var bubbleOn: Boolean
         get() = sp.getBoolean("bubble_on", false)
         set(v) { sp.edit().putBoolean("bubble_on", v).apply() }
+    var lastGame: String
+        get() = sp.getString("last_game", "") ?: ""
+        set(v) { sp.edit().putString("last_game", v).apply() }
     var bubbleHidden: Boolean
         get() = sp.getBoolean("bubble_hidden", false)
         set(v) { sp.edit().putBoolean("bubble_hidden", v).apply() }
@@ -114,13 +117,13 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("fl_x_p", 24)
         set(v) { sp.edit().putInt("fl_x_p", v).apply() }
     var flYp: Int
-        get() = sp.getInt("fl_y_p", 20)
+        get() = sp.getInt("fl_y_p", 260)
         set(v) { sp.edit().putInt("fl_y_p", v).apply() }
     var flXl: Int
         get() = sp.getInt("fl_x_l", 24)
         set(v) { sp.edit().putInt("fl_x_l", v).apply() }
     var flYl: Int
-        get() = sp.getInt("fl_y_l", 20)
+        get() = sp.getInt("fl_y_l", 140)
         set(v) { sp.edit().putInt("fl_y_l", v).apply() }
     var flPosVer: Int
         get() = sp.getInt("fl_pos_ver", 0)

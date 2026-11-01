@@ -1,4 +1,4 @@
-# HSIN v6.1.0
+# HSIN v6.2.0
 
 Game booster (modul Magisk/KernelSU/APatch + app) dengan tampilan game space. Mesin modul diambil dari Alpha Fusion
 (Uperf + fas-rs + Overdrive + game hooks), jadi fiturnya sama dan sudah teruji di perangkat. Beda: nama dan tampilan.
@@ -19,7 +19,7 @@ Game booster (modul Magisk/KernelSU/APatch + app) dengan tampilan game space. Me
 - Bahasa Indonesia / English.
 
 ## Pasang
-Flash `HSIN-v6.1.0-module.zip` (APK ikut terpasang) → reboot → buka HSIN. Modul ini memakai id yang sama dengan Alpha Fusion,
+Flash `HSIN-v6.2.0-module.zip` (APK ikut terpasang) → reboot → buka HSIN. Modul ini memakai id yang sama dengan Alpha Fusion,
 jadi menggantikannya. Hapus app Alpha Control lama supaya tidak ada dua app.
 
 ## Build
