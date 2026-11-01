@@ -16,7 +16,7 @@ ui_print "  CPU/frekuensi dipegang fas-rs, bukan Uperf"
 ui_print "================================================="
 
 # ---------------------------------------------------------
-# 1. Guardrail arsitektur (dari Alpha v1) - wajib ARM64
+# 1. Guardrail arsitektur (dari HSIN v1) - wajib ARM64
 # ---------------------------------------------------------
 DEVICE_ARCH="$ARCH"
 if [ -z "$DEVICE_ARCH" ]; then
@@ -37,19 +37,45 @@ case "$DEVICE_ARCH" in
 esac
 
 # ---------------------------------------------------------
-# 2. Setup direktori kerja Alpha
+# 2. Setup direktori kerja HSIN
 # ---------------------------------------------------------
-WORK_DIR="/data/adb/alpha"
+WORK_DIR="/data/adb/hsin"
 ui_print "- Menyiapkan direktori kerja HSIN: $WORK_DIR"
 mkdir -p "$WORK_DIR"
 chmod 0755 "$WORK_DIR"
-# M6: tulis penanda Alpha — uninstall.sh pakai ini untuk menentukan
-# apakah config uperf/fas-rs milik Alpha boleh dihapus.
-printf '%s\n' "1" > "$WORK_DIR/.alpha_installed" 2>/dev/null
+
+# Migrasi dari versi lama (id modul alpha_uperf_fasrs_fusion, data di /data/adb/alpha):
+# salin data pengguna (daftar game, opsi per game, flag), ganti nama kunci lama, lalu matikan modul lama
+# supaya dua modul tidak berjalan bersamaan. Modul lama tidak dihapus otomatis agar skrip hapus lamanya tidak membersihkan fas-rs/uperf yang dipakai HSIN.
+OLD_DIR="/data/adb/alpha"
+OLD_MOD="/data/adb/modules/alpha_uperf_fasrs_fusion"
+if [ -d "$OLD_DIR" ] && [ ! -f "$WORK_DIR/.migrated_from_alpha" ]; then
+    ui_print "- Data lama ditemukan, dipindahkan ke HSIN..."
+    cp -a "$OLD_DIR"/. "$WORK_DIR"/ 2>/dev/null
+    for _f in "$WORK_DIR"/*.conf "$WORK_DIR"/*.cfg; do
+        [ -f "$_f" ] || continue
+        sed -i -e 's/^ALPHA_/HSIN_/' -e 's/GB_FASRS_FORCE_ALPHA/GB_FASRS_FORCE_HSIN/g' "$_f" 2>/dev/null
+    done
+    for _f in "$WORK_DIR"/.alpha_*; do
+        [ -e "$_f" ] || continue
+        mv -f "$_f" "$WORK_DIR/.hsin_${_f##*/.alpha_}" 2>/dev/null
+    done
+    [ -f "$WORK_DIR/alpha.log" ] && mv -f "$WORK_DIR/alpha.log" "$WORK_DIR/hsin.log" 2>/dev/null
+    rm -f "$WORK_DIR"/*.pid "$WORK_DIR/.bubble_want" 2>/dev/null
+    : > "$WORK_DIR/.migrated_from_alpha"
+fi
+if [ -d "$OLD_MOD" ]; then
+    ui_print "- Modul Alpha lama dinonaktifkan (boleh dihapus manual dari daftar modul)."
+    touch "$OLD_MOD/disable" 2>/dev/null
+    for _p in monitor.sh watchdog.sh autoctl.sh; do pkill -f "alpha_uperf_fasrs_fusion/common/$_p" 2>/dev/null; done
+fi
+# M6: tulis penanda HSIN — uninstall.sh pakai ini untuk menentukan
+# apakah config uperf/fas-rs milik HSIN boleh dihapus.
+printf '%s\n' "1" > "$WORK_DIR/.hsin_installed" 2>/dev/null
 
 # Bersihkan cache deteksi lama saat reinstall agar hardware terdeteksi ulang
 rm -f "$WORK_DIR/detected.conf"
-rm -f "$WORK_DIR/alpha.log"
+rm -f "$WORK_DIR/hsin.log"
 
 # modul31: bersih state basi saat flash-timpa (tanpa uninstall dulu).
 # rm -f tidak pernah gagal, jadi aman dijalankan ulang berapa kali pun.
@@ -59,7 +85,7 @@ rm -f "$WORK_DIR/alpha.log"
 # saat boot, bukan restore nilai boost lama), log + cache monitor.
 # Yang DIPERTAHANKAN (data user): game_profile_map.conf (daftar game),
 # active_profile/current_state, SF_LATCH_UNSIGNALED, .disable_tweaks,
-# .alpha/.companion/.asoulopt_installed.
+# .hsin/.companion/.asoulopt_installed.
 rm -f "$WORK_DIR/boost_level" "$WORK_DIR/GAMEBOOST_LEVEL" \
     "$WORK_DIR/.gb_active" "$WORK_DIR/.gb_cooldown_count" \
     "$WORK_DIR/.gb_level_orig" "$WORK_DIR/.gb_pending" \
@@ -110,7 +136,7 @@ if [ -f "$MODPATH/uperf/script/libsysinfo.sh" ]; then
     if [ "$UPERF_CFGNAME" != "unsupported" ] && [ -f "$MODPATH/uperf/config/$UPERF_CFGNAME.json" ]; then
         mkdir -p "$UPERF_USER_PATH"
         cp -f "$MODPATH/uperf/config/$UPERF_CFGNAME.json" "$UPERF_USER_PATH/uperf.json"
-        # M1: Nonaktifkan modul cpu di salinan uperf.json — Alpha/fas-rs
+        # M1: Nonaktifkan modul cpu di salinan uperf.json — HSIN/fas-rs
         # memegang penuh kendali CPU governor/freq, supaya tidak rebutan.
         # Cek verifikasi: pastikan baris setelah "cpu": berisi "enable": false.
         _uperf_cpu_tmp="$UPERF_USER_PATH/.uperf.json.cpu_tmp"
@@ -155,47 +181,47 @@ if [ -f "$MODPATH/uperf/script/libsysinfo.sh" ]; then
         elif ! grep -q '"name": "Default rule"' "$UPERF_USER_PATH/uperf.json" 2>/dev/null; then
             ui_print "! Marker Default rule tidak ditemukan, injeksi Alpha-FasrsManaged dilewati (sync exclusion nonaktif)."
         else
-            ALPHA_RULE_TMP="$UPERF_USER_PATH/.uperf.json.alpha_tmp"
-            rm -f "$ALPHA_RULE_TMP" 2>/dev/null
-            ALPHA_RULE_PREV=""
-            ALPHA_RULE_FIRST=1
-            while IFS= read -r ALPHA_RULE_LINE || [ -n "$ALPHA_RULE_LINE" ]; do
-                if [ "$ALPHA_RULE_FIRST" = "1" ]; then
-                    ALPHA_RULE_PREV="$ALPHA_RULE_LINE"
-                    ALPHA_RULE_FIRST=0
+            HSIN_RULE_TMP="$UPERF_USER_PATH/.uperf.json.hsin_tmp"
+            rm -f "$HSIN_RULE_TMP" 2>/dev/null
+            HSIN_RULE_PREV=""
+            HSIN_RULE_FIRST=1
+            while IFS= read -r HSIN_RULE_LINE || [ -n "$HSIN_RULE_LINE" ]; do
+                if [ "$HSIN_RULE_FIRST" = "1" ]; then
+                    HSIN_RULE_PREV="$HSIN_RULE_LINE"
+                    HSIN_RULE_FIRST=0
                     continue
                 fi
-                case "$ALPHA_RULE_LINE" in
+                case "$HSIN_RULE_LINE" in
                     *'"name": "Default rule"'*)
-                        case "$ALPHA_RULE_PREV" in
+                        case "$HSIN_RULE_PREV" in
                             *'{'*)
-                                printf '%s\n' '        {' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '          "name": "Alpha-FasrsManaged",' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '          "regex": "ALPHA_NO_GAMES_YET_PLACEHOLDER",' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '          "pinned": true,' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '          "rules": [' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '            {' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '              "k": ".",' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '              "ac": "auto",' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '              "pc": "auto"' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '            }' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '          ]' >> "$ALPHA_RULE_TMP"
-                                printf '%s\n' '        },' >> "$ALPHA_RULE_TMP"
+                                printf '%s\n' '        {' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '          "name": "Alpha-FasrsManaged",' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '          "regex": "ALPHA_NO_GAMES_YET_PLACEHOLDER",' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '          "pinned": true,' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '          "rules": [' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '            {' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '              "k": ".",' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '              "ac": "auto",' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '              "pc": "auto"' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '            }' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '          ]' >> "$HSIN_RULE_TMP"
+                                printf '%s\n' '        },' >> "$HSIN_RULE_TMP"
                                 ;;
                         esac
                         ;;
                 esac
-                printf '%s\n' "$ALPHA_RULE_PREV" >> "$ALPHA_RULE_TMP"
-                ALPHA_RULE_PREV="$ALPHA_RULE_LINE"
+                printf '%s\n' "$HSIN_RULE_PREV" >> "$HSIN_RULE_TMP"
+                HSIN_RULE_PREV="$HSIN_RULE_LINE"
             done < "$UPERF_USER_PATH/uperf.json"
-            if [ "$ALPHA_RULE_FIRST" = "0" ]; then
-                printf '%s\n' "$ALPHA_RULE_PREV" >> "$ALPHA_RULE_TMP"
+            if [ "$HSIN_RULE_FIRST" = "0" ]; then
+                printf '%s\n' "$HSIN_RULE_PREV" >> "$HSIN_RULE_TMP"
             fi
-            if grep -q '"name": "Alpha-FasrsManaged"' "$ALPHA_RULE_TMP" 2>/dev/null; then
-                mv -f "$ALPHA_RULE_TMP" "$UPERF_USER_PATH/uperf.json"
+            if grep -q '"name": "Alpha-FasrsManaged"' "$HSIN_RULE_TMP" 2>/dev/null; then
+                mv -f "$HSIN_RULE_TMP" "$UPERF_USER_PATH/uperf.json"
                 ui_print "- Rule Alpha-FasrsManaged disuntik ke uperf.json (sebelum Default rule)."
             else
-                rm -f "$ALPHA_RULE_TMP" 2>/dev/null
+                rm -f "$HSIN_RULE_TMP" 2>/dev/null
                 ui_print "! Injeksi Alpha-FasrsManaged gagal (format tak dikenal), sync exclusion nonaktif."
             fi
         fi
@@ -252,7 +278,7 @@ set_perm "$MODPATH/common/sync_uperf_exclusion.sh" 0 0 0755
 set_perm "$MODPATH/common/engine_manager.sh" 0 0 0755
 set_perm "$MODPATH/common/game_add.sh" 0 0 0755
 set_perm "$MODPATH/common/render_manager.sh" 0 0 0755
-set_perm "$MODPATH/common/alphactl.sh" 0 0 0755
+set_perm "$MODPATH/common/hsinctl.sh" 0 0 0755
 set_perm "$MODPATH/common/autoctl.sh" 0 0 0755
 set_perm "$MODPATH/common/memfx.sh" 0 0 0755
 set_perm "$MODPATH/common/trim.sh" 0 0 0755
@@ -264,12 +290,12 @@ set_perm "$MODPATH/common/livecheck.sh" 0 0 0755
 # (biang error tiap flash, bersih maupun timpa). Tak ada yang mengeksekusi
 # .bin (service.sh selalu pakai .sh), jadi skip = aman.
 (
-    for _alpha_bin in "$MODPATH/common/monitor.bin" "$MODPATH/common/watchdog.bin" \
+    for _hsin_bin in "$MODPATH/common/monitor.bin" "$MODPATH/common/watchdog.bin" \
         "$MODPATH/common/apply_now.bin" "$MODPATH/common/game_add.bin" \
         "$MODPATH/common/engine_manager.bin" "$MODPATH/common/game_manager.bin" \
         "$MODPATH/common/sync_uperf_exclusion.bin" "$MODPATH/bin/pgr-log.bin"; do
-        if [ -f "$_alpha_bin" ]; then
-            set_perm "$_alpha_bin" 0 0 0755
+        if [ -f "$_hsin_bin" ]; then
+            set_perm "$_hsin_bin" 0 0 0755
         fi
     done
 )
@@ -337,11 +363,11 @@ fi
 #    Guard versi di companion_install.sh: tidak install ulang kalau sudah
 #    current (preferensi/permission user aman), tidak pernah downgrade.
 # ---------------------------------------------------------
-if [ -f "$MODPATH/common/companion_install.sh" ] && [ -f "$MODPATH/companion/AlphaBubble.apk" ]; then
-    set_perm "$MODPATH/companion/AlphaBubble.apk" 0 0 0644
+if [ -f "$MODPATH/common/companion_install.sh" ] && [ -f "$MODPATH/companion/HSINBubble.apk" ]; then
+    set_perm "$MODPATH/companion/HSINBubble.apk" 0 0 0644
     if [ "$(getprop sys.boot_completed 2>/dev/null)" = "1" ] && command -v pm >/dev/null 2>&1; then
         . "$MODPATH/common/companion_install.sh"
-        if alpha_companion_install_once "$MODPATH/companion/AlphaBubble.apk" "$WORK_DIR/.companion_installed"; then
+        if hsin_companion_install_once "$MODPATH/companion/HSINBubble.apk" "$WORK_DIR/.companion_installed"; then
             ui_print "- Companion app HSIN terpasang/up-to-date."
         else
             ui_print "- Companion app dijadwalkan dipasang saat boot pertama."

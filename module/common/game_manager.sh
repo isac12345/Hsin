@@ -1,11 +1,11 @@
 #!/system/bin/sh
-# Alpha v1 - Kelola daftar game & pemetaan profile per-game
+# HSIN v1 - Kelola daftar game & pemetaan profile per-game
 # File yang diubah adalah $STATE_DIR/game_profile_map.conf, format
 # "package:profile" satu baris per app - persis format yang sudah
 # dibaca oleh monitor.sh (get_game_profile). Script ini cuma
 # menyediakan sisi tulis (add/remove/list) buat dipanggil dari APK.
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 MAP_FILE="$STATE_DIR/game_profile_map.conf"
 
 mkdir -p "$STATE_DIR" 2>/dev/null

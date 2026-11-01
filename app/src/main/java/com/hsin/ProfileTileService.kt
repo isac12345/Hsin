@@ -14,17 +14,17 @@ class ProfileTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
-        scope.launch { render(Alpha.status()?.profile ?: "none") }
+        scope.launch { render(Hsin.status()?.profile ?: "none") }
     }
 
     override fun onClick() {
         super.onClick()
         scope.launch {
-            val cur = Alpha.status()?.profile ?: "none"
+            val cur = Hsin.status()?.profile ?: "none"
             val next = PROFILE_KEYS[(PROFILE_KEYS.indexOf(cur) + 1) % PROFILE_KEYS.size]
             render(next)
-            Alpha.setProfile(next)
-            render(Alpha.status()?.profile ?: next)
+            Hsin.setProfile(next)
+            render(Hsin.status()?.profile ?: next)
         }
     }
 

@@ -253,8 +253,8 @@ private fun StatBox(name: String, v: Float, mx: Float, unit: String, dec: Int, c
 
 @Composable
 private fun gameModeLine(vm: AppViewModel, g: GameEntry): String {
-    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Alpha.gameOpts(g.pkg) }
-    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Alpha.gamefx(g.pkg) }
+    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Hsin.gameOpts(g.pkg) }
+    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, vm.games) { value = Hsin.gamefx(g.pkg) }
     val m = info(profMode(g.profile, opts["OVD"] == "on"))
     val res = fx["downscale"].orEmpty().toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%"
     return if (LocalEn.current) "${m.nameEn} · Resolution $res" else "${m.nameId} · Resolusi $res"
@@ -408,8 +408,8 @@ private val FPS_KEYS = listOf("off", "30", "45", "60", "90", "120")
 @Composable
 private fun GameDetail(vm: AppViewModel, g: GameEntry) {
     var ver by remember { mutableIntStateOf(0) }
-    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, ver, vm.games) { value = Alpha.gameOpts(g.pkg) }
-    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Alpha.gamefx(g.pkg) }
+    val opts by produceState<Map<String, String>>(emptyMap(), g.pkg, ver, vm.games) { value = Hsin.gameOpts(g.pkg) }
+    val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Hsin.gamefx(g.pkg) }
     val cur = profMode(g.profile, opts["OVD"] == "on")
     val col = info(cur).color
     var res by remember(g.pkg, fx["downscale"]) { mutableFloatStateOf(((fx["downscale"]?.toDoubleOrNull() ?: 1.0) * 100).toFloat().coerceIn(50f, 100f)) }
@@ -481,7 +481,7 @@ internal fun AlatTab(vm: AppViewModel, land: Boolean) {
     var sub by remember { mutableIntStateOf(0) }
     LaunchedEffect(vm.modPath) {
         vm.go("tools")
-        vm.refreshRates = Alpha.refreshList(); vm.refreshHz = Alpha.refreshGet()
+        vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet()
     }
     val names = listOf(tx("Mesin", "Engine"), tx("Layar", "Display"), tx("Bersih", "Clean"), tx("Log", "Logs"), tx("Sistem", "System"))
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -515,7 +515,7 @@ private fun TwoCol(land: Boolean, left: @Composable () -> Unit, right: @Composab
 private fun AlatMesin(vm: AppViewModel, land: Boolean) {
     TwoCol(land, {
         Section(tx("PENGENDALI CPU", "CPU CONTROL")) {
-            HSwitch(tx("Kunci CPU pintar", "Smart CPU control"), tx("fas-rs menyesuaikan frekuensi CPU mengikuti beban game.", "fas-rs adapts CPU frequency to game load."), !vm.flag("GB_FASRS_FORCE_ALPHA")) { vm.setFlag("GB_FASRS_FORCE_ALPHA", !it) }
+            HSwitch(tx("Kunci CPU pintar", "Smart CPU control"), tx("fas-rs menyesuaikan frekuensi CPU mengikuti beban game.", "fas-rs adapts CPU frequency to game load."), !vm.flag("GB_FASRS_FORCE_HSIN")) { vm.setFlag("GB_FASRS_FORCE_HSIN", !it) }
             HSwitch(tx("Turbo setelah dingin", "Turbo after cooldown"), tx("Boost penuh lagi begitu suhu turun.", "Full boost again once the phone cools down."), vm.flag("GB_COOLDOWN_EXTREME")) { vm.setFlag("GB_COOLDOWN_EXTREME", it) }
             HSwitch(tx("Fokus inti game", "Game core focus"), tx("Game dipersempit ke inti terbaik (cpuset).", "Game is narrowed to the best cores (cpuset)."), !vm.flag("NO_CPUSET")) { vm.setFlag("NO_CPUSET", !it) }
         }
@@ -594,7 +594,7 @@ private fun AlatLog(vm: AppViewModel) {
     val filters = listOf("ALL" to tx("Semua", "All"), "ERROR" to "Error", "CPU" to "CPU", "GAME" to "Game", "INPUT" to "Input")
     Section(tx("CATATAN MODUL", "MODULE LOG")) {
         HChips(filters.map { it.second }, filters.indexOfFirst { it.first == vm.logFilter }.coerceAtLeast(0)) { vm.logFilter = filters[it].first }
-        val shown = vm.logs.filter { Alpha.logMatches(it, vm.logFilter) }.takeLast(10).reversed()
+        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(10).reversed()
         if (shown.isEmpty()) SText(tx("Belum ada log.", "No log yet."), 12.sp, SP.faint)
         shown.forEach { l ->
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
@@ -699,8 +699,8 @@ internal fun RitualOverlay(vm: AppViewModel) {
 
     LaunchedEffect(pkg) {
         val g = vm.games.firstOrNull { it.pkg == pkg }
-        val opts = Alpha.gameOpts(pkg)
-        val fx = Alpha.gamefx(pkg)
+        val opts = Hsin.gameOpts(pkg)
+        val fx = Hsin.gamefx(pkg)
         mode = info(profMode(g?.profile ?: "balanced", opts["OVD"] == "on"))
         step = 0
         val mb = vm.cleanRamQuiet()
@@ -709,7 +709,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 1
         val gProf = g?.profile ?: "balanced"
-        val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Alpha.setProfile(gProf).ok else true
+        val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
         delay(350)
         setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else if (en) " ✗" else " ✗")
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
@@ -721,12 +721,12 @@ internal fun RitualOverlay(vm: AppViewModel) {
         if (vm.bubbleOn && android.provider.Settings.canDrawOverlays(ctx)) { BubbleService.start(ctx); setRes(4, if (en) "Ready" else "Siap") } else setRes(4, if (en) "Off" else "Mati")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 5
-        val r = Alpha.launchGame(pkg)
+        val r = Hsin.launchGame(pkg)
         setRes(5, if (r.ok) (if (en) "Go" else "Mulai") else (if (en) "Failed" else "Gagal"))
         if (r.ok) {
             // verifikasi jujur: tunggu game benar-benar di depan
             var seen = false
-            for (k in 0 until 6) { delay(700); if (Alpha.status()?.gamePkg == pkg) { seen = true; break } }
+            for (k in 0 until 6) { delay(700); if (Hsin.status()?.gamePkg == pkg) { seen = true; break } }
             if (!seen) setRes(5, if (en) "Starting…" else "Memuat…")
         }
         if (!r.ok) vm.toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")

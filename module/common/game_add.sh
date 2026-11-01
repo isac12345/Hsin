@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Fusion - Wrapper tambah game (fas-rs games.toml + uperf exclusion)
+# HSIN - Wrapper tambah game (fas-rs games.toml + uperf exclusion)
 # CLI:
 #   game_add.sh add <pkg> [fps_csv] [profile]
 #   game_add.sh list
@@ -17,8 +17,8 @@
 MODDIR="$(dirname "$(readlink -f "$0")")"
 REPO_DIR="$(dirname "$MODDIR")"
 FASRS_TOML="$REPO_DIR/fasrs/games.toml"
-WORK_DIR="${ALPHA_WORK_DIR:-/data/adb/alpha}"
-LOG_FILE="$WORK_DIR/alpha.log"
+WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
+LOG_FILE="$WORK_DIR/hsin.log"
 MAP_FILE="$WORK_DIR/game_profile_map.conf"
 FASRS_DIR="/sdcard/Android/fas-rs"
 MERGE_FLAG="$FASRS_DIR/.need_merge"
@@ -200,7 +200,7 @@ ${_new_line}" "$FASRS_TOML" > "$_tmp"
 
     # 2. Sentuh merge flag + live merge (tanpa reboot)
     touch "$MERGE_FLAG" 2>/dev/null
-    # GA_SKIP_MERGE=1: dipakai mode batch (alphactl game scan add) supaya fas-rs tidak di-restart per game;
+    # GA_SKIP_MERGE=1: dipakai mode batch (hsinctl game scan add) supaya fas-rs tidak di-restart per game;
     # setelah semua selesai panggil `game_add.sh merge` SEKALI.
     [ "${GA_SKIP_MERGE:-0}" = "1" ] || do_live_merge
 

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Shield: pemblokir iklan/tracker berbasis hosts, systemless (bind mount, partisi tidak diubah).
+# HSIN Shield: pemblokir iklan/tracker berbasis hosts, systemless (bind mount, partisi tidak diubah).
 # Tidak ada daftar domain yang ditanam: kamu yang memasukkan daftar (format hosts "0.0.0.0 domain"
 # atau satu domain per baris), mis. dari L-Blocker / AdAway / Hagezi.
 #
@@ -19,7 +19,7 @@
 # Batas: hosts tidak menangkap app yang memakai DNS-over-HTTPS sendiri / Private DNS;
 # matikan Private DNS bila iklan masih lolos. Jangan jalankan bersama modul hosts lain (L-Blocker, AdAway).
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 SH_DIR="$STATE_DIR/shield"
 LISTS="$SH_DIR/lists"
 ENABLED="$SH_DIR/enabled.conf"
@@ -27,9 +27,9 @@ ALLOW="$SH_DIR/allow.txt"
 ACTIVE="$SH_DIR/active_hosts"
 MARK="$SH_DIR/.mounted"
 CONF="$STATE_DIR/app.conf"
-TARGET="${ALPHA_HOSTS_TARGET:-/system/etc/hosts}"
-PROC_MOUNTS="${ALPHA_PROC_MOUNTS:-/proc/mounts}"
-LOG="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
+TARGET="${HSIN_HOSTS_TARGET:-/system/etc/hosts}"
+PROC_MOUNTS="${HSIN_PROC_MOUNTS:-/proc/mounts}"
+LOG="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
 
 mkdir -p "$LISTS" 2>/dev/null
 

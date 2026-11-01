@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Fusion - trim: `fstrim` semua partisi yang ter-mount (data, cache, metadata, system, vendor, ...).
+# HSIN - trim: `fstrim` semua partisi yang ter-mount (data, cache, metadata, system, vendor, ...).
 # TRIM memberi tahu flash blok mana yang tidak dipakai, supaya penulisan berikutnya tidak melambat.
 # Ide dari utilitas FSTrim milik AZenith; ditulis ulang. Manual saja (tidak terjadwal).
 #
@@ -7,11 +7,11 @@
 # Penjagaan: tidak jalan saat game aktif, dan tidak saat baterai < 15% bila tidak dipaksa.
 # Keluaran: satu baris per partisi dari fstrim, lalu "OK: N partisi di-trim".
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
-PROC_MOUNTS="${ALPHA_PROC_MOUNTS:-/proc/mounts}"
-BATT="${ALPHA_BATT_CAP:-/sys/class/power_supply/battery/capacity}"
-LOG="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
-FSTRIM="${ALPHA_FSTRIM:-fstrim}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
+PROC_MOUNTS="${HSIN_PROC_MOUNTS:-/proc/mounts}"
+BATT="${HSIN_BATT_CAP:-/sys/class/power_supply/battery/capacity}"
+LOG="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
+FSTRIM="${HSIN_FSTRIM:-fstrim}"
 
 _log() { printf '[%s] [TRIM] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" "$1" "$2" >> "$LOG" 2>/dev/null; }
 

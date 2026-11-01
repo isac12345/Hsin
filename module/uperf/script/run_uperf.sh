@@ -1,9 +1,9 @@
 #!/system/bin/sh
-# Uperf safe-backend runner (bagian dari Alpha + Uperf Fusion)
+# Uperf safe-backend runner (bagian dari HSIN)
 # HANYA menjalankan binary `uperf` untuk thread/cgroup classification
 # (foreground/background cpuset placement berdasarkan uperf.json).
 # TIDAK ADA kode governor/scaling_min_freq/scaling_max_freq di sini -
-# semua kontrol CPU freq/governor sepenuhnya milik Alpha (dan fas-rs jika ada).
+# semua kontrol CPU freq/governor sepenuhnya milik HSIN (dan fas-rs jika ada).
 
 BASEDIR="$(dirname $(readlink -f "$0"))"
 . "$BASEDIR/pathinfo.sh"
@@ -27,7 +27,7 @@ wait_until_login
 # (misal config chipset tidak kompatibel - terpantau error
 # "powersave.trigger not specified" di Unisoc T606), JANGAN retry tanpa henti.
 # Berhenti setelah 3x, log WARNING jelas sekali, dan nonaktifkan backend uperf
-# untuk sesi ini. fas-rs & Alpha core tuning TIDAK terpengaruh (proses dan
+# untuk sesi ini. fas-rs & HSIN core tuning TIDAK terpengaruh (proses dan
 # alur terpisah, service.sh tidak memakai set -e).
 UPERF_MAX_START_ATTEMPTS=3
 UPERF_START_RETRY_DELAY=3
@@ -49,7 +49,7 @@ uperf_is_running() {
 }
 
 # Tulis ke initsvc.log (via log()) SEKALIGUS stdout (ditangkap redirect
-# nohup service.sh / engine_manager.sh ke alpha.log).
+# nohup service.sh / engine_manager.sh ke hsin.log).
 uperf_warn() {
     log "[UPERF] $1"
     echo "[UPERF] $1"

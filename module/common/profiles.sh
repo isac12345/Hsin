@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha v1 - Profile data and loader
+# HSIN v1 - Profile data and loader
 
 # DAILY (label Daily, internal battery) profile: conservative clocks and
 # memory, safe for all-day use. Internal name remains "battery" for
@@ -38,7 +38,7 @@ BATTERY_CPU_FREQ_MIN_SKIP=1
 BATTERY_GPU_ADRENO_SKIP=0
 BATTERY_GPU_ADRENO_MODE="cap"
 BATTERY_GPU_ADRENO_POWERLEVEL=0
-BATTERY_GPU_FREQ_MAX_PERCENT=45
+BATTERY_GPU_FREQ_MAX_PERCENT=62
 # GPU floor: 0 = terendah/default (full idle diizinkan). Hanya performance
 # yang mengangkat floor (50%), dijaga thermal gate di engine.
 BATTERY_GPU_FREQ_MIN_PERCENT=0
@@ -163,8 +163,8 @@ PERFORMANCE_SCHED_AUTOGROUP=0
 profile_warn() {
     profile_warn_message="$1"
     printf '%s\n' "[WARN] $profile_warn_message" >&2
-    if [ -n "${ALPHA_LOG_FILE:-}" ] && [ -d "$(dirname "$ALPHA_LOG_FILE")" ]; then
-        printf '%s\n' "[WARN] [PROFILE] $profile_warn_message" >> "$ALPHA_LOG_FILE" 2>/dev/null
+    if [ -n "${HSIN_LOG_FILE:-}" ] && [ -d "$(dirname "$HSIN_LOG_FILE")" ]; then
+        printf '%s\n' "[WARN] [PROFILE] $profile_warn_message" >> "$HSIN_LOG_FILE" 2>/dev/null
     fi
 }
 

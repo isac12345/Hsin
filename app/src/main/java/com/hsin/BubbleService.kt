@@ -36,12 +36,12 @@ class BubbleService : Service() {
         const val ACT_FPSLOG = "com.hsin.FPS_LOG"
         const val EXTRA_P = "profile"
 
-        private const val WANT = "/data/adb/alpha/.bubble_want"
+        private const val WANT = "/data/adb/hsin/.bubble_want"
 
         /** Penanda untuk watchdog modul: "floating harus hidup". Dihapus saat pengguna mematikannya. */
         private fun mark(on: Boolean) {
             kotlin.concurrent.thread(isDaemon = true) {
-                Root.execBlocking(if (on) "mkdir -p /data/adb/alpha; : > $WANT" else "rm -f $WANT", 8_000L)
+                Root.execBlocking(if (on) "mkdir -p /data/adb/hsin; : > $WANT" else "rm -f $WANT", 8_000L)
             }
         }
 
@@ -114,7 +114,7 @@ class BubbleService : Service() {
                 // profil yang dicatat = yang tertinggi antara profil aktif dan profil yang diatur untuk game itu
                 // (profil aktif tetap "daily" selama game di ROM ini, padahal game memakai profil per-game)
                 val rank = { p: String -> when (p) { "battery" -> 1; "balanced" -> 2; "performance" -> 3; else -> 0 } }
-                val gp = try { Alpha.games().firstOrNull { it.pkg == st0.pkg }?.profile.orEmpty() } catch (_: Exception) { "" }
+                val gp = try { Hsin.games().firstOrNull { it.pkg == st0.pkg }?.profile.orEmpty() } catch (_: Exception) { "" }
                 val st = if (rank(gp) > rank(st0.profile)) st0.copy(profile = gp) else st0
                 prefs.fpsSessions = listOf(st) + prefs.fpsSessions
                 val mode = if (st.ovdPct >= 50) "Puncak" else profileLabel(st.profile)
@@ -136,7 +136,7 @@ class BubbleService : Service() {
                     while (isActive && !pm.isInteractive && w < 15) { delay(2000); w++ }
                     continue
                 }
-                val s = Alpha.status()
+                val s = Hsin.status()
                 if (s == null) {
                     // status gagal/lambat: floating tetap dipastikan ada (jangan hilang menunggu su)
                     if (orbAllowed()) floating?.setGame("auto")
@@ -253,13 +253,13 @@ class BubbleService : Service() {
         floating?.setProfileState(p, recOn)
         updateNotification()
         scope.launch {
-            val r = Alpha.setProfile(p)
+            val r = Hsin.setProfile(p)
             Toast.makeText(
                 this@BubbleService,
                 if (r.ok) "Mode ${profileLabel(p)}" else "Gagal ganti mode",
                 Toast.LENGTH_SHORT,
             ).show()
-            Alpha.status()?.let {
+            Hsin.status()?.let {
                 profile = it.profile
                 tempC = it.tempC
                 batt = it.batt
@@ -273,21 +273,21 @@ class BubbleService : Service() {
     // ---------- rekam ----------
     private fun toggleOvd(on: Boolean) {
         scope.launch {
-            val r = if (on) Alpha.ovdStart() else Alpha.ovdStop()
+            val r = if (on) Hsin.ovdStart() else Hsin.ovdStop()
             if (on && !r.ok) {
                 val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                 Toast.makeText(this@BubbleService, msg, Toast.LENGTH_LONG).show()
             }
-            Alpha.status()?.let { ovdOn = it.ovd; floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()); updateNotification() }
+            Hsin.status()?.let { ovdOn = it.ovd; floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()); updateNotification() }
         }
     }
 
     private fun toggleRec() {
         val start = !recOn
         scope.launch {
-            val r = if (start) Alpha.recStart() else Alpha.recStop()
+            val r = if (start) Hsin.recStart() else Hsin.recStop()
             if (!r.ok) Toast.makeText(this@BubbleService, "Gagal mengakses rekaman", Toast.LENGTH_SHORT).show()
-            Alpha.status()?.let {
+            Hsin.status()?.let {
                 recOn = it.rec
                 profile = it.profile
             }
@@ -332,7 +332,7 @@ class BubbleService : Service() {
             if (batt >= 0) append(" · ").append(batt).append("%")
         }
         val b = NotificationCompat.Builder(this, CH)
-            .setSmallIcon(R.drawable.ic_stat_alpha)
+            .setSmallIcon(R.drawable.ic_stat_hsin)
             .setContentTitle("HSIN · Mode ${modeNow()}")
             .setContentText(if (hidden) "Orb disembunyikan · ketuk untuk memunculkan" else text)
             .setContentIntent(content)

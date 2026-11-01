@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha + Uperf Fusion - Late Start Service Entry Point
+# HSIN - Late Start Service Entry Point
 MODDIR="${0%/*}"
 
 # M8: Tunggu boot completed, maksimal 120 detik (2x timeout).
@@ -11,17 +11,17 @@ until [ "$(getprop sys.boot_completed)" = "1" ] || [ "$BOOT_WAIT" -ge "$BOOT_TIM
     BOOT_WAIT=$((BOOT_WAIT + 1))
 done
 
-WORK_DIR="${ALPHA_WORK_DIR:-/data/adb/alpha}"
+WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
 mkdir -p "$WORK_DIR"
-LOG_FILE="$WORK_DIR/alpha.log"
-export ALPHA_LOG_FILE="$LOG_FILE"
-export ALPHA_CONF_DIR="$WORK_DIR"
+LOG_FILE="$WORK_DIR/hsin.log"
+export HSIN_LOG_FILE="$LOG_FILE"
+export HSIN_CONF_DIR="$WORK_DIR"
 
-echo "=== Alpha + Uperf Fusion Starting Boot Service: $(date) ===" >> "$LOG_FILE"
+echo "=== HSIN Starting Boot Service: $(date) ===" >> "$LOG_FILE"
 echo "[BOOT] boot service dimulai (MODDIR=$MODDIR WORK_DIR=$WORK_DIR)" >> "$LOG_FILE"
 
 # modul30: bersihkan state transient boost basi dari modul23/26 yang
-# nyangkut di /data/adb/alpha dan ikut kebawa saat flash rilis/garapan
+# nyangkut di /data/adb/hsin dan ikut kebawa saat flash rilis/garapan
 # (boost_level/.gb_active/cooldown/GAMEBOOST_LEVEL basi = boost salah
 # level + restore ke nilai boost lama = kresek + ga stabil).
 rm -f "$WORK_DIR/boost_level" "$WORK_DIR/.gb_active" "$WORK_DIR/.gb_cooldown_count" "$WORK_DIR/GAMEBOOST_LEVEL" 2>/dev/null
@@ -59,7 +59,7 @@ if [ "${DISABLE_TWEAKS:-0}" = "1" ] || [ -f "$DISABLE_TWEAKS_FILE" ]; then
 fi
 
 if [ "$BOOT_COMPLETED_OK" = "0" ]; then
-    echo "=== Alpha boot-guard: skipped (boot_completed=$BOOT_COMPLETED_OK DISABLE_TWEAKS=${DISABLE_TWEAKS:-0}) ===" >> "$LOG_FILE"
+    echo "=== HSIN boot-guard: skipped (boot_completed=$BOOT_COMPLETED_OK DISABLE_TWEAKS=${DISABLE_TWEAKS:-0}) ===" >> "$LOG_FILE"
     exit 0
 fi
 
@@ -163,7 +163,7 @@ fi
 # tune_boost_silencer JUGA SENGAJA TIDAK dipanggil: fungsi ini menulis ke
 # mtk_fpsgo/perfmgr/perfmgr_mtk/migt parameters - node yang PERSIS SAMA
 # dipegang & dikelola dinamis oleh binary fas-rs sendiri di perangkat MTK.
-# Static write sekali boot dari Alpha akan rebutan dengan kontrol real-time
+# Static write sekali boot dari HSIN akan rebutan dengan kontrol real-time
 # fas-rs, jadi domain ini diserahkan 100% ke fas-rs.
 tune_devfreq
 tune_io
@@ -174,7 +174,7 @@ tune_gpu
 tune_sched
 tune_input
 
-# M2: CPU Ownership — deteksi fas-rs vs Alpha fallback
+# M2: CPU Ownership — deteksi fas-rs vs HSIN fallback
 # Bila fas-rs hidup → powercfg.sh; bila mati → tune_cpu_freq fallback
 # dengan minimum 50% hardware_max, Performance = maksimum.
 if [ -f "$MODDIR/common/cpu_owner.sh" ]; then
@@ -186,7 +186,7 @@ else
 fi
 
 # 5. Tulis Ringkasan Eksekusi
-echo "=== Alpha + Uperf Fusion Optimization Complete ===" >> "$LOG_FILE"
+echo "=== HSIN Optimization Complete ===" >> "$LOG_FILE"
 echo "Applied: $APPLIED_COUNT | Skipped: $SKIPPED_COUNT | Failed: $FAILED_COUNT" >> "$LOG_FILE"
 echo "======================================" >> "$LOG_FILE"
 echo "[BOOT] tahap tuning selesai (applied=$APPLIED_COUNT skipped=$SKIPPED_COUNT failed=$FAILED_COUNT)" >> "$LOG_FILE"
@@ -194,15 +194,15 @@ echo "[BOOT] tahap tuning selesai (applied=$APPLIED_COUNT skipped=$SKIPPED_COUNT
 # 6.9 Sisa state ekstra game dari sesi sebelumnya (DND, refresh rate, render, rekaman) dibersihkan
 # saat boot supaya tidak ada pengaturan yang tertinggal kalau HP mati di tengah game.
 if [ -f "$MODDIR/common/gamehooks.sh" ]; then
-    ALPHA_STATE_DIR="$WORK_DIR" ALPHA_MOD_DIR="$MODDIR" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$MODDIR" >/dev/null 2>&1
+    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$MODDIR" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$MODDIR" >/dev/null 2>&1
 fi
 # MGLRU opt-in (MGLRU_MODE=on): sysfs tidak persisten antar boot, terapkan ulang. Default off = tidak menyentuh apa pun.
 if [ -f "$MODDIR/common/memfx.sh" ]; then
-    ALPHA_STATE_DIR="$WORK_DIR" sh -c '. "$1/gamehooks.sh"; . "$1/memfx.sh"; mf_mglru_apply' _ "$MODDIR/common" >/dev/null 2>&1
+    HSIN_STATE_DIR="$WORK_DIR" sh -c '. "$1/gamehooks.sh"; . "$1/memfx.sh"; mf_mglru_apply' _ "$MODDIR/common" >/dev/null 2>&1
 fi
-# Alpha Shield (hosts blocker): pasang ulang kalau SHIELD_ON=1. Latar belakang, daftar besar butuh beberapa detik.
+# HSIN Shield (hosts blocker): pasang ulang kalau SHIELD_ON=1. Latar belakang, daftar besar butuh beberapa detik.
 if [ -f "$MODDIR/common/shield.sh" ]; then
-    ( ALPHA_STATE_DIR="$WORK_DIR" sh "$MODDIR/common/shield.sh" boot >/dev/null 2>&1 & )
+    ( HSIN_STATE_DIR="$WORK_DIR" sh "$MODDIR/common/shield.sh" boot >/dev/null 2>&1 & )
 fi
 rm -f "$WORK_DIR/.rec_pid" "$WORK_DIR/.rec_stop" "$WORK_DIR/.rec_file" "$WORK_DIR/.hud_layer" 2>/dev/null
 
@@ -211,9 +211,9 @@ rm -f "$WORK_DIR/.rec_pid" "$WORK_DIR/.rec_stop" "$WORK_DIR/.rec_file" "$WORK_DI
 if [ -f "$MODDIR/common/gamescan.sh" ] && grep -qx 'SCAN_AUTO=1' "$WORK_DIR/app.conf" 2>/dev/null; then
     (
         sleep 25
-        COMMON="$MODDIR/common" ALPHA_STATE_DIR="$WORK_DIR" sh -c '
+        COMMON="$MODDIR/common" HSIN_STATE_DIR="$WORK_DIR" sh -c '
             . "$COMMON/gamescan.sh"
-            gs_add_all "$(sed -n "s/^SCAN_PROFILE=//p" "$ALPHA_STATE_DIR/app.conf" | tail -n 1)"
+            gs_add_all "$(sed -n "s/^SCAN_PROFILE=//p" "$HSIN_STATE_DIR/app.conf" | tail -n 1)"
         ' >> "$LOG_FILE" 2>&1
     ) &
 fi
@@ -235,8 +235,8 @@ if [ "$monitor_running" = "1" ]; then
     echo "[INFO] monitor.sh sudah berjalan pid=$monitor_pid" >> "$LOG_FILE"
 else
     rm -f "$MONITOR_PID_FILE" 2>/dev/null
-    ALPHA_STATE_DIR="$WORK_DIR"
-    export ALPHA_STATE_DIR
+    HSIN_STATE_DIR="$WORK_DIR"
+    export HSIN_STATE_DIR
     nohup sh "$MODDIR/common/monitor.sh" >> "$LOG_FILE" 2>&1 &
     monitor_pid=$!
     printf '%s\n' "$monitor_pid" > "$MONITOR_PID_FILE"
@@ -262,8 +262,8 @@ if [ "$watchdog_running" = "1" ]; then
     echo "[INFO] watchdog.sh sudah berjalan pid=$watchdog_pid" >> "$LOG_FILE"
 else
     rm -f "$WATCHDOG_PID_FILE" 2>/dev/null
-    ALPHA_STATE_DIR="$WORK_DIR"
-    export ALPHA_STATE_DIR
+    HSIN_STATE_DIR="$WORK_DIR"
+    export HSIN_STATE_DIR
     nohup sh "$MODDIR/common/watchdog.sh" >> "$LOG_FILE" 2>&1 &
     watchdog_pid=$!
     printf '%s\n' "$watchdog_pid" > "$WATCHDOG_PID_FILE"
@@ -284,8 +284,8 @@ if [ -f "$AUTOCTL_PID_FILE" ]; then
 fi
 if [ "$autoctl_running" != "1" ] && [ -f "$MODDIR/common/autoctl.sh" ]; then
     rm -f "$AUTOCTL_PID_FILE" 2>/dev/null
-    ALPHA_STATE_DIR="$WORK_DIR"
-    export ALPHA_STATE_DIR
+    HSIN_STATE_DIR="$WORK_DIR"
+    export HSIN_STATE_DIR
     nohup sh "$MODDIR/common/autoctl.sh" >> "$LOG_FILE" 2>&1 &
     echo "[INFO] autoctl.sh started pid=$!" >> "$LOG_FILE"
 fi
@@ -329,7 +329,7 @@ echo "[BOOT] tahap asoulopt selesai" >> "$LOG_FILE"
 #     setelah sukses.
 if [ -f "$MODDIR/common/companion_install.sh" ]; then
     . "$MODDIR/common/companion_install.sh"
-    if alpha_companion_install_once "$MODDIR/companion/AlphaBubble.apk" "$WORK_DIR/.companion_installed"; then
+    if hsin_companion_install_once "$MODDIR/companion/HSINBubble.apk" "$WORK_DIR/.companion_installed"; then
         echo "[BOOT] tahap companion app selesai (terpasang/up-to-date)" >> "$LOG_FILE"
     else
         echo "[BOOT] tahap companion app ditunda (pm belum siap, coba boot berikut)" >> "$LOG_FILE"
@@ -338,7 +338,7 @@ fi
 
 # 8. Jalankan backend Uperf (thread/cgroup classifier only) di background.
 #    Terpisah dari alur di atas supaya wait_until_login miliknya (nunggu
-#    /sdcard bisa diakses) tidak memblokir monitor Alpha.
+#    /sdcard bisa diakses) tidak memblokir monitor HSIN.
 if [ -f "$MODDIR/uperf/script/run_uperf.sh" ]; then
     nohup sh "$MODDIR/uperf/script/run_uperf.sh" >> "$LOG_FILE" 2>&1 &
     echo "[INFO] uperf backend runner started pid=$!" >> "$LOG_FILE"
@@ -347,7 +347,7 @@ echo "[BOOT] tahap uperf distart" >> "$LOG_FILE"
 
 # 9. Jalankan fas-rs (frame-aware CPU scheduler, eBPF). Ini SATU-SATUNYA
 #    komponen yang boleh mengendalikan governor/scaling freq di modul ini -
-#    Alpha & Uperf sudah dikonfigurasi untuk tidak menyentuh domain tersebut.
+#    HSIN & Uperf sudah dikonfigurasi untuk tidak menyentuh domain tersebut.
 #    Logika persis mengikuti service.sh asli fas-rs (merge config, dsb),
 #    cuma path-nya di-namespace ke $MODDIR/fasrs/.
 FASRS_DIR="/sdcard/Android/fas-rs"
@@ -396,10 +396,10 @@ else
 fi
 echo "[BOOT] tahap fas-rs distart" >> "$LOG_FILE"
 
-# M2b: fas-rs baru hidup SETELAH tahap tuning. Kalau tadi jatuh ke fallback Alpha
+# M2b: fas-rs baru hidup SETELAH tahap tuning. Kalau tadi jatuh ke fallback HSIN
 # (CPU dibatasi persen), evaluasi ulang begitu node /dev/fas_rs/mode siap supaya
 # fas-rs yang memegang CPU seperti seharusnya.
-if [ "${CPU_OWNER:-}" = "alpha" ] && [ "$_fasrs_ok" = "0" ] 2>/dev/null; then
+if [ "${CPU_OWNER:-}" = "hsin" ] && [ "$_fasrs_ok" = "0" ] 2>/dev/null; then
     _o=0
     while [ "$_o" -lt 15 ] && [ ! -r /dev/fas_rs/mode ]; do sleep 1; _o=$((_o + 1)); done
     if [ -r /dev/fas_rs/mode ] && command -v cpu_detect_owner >/dev/null 2>&1; then

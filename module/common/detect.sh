@@ -1,13 +1,13 @@
 #!/system/bin/sh
-# Alpha v1 - Hardware & Topology Detection Engine
-# Hasil deteksi dicache ke /data/adb/alpha/detected.conf (idempotent)
+# HSIN v1 - Hardware & Topology Detection Engine
+# Hasil deteksi dicache ke /data/adb/hsin/detected.conf (idempotent)
 # Pola: DETECT SEKALI DI AWAL -> SIMPAN KE CACHE -> tweak baca cache saja.
 # Naikkan DETECT_VERSION setiap logic deteksi berubah supaya cache lama
 # otomatis di-refresh (tanpa detect ulang tiap boot).
 
 DETECT_VERSION=3
 
-CONF_DIR="${ALPHA_CONF_DIR:-/data/adb/alpha}"
+CONF_DIR="${HSIN_CONF_DIR:-/data/adb/hsin}"
 CACHE_FILE="$CONF_DIR/detected.conf"
 
 SYSFS_CPU_PREFIX="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
@@ -433,19 +433,19 @@ detect_thermal() {
 
 # --- Main Flow ---
 # Cache dipakai ulang HANYA kalau: sudah ada + versi cache >= versi
-# script ini + tidak ada ALPHA_FORCE_DETECT=1. Selain itu (first-run,
+# script ini + tidak ada HSIN_FORCE_DETECT=1. Selain itu (first-run,
 # cache versi lama, atau tombol DETEKSI ULANG di app) → scan ulang.
-if [ -f "$CACHE_FILE" ] && [ -s "$CACHE_FILE" ] && [ "${ALPHA_FORCE_DETECT:-0}" != "1" ]; then
-    ALPHA_SCRIPT_DETECT_VERSION="$DETECT_VERSION"
+if [ -f "$CACHE_FILE" ] && [ -s "$CACHE_FILE" ] && [ "${HSIN_FORCE_DETECT:-0}" != "1" ]; then
+    HSIN_SCRIPT_DETECT_VERSION="$DETECT_VERSION"
     DETECT_VERSION=""
     . "$CACHE_FILE"
     # Cache lama (v1) tidak punya field DETECT_VERSION -> anggap 0,
     # jadi otomatis di-refresh ke versi script yang sekarang.
     case "${DETECT_VERSION:-0}" in ''|*[!0-9]*) DETECT_VERSION=0 ;; esac
-    if [ "$DETECT_VERSION" -ge "$ALPHA_SCRIPT_DETECT_VERSION" ] 2>/dev/null; then
+    if [ "$DETECT_VERSION" -ge "$HSIN_SCRIPT_DETECT_VERSION" ] 2>/dev/null; then
         return 0 2>/dev/null || exit 0
     fi
-    DETECT_VERSION="$ALPHA_SCRIPT_DETECT_VERSION"
+    DETECT_VERSION="$HSIN_SCRIPT_DETECT_VERSION"
 fi
 
 mkdir -p "$CONF_DIR"
@@ -469,7 +469,7 @@ DETECT_DATE=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date 2>/dev/null)
 # Tulis ke cache file. Nilai UNKNOWN/kosong/0 di bawah EKSPLISIT
 # (bukan silent-fail): consumer wajib skip fitur terkait TANPA scan ulang.
 cat <<EOF > "$CACHE_FILE"
-# Alpha v1 Auto-detected Hardware Profile
+# HSIN v1 Auto-detected Hardware Profile
 # DETECT_VERSION=$DETECT_VERSION DETECT_DATE="$DETECT_DATE"
 DETECT_VERSION="$DETECT_VERSION"
 DETECT_DATE="$DETECT_DATE"

@@ -51,7 +51,7 @@ fun PerfScreen(vm: AppViewModel) {
     // muat ulang daftar begitu satu rekaman selesai disimpan
     LaunchedEffect(FpsLog.saved) { if (FpsLog.saved > 0) { kotlinx.coroutines.delay(1500); vm.loadFpsFiles() } }
 
-    AlphaCard {
+    HsinCard {
         Label("Rekam data FPS")
         if (FpsLog.on) {
             txt("Merekam... ${FpsLog.rows} baris (1 baris per detik).", 13.sp, Mint)
@@ -67,7 +67,7 @@ fun PerfScreen(vm: AppViewModel) {
     val sel = vm.fpsSel.mapNotNull { n -> vm.fpsFiles.firstOrNull { it.name == n } }
     if (sel.size == 2) {
         val a = sel[0]; val b = sel[1]
-        AlphaCard {
+        HsinCard {
             Label("Perbandingan")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1.1f)) {}
@@ -94,13 +94,13 @@ fun PerfScreen(vm: AppViewModel) {
                 txt("Suhu awal beda jauh (${a.tMin}° vs ${b.tMin}°): perbandingan kurang adil, ulangi dari suhu yang sama.", 11.sp, muted(), modifier = Modifier.padding(top = 6.dp))
         }
     } else {
-        AlphaCard {
+        HsinCard {
             Label("Perbandingan")
             txt("Pilih 2 rekaman di bawah (tekan BANDINGKAN) untuk membandingkan, mis. Performa vs Puncak di game yang sama.", 12.sp, muted())
         }
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Rekaman tersimpan")
         if (vm.fpsLoading) txt("Membaca...", 12.sp, muted())
         else if (vm.fpsFiles.isEmpty()) txt("Belum ada rekaman di Download/HSIN_fps_*.csv.", 12.sp, muted())
@@ -123,7 +123,7 @@ fun PerfScreen(vm: AppViewModel) {
 
     val ses = vm.prefs.fpsSessions
     if (ses.isNotEmpty()) {
-        AlphaCard {
+        HsinCard {
             Label("Riwayat sesi otomatis")
             txt("Dicatat sendiri tiap kali main game (tanpa perlu menekan rekam).", 11.sp, muted())
             ses.take(6).forEach { x ->
@@ -165,7 +165,7 @@ private fun FpsDetail(vm: AppViewModel, f: FpsFile) {
     val smooth = f.smoothPct
     val verdict = when { smooth >= 95 -> "Mulus"; smooth >= 80 -> "Agak patah"; else -> "Patah-patah" }
 
-    AlphaCard {
+    HsinCard {
         txt(if (f.pkg.isNotEmpty()) vm.label(f.pkg) else "Rekaman FPS", 18.sp, weight = FontWeight.Medium, maxLines = 1)
         txt(fileDate(f.name) + "  \u00B7  " + f.mode, 12.sp, muted(), maxLines = 1)
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -189,7 +189,7 @@ private fun FpsDetail(vm: AppViewModel, f: FpsFile) {
         }
     }
 
-    AlphaCard {
+    HsinCard {
         val tabs = listOf("FPS", "Frame time", "CPU", "GPU", "Suhu")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             tabs.forEachIndexed { i, t -> Chip(t, tab == i) { tab = i; touch = -1 } }

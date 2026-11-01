@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Fusion - Overdrive: mode di atas Performa, mesin sendiri (tanpa Uperf / fas-rs).
+# HSIN - Overdrive: mode di atas Performa, mesin sendiri (tanpa Uperf / fas-rs).
 #
 #   overdrive.sh start [pkg]    mulai Overdrive untuk game (pkg kosong = game terdaftar yang sedang aktif)
 #   overdrive.sh stop [alasan]  keluar, kembalikan semua nilai asli
@@ -18,7 +18,7 @@
 # CATATAN: /system/bin/sh di ROM ini 32-bit. Tidak ada aritmetika pada angka besar (frekuensi dibandingkan
 #   sebagai string, urutan dari `sort -n`).
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 OVD_ACTIVE="$STATE_DIR/.ovd_active"
 OVD_PREV="$STATE_DIR/.ovd_prev"
 OVD_PID="$STATE_DIR/.ovd_pid"
@@ -26,13 +26,13 @@ OVD_STOPPED="$STATE_DIR/.ovd_stopped"
 OVD_LAST="$STATE_DIR/.ovd_last"
 OVD_FG="$STATE_DIR/.hud_foreground_pkg"
 CONF="$STATE_DIR/app.conf"
-LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
-CPUFREQ="${ALPHA_SYS_CPUFREQ:-/sys/devices/system/cpu/cpufreq}"
-DEVFREQ="${ALPHA_SYS_DEVFREQ:-/sys/class/devfreq}"
+LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
+CPUFREQ="${HSIN_SYS_CPUFREQ:-/sys/devices/system/cpu/cpufreq}"
+DEVFREQ="${HSIN_SYS_DEVFREQ:-/sys/class/devfreq}"
 THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 POWER="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}"
 
-OVD_TICK="${ALPHA_OVD_TICK:-3}"
+OVD_TICK="${HSIN_OVD_TICK:-3}"
 OVD_CPU_FULL=100     # persen posisi dalam daftar frekuensi (0 = terendah, 100 = tertinggi); bisa diubah: OVD_CPU_PCT / OVD_GPU_PCT di app.conf
 OVD_GPU_FULL=100     # catatan: fas-rs mode performa di game sudah mengunci CPU di maksimum, jadi Overdrive tidak boleh lebih rendah dari itu
 OVD_CPU_MID=70
@@ -298,7 +298,7 @@ do_start() {
     fi
     # penjaga menulis pid-nya sendiri (setsid bisa mem-fork, jadi $! tidak bisa dipercaya)
     _w=0
-    while [ ! -f "$OVD_PID" ] && [ "$_w" -lt 20 ]; do sleep 0.1; _w=$((_w + 1)); done
+    while [ ! -f "$OVD_PID" ] && [ "$_w" -lt 80 ]; do sleep 0.1; _w=$((_w + 1)); done
     if [ ! -f "$OVD_PID" ]; then
         do_stop "penjaga gagal start"
         echo "ERROR: penjaga Overdrive gagal start"; return 1
@@ -380,8 +380,18 @@ do_status() {
     printf 'ovd_last=%s\n' "$(sed -n '1p' "$OVD_LAST" 2>/dev/null)"
 }
 
+ovd_fresh() {
+    # Puncak baru dimulai (< 25 dtk): penjaga mungkin belum menulis pid, jangan dipulihkan dulu
+    _fm=$(stat -c %Y "$OVD_ACTIVE" 2>/dev/null)
+    _fn=$(date +%s 2>/dev/null)
+    num "$_fm" && num "$_fn" && [ $((_fn - _fm)) -lt 25 ]
+}
+
 do_recover() {
     if [ -f "$OVD_ACTIVE" ] && ovd_alive; then return 0; fi
+    if [ -f "$OVD_ACTIVE" ] && ovd_fresh; then return 0; fi
+    # periksa sekali lagi setelah jeda: hindari salah baca saat sistem sibuk
+    if [ -f "$OVD_ACTIVE" ]; then sleep 2; ovd_alive && return 0; fi
     if [ -f "$OVD_ACTIVE" ] || [ -f "$OVD_PREV" ] || [ -f "$OVD_STOPPED" ]; then
         do_stop "pemulihan"
     fi

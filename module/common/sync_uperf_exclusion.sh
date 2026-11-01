@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha + Uperf + fas-rs Fusion
+# HSIN + Uperf + fas-rs Fusion
 # Sinkronkan [game_list] di fas-rs games.toml -> exclusion rule "Alpha-FasrsManaged"
 # di uperf.json, supaya package yang sudah didaftarkan ke fas-rs otomatis TIDAK
 # lagi disentuh cpuset-nya oleh uperf (menghindari rebutan thread classification).

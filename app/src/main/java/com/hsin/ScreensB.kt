@@ -50,7 +50,7 @@ fun relTime(ms: Long?): String {
 // ---------------------------------------------------------------- CUSTOM
 @Composable
 fun CustomScreen(vm: AppViewModel) {
-    AlphaCard {
+    HsinCard {
         Pill("BACKGROUND & BANNER  ›", { vm.go("bgbanner") }, modifier = Modifier.padding(top = 0.dp))
         Pill("FLOATING OVERLAY  ›", { vm.go("bubble") })
         Pill("TEMA WARNA  ›", { vm.go("theme") })
@@ -62,7 +62,7 @@ fun BgBannerScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     val pickBg = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) vm.setBackground(uri) }
     val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) vm.setBanner(uri) }
-    AlphaCard {
+    HsinCard {
         Label("Background")
         Pill("PILIH GAMBAR BACKGROUND", { pickBg.launch("image/*") }, modifier = Modifier.padding(top = 0.dp))
         Pill("HAPUS BACKGROUND", { vm.clearBackground() })
@@ -70,7 +70,7 @@ fun BgBannerScreen(vm: AppViewModel) {
         Pill("PILIH GAMBAR BANNER", { pickBanner.launch("image/*") }, modifier = Modifier.padding(top = 0.dp))
         Pill("BANNER DEFAULT", { vm.resetBanner() })
     }
-    AlphaCard {
+    HsinCard {
         val t = 1f - vm.cardAlpha
         SliderRow("Transparansi kartu", t, 0f..0.9f, "${(t * 100).toInt()}%", { vm.updateCardAlpha(1f - it) })
         Label("Penyesuaian gambar", Modifier.padding(top = 10.dp))
@@ -105,7 +105,7 @@ private fun FloatingSettings(vm: AppViewModel) {
         }
         vm.flChanged()
     }
-    AlphaCard {
+    HsinCard {
         Label("Floating overlay")
         txt("Perubahan langsung terlihat di floating.", 11.sp, muted())
         // Nilai slider disimpan lokal supaya geseran mulus; ke pengaturan ditulis paling sering tiap 150 ms
@@ -123,7 +123,7 @@ private fun FloatingSettings(vm: AppViewModel) {
         Label("Tampilan awal", Modifier.padding(top = 10.dp))
         Seg(listOf("RINGKAS", "BAR TIPIS"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })
     }
-    AlphaCard {
+    HsinCard {
         Label("Metrik yang ditampilkan")
         ToggleRow("FPS", "mati = tampilan ringkas hanya logo yang berubah warna sesuai mode", p.flMFps) { p.flMFps = it; vm.flChanged() }
         ToggleRow("CPU", null, p.flMCpu) { setMetric(0, it) }
@@ -132,7 +132,7 @@ private fun FloatingSettings(vm: AppViewModel) {
         ToggleRow("Suhu", null, p.flMTemp) { setMetric(3, it) }
         ToggleRow("Grafik FPS", null, p.flGraph) { p.flGraph = it; vm.flChanged() }
     }
-    AlphaCard {
+    HsinCard {
         Label("Warna aksen")
         Seg(listOf("IKUT PROFIL", "TETAP"), if (p.flAccentFixed) 1 else 0, { p.flAccentFixed = it == 1; vm.flChanged() })
         if (p.flAccentFixed) {
@@ -160,7 +160,7 @@ private fun FloatingSettings(vm: AppViewModel) {
 fun ThemeScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     val swatches = listOf(0xFFE8E6E1.toInt(), 0xFF5DCAA5.toInt(), 0xFFAFA9EC.toInt(), 0xFFF0997B.toInt(), 0xFF85B7EB.toInt(), 0xFFEF9F27.toInt())
-    AlphaCard {
+    HsinCard {
         Label("Warna aksen")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             swatches.forEach { c ->
@@ -186,7 +186,7 @@ fun ThemeScreen(vm: AppViewModel) {
 @Composable
 fun ToolsScreen(vm: AppViewModel) {
     val ri = vm.resInfo
-    AlphaCard {
+    HsinCard {
         Label("Peralatan")
         if (ri != null) {
             KV("Native", "${ri.nat.w}×${ri.nat.h} · ${ri.nat.d}")
@@ -214,14 +214,14 @@ fun ToolsScreen(vm: AppViewModel) {
         }
         Pill("DEXOPT APP", { vm.go("dexopt") })
         Pill("BERSIHKAN RAM", { vm.cleanRam() }, solid = true)
-        txt("Menutup proses latar belakang saja. Termux, Magisk, KernelSU, Alpha, launcher, keyboard, dan game yang sedang jalan tidak disentuh.", 11.sp, muted())
+        txt("Menutup proses latar belakang saja. Termux, Magisk, KernelSU, HSIN, launcher, keyboard, dan game yang sedang jalan tidak disentuh.", 11.sp, muted())
         Pill("APP DILINDUNGI (${vm.prefs.ramKeep.size})", { vm.go("ramkeep") })
         Pill("TUTUP SEMUA APP", { vm.askCloseApps() })
         Pill("MEMORI & ALAT", { vm.go("memfx") })
         Pill("EKSPOR LOG (1 BERKAS)", { vm.exportLog() })
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Cek fitur")
         txt("Menguji sungguhan apakah tweak modul jalan di HP ini. Selesai sekitar 10 detik. Buka game dulu kalau mau ikut cek sumber FPS.", 11.sp, muted())
         Pill(if (vm.liveBusy) "MENGUJI..." else "CEK SEMUA FITUR", { vm.runLiveCheck() }, solid = !vm.liveBusy, enabled = !vm.liveBusy)
@@ -236,19 +236,19 @@ fun ToolsScreen(vm: AppViewModel) {
         }
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Performa & FPS")
         txt("Rekam data FPS, riwayat sesi, dan bandingkan Performa vs Puncak: semua di satu layar.", 11.sp, muted())
         Pill(if (FpsLog.on) "SEDANG MEREKAM FPS (${FpsLog.rows})" else "BUKA PERFORMA & FPS", { vm.go("perf") }, solid = FpsLog.on)
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Tuning log")
         val filters = listOf("ALL" to "SEMUA", "ERROR" to "ERROR", "CPU" to "CPU", "GAME" to "GAME", "INPUT" to "INPUT")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             filters.forEach { (k, t) -> Chip(t, vm.logFilter == k) { vm.logFilter = k } }
         }
-        val shown = vm.logs.filter { Alpha.logMatches(it, vm.logFilter) }.takeLast(6).reversed()
+        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(6).reversed()
         if (shown.isEmpty()) txt("Belum ada log.", 12.sp, muted())
         shown.forEach { LogRow(it) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -257,16 +257,16 @@ fun ToolsScreen(vm: AppViewModel) {
         }
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Mesin")
-        ToggleRow("fas-rs pegang CPU", null, !vm.flag("GB_FASRS_FORCE_ALPHA")) { vm.setFlag("GB_FASRS_FORCE_ALPHA", !it) }
+        ToggleRow("fas-rs pegang CPU", null, !vm.flag("GB_FASRS_FORCE_HSIN")) { vm.setFlag("GB_FASRS_FORCE_HSIN", !it) }
         Divider()
         ToggleRow("Boost penuh setelah dingin", null, vm.flag("GB_COOLDOWN_EXTREME")) { vm.setFlag("GB_COOLDOWN_EXTREME", it) }
         Divider()
         ToggleRow("Cpuset game dipersempit", null, !vm.flag("NO_CPUSET")) { vm.setFlag("NO_CPUSET", !it) }
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Game extras")
         ToggleRow("Prioritas proses game", "nice, ionice, oom adj", !vm.flag("GAME_PRIO_OFF")) { vm.setFlag("GAME_PRIO_OFF", !it) }
         Divider()
@@ -282,7 +282,7 @@ fun ToolsScreen(vm: AppViewModel) {
         txt("Dikunci ke angka itu selama game, lalu dikembalikan. Tidak semua ROM menurut.", 11.sp, muted())
     }
 
-    AlphaCard {
+    HsinCard {
         Label("HUD & rekam layar")
         ToggleRow("HUD FPS saat game", "FPS, GPU, CPU, suhu. Butuh izin overlay", vm.hudOn) { vm.updateHudOn(it) }
         Spacer(Modifier.height(6.dp))
@@ -290,7 +290,7 @@ fun ToolsScreen(vm: AppViewModel) {
         txt("Hasil di Movies/HSIN, tanpa audio. Tombol REC juga ada di HUD.", 11.sp, muted())
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Health check modul")
         val h = vm.health
         StatusRow("Uperf", h.uperf)
@@ -303,7 +303,7 @@ fun ToolsScreen(vm: AppViewModel) {
         Pill("CEK ULANG", { vm.checkHealth() })
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Device")
         val d = vm.device
         KV("SoC", d["SOC_VENDOR"].orEmpty().ifEmpty { "—" })
@@ -316,7 +316,7 @@ fun ToolsScreen(vm: AppViewModel) {
         Pill("DETEKSI ULANG", { vm.redetect() })
     }
 
-    AlphaCard {
+    HsinCard {
         ToggleRow("Auto-start saat boot", null, vm.autostart) { vm.updateAutostart(it) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) { Pill("REFRESH", { vm.refreshButton() }) }
@@ -330,10 +330,10 @@ fun ToolsScreen(vm: AppViewModel) {
         txt(line, 12.sp, muted(), modifier = Modifier.padding(top = 10.dp))
     }
 
-    AlphaCard {
+    HsinCard {
         Label("About")
-        txt("HSIN by somwan (basis Alpha Fusion)", 15.sp, weight = FontWeight.Medium)
-        txt("Alpha · Uperf · fas-rs" + if (vm.status.ver > 0) " · modul ${vm.status.ver}" else "", 12.sp, muted(), modifier = Modifier.padding(top = 4.dp))
+        txt("HSIN by somwan", 15.sp, weight = FontWeight.Medium)
+        txt("HSIN · Uperf · fas-rs" + if (vm.status.ver > 0) " · modul ${vm.status.ver}" else "", 12.sp, muted(), modifier = Modifier.padding(top = 4.dp))
         txt("Credit: Matt Yang & yinwanxi (Uperf), shadow3 & shadow3aaa (fas-rs)", 12.sp, muted(), modifier = Modifier.padding(top = 2.dp))
         Pill("BUKA BATTERY LAB", { vm.go("batlab") })
     }
@@ -351,12 +351,12 @@ fun LogRow(l: LogLine) {
 @Composable
 fun FullLogScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
-    AlphaCard {
+    HsinCard {
         val filters = listOf("ALL" to "SEMUA", "ERROR" to "ERROR", "CPU" to "CPU", "GAME" to "GAME", "INPUT" to "INPUT")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             filters.forEach { (k, t) -> Chip(t, vm.logFilter == k) { vm.logFilter = k } }
         }
-        val shown = vm.logs.filter { Alpha.logMatches(it, vm.logFilter) }.takeLast(300).reversed()
+        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(300).reversed()
         if (shown.isEmpty()) txt("Tidak ada baris yang cocok.", 12.sp, muted())
         shown.forEach { l ->
             txt(l.raw, 11.sp, muted(), modifier = Modifier.padding(vertical = 2.dp))
@@ -376,7 +376,7 @@ fun DexoptScreen(vm: AppViewModel) {
         Triple("verify", "RINGAN", "verifikasi saja · hemat storage"),
         Triple("reset", "RESET", "kembalikan ke compile bawaan sistem"),
     )
-    AlphaCard {
+    HsinCard {
         Label("Mode dexopt")
         modes.forEach { (k, t, d) ->
             val on = vm.dexMode == k
@@ -395,7 +395,7 @@ fun DexoptScreen(vm: AppViewModel) {
         }
     }
 
-    AlphaCard {
+    HsinCard {
         Label("Jalankan")
         txt("${vm.dexSel.size} app dipilih · mode ${vm.dexMode}", 12.sp, muted())
         if (vm.dexRunning) {
@@ -411,7 +411,7 @@ fun DexoptScreen(vm: AppViewModel) {
         }
     }
 
-    AlphaCard {
+    HsinCard {
         val list = vm.thirdParty
         Label("App pihak ketiga · ${list.size}")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -446,7 +446,7 @@ fun MemFxScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     val m = vm.memInfo
     fun pct(k: String): String = m[k]?.toIntOrNull()?.let { "%d.%02d%%".format(it / 100, it % 100) } ?: "-"
-    AlphaCard {
+    HsinCard {
         Label("Tekanan memori")
         if (m["psi"] != "1") {
             txt("Kernel ini tidak punya PSI memori, jadi angka tekanan tidak tersedia.", 12.sp, muted())
@@ -463,7 +463,7 @@ fun MemFxScreen(vm: AppViewModel) {
         KV("Swap terpakai", m["swap_used_mb"]?.let { "$it MB" } ?: "-")
         Pill("SEGARKAN", { vm.loadMem() })
     }
-    AlphaCard {
+    HsinCard {
         Label("MGLRU (eksperimental)")
         val sup = vm.mglru["supported"] == "1"
         if (!sup) {
@@ -477,7 +477,7 @@ fun MemFxScreen(vm: AppViewModel) {
             txt("Status kernel: ${vm.mglru["enabled_raw"] ?: "-"}", 11.sp, muted())
         }
     }
-    AlphaCard {
+    HsinCard {
         Label("Pembersih adaptif")
         ToggleRow(
             "Bersihkan saat tekanan tinggi",
@@ -492,7 +492,7 @@ fun MemFxScreen(vm: AppViewModel) {
         ) { vm.setConfKey("MEMCLEAN_ON_START", if (it) "1" else "0") }
         txt("Memakai perintah am kill-all; bila ROM tidak punya, aksinya dilewati dan dicatat di log.", 11.sp, muted())
     }
-    AlphaCard {
+    HsinCard {
         Label("Alat")
         Pill("TRIM PENYIMPANAN", { vm.runTrim() })
         txt("fstrim semua partisi. Tidak jalan saat game aktif atau baterai di bawah 15%.", 11.sp, muted())
@@ -513,11 +513,11 @@ fun MemFxScreen(vm: AppViewModel) {
 fun RamKeepScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     key(vm.ramKeepVer) {
-        AlphaCard {
+        HsinCard {
             Label("Selalu dilindungi")
             txt("Termux, Magisk, KernelSU, APatch, HSIN, launcher, keyboard, dialer, dan layanan sistem tidak pernah ditutup. Pilih app lain yang juga ingin dilindungi dari Bersihkan RAM:", 12.sp, muted())
         }
-        AlphaCard {
+        HsinCard {
             val list = vm.thirdParty
             val keep = vm.prefs.ramKeep
             Label("App pihak ketiga · ${list.size} · dilindungi ${keep.size}")
@@ -549,7 +549,7 @@ fun RamKeepScreen(vm: AppViewModel) {
 fun BatLabScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     val b = vm.battery
-    AlphaCard {
+    HsinCard {
         Label("Battery Lab")
         txt(if (b.level >= 0) "${b.level}%" else "—", 28.sp, weight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
         KV("Status", b.status.ifEmpty { "—" })

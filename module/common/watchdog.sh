@@ -1,16 +1,16 @@
 #!/system/bin/sh
-# Alpha v1 - monitor.sh watchdog (cron-like ringan)
-# Loop tidur + cek pidfile tiap ALPHA_WATCHDOG_INTERVAL (default 180s).
+# HSIN v1 - monitor.sh watchdog (cron-like ringan)
+# Loop tidur + cek pidfile tiap HSIN_WATCHDOG_INTERVAL (default 180s).
 # Kalau monitor.sh mati di luar skenario normal, start ulang otomatis
 # persis seperti service.sh (bukan nunggu reboot). Satu-satunya proses
 # tambahan: satu sleep loop (ppid 1), nyaris nol overhead.
 
 WATCHDIR="${0%/*}"
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 WD_PID_FILE="$STATE_DIR/watchdog.pid"
 MON_PID_FILE="$STATE_DIR/monitor.pid"
-WD_INTERVAL="${ALPHA_WATCHDOG_INTERVAL:-180}"
-WD_LOG="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
+WD_INTERVAL="${HSIN_WATCHDOG_INTERVAL:-180}"
+WD_LOG="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
 WD_STOP=0
 
 wd_log() {
@@ -49,7 +49,7 @@ wd_log "START" "watchdog pid=$$ interval=${WD_INTERVAL}s"
 
 BUBBLE_WANT="$STATE_DIR/.bubble_want"
 BUBBLE_PKG="com.hsin"
-BUBBLE_TICK="${ALPHA_BUBBLE_TICK:-45}"
+BUBBLE_TICK="${HSIN_BUBBLE_TICK:-45}"
 wd_n=0
 wd_per=$((WD_INTERVAL / BUBBLE_TICK)); [ "$wd_per" -ge 1 ] || wd_per=1
 
@@ -88,10 +88,10 @@ while [ "$WD_STOP" -eq 0 ]; do
     if [ "$mon_ok" -ne 1 ]; then
         wd_log "RESTART" "monitor.sh mati/hilang, start ulang"
         rm -f "$MON_PID_FILE" 2>/dev/null
-        ALPHA_STATE_DIR="$STATE_DIR"
-        ALPHA_LOG_FILE="${ALPHA_LOG_FILE:-$STATE_DIR/alpha.log}"
-        ALPHA_CONF_DIR="${ALPHA_CONF_DIR:-$STATE_DIR}"
-        export ALPHA_STATE_DIR ALPHA_LOG_FILE ALPHA_CONF_DIR
+        HSIN_STATE_DIR="$STATE_DIR"
+        HSIN_LOG_FILE="${HSIN_LOG_FILE:-$STATE_DIR/hsin.log}"
+        HSIN_CONF_DIR="${HSIN_CONF_DIR:-$STATE_DIR}"
+        export HSIN_STATE_DIR HSIN_LOG_FILE HSIN_CONF_DIR
         nohup sh "$WATCHDIR/monitor.sh" >> "$WD_LOG" 2>&1 &
         wd_new=$!
         printf '%s\n' "$wd_new" > "$MON_PID_FILE"

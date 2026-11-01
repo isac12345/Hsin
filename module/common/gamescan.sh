@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# Alpha Fusion - gamescan: temukan game terpasang yang belum terdaftar, lalu daftarkan sekaligus.
-# LIBRARY (di-source alphactl.sh). Tidak ada daftar game yang ditanam di kode:
+# HSIN - gamescan: temukan game terpasang yang belum terdaftar, lalu daftarkan sekaligus.
+# LIBRARY (di-source hsinctl.sh). Tidak ada daftar game yang ditanam di kode:
 #   - common/gamelist.seed   daftar paket game umum (data, bisa diganti/ditambah)
 #   - $STATE/gamelist.user   paket tambahan dari pengguna (satu per baris)
 # Game "terdaftar" = ada di game_profile_map.conf (sumber yang sama dengan Games di app).
@@ -9,7 +9,7 @@
 #   gs_add_all [profil] [fps]  daftarkan semua kandidat, fas-rs di-merge SEKALI di akhir
 #   gs_user_add <pkg>          tambah paket ke daftar pengguna
 
-GS_STATE="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+GS_STATE="${HSIN_STATE_DIR:-/data/adb/hsin}"
 GS_MAP="$GS_STATE/game_profile_map.conf"
 GS_USER="$GS_STATE/gamelist.user"
 

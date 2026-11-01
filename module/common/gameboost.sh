@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Alpha Fusion - Game Boost Engine (Extreme / Performance / Balanced)
+# HSIN - Game Boost Engine (Extreme / Performance / Balanced)
 # Hybrid v35: extreme = game max (lantai big 80%, little 45%,
 # uclamp 60), performance = mild (lantai 40%, uclamp 30,
 # tangga sadar-profil di monitor.sh), restore native (pendinginan).
@@ -10,8 +10,8 @@
 # dua kali tulis-baca-verifikasi.
 # Sakelar: DISABLE_GAMEBOOST, NO_CPUSET, GAMEBOOST_NO_VM, GAMEBOOST_LEVEL
 
-CONF_DIR="${ALPHA_CONF_DIR:-/data/adb/alpha}"
-LOG_FILE="${ALPHA_LOG_FILE:-/data/adb/alpha/alpha.log}"
+CONF_DIR="${HSIN_CONF_DIR:-/data/adb/hsin}"
+LOG_FILE="${HSIN_LOG_FILE:-/data/adb/hsin/hsin.log}"
 NATIVE_CONF="$CONF_DIR/native_boost.conf"
 
 SYSFS_CPU_PREFIX="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"
@@ -153,7 +153,7 @@ _gb_level() {
 # ============================================================
 # OPP Cap Picker (dari engine.sh)
 # ============================================================
-_alpha_opp_cap_pick() {
+_hsin_opp_cap_pick() {
     local target="$1"
     local avail="$2"
     case "$target" in
@@ -297,7 +297,7 @@ _gb_sched_apply_level() {
 # ============================================================
 # Backup Originals (sekali, ke native_boost.conf)
 # NATIVE_VERSION bump = paksa refresh snapshot basi (modul23 uscfreq
-# 5000/3000 + modul26 floor75 yang nyangkut di /data/adb/alpha dan
+# 5000/3000 + modul26 floor75 yang nyangkut di /data/adb/hsin dan
 # ikut kebawa saat flash rilis/garapan). Tanpa ini restore memulihkan
 # nilai boost lama, bukan native asli = kresek + ga stabil.
 # ============================================================
@@ -557,7 +557,7 @@ _gb_apply_cpu() {
         fi
 
         if [ -n "$_opp_list" ]; then
-            _target_min=$(_alpha_opp_cap_pick "$_floor" "$_opp_list")
+            _target_min=$(_hsin_opp_cap_pick "$_floor" "$_opp_list")
         else
             _target_min="$_floor"
         fi
@@ -593,7 +593,7 @@ _gb_apply_cpu() {
     fi
 
     # --- uclamp (extreme 60, performance 30) ---
-    # Di bawah GB_FASRS_OWNS_CPU: Alpha tidak menulis boost CPU apa pun (lantai,
+    # Di bawah GB_FASRS_OWNS_CPU: HSIN tidak menulis boost CPU apa pun (lantai,
     # uclamp, stune); fas-rs satu-satunya pemilik performa CPU. cpuset (penempatan
     # thread, bukan frekuensi) tetap diatur NO_CPUSET.
     if _gb_fasrs_owns_cpu; then
@@ -801,22 +801,22 @@ _gb_apply_vm() {
 # ============================================================
 # IO Apply
 # ============================================================
-# v50 AUTO: Alpha memutuskan sendiri tiap apply, user tidak perlu touch/rm
+# v50 AUTO: HSIN memutuskan sendiri tiap apply, user tidak perlu touch/rm
 # flag apa pun. Logika: fas-rs HIDUP (node mode bisa dibaca) = dia pemilik
-# frekuensi CPU, Alpha skip tulis lantai/uclamp/stune (cuma churn: terbukti
-# di device, tulisan Alpha ditimpa dalam 1-2 dtk). fas-rs MATI/node hilang =
-# Alpha nulis assist seperti biasa.
+# frekuensi CPU, HSIN skip tulis lantai/uclamp/stune (cuma churn: terbukti
+# di device, tulisan HSIN ditimpa dalam 1-2 dtk). fas-rs MATI/node hilang =
+# HSIN nulis assist seperti biasa.
 # Sengaja TIDAK pakai isi mode (fast/balance) sebagai syarat: owner diputus
 # SEBELUM mode di-set saat apply + restore selalu reset mode ke powersave,
 # jadi mode saat keputusan selalu basi (maka auto akan selalu assist = bug).
-# Override manual (hanya utk A/B): GB_FASRS_FORCE_ALPHA = paksa assist,
+# Override manual (hanya utk A/B): GB_FASRS_FORCE_HSIN = paksa assist,
 # GB_FASRS_FORCE_OWNS = paksa skip. Flag lama GB_FASRS_OWNS_CPU = paksa skip
 # (kompatibel v47-49). Tanpa file apa pun = AUTO.
 _gb_fasrs_owns_cpu() {
-    [ -f "$CONF_DIR/GB_FASRS_FORCE_ALPHA" ] && return 1
+    [ -f "$CONF_DIR/GB_FASRS_FORCE_HSIN" ] && return 1
     [ -f "$CONF_DIR/GB_FASRS_FORCE_OWNS" ] && return 0
     [ -f "$CONF_DIR/GB_FASRS_OWNS_CPU" ] && return 0
-    [ -r "${ALPHA_FASRS_MODE_NODE:-/dev/fas_rs/mode}" ]
+    [ -r "${HSIN_FASRS_MODE_NODE:-/dev/fas_rs/mode}" ]
 }
 
 # Flag GB_PROFILE_OWNS_IO: profil (tune_io/tune_network) pemilik tunggal
@@ -933,7 +933,7 @@ gb_apply() {
     fi
 
     # 4. CPU — lantai tetap jalan walau fas-rs aktif (lantai ≠ mematikan fas-rs)
-    local _cpu_owner="${CPU_OWNER:-alpha}"
+    local _cpu_owner="${CPU_OWNER:-hsin}"
     _gb_log "INFO" "CPU_OWNER=$_cpu_owner (lantai tetap dijalankan)"
     _gb_apply_cpu "$_level"
 
@@ -973,7 +973,7 @@ _gb_set_fasrs_mode() {
     local _pcfg=""
     local _cand
     for _cand in /data/powercfg.sh \
-        "${MODDIR:-/data/adb/modules/alpha_uperf_fasrs_fusion}/fasrs/powercfg.sh"; do
+        "${MODDIR:-/data/adb/modules/hsin}/fasrs/powercfg.sh"; do
         if [ -f "$_cand" ] 2>/dev/null; then
             _pcfg="$_cand"
             break
@@ -1147,7 +1147,7 @@ _gb_restore_fasrs_mode() {
     local _pcfg=""
     local _cand
     for _cand in /data/powercfg.sh \
-        "${MODDIR:-/data/adb/modules/alpha_uperf_fasrs_fusion}/fasrs/powercfg.sh"; do
+        "${MODDIR:-/data/adb/modules/hsin}/fasrs/powercfg.sh"; do
         if [ -f "$_cand" ] 2>/dev/null; then
             _pcfg="$_cand"
             break

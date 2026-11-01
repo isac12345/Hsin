@@ -6,17 +6,17 @@
 #   screenrec.sh status    running=1|0, file=<potongan sekarang>, dir=<folder>
 #   screenrec.sh list [N]  N file rekaman terbaru
 #
-# Hasil: /sdcard/Movies/HSIN/Alpha_<tanggal>_<jam>.mp4 (potongan lanjutan: _p2, _p3 ...) (tanpa audio; screenrecord tidak
+# Hasil: /sdcard/Movies/HSIN/HSIN_<tanggal>_<jam>.mp4 (potongan lanjutan: _p2, _p3 ...) (tanpa audio; screenrecord tidak
 # bisa merekam audio internal). Bitrate dari conf REC_BITRATE_MBPS (default 8, rentang 2-40).
 # Ada jeda sekitar setengah detik antar potongan.
 
-STATE_DIR="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 CONF_FILE="$STATE_DIR/app.conf"
 PID_FILE="$STATE_DIR/.rec_pid"
 STOP_FILE="$STATE_DIR/.rec_stop"
 CUR_FILE="$STATE_DIR/.rec_file"
-OUT_DIR="${ALPHA_REC_DIR:-/sdcard/Movies/HSIN}"
-SEG_SECS="${ALPHA_REC_SEG:-3600}"
+OUT_DIR="${HSIN_REC_DIR:-/sdcard/Movies/HSIN}"
+SEG_SECS="${HSIN_REC_SEG:-3600}"
 SELF="$(readlink -f "$0")"
 
 rec_alive() {

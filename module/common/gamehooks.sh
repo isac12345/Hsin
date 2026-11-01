@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# Alpha Fusion - gamehooks: ekstra yang jalan selama game terdaftar di foreground.
-# File ini LIBRARY (di-source oleh monitor.sh dan alphactl.sh), bukan CLI.
+# HSIN - gamehooks: ekstra yang jalan selama game terdaftar di foreground.
+# File ini LIBRARY (di-source oleh monitor.sh dan hsinctl.sh), bukan CLI.
 #
 #   gh_foreground <pkg> <profil_peta>  tiap pindah foreground; profil_peta kosong = bukan game
 #   gh_tick                            tiap siklus monitor: grace keluar game, prioritas ulang, bersih-bersih
@@ -22,7 +22,7 @@
 #
 # Semua perubahan disimpan nilai aslinya dan dikembalikan saat keluar game (setelah grace).
 
-GH_STATE="${ALPHA_STATE_DIR:-/data/adb/alpha}"
+GH_STATE="${HSIN_STATE_DIR:-/data/adb/hsin}"
 GH_MARK="$GH_STATE/.gh_active"
 GH_PEND="$GH_STATE/.gh_pending"
 GH_DND_PREV="$GH_STATE/.gh_dnd_prev"
@@ -37,7 +37,7 @@ GH_GM_MARK="$GH_STATE/.gh_gm_pkg"
 GH_ANGLE_PREV="$GH_STATE/.gh_angle_prev"
 GH_PRELOAD_T="$GH_STATE/.gh_preload_t"
 GH_CONF="$GH_STATE/app.conf"
-GH_GRACE="${ALPHA_GB_GRACE:-12}"
+GH_GRACE="${HSIN_GB_GRACE:-12}"
 GH_PRIO_EVERY=45
 GH_RENDER_TIMEOUT=90
 
@@ -45,7 +45,7 @@ _gh_now() { date +%s 2>/dev/null; }
 
 _gh_log() {
     printf '[%s] [GAMEHOOK] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" "$1" "$2" \
-        >> "${ALPHA_LOG_FILE:-$GH_STATE/alpha.log}" 2>/dev/null
+        >> "${HSIN_LOG_FILE:-$GH_STATE/hsin.log}" 2>/dev/null
 }
 
 _gh_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
@@ -463,7 +463,7 @@ _gh_render_restore() {
     _ghx=${_ghl1%%\|*}
     # Pilihan global pengguna (render_backend.conf) adalah nilai yang HARUS berlaku di luar game; bila penanda
     # kosong tapi global bukan default, pulihkan ke global (bukan ke kosong).
-    _ghg=$(tr -d '[:space:]' < "${ALPHA_RENDER_CONF:-$GH_STATE/render_backend.conf}" 2>/dev/null)
+    _ghg=$(tr -d '[:space:]' < "${HSIN_RENDER_CONF:-$GH_STATE/render_backend.conf}" 2>/dev/null)
     case "$_ghg" in skiagl|skiavk) [ -n "$_ghx" ] || _ghx="$_ghg" ;; esac
     _gh_log INFO "render restore: penanda='$_ghl1' global='$_ghg' target='$_ghx'"
     if ! command -v setprop >/dev/null 2>&1; then
@@ -648,7 +648,7 @@ _gh_angle_restore() {
 # Urutan: oat/*.odex|vdex (kode terkompilasi) -> lib/*/*.so -> base.apk -> split APK, sampai batas ukuran.
 # Batas = 1/4 dari MemAvailable saat itu (bukan angka tetap); PRELOAD_MAX_MB di app.conf bisa menurunkannya.
 # Sekali per PRELOAD_COOLDOWN detik (default 600) per game. Manfaat belum terukur: uji dengan waktu loading sendiri.
-_gh_meminfo_kb() { sed -n "s/^$1:[[:space:]]*\([0-9]*\).*/\1/p" "${ALPHA_MEMINFO:-/proc/meminfo}" 2>/dev/null | head -n 1; }
+_gh_meminfo_kb() { sed -n "s/^$1:[[:space:]]*\([0-9]*\).*/\1/p" "${HSIN_MEMINFO:-/proc/meminfo}" 2>/dev/null | head -n 1; }
 
 _gh_preload() {
     _gpl_pkg="$1"
@@ -719,8 +719,8 @@ gh_caps() {
 # ---------------------------------------------------------------- Overdrive (mesin sendiri, overdrive.sh)
 _gh_ovd_sh() {
     for _gc in "${COMMON:-/nonexistent}/overdrive.sh" "${MODDIR:-/nonexistent}/overdrive.sh" \
-               "${ALPHA_MOD_DIR:-/nonexistent}/common/overdrive.sh" \
-               /data/adb/modules/alpha_uperf_fasrs_fusion/common/overdrive.sh; do
+               "${HSIN_MOD_DIR:-/nonexistent}/common/overdrive.sh" \
+               /data/adb/modules/hsin/common/overdrive.sh; do
         [ -f "$_gc" ] && { printf '%s' "$_gc"; return 0; }
     done
     return 1
@@ -732,7 +732,7 @@ _gh_ovd_exists() {
 
 _gh_ovd() {   # $1=start|stop|recover  $2=pkg/alasan
     _gos=$(_gh_ovd_sh) || return 0
-    ALPHA_STATE_DIR="$GH_STATE" sh "$_gos" "$1" "$2" >/dev/null 2>&1
+    HSIN_STATE_DIR="$GH_STATE" sh "$_gos" "$1" "$2" >/dev/null 2>&1
 }
 
 # ---------------------------------------------------------------- siklus hidup
@@ -804,7 +804,8 @@ gh_tick() {
                 return 0
             fi
         fi
-        _ght_l=$(tr -d '[:space:]' < "$GH_PRIO_T" 2>/dev/null)
+        _ght_l=""
+        [ -f "$GH_PRIO_T" ] && _ght_l=$(tr -d '[:space:]' < "$GH_PRIO_T" 2>/dev/null)
         _gh_num "$_ght_l" || _ght_l=0
         if [ $((_ght_now - _ght_l)) -ge "$GH_PRIO_EVERY" ]; then
             _gh_prio_apply "$(cat "$GH_MARK" 2>/dev/null)"

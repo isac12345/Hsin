@@ -1,10 +1,10 @@
 #!/system/bin/sh
-# Alpha Fusion - CPU Ownership Detection (M2)
-# Deteksi siapa yang menguasai CPU governor/freq: fas-rs atau Alpha fallback.
+# HSIN - CPU Ownership Detection (M2)
+# Deteksi siapa yang menguasai CPU governor/freq: fas-rs atau HSIN fallback.
 # Dipanggil dari service.sh / apply_now.sh SETELAH detect.sh + profiles.sh load.
 #
 # Output global:
-#   CPU_OWNER = "fas-rs" | "alpha"
+#   CPU_OWNER = "fas-rs" | "hsin"
 #   (dan memanggil fas-rs powercfg.sh bila fas-rs aktif)
 #
 # Mekanisme:
@@ -12,7 +12,7 @@
 #      executable, anggap fas-rs aktif.
 #   2. Fallback: cek proses fas-rs via pidof/killall (bila binary ada tapi
 #      node belum ready — race saat boot awal).
-#   3. Bila kedua-duanya mati → Alpha memegang CPU freq via tune_cpu_freq.
+#   3. Bila kedua-duanya mati → HSIN memegang CPU freq via tune_cpu_freq.
 
 _cpu_owner_log() {
     local _status="$1"
@@ -29,7 +29,7 @@ cpu_detect_owner() {
     # Cari binary fas-rs (beberapa path umum)
     for _cand in /system/bin/fas-rs /data/adb/modules/*/fasrs/fas-rs \
                  /data/adb/ksu/modules/*/fasrs/fas-rs \
-                 "${MODDIR:-/data/adb/modules/alpha_uperf_fasrs_fusion}/fasrs/fas-rs"; do
+                 "${MODDIR:-/data/adb/modules/hsin}/fasrs/fas-rs"; do
         if [ -x "$_cand" ] 2>/dev/null; then
             fasrs_binary="$_cand"
             break
@@ -52,20 +52,20 @@ cpu_detect_owner() {
         return 0
     fi
 
-    # Fallback: Alpha memegang CPU freq
-    CPU_OWNER="alpha"
-    _cpu_owner_log "INFO" "fas-rs tidak aktif, Alpha mengambil alih CPU freq (fallback)"
-    _cpu_apply_alpha_freq
+    # Fallback: HSIN memegang CPU freq
+    CPU_OWNER="hsin"
+    _cpu_owner_log "INFO" "fas-rs tidak aktif, HSIN mengambil alih CPU freq (fallback)"
+    _cpu_apply_hsin_freq
     return 0
 }
 
-# Mapp profil Alpha → mode fas-rs via powercfg.sh:
+# Mapp profil HSIN → mode fas-rs via powercfg.sh:
 #   battery → powersave, balanced → balance,
 #   performance + boost aktif → fast, performance tanpa boost → performance
 # "boost aktif" = file $STATE_DIR/boost_level ada (ditulis oleh gb_apply).
 _cpu_apply_powercfg() {
     local _mode=""
-    local _conf_dir="${ALPHA_STATE_DIR:-${ALPHA_CONF_DIR:-/data/adb/alpha}}"
+    local _conf_dir="${HSIN_STATE_DIR:-${HSIN_CONF_DIR:-/data/adb/hsin}}"
     case "${ACTIVE_PROFILE:-balanced}" in
         battery)
             _mode="powersave"
@@ -88,7 +88,7 @@ _cpu_apply_powercfg() {
     # Cari powercfg.sh — path fas-rs standar
     local _pcfg=""
     for _cand in /data/powercfg.sh \
-                 "${MODDIR:-/data/adb/modules/alpha_uperf_fasrs_fusion}/fasrs/powercfg.sh"; do
+                 "${MODDIR:-/data/adb/modules/hsin}/fasrs/powercfg.sh"; do
         if [ -f "$_cand" ] 2>/dev/null; then
             _pcfg="$_cand"
             break
@@ -103,13 +103,13 @@ _cpu_apply_powercfg() {
     fi
 }
 
-# Alpha fallback: pakai tune_cpu_freq dari engine.sh dengan persentase profiles.sh
+# HSIN fallback: pakai tune_cpu_freq dari engine.sh dengan persentase profiles.sh
 # Aturan M2:
 #   - min 50% hardware_max (jamin minimal performa dasar)
 #   - Performance profile → paksa 100% (maximum)
 #   - baca-ulang verifikasi
 #   - node tak-writable → skip + log
-_cpu_apply_alpha_freq() {
+_cpu_apply_hsin_freq() {
     # tune_cpu_freq sudah di-engine.sh, panggil langsung.
     # Pastikan profile sudah load supaya CPU_FREQ_MAX_PERCENT benar.
     if [ "${ACTIVE_PROFILE:-}" = "performance" ]; then
