@@ -542,7 +542,12 @@ internal fun ramInfo(ctx: Context): Pair<Float, Float> {
 @Composable
 private fun RecTab(vm: AppViewModel) {
     var files by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(vm.recOn, vm.modPath) {
+    var count by remember { mutableIntStateOf(0) }
+    var reload by remember { mutableIntStateOf(0) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val br = vm.conf["REC_BITRATE_MBPS"]?.toIntOrNull() ?: 8
+    fun safe(f: String) = f.startsWith("/sdcard/Movies/HSIN/") && !f.contains("..") && f.none { it == '"' || it == '\'' || it == '$' || it == '`' || it == ';' }
+    LaunchedEffect(vm.recOn, vm.modPath, reload) {
         vm.loadFpsFiles()
         if (vm.modPath.isNotEmpty()) {
             val r = Root.exec("sh '${vm.modPath}/common/screenrec.sh' list 10", 10_000L)
@@ -556,11 +561,25 @@ private fun RecTab(vm: AppViewModel) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SText(tx("Rekam layar", "Screen recording"), 14.sp, SP.text, FontWeight.SemiBold)
                     Text(tx("Hasil disimpan di Movies/HSIN (tanpa suara sistem).", "Saved to Movies/HSIN (no system audio)."), color = SP.dim, fontSize = 12.sp)
+                    SText(tx("Kualitas", "Quality"), 11.sp, SP.dim)
+                    val qs = listOf(4, 8, 16)
+                    HChips(listOf(tx("Hemat 4", "Light 4"), tx("Normal 8", "Normal 8"), tx("Tinggi 16", "High 16")) , qs.indexOf(qs.minByOrNull { Math.abs(it - br) }!!)) { vm.setConfKey("REC_BITRATE_MBPS", qs[it].toString()) }
                     Box(
-                        Modifier.fillMaxWidth().tap { vm.toggleRec() }.clip(RoundedCornerShape(10.dp)).background(if (vm.recOn) SP.red else SP.gold).padding(vertical = 12.dp),
+                        Modifier.fillMaxWidth().tap {
+                            if (vm.recOn) vm.toggleRec()
+                            else if (count == 0) scope.launch { for (i in 3 downTo 1) { count = i; delay(1000) }; count = 0; vm.toggleRec() }
+                        }.clip(RoundedCornerShape(10.dp)).background(if (vm.recOn) SP.red else SP.gold).padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
-                    ) { SText(if (vm.recOn) tx("■ HENTIKAN REKAM", "■ STOP") else tx("● MULAI REKAM LAYAR", "● START RECORDING"), 13.sp, SP.ink, FontWeight.Bold, 1.sp) }
-                    for (f in files.take(5)) SText(f, 11.sp, SP.faint)
+                    ) { SText(if (vm.recOn) tx("■ HENTIKAN REKAM", "■ STOP") else if (count > 0) "$count..." else tx("● MULAI REKAM LAYAR", "● START RECORDING"), 13.sp, SP.ink, FontWeight.Bold, 1.sp) }
+                    Text(tx("Tanpa suara: Android tidak bisa merekam suara internal lewat perekam bawaan.", "No audio: Android's built-in recorder cannot capture internal audio."), color = SP.faint, fontSize = 10.sp)
+                    for (f in files.take(5)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SText(f.substringAfterLast('/'), 11.sp, SP.dim, modifier = Modifier.weight(1f))
+                            Box(Modifier.tap { if (safe(f)) scope.launch { Root.exec("am start -a android.intent.action.VIEW -d 'file://$f' -t video/mp4 >/dev/null 2>&1", 8_000L) } }.clip(CircleShape).border(1.dp, SP.gold, CircleShape).padding(horizontal = 10.dp, vertical = 3.dp)) { SText(tx("Putar", "Play"), 11.sp, SP.gold) }
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.tap { if (safe(f)) scope.launch { Root.exec("rm -f '$f' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d 'file://$f' >/dev/null 2>&1", 8_000L); reload++ } }.clip(CircleShape).border(1.dp, SP.red, CircleShape).padding(horizontal = 10.dp, vertical = 3.dp)) { SText(tx("Hapus", "Delete"), 11.sp, SP.red) }
+                        }
+                    }
                 }
             }
         }
