@@ -34,9 +34,8 @@ CPU_POLICIES="${CPU_POLICIES:-}"
 # ============================================================
 _gb_log() {
     local _s="$1" _d="$2"
-    local _ts
-    _ts=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)
-    if [ -d "$(dirname "$LOG_FILE")" ]; then
+    # satu fork date saja, tanpa dirname (hemat fork saat game baru dibuka)
+    if [ -d "${LOG_FILE%/*}" ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)] [GAMEBOOST] [$_s] $_d" \
             >> "$LOG_FILE" 2>/dev/null
     fi
@@ -115,7 +114,13 @@ _gb_write() {
     local _pass=1 _rb=""
     while [ "$_pass" -le 2 ]; do
         printf '%s' "$_val" > "$_node" 2>/dev/null
-        _rb=$(cat "$_node" 2>/dev/null | tr -d '[:space:]')
+        # jalur cepat tanpa fork: baca baris pertama dengan builtin read
+        # (hanya node /sys; node /proc/sys di sebagian kernel terbaca terpotong oleh read)
+        _rb=""
+        case "$_node" in /sys/*) read -r _rb < "$_node" 2>/dev/null ;; esac
+        if [ "$_rb" != "$_val" ]; then
+            _rb=$(cat "$_node" 2>/dev/null | tr -d '[:space:]')
+        fi
         if [ "$_rb" = "$_val" ]; then
             _gb_log "APPLIED" "$_cat node=$_node value=$_val"
             return 0
