@@ -349,7 +349,9 @@ do_loop() {
         temp_state; _ts=$?
         if [ "$_ts" -ge 2 ]; then
             _hot=$((_hot + 1))
-            [ "$_hot" -ge 2 ] && { do_stop "suhu tinggi"; exit 0; }
+            [ "$_hot" -eq 2 ] && ovd_log WARN "suhu lewat batas: Puncak ditahan di level aman, naik lagi setelah dingin"
+            # bertahan di level aman (naik lagi otomatis bila dingin); baru berhenti bila panas terus ~90 dtk
+            [ "$_hot" -ge 30 ] && { do_stop "suhu tinggi"; exit 0; }
         else
             _hot=0
         fi
