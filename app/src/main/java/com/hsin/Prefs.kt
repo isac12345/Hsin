@@ -96,6 +96,9 @@ class Prefs(ctx: Context) {
     var flMTemp: Boolean
         get() = sp.getBoolean("fl_m_temp", true)
         set(v) { sp.edit().putBoolean("fl_m_temp", v).apply() }
+    var introDone: Boolean
+        get() = sp.getBoolean("intro_done", false)
+        set(v) { sp.edit().putBoolean("intro_done", v).apply() }
     var accentTheme: Int
         get() = sp.getInt("accent_theme", 0).coerceIn(0, 3)
         set(v) { sp.edit().putInt("accent_theme", v.coerceIn(0, 3)).apply() }

@@ -333,6 +333,7 @@ fun HsinApp(vm: AppViewModel) {
                     }
                 }
                 RitualOverlay(vm)
+            IntroOverlay(vm)
                 DialogHost(vm)
             }
         }

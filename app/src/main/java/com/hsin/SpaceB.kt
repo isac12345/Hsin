@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -322,6 +323,7 @@ internal fun HomeTab(vm: AppViewModel, land: Boolean) {
                     StatRow(vm, live, col)
                     GamePicker(vm)
                     ActionRow(vm, col)
+                    SessionCard(vm, col)
                 }
             }
         }
@@ -335,6 +337,41 @@ internal fun HomeTab(vm: AppViewModel, land: Boolean) {
                 StatRow(vm, live, col)
                 GamePicker(vm)
                 ActionRow(vm, col)
+                SessionCard(vm, col)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessStat(name: String, v: String, col: Color) {
+    Column {
+        SText(name, 10.sp, SP.dim)
+        SText(v, 13.sp, col, FontWeight.SemiBold)
+    }
+}
+
+/** Ringkasan sesi main terakhir + tombol lanjut game terakhir (satu ketuk, ritual otomatis). */
+@Composable
+private fun SessionCard(vm: AppViewModel, col: Color) {
+    val last = vm.prefs.fpsSessions.firstOrNull()
+    val lastPkg = vm.prefs.lastGame
+    if (last == null && lastPkg.isEmpty()) return
+    Glass(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (last != null) {
+                SText(tx("SESI TERAKHIR", "LAST SESSION"), 10.sp, SP.dim, FontWeight.SemiBold, 1.5.sp)
+                SText(vm.label(last.pkg), 15.sp, SP.text, FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val mode = if (last.ovdPct >= 50) "Puncak" else profileLabel(last.profile)
+                    SessStat(tx("Durasi", "Duration"), "${last.secs / 60}m ${last.secs % 60}s", col)
+                    SessStat(tx("Rata-rata", "Average"), "${last.avg} FPS", col)
+                    SessStat("1% low", "${last.low1} FPS", col)
+                    SessStat(tx("Mode", "Mode"), mode, col)
+                }
+            }
+            if (lastPkg.isNotEmpty()) {
+                HBtn(tx("▶  LANJUT: ", "▶  RESUME: ") + vm.label(lastPkg), Modifier.fillMaxWidth(), col, solid = true) { UiState.startRitual(lastPkg) }
             }
         }
     }
@@ -703,6 +740,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 1
         val gProf = g?.profile ?: "balanced"
+        vm.prefs.lastGame = pkg
         val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
         delay(350)
         setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else if (en) " ✗" else " ✗")
@@ -784,5 +822,36 @@ internal fun RitualOverlay(vm: AppViewModel) {
         }
         if (wide) Row(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) { content(Modifier.weight(0.7f), Modifier.weight(1.3f)) }
         else Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) { content(Modifier.fillMaxWidth(), Modifier.fillMaxWidth()) }
+    }
+}
+
+
+// =====================================================================
+//  INTRO pertama kali (3 kartu, bisa dilewati)
+// =====================================================================
+
+@Composable
+internal fun IntroOverlay(vm: AppViewModel) {
+    var show by remember { mutableStateOf(!vm.prefs.introDone) }
+    if (!show) return
+    var page by remember { mutableIntStateOf(0) }
+    val titles = listOf(tx("Pilih mode", "Pick a mode"), tx("Luncurkan sekali ketuk", "Launch with one tap"), tx("Orb di dalam game", "Orb inside games"))
+    val bodies = listOf(
+        tx("Hemat, Seimbang, Performa, atau Puncak. Ketuk lingkaran di Beranda untuk berpindah. Warna berubah sesuai mode.", "Saver, Balanced, Performance or Peak. Tap the dial on Home to switch. The color follows the mode."),
+        tx("Ketuk MULAI GAME. HSIN membersihkan RAM, memasang mode, lalu membuka game otomatis. Tidak perlu menekan apa pun lagi.", "Tap START GAME. HSIN cleans RAM, applies the mode and opens the game automatically. Nothing else to press."),
+        tx("Saat main, orb kecil menampilkan FPS. Ketuk untuk ganti mode atau rekam, ketuk dua kali untuk berpindah mode cepat.", "While playing, a small orb shows FPS. Tap for modes and recording, double-tap to cycle modes quickly.")
+    )
+    val col = SP.gold
+    fun finish() { vm.prefs.introDone = true; show = false }
+    Box(Modifier.fillMaxSize().background(Color(0xF2090A0D)).pointerInput(Unit) { detectTapGestures { } }, contentAlignment = Alignment.Center) {
+        Column(Modifier.widthIn(max = 420.dp).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SText("${page + 1} / 3", 11.sp, SP.dim, spacing = 2.sp)
+            SText(titles[page], 22.sp, col, FontWeight.Bold)
+            Text(bodies[page], color = SP.text, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HBtn(tx("Lewati", "Skip"), Modifier.width(110.dp)) { finish() }
+                HBtn(if (page < 2) tx("Lanjut", "Next") else tx("Mulai", "Start"), Modifier.width(110.dp), col, solid = true) { if (page < 2) page++ else finish() }
+            }
+        }
     }
 }
