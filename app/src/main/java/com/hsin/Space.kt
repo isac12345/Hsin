@@ -113,7 +113,8 @@ fun tx(id: String, en: String): String = if (LocalEn.current) en else id
 val LocalClock = staticCompositionLocalOf<FloatState> { mutableFloatStateOf(0f) }
 
 @Composable
-fun ownAnim(target: Float, ms: Int = 300): Float {
+fun ownAnim(target: Float, msIn: Int = 300): Float {
+    val ms = if (UiState.reduceAnim) 1 else msIn
     val s = remember { mutableFloatStateOf(target) }
     LaunchedEffect(target) {
         val from = s.floatValue
@@ -133,7 +134,8 @@ fun ownAnim(target: Float, ms: Int = 300): Float {
 
 /** Mulai dari 0 lalu naik ke 1 tiap `key` berubah (dipakai untuk judul mode, nama game, dll). */
 @Composable
-fun popKey(key: Any, ms: Int = 340): Float {
+fun popKey(key: Any, msIn: Int = 340): Float {
+    val ms = if (UiState.reduceAnim) 1 else msIn
     val s = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(key) {
         s.floatValue = 0f
@@ -155,11 +157,12 @@ fun Modifier.rise(delayMs: Int = 0, key: Any = Unit): Modifier {
     val a = remember(key) { mutableFloatStateOf(0f) }
     LaunchedEffect(key) {
         a.floatValue = 0f
-        delay(delayMs.toLong())
+        val red = UiState.reduceAnim
+        if (!red) delay(delayMs.toLong())
         val t0 = withFrameNanosCompat()
         while (true) {
             val now = withFrameNanosCompat()
-            val k = ((now - t0) / 1_000_000f / 440f).coerceIn(0f, 1f)
+            val k = ((now - t0) / 1_000_000f / (if (red) 1f else 440f)).coerceIn(0f, 1f)
             a.floatValue = 1f - (1f - k) * (1f - k) * (1f - k)
             if (k >= 1f) break
         }
@@ -213,6 +216,9 @@ object UiState {
     var en by mutableStateOf(false)
     var themeTick by mutableStateOf(0)
     var haptics by mutableStateOf(true)
+    var reduceAnim = false
+    var bgDim by mutableStateOf(1)
+    fun setReduce(p: Prefs, on: Boolean) { reduceAnim = on; p.reduceAnim = on; themeTick++ }
     var view: android.view.View? = null
     fun setHaptics(p: Prefs, on: Boolean) { haptics = on; p.haptics = on }
     /** Getar halus (bisa dimatikan di Pengaturan). */
@@ -230,6 +236,8 @@ object UiState {
     fun init(p: Prefs) {
         if (inited) return
         haptics = p.haptics
+        reduceAnim = p.reduceAnim
+        bgDim = p.bgDim
         inited = true
         en = p.sp.getBoolean("hsin_en", false)
         portrait = p.sp.getBoolean("hsin_portrait", false)
@@ -645,12 +653,15 @@ private fun SettingsTab(vm: AppViewModel) {
                 Seg(listOf("Indonesia", "English"), if (UiState.en) 1 else 0) { UiState.setEn(vm.prefs, it == 1) }
                 SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
                 Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
+                SText(tx("Gelap latar (kalau pakai gambar sendiri)", "Background dimming (custom image)"), 12.sp, SP.dim)
+                Seg(listOf(tx("Ringan", "Light"), tx("Sedang", "Medium"), tx("Pekat", "Dark")), UiState.bgDim) { UiState.bgDim = it; vm.prefs.bgDim = it }
                 SText(tx("Tampilan layar", "Screen layout"), 12.sp, SP.dim)
                 Seg(listOf(tx("Landscape", "Landscape"), tx("Potret", "Portrait")), if (UiState.portrait) 1 else 0) { UiState.setPortrait(vm.prefs, it == 1) }
             }
         }
         SetupCheck(vm)
         SwitchRow(tx("Getar halus", "Haptic feedback"), tx("Getar ringan saat ganti mode dan mulai ritual.", "Light vibration when switching mode and starting the ritual."), UiState.haptics, 50) { UiState.setHaptics(vm.prefs, it) }
+        SwitchRow(tx("Kurangi animasi", "Reduce animation"), tx("Perpindahan layar langsung tanpa gerak, hemat tenaga.", "Instant transitions with no motion, saves power."), UiState.reduceAnim, 55) { UiState.setReduce(vm.prefs, it) }
         SwitchRow(tx("Floating orb", "Floating orb"), tx("Cincin FPS melayang di game: ketuk untuk menu ganti mode, rekam, dan detail.", "FPS ring floating in games: tap for the menu to switch mode, record and see details."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
         SwitchRow(tx("Tampilkan FPS di floating", "Show FPS in floating"), tx("Angka FPS, CPU, GPU, dan suhu.", "FPS, CPU, GPU and temperature readout."), vm.hudOn, 90) { vm.updateHudOn(it) }
         SwitchRow(tx("Jangan ganggu saat game", "Do not disturb in games"), tx("Notifikasi dibisukan selama game, balik normal setelah ditutup.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON"), 120) { vm.setFlag("GAME_DND_ON", it) }
