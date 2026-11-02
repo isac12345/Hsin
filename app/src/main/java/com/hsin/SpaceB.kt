@@ -354,6 +354,8 @@ internal fun GameTab(vm: AppViewModel, land: Boolean) {
             Text(tx("Tambahkan game supaya HSIN bisa mengatur mode, resolusi, dan floating khusus game itu.", "Add a game so HSIN can set its own mode, resolution and floating."), color = SP.dim, fontSize = 13.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(14.dp))
             HBtn(tx("+ Tambah game", "+ Add game"), Modifier.width(200.dp), solid = true) { vm.go("addgame") }
+            Spacer(Modifier.height(8.dp))
+            HBtn(tx("Pindai game terpasang", "Scan installed games"), Modifier.width(200.dp)) { vm.scanAndAdd() }
         }
         return
     }
@@ -370,6 +372,7 @@ internal fun GameTab(vm: AppViewModel, land: Boolean) {
                     }
                 }
                 HBtn(tx("+ Tambah game", "+ Add game"), Modifier.fillMaxWidth()) { vm.go("addgame") }
+                HBtn(tx("Pindai game baru", "Scan new games"), Modifier.fillMaxWidth()) { vm.scanAndAdd() }
             }
             Column(Modifier.weight(1.15f).fillMaxHeight().verticalScroll(rememberScrollState())) { GameDetail(vm, g) }
         }
@@ -382,6 +385,7 @@ internal fun GameTab(vm: AppViewModel, land: Boolean) {
                     SText("+", 26.sp, SP.gold)
                 }
             }
+            HBtn(tx("Pindai game baru", "Scan new games"), Modifier.fillMaxWidth()) { vm.scanAndAdd() }
             GameDetail(vm, g)
         }
     }
@@ -412,7 +416,6 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
     val fx by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Hsin.gamefx(g.pkg) }
     val cur = profMode(g.profile, opts["OVD"] == "on")
     val col = info(cur).color
-    var res by remember(g.pkg, fx["downscale"]) { mutableFloatStateOf(((fx["downscale"]?.toDoubleOrNull() ?: 1.0) * 100).toFloat().coerceIn(50f, 100f)) }
     Glass(Modifier.fillMaxWidth().rise(60, g.pkg)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -439,20 +442,14 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                     ) { SText(mname(m), 12.sp, lerpColor(m.color, SP.ink, a), FontWeight.Bold) }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SText(tx("Resolusi", "Resolution"), 12.sp, SP.dim, modifier = Modifier.width(64.dp))
-                Slider(
-                    value = res, onValueChange = { res = it },
-                    onValueChangeFinished = {
-                        val v = if (res >= 99.5f) "off" else String.format(Locale.US, "%.2f", res / 100f)
-                        vm.setGameFx(g.pkg, "downscale", v)
-                    },
-                    valueRange = 50f..100f, steps = 9,
-                    colors = SliderDefaults.colors(thumbColor = col, activeTrackColor = col, inactiveTrackColor = Color(0x33FFFFFF), activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
-                    modifier = Modifier.weight(1f)
-                )
-                SText("${res.toInt()}%", 13.sp, SP.text, FontWeight.SemiBold, modifier = Modifier.width(44.dp))
+            SText(tx("Resolusi game", "Game resolution"), 11.sp, SP.dim)
+            val resKeys = listOf("off", "0.85", "0.7", "0.55")
+            val resCur = resKeys.indexOfFirst { k -> k != "off" && (fx["downscale"]?.toDoubleOrNull() ?: 1.0) in ((k.toDouble() - 0.03)..(k.toDouble() + 0.03)) }.let { if (it < 0) 0 else it }
+            HChips(listOf("100%", "85%", "70%", "55%"), resCur, col) {
+                vm.setGameFx(g.pkg, "downscale", resKeys[it]); ver++
             }
+            val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
+            if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
             SText(tx("Batas FPS", "FPS cap"), 11.sp, SP.dim)
             HChips(FPS_KEYS.map { if (it == "off") tx("Bebas", "Free") else it }, FPS_KEYS.indexOf(fx["fps"] ?: "off").coerceAtLeast(0), col) {
                 vm.setGameFx(g.pkg, "fps", FPS_KEYS[it]); ver++
@@ -541,7 +538,7 @@ private fun AlatMesin(vm: AppViewModel, land: Boolean) {
 @Composable
 private fun AlatLayar(vm: AppViewModel) {
     val ri = vm.resInfo
-    Section(tx("RESOLUSI LAYAR HP", "PHONE DISPLAY RESOLUTION")) {
+    Section(tx("LAYAR HP", "PHONE DISPLAY")) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f)) {
                 SText(tx("Asli", "Native"), 11.sp, SP.dim)
@@ -552,22 +549,8 @@ private fun AlatLayar(vm: AppViewModel) {
                 SText(if (ri != null) "${ri.act.w}×${ri.act.h} · ${Math.round(ri.act.w * 100f / ri.nat.w)}%" else "...", 15.sp, SP.gold, FontWeight.SemiBold)
             }
         }
-        val opts = listOf(60, 70, 80, 90, 100)
-        HChips(opts.map { "$it%" }, opts.indexOf(vm.resPct).coerceAtLeast(0)) { vm.resPct = opts[it] }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HBtn(tx("TERAPKAN", "APPLY"), Modifier.weight(1f), solid = vm.resCountdown == 0) { if (vm.resCountdown == 0) vm.applyRes() }
-            HBtn(tx("KEMBALIKAN", "RESET"), Modifier.weight(1f)) { if (vm.resCountdown == 0) vm.resetRes() }
-        }
-        if (vm.resCountdown > 0) {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, SP.gold, RoundedCornerShape(12.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SText(tx("Layar oke? Kembali otomatis dalam ${vm.resCountdown} detik.", "Screen OK? Reverts in ${vm.resCountdown}s."), 13.sp, SP.text)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HBtn(tx("PERTAHANKAN", "KEEP"), Modifier.weight(1f), solid = true) { vm.keepRes() }
-                    HBtn(tx("BATALKAN", "REVERT"), Modifier.weight(1f)) { vm.revertRes() }
-                }
-            }
-        }
-        Text(tx("Ini untuk seluruh layar HP. Resolusi khusus game ada di tab Game.", "This changes the whole phone display. Per-game resolution is in the Games tab."), color = SP.dim, fontSize = 11.sp)
+        HBtn(tx("KEMBALIKAN KE ASLI", "RESET TO NATIVE"), Modifier.fillMaxWidth(), solid = false) { vm.resetRes() }
+        Text(tx("Resolusi diatur per game di tab Game (satu tempat). Tombol ini hanya untuk mengembalikan layar kalau ada yang tersangkut.", "Resolution is set per game in the Games tab (one place). This button only resets the display if something got stuck."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
     }
 }
 
@@ -581,10 +564,14 @@ private fun AlatBersih(vm: AppViewModel, land: Boolean) {
             HBtn(tx("Tutup semua app", "Close all apps"), Modifier.fillMaxWidth()) { vm.askCloseApps() }
         }
     }, {
-        Section(tx("PERAWATAN", "MAINTENANCE"), 40) {
+        Section(tx("LANJUTAN (HATI-HATI)", "ADVANCED (CAREFUL)"), 40) {
+            Text(tx("Untuk yang paham. Salah atur bisa bikin HP lebih lambat atau boros; semuanya bisa dikembalikan.", "For experienced users. Wrong settings can slow the phone or drain battery; everything can be reverted."), color = SP.red, fontSize = 11.sp, lineHeight = 14.sp)
             HBtn(tx("Optimasi app (dexopt)", "Optimize apps (dexopt)"), Modifier.fillMaxWidth()) { vm.go("dexopt") }
+            Text(tx("Dipakai kalau app terasa lambat dibuka setelah update. Butuh beberapa menit.", "Use when apps open slowly after an update. Takes a few minutes."), color = SP.faint, fontSize = 10.sp)
             HBtn(tx("Memori dan penyetelan", "Memory tuning"), Modifier.fillMaxWidth()) { vm.go("memfx") }
+            Text(tx("Dipakai kalau game sering tertutup sendiri karena RAM penuh.", "Use when games close themselves because RAM is full."), color = SP.faint, fontSize = 10.sp)
             HBtn(tx("Lab baterai", "Battery lab"), Modifier.fillMaxWidth()) { vm.go("batlab") }
+            Text(tx("Dipakai untuk membandingkan pemakaian baterai antar mode.", "Use to compare battery use between modes."), color = SP.faint, fontSize = 10.sp)
         }
     })
 }
@@ -631,6 +618,13 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
                     Text(note, color = SP.faint, fontSize = 10.sp)
                 }
             }
+        }
+        Section(tx("DIAGNOSA DAN PEMULIHAN", "DIAGNOSTICS AND RECOVERY"), 50) {
+            Text(tx("FPS tampil '--'? Tombol ini menunjukkan sumber FPS mana yang berjalan untuk game terakhir.", "FPS shows '--'? This shows which FPS source works for the last game."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            HBtn(tx("DIAGNOSA FPS", "FPS DIAGNOSIS"), Modifier.fillMaxWidth()) { vm.fpsDiag() }
+            if (vm.diagText.isNotEmpty()) Text(vm.diagText, color = SP.text, fontSize = 10.sp, lineHeight = 13.sp)
+            Text(tx("Ada yang tersangkut (Puncak, DND, refresh rate, resolusi)? Satu ketuk mengembalikan semuanya.", "Something stuck (Peak, DND, refresh rate, resolution)? One tap restores everything."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            HBtn(tx("KEMBALIKAN SEMUA KE NORMAL", "RESTORE EVERYTHING"), Modifier.fillMaxWidth(), SP.red) { vm.restoreAll() }
         }
     }, {
         Section(tx("PERANGKAT", "DEVICE"), 20) {

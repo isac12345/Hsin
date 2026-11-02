@@ -182,6 +182,29 @@ object Hsin {
         return ctl("gamefx set $pkg $key $v")
     }
 
+    /** Cek nyata: apakah sistem benar-benar menyimpan skala resolusi untuk game ini. Teks kosong = tidak perlu ditampilkan. */
+    suspend fun downscaleStatus(pkg: String, want: String): String {
+        if (!PKG_RE.matches(pkg)) return ""
+        val w = want.toDoubleOrNull()
+        if (w == null || w >= 0.995) return ""
+        val out = Root.exec("cmd game list-configs $pkg 2>&1 | head -n 12", 8_000L).out
+        if (out.isBlank()) return "Belum bisa dicek di ROM ini. Cek setelah game dibuka."
+        val m = Regex("(?i)downscale\\D{0,12}([0-9]*\\.?[0-9]+)").findAll(out).map { it.groupValues[1].toDoubleOrNull() }.filterNotNull().toList()
+        val pct = Math.round(w * 100)
+        return when {
+            m.any { Math.abs(it - w) < 0.02 } -> "Terbaca sistem: $pct% (aktif saat game dibuka)"
+            m.isNotEmpty() -> "Sistem masih membaca ${Math.round(m.first() * 100)}%, bukan $pct%. Buka game lewat HSIN agar dipasang."
+            else -> "Disimpan $pct%, tapi ROM tidak menampilkannya. Kalau tampilan game tidak berubah, ROM ini menolak."
+        }
+    }
+
+    suspend fun fpsDiag(pkg: String): String {
+        if (!PKG_RE.matches(pkg)) return "package tidak valid"
+        return ctl("hud diag $pkg", 25_000L).out.trim()
+    }
+
+    suspend fun restoreAll(): String = ctl("restore", 40_000L).out.trim()
+
     suspend fun ovdStart(): Root.Res = ctl("ovd start", 20_000L)
 
     suspend fun ovdStop(): Root.Res = ctl("ovd stop", 20_000L)

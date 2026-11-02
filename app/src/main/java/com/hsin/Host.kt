@@ -232,8 +232,17 @@ fun DialogHost(vm: AppViewModel) {
 fun HsinApp(vm: AppViewModel) {
     val ctx = LocalContext.current
     UiState.init(vm.prefs)
+    UiState.view = androidx.compose.ui.platform.LocalView.current
     val cmode = curMode(vm)
-    val ui = UiCfg(if (cmode.isEmpty()) SP.gold else info(cmode).color, vm.cardAlpha, vm.contrast / 100f, vm.saver)
+    UiState.themeTick
+    val accent = when (vm.prefs.accentTheme) {
+        1 -> if (cmode.isEmpty()) Color(0xFFE8B95A) else info(cmode).color
+        2 -> Color(0xFF4FE3C1)
+        3 -> Color(0xFFFF4D5E)
+        else -> Color(0xFFE8B95A)
+    }
+    ThemeHolder.accent.value = accent
+    val ui = UiCfg(accent, vm.cardAlpha, vm.contrast / 100f, vm.saver)
     val clock = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         val t0 = withFrameNanos { it }
@@ -269,10 +278,10 @@ fun HsinApp(vm: AppViewModel) {
                     Column(Modifier.fillMaxSize().systemBarsPadding()) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                             Box(
-                                Modifier.clip(CircleShape).background(SP.gold).tap {
+                                Modifier.clip(CircleShape).background(SP.glass).border(1.dp, SP.gold.copy(alpha = 0.6f), CircleShape).tap {
                                     if (vm.route in setOf("games", "custom", "tools")) vm.go("dash") else if (!vm.back()) vm.go("dash")
-                                }.padding(horizontal = 14.dp, vertical = 8.dp)
-                            ) { SText("‹ " + tx("Kembali", "Back"), 13.sp, SP.ink, FontWeight.Bold) }
+                                }.padding(horizontal = 12.dp, vertical = 5.dp)
+                            ) { SText("‹ " + tx("Kembali", "Back"), 12.sp, SP.gold, FontWeight.SemiBold) }
                         }
                         key(vm.route) {
                             val scroll = rememberScrollState()

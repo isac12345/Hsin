@@ -87,8 +87,13 @@ import kotlin.math.sin
 // ===================== warna & animasi sendiri =====================
 // Semua animasi di file ini digerakkan jam frame (withFrameNanos), BUKAN ValueAnimator/animate*AsState,
 // jadi tetap jalan walau "Skala animasi" di Opsi Pengembang diset 0.0.
+object ThemeHolder {
+    /** Warna aksen aktif (dipakai SP.gold di seluruh app). Diset Host sesuai pilihan tema. */
+    val accent = androidx.compose.runtime.mutableStateOf(Color(0xFFE8B95A))
+}
+
 object SP {
-    val gold = Color(0xFFE8B95A)
+    val gold: Color get() = ThemeHolder.accent.value
     val goldHi = Color(0xFFF6D88F)
     val red = Color(0xFFE5484D)
     val glass = Color(0xB8141416)
@@ -206,15 +211,25 @@ fun Glass(modifier: Modifier = Modifier, radius: Int = 12, alt: Boolean = false,
 // ===================== state UI =====================
 object UiState {
     var en by mutableStateOf(false)
+    var themeTick by mutableStateOf(0)
+    var haptics by mutableStateOf(true)
+    var view: android.view.View? = null
+    fun setHaptics(p: Prefs, on: Boolean) { haptics = on; p.haptics = on }
+    /** Getar halus (bisa dimatikan di Pengaturan). */
+    fun buzz() {
+        if (!haptics) return
+        try { view?.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK) } catch (_: Exception) {}
+    }
     var portrait by mutableStateOf(false)
     var tab by mutableIntStateOf(0)
     var gameIdx by mutableIntStateOf(0)
     var splashDone = false          // loading hanya sekali per pembukaan app (bukan tiap kembali ke Beranda)
     var ritual by mutableStateOf("")   // paket game yang sedang diluncurkan lewat ritual
-    fun startRitual(pkg: String) { if (ritual.isEmpty()) ritual = pkg }
+    fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz() } }
     private var inited = false
     fun init(p: Prefs) {
         if (inited) return
+        haptics = p.haptics
         inited = true
         en = p.sp.getBoolean("hsin_en", false)
         portrait = p.sp.getBoolean("hsin_portrait", false)
@@ -257,6 +272,7 @@ internal fun profMode(profile: String, ovd: Boolean): String =
     if (ovd) "puncak" else when (profile) { "battery" -> "hemat"; "performance" -> "performa"; else -> "seimbang" }
 
 fun AppViewModel.chooseMode(key: String) {
+    UiState.buzz()
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
     viewModelScope.launch {
@@ -287,7 +303,7 @@ fun SpaceRoot(vm: AppViewModel) {
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF0C0C0E))) {
         val land = maxWidth > maxHeight
-        val compact = maxHeight < 300.dp
+        val compact = maxHeight < 420.dp
         Image(painterResource(R.drawable.wallpaper_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
@@ -442,7 +458,7 @@ private fun NavRail(compact: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp)
     ) {
-        Logo(if (compact) 36 else 44)
+        Logo(if (compact) 32 else 44)
         for (i in 0 until 5) NavItem(i, compact)
     }
 }
@@ -474,7 +490,7 @@ private fun NavItem(i: Int, compact: Boolean) {
             Modifier.clip(RoundedCornerShape(14.dp)).background(SP.gold.copy(alpha = 0.16f * a)).padding(horizontal = 14.dp, vertical = if (compact) 4.dp else 6.dp),
             contentAlignment = Alignment.Center
         ) { NavIcon(i, col) }
-        if (!compact) SText(navName(i), 10.sp, col)
+        if (!compact || sel) SText(navName(i), 10.sp, col)
     }
 }
 
@@ -608,10 +624,14 @@ private fun SettingsTab(vm: AppViewModel) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SText(tx("Bahasa", "Language"), 12.sp, SP.dim)
                 Seg(listOf("Indonesia", "English"), if (UiState.en) 1 else 0) { UiState.setEn(vm.prefs, it == 1) }
+                SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
+                Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
                 SText(tx("Tampilan layar", "Screen layout"), 12.sp, SP.dim)
                 Seg(listOf(tx("Landscape", "Landscape"), tx("Potret", "Portrait")), if (UiState.portrait) 1 else 0) { UiState.setPortrait(vm.prefs, it == 1) }
             }
         }
+        SetupCheck(vm)
+        SwitchRow(tx("Getar halus", "Haptic feedback"), tx("Getar ringan saat ganti mode dan mulai ritual.", "Light vibration when switching mode and starting the ritual."), UiState.haptics, 50) { UiState.setHaptics(vm.prefs, it) }
         SwitchRow(tx("Floating orb", "Floating orb"), tx("Cincin FPS melayang di game: ketuk untuk menu ganti mode, rekam, dan detail.", "FPS ring floating in games: tap for the menu to switch mode, record and see details."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
         SwitchRow(tx("Tampilkan FPS di floating", "Show FPS in floating"), tx("Angka FPS, CPU, GPU, dan suhu.", "FPS, CPU, GPU and temperature readout."), vm.hudOn, 90) { vm.updateHudOn(it) }
         SwitchRow(tx("Jangan ganggu saat game", "Do not disturb in games"), tx("Notifikasi dibisukan selama game, balik normal setelah ditutup.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON"), 120) { vm.setFlag("GAME_DND_ON", it) }
@@ -632,7 +652,65 @@ private fun SettingsTab(vm: AppViewModel) {
             HBtn(tx("Latar dan banner", "Background and banner"), Modifier.weight(1f)) { vm.go("bgbanner") }
             HBtn(tx("Statistik sesi", "Session stats"), Modifier.weight(1f)) { vm.go("stats") }
         }
+        Glass(Modifier.fillMaxWidth().rise(240)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SText(tx("Pembaruan", "Updates"), 12.sp, SP.dim)
+                SText("HSIN v${vm.appVer}", 14.sp, SP.text, FontWeight.Medium)
+                if (vm.updateText.isNotEmpty()) Text(vm.updateText, color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HBtn(tx("Cek pembaruan", "Check for updates"), Modifier.weight(1f)) { vm.checkUpdate() }
+                    if (vm.updateUrl.isNotEmpty()) HBtn(tx("Buka halaman", "Open page"), Modifier.weight(1f)) {
+                        try { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(vm.updateUrl)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SetupCheck(vm: AppViewModel) {
+    val ctx = LocalContext.current
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(2000); tick++ } }
+    @Suppress("UNUSED_EXPRESSION") tick
+    val overlay = android.provider.Settings.canDrawOverlays(ctx)
+    val notif = androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+    val battOk = try { (ctx.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isIgnoringBatteryOptimizations(ctx.packageName) } catch (_: Exception) { true }
+    val modOk = vm.modPath.isNotEmpty()
+    val verBad = modOk && vm.status.ver > 0 && vm.status.ver != vm.appVer
+    val allOk = vm.rootOk && modOk && !verBad && overlay && notif && battOk
+    fun open(a: String, pkgUri: Boolean = false) {
+        try {
+            val i = android.content.Intent(a)
+            if (pkgUri) i.data = android.net.Uri.parse("package:" + ctx.packageName)
+            if (a == android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS) i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+            ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {}
+    }
+    Glass(Modifier.fillMaxWidth().rise(20)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SText(if (allOk) tx("Cek awal: semua siap", "Setup check: all good") else tx("Cek awal: ada yang perlu dibenahi", "Setup check: something needs fixing"), 12.sp, if (allOk) Color(0xFF4FE3C1) else SP.gold, FontWeight.SemiBold)
+            CheckRow(tx("Akses root", "Root access"), vm.rootOk, tx("Buka manager root dan izinkan HSIN", "Open your root manager and allow HSIN"), null)
+            CheckRow(tx("Modul HSIN terpasang", "HSIN module installed"), modOk, tx("Flash zip modul di KernelSU lalu reboot", "Flash the module zip in your root manager and reboot"), null)
+            if (verBad) CheckRow(tx("Versi modul cocok dengan app", "Module matches app version"), false, tx("Modul v${vm.status.ver}, app v${vm.appVer}: flash modul terbaru lalu reboot", "Module v${vm.status.ver}, app v${vm.appVer}: flash the latest module and reboot"), null)
+            CheckRow(tx("Izin tampil di atas app (floating)", "Draw over other apps (floating)"), overlay, "", { open(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, true) })
+            CheckRow(tx("Izin notifikasi", "Notifications"), notif, "", { open(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS) })
+            CheckRow(tx("Tidak dihemat baterai (supaya floating tidak mati)", "Not battery-optimized (keeps floating alive)"), battOk, "", { open(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) })
+        }
+    }
+}
+
+@Composable
+private fun CheckRow(name: String, ok: Boolean, hint: String, fix: (() -> Unit)?) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SText(if (ok) "✓" else "✗", 13.sp, if (ok) Color(0xFF4FE3C1) else SP.red, FontWeight.Bold, modifier = Modifier.width(18.dp))
+            SText(name, 12.sp, SP.text, modifier = Modifier.weight(1f))
+            if (!ok && fix != null) Box(Modifier.tap { fix() }.clip(CircleShape).border(1.dp, SP.gold, CircleShape).padding(horizontal = 10.dp, vertical = 3.dp)) { SText(tx("Perbaiki", "Fix"), 11.sp, SP.gold, FontWeight.SemiBold) }
+        }
+        if (!ok && hint.isNotEmpty()) Text(hint, color = SP.faint, fontSize = 10.sp, modifier = Modifier.padding(start = 18.dp))
     }
 }
 

@@ -669,6 +669,67 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun scanAndAdd() {
+        viewModelScope.launch {
+            busy = "Mencari game terpasang..."
+            val l = Hsin.gameScan()
+            if (l.isEmpty()) { busy = null; toast("Tidak ada game baru yang dikenal"); return@launch }
+            Hsin.gameScanAdd()
+            games = Hsin.games()
+            busy = null
+            toast("${l.size} game baru ditambahkan")
+        }
+    }
+
+    var diagText by mutableStateOf("")
+    fun fpsDiag() {
+        viewModelScope.launch {
+            busy = "Mendiagnosa FPS..."
+            val pkg = status.hudPkg.ifEmpty { status.gamePkg }.ifEmpty { prefs.lastGame }
+            diagText = if (pkg.isEmpty()) "Belum ada game yang dibuka. Buka game lewat HSIN lalu coba lagi." else Hsin.fpsDiag(pkg).ifEmpty { "Tidak ada hasil dari modul." }
+            busy = null
+        }
+    }
+
+    fun restoreAll() {
+        viewModelScope.launch {
+            busy = "Mengembalikan ke normal..."
+            val r = Hsin.restoreAll()
+            busy = null
+            toast(r.ifEmpty { "Selesai" })
+            refreshButton()
+        }
+    }
+
+    var updateText by mutableStateOf("")
+    var updateUrl by mutableStateOf("")
+    fun checkUpdate() {
+        viewModelScope.launch {
+            updateText = "Memeriksa..."
+            val res = withContext(Dispatchers.IO) {
+                try {
+                    val c = java.net.URL("https://api.github.com/repos/isac12345/Hsin/releases/latest").openConnection() as java.net.HttpURLConnection
+                    c.connectTimeout = 8000; c.readTimeout = 8000
+                    c.setRequestProperty("Accept", "application/vnd.github+json")
+                    if (c.responseCode == 404) "NONE|"
+                    else {
+                        val j = org.json.JSONObject(c.inputStream.bufferedReader().readText())
+                        (j.optString("tag_name") + "|" + j.optString("html_url"))
+                    }
+                } catch (e: Exception) { "ERR|" }
+            }
+            val (tag, url) = res.split("|").let { it[0] to it.getOrElse(1) { "" } }
+            updateUrl = url
+            updateText = when {
+                tag == "ERR" -> "Tidak bisa terhubung ke GitHub."
+                tag == "NONE" || tag.isEmpty() -> "Belum ada rilis di GitHub. Hasil build ada di tab Actions repo isac12345/Hsin."
+                else -> {
+                    "Rilis terbaru: $tag (versi kode app kamu: $appVer)"
+                }
+            }
+        }
+    }
+
     fun scanGames() {
         viewModelScope.launch {
             busy = "Mencari game terpasang..."
