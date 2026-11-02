@@ -96,6 +96,19 @@ class Prefs(ctx: Context) {
     var flMTemp: Boolean
         get() = sp.getBoolean("fl_m_temp", true)
         set(v) { sp.edit().putBoolean("fl_m_temp", v).apply() }
+    var flMBatt: Boolean
+        get() = sp.getBoolean("fl_m_batt", false)
+        set(v) { sp.edit().putBoolean("fl_m_batt", v).apply() }
+    var reduceAnim: Boolean
+        get() = sp.getBoolean("reduce_anim", false)
+        set(v) { sp.edit().putBoolean("reduce_anim", v).apply() }
+    /** Gelap latar custom: 0 ringan, 1 sedang, 2 pekat. */
+    var bgDim: Int
+        get() = sp.getInt("bg_dim", 1).coerceIn(0, 2)
+        set(v) { sp.edit().putInt("bg_dim", v.coerceIn(0, 2)).apply() }
+    var flAutoLog: Boolean
+        get() = sp.getBoolean("fl_auto_log", false)
+        set(v) { sp.edit().putBoolean("fl_auto_log", v).apply() }
     var introDone: Boolean
         get() = sp.getBoolean("intro_done", false)
         set(v) { sp.edit().putBoolean("intro_done", v).apply() }

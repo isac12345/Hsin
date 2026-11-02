@@ -146,7 +146,7 @@ fun Backdrop(vm: AppViewModel) {
         var m = Modifier.fillMaxSize()
         if (vm.blur > 0 && Build.VERSION.SDK_INT >= 31) m = m.blur((vm.blur * 0.24f).dp)
         Image(bmp.asImageBitmap(), null, m, contentScale = scale)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = when (UiState.bgDim) { 0 -> 0.3f; 2 -> 0.7f; else -> 0.5f })))
     } else {
         // tanpa background pilihan: pakai wallpaper bawaan HSIN supaya tidak ada layar kosong/hitam
         Image(painterResource(R.drawable.wallpaper_default), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)

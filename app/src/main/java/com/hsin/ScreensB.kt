@@ -131,6 +131,8 @@ private fun FloatingSettings(vm: AppViewModel) {
         ToggleRow("GPU", null, p.flMGpu) { setMetric(1, it) }
         ToggleRow("RAM", null, p.flMRam) { setMetric(2, it) }
         ToggleRow("Suhu", null, p.flMTemp) { setMetric(3, it) }
+        ToggleRow("Baterai", "persen baterai di kapsul", p.flMBatt) { p.flMBatt = it; vm.flChanged() }
+        ToggleRow("Rekam FPS otomatis", "mulai saat game dibuka, simpan ke file saat game ditutup", p.flAutoLog) { p.flAutoLog = it; vm.flChanged() }
         ToggleRow("Grafik FPS", null, p.flGraph) { p.flGraph = it; vm.flChanged() }
     }
     HsinCard {

@@ -497,9 +497,28 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             HSwitch(tx("Mode ringan", "Light mode"), tx("Hanya profil yang jalan; tanpa prioritas, DND, dan refresh rate.", "Profile only; no priority, DND or refresh rate."), opts["LITE"] == "1", col) {
                 vm.setGameOpt(g.pkg, "LITE", if (it) "1" else "default"); ver++
             }
+            var more by remember(g.pkg) { mutableStateOf(false) }
+            HBtn(if (more) tx("Lanjutan ▴", "Advanced ▴") else tx("Lanjutan ▾", "Advanced ▾"), Modifier.fillMaxWidth()) { more = !more }
+            if (more) {
+                fun tri(k: String) = when (opts[k]) { "on" -> 1; "off" -> 2; else -> 0 }
+                val triLbl = listOf(tx("Ikut umum", "Global"), tx("Nyala", "On"), tx("Mati", "Off"))
+                fun setTri(k: String, i: Int) { vm.setGameOpt(g.pkg, k, when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }); ver++ }
+                SText(tx("Prioritas proses", "Process priority"), 11.sp, SP.dim)
+                HChips(triLbl, tri("PRIO"), col) { setTri("PRIO", it) }
+                SText(tx("Jangan ganggu (DND)", "Do not disturb"), 11.sp, SP.dim)
+                HChips(triLbl, tri("DND"), col) { setTri("DND", it) }
+                SText(tx("Game Mode Android", "Android Game Mode"), 11.sp, SP.dim)
+                val gmKeys = listOf("off", "standard", "performance", "battery")
+                HChips(listOf(tx("Mati", "Off"), tx("Standar", "Standard"), "Performa", "Hemat"), gmKeys.indexOf(fx["gamemode"] ?: "off").coerceAtLeast(0), col) {
+                    vm.setGameFx(g.pkg, "gamemode", gmKeys[it]); ver++
+                }
+                HSwitch(tx("Muat game ke cache dulu", "Preload game cache"), tx("Loading awal lebih cepat, butuh RAM bebas.", "Faster first load, needs free RAM."), fx["preload"] == "on", col) {
+                    vm.setGameFx(g.pkg, "preload", if (it) "on" else "off"); ver++
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HBtn(tx("▶  LUNCURKAN", "▶  LAUNCH"), Modifier.weight(1f), col, solid = true) { UiState.startRitual(g.pkg) }
-                HBtn(tx("Lanjutan", "Advanced")) { vm.editPkg = g.pkg; vm.go("edit") }
+                HBtn(tx("Semua opsi", "All options")) { vm.editPkg = g.pkg; vm.go("edit") }
                 HBtn(tx("Hapus", "Remove"), color = SP.red) { vm.removeGame(g.pkg) }
             }
         }

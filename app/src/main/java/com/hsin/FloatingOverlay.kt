@@ -232,6 +232,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private val barViews = arrayOfNulls<BarView>(4)
     private val cards = arrayOfNulls<View>(4)
     private val thinVals = arrayOfNulls<TextView>(4)
+    private var autoLogged = false
+    private var thinBatGrp: View? = null
+    private var thinBatV: TextView? = null
+    private var lastBat = -1
     private val thinGroups = arrayOfNulls<View>(4)
     private val rings = ArrayList<RingView>()
     private var segButtons = ArrayList<TextView>()
@@ -307,6 +311,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         barViews.fill(null)
         cards.fill(null)
         thinVals.fill(null)
+        thinBatGrp = null; thinBatV = null; lastBat = -1
         thinGroups.fill(null)
         rings.clear()
         orbs.clear()
@@ -551,6 +556,15 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 if (lastInt[2] != used) metric(2, used, (used / 10).toString() + "." + (used % 10) + "G", (mi.totalMem - mi.availMem).toFloat() / mi.totalMem.toFloat())
             }
         }
+        if (prefs.flMBatt && thinBatV != null) {
+            val bi = ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val lv = bi?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val sc = bi?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+            if (lv >= 0 && sc > 0) {
+                val pct = lv * 100 / sc
+                if (pct != lastBat) { lastBat = pct; setText(thinBatV, pct.toString() + "%") }
+            }
+        }
         val tempV = s.tempC
         if (prefs.flMTemp && tempV != null) {
             val t = tempV.toInt()
@@ -666,6 +680,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun syncProbe(game: Boolean) {
         if (game == gameFg) return
         gameFg = game
+        if (prefs.flAutoLog) {
+            if (game && !csvOn) { toggleFpsLog(); autoLogged = true }
+            else if (!game && csvOn && autoLogged) { toggleFpsLog(); autoLogged = false }
+        }
         if (game) {
             if (attached) ensureProbe()
         } else if (probeOn) {
@@ -1177,9 +1195,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(px(8), 0, px(6), 0)
             background = roundBg(panelColor(), pf(26), BORDER)
-            minimumHeight = px(52)
+            minimumHeight = px(46)
         }
-        val ring = RingView(36, accentColor())
+        val ring = RingView(32, accentColor())
         rings.add(ring)
         row.addView(ring)
         val b = textView("--", 24f, TEXT, true).apply { letterSpacing = -0.02f }
@@ -1200,6 +1218,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             thinGroups[i] = grp
             row.addView(grp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = if (i == 0) 0 else px(14) })
         }
+        val bg = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
+        bg.addView(textView("BAT", 10f, LABEL, true).apply { letterSpacing = 0.1f })
+        val bv = textView("--", 15f, TEXT, true)
+        bg.addView(bv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(4) })
+        thinBatGrp = bg; thinBatV = bv
+        bg.visibility = if (prefs.flMBatt) View.VISIBLE else View.GONE
+        row.addView(bg, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(14) })
         val spacer = View(ctx)
         row.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
         // tombol cepat: profil (ketuk = ganti), Overdrive, rekam data FPS
@@ -1236,7 +1261,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun paintThinBtns() {
         thinProf?.apply {
             text = when (profile) { "battery" -> "HEMAT"; "balanced" -> "SEIMBANG"; "performance" -> "PERFORMA"; else -> "..." }
-            background = roundBg(0x33FFFFFF, pf(20), 0)
+            val mc = when (profile) { "battery" -> P_BATTERY; "balanced" -> P_BALANCED; else -> P_PERF }
+            setTextColor(mc)
+            background = roundBg((mc and 0x00FFFFFF) or 0x26000000, pf(20), (mc and 0x00FFFFFF) or 0x80000000.toInt())
         }
         thinOd?.apply {
             text = "PUNCAK"
@@ -1559,6 +1586,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             cards[i]?.visibility = if (on) View.VISIBLE else View.GONE
             thinGroups[i]?.visibility = if (on) View.VISIBLE else View.GONE
         }
+        thinBatGrp?.visibility = if (prefs.flMBatt) View.VISIBLE else View.GONE
         val fpsVis = if (prefs.flMFps) View.VISIBLE else View.GONE
         fpsPill?.visibility = fpsVis
         fpsPillLbl?.visibility = fpsVis
