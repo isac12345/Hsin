@@ -16,6 +16,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -239,6 +240,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var odFlame: FlameView? = null
     private var odName: TextView? = null
     private var odSmall: TextView? = null
+    private var odStatusLine: TextView? = null
     private var odOn = false
     private var odLevel = ""
     private var odAvail = false
@@ -1334,9 +1336,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             seg.addView(b, LinearLayout.LayoutParams(0, px(44), 1f).apply { marginStart = if (i == 0) 0 else px(6) })
             segButtons.add(b)
         }
+        val odChip = buildOdRow()
+        seg.addView(odChip, LinearLayout.LayoutParams(0, px(44), 1.15f).apply { marginStart = px(6) })
         segRow = seg
         add(seg)
-        add(buildOdRow(), 8)
+        val st = odSmall
+        if (st != null) {
+            (st.parent as? ViewGroup)?.removeView(st)
+            st.textSize = 11f
+            add(st, 8)
+            odStatusLine = st
+        }
 
         val top = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val dot = View(ctx).apply {
@@ -1368,7 +1378,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         add(big)
 
         val grid = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        val names = listOf("CPU", "GPU", "RAM", "SUHU")
+        val names = listOf("CPU PAKAI", "GPU PAKAI", "RAM PAKAI", "SUHU HP")
         for (i in 0 until 4) {
             grid.addView(card(names[i], i), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = if (i == 0) 0 else px(8) })
         }
@@ -1425,8 +1435,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun buildOdRow(): View {
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(px(14), 0, px(14), 0)
+            gravity = Gravity.CENTER
+            setPadding(px(6), 0, px(6), 0)
             minimumHeight = px(44)
             isClickable = true
             setOnClickListener {
@@ -1437,13 +1447,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val fl = FlameView(OD_TEXT)
         odFlame = fl
         row.addView(fl, LinearLayout.LayoutParams(px(18), px(18)))
-        val nm = textView("Puncak", 14f, OD_TEXT, true)
+        val nm = textView("Puncak", 13f, OD_TEXT, true)
         odName = nm
-        row.addView(nm, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(8) })
-        row.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f))
+        row.addView(nm, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(5) })
         val sm = textView("", 11f, HINT, true).apply { letterSpacing = 0.02f }
         odSmall = sm
-        row.addView(sm)
         odRow = row
         applyOvd()
         return row
@@ -1468,17 +1476,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val row = odRow
         if (row != null) {
             if (odOn) {
-                row.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(OD, OD_END)).apply { cornerRadius = pf(22) }
+                row.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(OD, OD_END)).apply { cornerRadius = pf(10) }
                 odFlame?.color = Color.WHITE; odFlame?.invalidate()
                 odName?.setTextColor(Color.WHITE)
-                odSmall?.setTextColor(0xD9FFFFFF.toInt())
-                setText(odSmall, if (odLevel == "safe") "AKTIF \u00B7 DIBATASI SUHU" else if (odLevel == "mid") "AKTIF \u00B7 DITURUNKAN SEDIKIT" else "AKTIF")
+                odSmall?.setTextColor(OD_TEXT)
+                setText(odSmall, if (odLevel == "safe") "Puncak aktif, dibatasi karena panas" else if (odLevel == "mid") "Puncak aktif, diturunkan sedikit karena hangat" else "Puncak aktif sampai game ditutup")
             } else {
-                row.background = roundBg(0x1AFF4D5E, pf(22), 0x8CFF4D5E.toInt())
+                row.background = roundBg(0x1AFF4D5E, pf(10), 0x8CFF4D5E.toInt())
                 odFlame?.color = OD_TEXT; odFlame?.invalidate()
                 odName?.setTextColor(OD_TEXT)
                 odSmall?.setTextColor(HINT)
-                setText(odSmall, if (odAvail) "Tenaga penuh, turun otomatis saat panas" else "Butuh game aktif")
+                setText(odSmall, if (odAvail) "Puncak: tenaga penuh, turun sendiri kalau panas" else "Puncak butuh game yang sedang dibuka")
             }
             row.alpha = if (!odOn && !odAvail) 0.6f else 1f
         }
@@ -1517,10 +1525,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         paintThinBtns()
         if (segButtons.size < 3) return
         val acc = accentColor()
+        val chipCol = intArrayOf(P_BATTERY, P_BALANCED, P_PERF)
         for (i in 0 until 3) {
-            val on = PROFILE_KEYS[i] == profile
+            val on = PROFILE_KEYS[i] == profile && !odOn
             val b = segButtons[i]
-            b.background = roundBg(if (on) acc else Color.TRANSPARENT, pf(10), 0)
+            b.background = roundBg(if (on) chipCol[i] else Color.TRANSPARENT, pf(10), if (on) 0 else (chipCol[i] and 0x00FFFFFF) or 0x55000000)
             b.setTextColor(if (on) DARK else SEG_TEXT)
             b.alpha = if (recOn || odOn) 0.45f else 1f
         }
@@ -1530,6 +1539,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         paintMenu()
         segRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         odRow?.visibility = if (recOn) View.GONE else View.VISIBLE
+        odStatusLine?.visibility = if (recOn) View.GONE else View.VISIBLE
         topRow?.visibility = if (recOn) View.VISIBLE else View.GONE
         footRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         hintRec?.visibility = if (recOn) View.VISIBLE else View.GONE
