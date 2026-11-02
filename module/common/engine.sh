@@ -34,7 +34,9 @@ hsin_rd() {
     HSIN_RD=""
     [ -r "$1" ] || return 1
     HSIN_RD=$(cat "$1" 2>/dev/null) || return 1
-    HSIN_RD=$(printf '%s\n' "$HSIN_RD" | head -n 1)
+    # baris pertama saja, tanpa fork (sebelumnya printf|head = 2 proses per baca)
+    HSIN_RD=${HSIN_RD%%
+*}
     return 0
 }
 
