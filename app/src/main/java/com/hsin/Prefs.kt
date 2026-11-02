@@ -96,6 +96,12 @@ class Prefs(ctx: Context) {
     var flMTemp: Boolean
         get() = sp.getBoolean("fl_m_temp", true)
         set(v) { sp.edit().putBoolean("fl_m_temp", v).apply() }
+    var accentTheme: Int
+        get() = sp.getInt("accent_theme", 0).coerceIn(0, 3)
+        set(v) { sp.edit().putInt("accent_theme", v.coerceIn(0, 3)).apply() }
+    var haptics: Boolean
+        get() = sp.getBoolean("haptics", true)
+        set(v) { sp.edit().putBoolean("haptics", v).apply() }
     /** App yang tidak boleh disentuh Bersihkan RAM (pilihan pengguna, di luar daftar bawaan yang selalu dilindungi). */
     var ramKeep: Set<String>
         get() = sp.getStringSet("ram_keep", emptySet())?.toSet() ?: emptySet()
