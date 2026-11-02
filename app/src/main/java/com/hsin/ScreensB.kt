@@ -121,7 +121,8 @@ private fun FloatingSettings(vm: AppViewModel) {
             { al = it; val n = SystemClock.uptimeMillis(); if (n - alT > 150) { alT = n; p.flAlpha = it.toInt() } },
             { p.flAlpha = al.toInt(); vm.flChanged() })
         Label("Tampilan awal", Modifier.padding(top = 10.dp))
-        Seg(listOf("RINGKAS", "BAR TIPIS"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })
+        Seg(listOf("ORB", "KAPSUL"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })
+        ToggleRow("Kapsul tembus sentuh", "Kapsul hanya tampil, sentuhan diteruskan ke game. Matikan di sini untuk menggesernya lagi.", p.flBarThrough) { p.flBarThrough = it; vm.flChanged() }
     }
     HsinCard {
         Label("Metrik yang ditampilkan")

@@ -74,6 +74,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     @Volatile var lastFps = 0
+    private var holdFps = 0f
+    private var holdAt = 0L
     var onProfile: ((String) -> Unit)? = null
     var onRec: (() -> Unit)? = null
     var onHidden: (() -> Unit)? = null
@@ -491,10 +493,15 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (prefs.bubbleHidden) return
         if (recOn) tickTimer()
         if (csvOn) csvRow(s)
+        // tahan angka FPS terakhir yang valid 2,5 dtk supaya tidak berkedip ke 0/-- saat sampel meleset
+        val nowMs = SystemClock.uptimeMillis()
+        val raw = s.fps
+        if (raw != null && raw >= 1f) { holdFps = raw; holdAt = nowMs }
+        val shown: Float? = if ((raw == null || raw < 1f) && holdFps > 0f && nowMs - holdAt < 2500L && idleRun < 3) holdFps else raw
         val fpsText = when {
             !prefs.flMFps -> null
-            s.fps == null -> "--"
-            else -> s.fps.toInt().toString()
+            shown == null -> "--"
+            else -> shown.toInt().toString()
         }
         val fv = s.fps
         if (fv != null && fv >= 1f) {
@@ -530,7 +537,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 val mhz = s.gpuMhz
                 if (mhz != null) {
                     if (mhz > gpuMaxMhz) gpuMaxMhz = mhz
-                    if (lastInt[1] != -mhz) metric(1, -mhz, mhz.toString() + "M", mhz.toFloat() / gpuMaxMhz.toFloat())
+                    if (lastInt[1] != -mhz) metric(1, -mhz, (mhz * 100 / gpuMaxMhz).toString() + "%", mhz.toFloat() / gpuMaxMhz.toFloat())
                 }
             }
         }
@@ -765,7 +772,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                         // area kosong di sekitar menu: tutup menu dan jangan telan sentuhan
                         val c = px(MENU_BOX) / 2f
                         val d = Math.hypot((e.x - c).toDouble(), (e.y - c).toDouble())
-                        if (d > px(ORB) / 2f + px(4)) { setMode(MODE_PILL); return@setOnTouchListener false }
+                        if (d > px(orbDp()) / 2f + px(4)) { setMode(MODE_PILL); return@setOnTouchListener false }
                     }
                     markActive()
                     snapping = false
@@ -794,7 +801,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                     } else if (held >= 500L) {
                         hide()
                     } else {
-                        toggle()
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastTapAt < 300L && mode == MODE_PILL) {
+                            lastTapAt = 0L
+                            pendingToggle?.let { v.removeCallbacks(it) }
+                            cycleMode()
+                        } else {
+                            lastTapAt = now
+                            val r = Runnable { toggle() }
+                            pendingToggle = r
+                            if (mode == MODE_PILL) v.postDelayed(r, 290L) else r.run()
+                        }
                     }
                     true
                 }
@@ -822,6 +839,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var snapTo = 0
     private var flashT0 = 0L
     private var dimA = 1f
+    private var lastTapAt = 0L
+    private var pendingToggle: Runnable? = null
 
     private fun markActive() {
         lastActive = SystemClock.uptimeMillis()
@@ -923,7 +942,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         Toast.makeText(ctx, "Orb disembunyikan. Munculkan lagi lewat notifikasi.", Toast.LENGTH_LONG).show()
     }
 
-    private fun menuPad(): Int = (px(MENU_BOX) - px(ORB)) / 2
+    private fun orbDp(): Int = ORB
+
+    private fun menuPad(): Int = (px(MENU_BOX) - px(orbDp())) / 2
 
     private fun setMode(n: Int) {
         val old = mode
@@ -981,9 +1002,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val base = if (right) 0.0 else 180.0
         val angs = doubleArrayOf(-62.0, -21.0, 21.0, 62.0)
         val c = px(MENU_BOX) / 2f
+        val shH = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        val cyScreen = (lp?.y ?: 0) + px(MENU_BOX) / 2
+        // dekat tepi atas/bawah layar: putar sebaran tombol ke arah yang lega (hindari bar atas game)
+        val vShift = when { cyScreen < px(MENU_R + 70) -> 38.0; cyScreen > shH - px(MENU_R + 70) -> -38.0; else -> 0.0 }
         val r = pf(MENU_R)
         for ((i, b) in menuBtns.withIndex()) {
-            val a = Math.toRadians(base + (if (right) angs[i] else -angs[i]))
+            val a = Math.toRadians(base + (if (right) angs[i] + vShift else -(angs[i] + vShift)))
             val half = px(52) / 2f
             val lpb = b.layoutParams as FrameLayout.LayoutParams
             lpb.leftMargin = (c + r * Math.cos(a) - half).toInt()
@@ -994,7 +1019,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (ib != null) {
             val lpi = ib.layoutParams as FrameLayout.LayoutParams
             lpi.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            lpi.topMargin = (c - pf(ORB) / 2f - pf(8) - px(26)).toInt()
+            lpi.topMargin = if (vShift > 0.0) (c + pf(orbDp()) / 2f + pf(8)).toInt() else (c - pf(orbDp()) / 2f - pf(8) - px(26)).toInt()
             ib.layoutParams = lpi
         }
         paintMenu()
@@ -1060,8 +1085,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         menuInfo = info
         m.addView(info, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         val orb = buildOrb(true)
-        val olp = FrameLayout.LayoutParams(px(ORB), px(ORB))
-        olp.leftMargin = (px(MENU_BOX) - px(ORB)) / 2
+        val olp = FrameLayout.LayoutParams(px(orbDp()), px(orbDp()))
+        olp.leftMargin = (px(MENU_BOX) - px(orbDp())) / 2
         olp.topMargin = olp.leftMargin
         m.addView(orb, olp)
         return m
@@ -1074,6 +1099,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         thin?.visibility = if (mode == MODE_THIN) View.VISIBLE else View.GONE
         for (i in lastInt.indices) lastInt[i] = -1
         if (mode == MODE_PANEL) graph?.clear()
+        applyTouchFlags()
+    }
+
+    /** Bar ringkas bisa dibuat tembus sentuh (tampil saja) supaya tidak menghalangi layar game. */
+    private fun applyTouchFlags() {
+        val p = lp ?: return
+        val r = root ?: return
+        if (!attached) return
+        val through = mode == MODE_THIN && prefs.flBarThrough
+        val nf = if (through) p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        if (nf != p.flags) { p.flags = nf; try { wm.updateViewLayout(r, p) } catch (_: Exception) { } }
     }
 
     // ---------------- tampilan ----------------
@@ -1125,11 +1161,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val f = FrameLayout(ctx)
         val orb = OrbView()
         orbs.add(orb)
-        f.addView(orb, FrameLayout.LayoutParams(px(ORB), px(ORB)))
+        f.addView(orb, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())))
         val b = textView("--", 18f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.02f }
         if (forMenu) fpsMenu = b else fpsPill = b
-        f.addView(b, FrameLayout.LayoutParams(px(ORB), px(ORB)))
-        f.layoutParams = FrameLayout.LayoutParams(px(ORB), px(ORB))
+        f.addView(b, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())))
+        f.layoutParams = FrameLayout.LayoutParams(px(orbDp()), px(orbDp()))
         return f
     }
 
@@ -1436,13 +1472,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 odFlame?.color = Color.WHITE; odFlame?.invalidate()
                 odName?.setTextColor(Color.WHITE)
                 odSmall?.setTextColor(0xD9FFFFFF.toInt())
-                setText(odSmall, if (odLevel == "safe") "AKTIF \u00B7 AMAN (PANAS)" else if (odLevel == "mid") "AKTIF \u00B7 TURUN SEDIKIT" else "AKTIF")
+                setText(odSmall, if (odLevel == "safe") "AKTIF \u00B7 DIBATASI SUHU" else if (odLevel == "mid") "AKTIF \u00B7 DITURUNKAN SEDIKIT" else "AKTIF")
             } else {
                 row.background = roundBg(0x1AFF4D5E, pf(22), 0x8CFF4D5E.toInt())
                 odFlame?.color = OD_TEXT; odFlame?.invalidate()
                 odName?.setTextColor(OD_TEXT)
                 odSmall?.setTextColor(HINT)
-                setText(odSmall, if (odAvail) "Mesin sendiri, tanpa Uperf/fas-rs" else "Butuh game aktif")
+                setText(odSmall, if (odAvail) "Tenaga penuh, turun otomatis saat panas" else "Butuh game aktif")
             }
             row.alpha = if (!odOn && !odAvail) 0.6f else 1f
         }

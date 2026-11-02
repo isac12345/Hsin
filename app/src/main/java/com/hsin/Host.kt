@@ -166,7 +166,7 @@ fun Banner(vm: AppViewModel) {
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
             txt("HSIN", 21.sp, Paper, FontWeight.Medium, spacing = 4.sp)
-            txt("V2 · FUSION", 11.sp, Color.White.copy(alpha = 0.7f), spacing = 3.sp)
+            txt("game booster", 11.sp, Color.White.copy(alpha = 0.7f), spacing = 3.sp)
         }
     }
 }

@@ -4,6 +4,12 @@ import androidx.compose.runtime.Composable
 
 /** Kamus Indo -> Inggris untuk layar turunan (teks yang ditulis langsung). Teks tanpa padanan tampil apa adanya. */
 private val EN: Map<String, String> = mapOf(
+    "BATALKAN" to "CANCEL", "KEMBALIKAN" to "RESET", "KOSONGKAN" to "CLEAR", "SEGARKAN" to "REFRESH", "KAPSUL" to "CAPSULE", "ORB" to "ORB",
+    "Kapsul tembus sentuh" to "Click-through capsule",
+    "Kapsul hanya tampil, sentuhan diteruskan ke game. Matikan di sini untuk menggesernya lagi." to "The capsule is display-only; touches pass through to the game. Turn this off to drag it again.",
+    "Dipasang saat game dibuka lewat tombol Luncurkan, dan dibuang saat game selesai. Resolusi game diatur di tab Game. Butuh Android 12 ke atas; tidak semua ROM menurut." to "Applied when the game opens via the Launch button and removed when it ends. Game resolution is set in the Games tab. Needs Android 12+; not every ROM obeys.",
+    "Game Mode Android" to "Android Game Mode", "LUNCUR" to "LAUNCH", "lama" to "old", "baru" to "new", "GAME" to "GAME", "GAMES" to "GAMES",
+    "Credit: Matt Yang & yinwanxi (Uperf), shadow3 & shadow3aaa (fas-rs)" to "Credit: Matt Yang & yinwanxi (Uperf), shadow3 & shadow3aaa (fas-rs)",
     "1% terendah" to "1% low", "5% terendah" to "5% low", "APPLY RES" to "APPLY", "AUTO-DETECT GAME" to "FIND GAMES",
     "Agak patah" to "Slightly choppy", "Akses root belum diberikan. Buka manager root (KernelSU/Magisk) dan izinkan HSIN." to "Root access not granted. Open your root manager (KernelSU/Magisk) and allow HSIN.",
     "Aktif" to "Active", "Alat" to "Tools", "Ambang pembersih" to "Cleaner threshold",
