@@ -119,6 +119,13 @@ class Prefs(ctx: Context) {
     var flAccentColor: Int
         get() = sp.getInt("fl_accent_color", 0xFFF5A524.toInt())
         set(v) { sp.edit().putInt("fl_accent_color", v).apply() }
+    /** 0 kecil, 1 sedang, 2 besar */
+    var flOrbSize: Int
+        get() = sp.getInt("fl_orb_size", 1).coerceIn(0, 2)
+        set(v) { sp.edit().putInt("fl_orb_size", v.coerceIn(0, 2)).apply() }
+    var flBarThrough: Boolean
+        get() = sp.getBoolean("fl_bar_through", false)
+        set(v) { sp.edit().putBoolean("fl_bar_through", v).apply() }
     var flXp: Int
         get() = sp.getInt("fl_x_p", 24)
         set(v) { sp.edit().putInt("fl_x_p", v).apply() }
