@@ -41,7 +41,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         "auto" to "dash", "therm" to "dash",
         "stats" to "games", "detect" to "games", "edit" to "games", "addgame" to "games",
         "bgbanner" to "custom", "bubble" to "custom", "theme" to "custom",
-        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "memfx" to "tools", "perf" to "tools",
+        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "sessions" to "games", "bench" to "tools", "memfx" to "tools", "perf" to "tools",
     )
     val tab: String get() = parents[route] ?: route
 
@@ -786,6 +786,40 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    var benchBusy by mutableStateOf(false)
+    var benchVer by mutableStateOf(0)
+    var cmpA by mutableStateOf(-1)
+    var cmpB by mutableStateOf(-1)
+    /** Uji CPU 3 dtk tunggal + 3 dtk semua inti; skor = juta iterasi. Dibandingkan antar mode. */
+    fun runBench() {
+        if (benchBusy) return
+        benchBusy = true
+        viewModelScope.launch {
+            val (one, all) = withContext(Dispatchers.Default) {
+                fun run(threads: Int): Long {
+                    val total = java.util.concurrent.atomic.AtomicLong(0)
+                    val end = System.nanoTime() + 3_000_000_000L
+                    val ts = (0 until threads).map {
+                        Thread {
+                            var n = 0L; var x = 1.0001
+                            while (System.nanoTime() < end) {
+                                for (i in 0 until 20000) { x = x * 1.0000001 + 0.0000001; if (x > 1e9) x = 1.0001 }
+                                n += 20000
+                            }
+                            total.addAndGet(n + (x.toLong() and 0))
+                        }.also { it.start() }
+                    }
+                    ts.forEach { it.join() }
+                    return total.get() / 1_000_000L
+                }
+                Pair(run(1), run(Runtime.getRuntime().availableProcessors().coerceAtLeast(2)))
+            }
+            val mode = profileLabel(status.profile)
+            prefs.benchHist = listOf(listOf(System.currentTimeMillis().toString(), mode, one.toString(), all.toString())) + prefs.benchHist
+            benchBusy = false
+            benchVer++
+        }
+    }
     var frozen by mutableStateOf<List<String>>(emptyList())
     var chargeInfo by mutableStateOf<Map<String, String>>(emptyMap())
     fun freezeApp(pkg: String) {

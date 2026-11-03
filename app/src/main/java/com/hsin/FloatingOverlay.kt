@@ -1296,6 +1296,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val sep = View(ctx).apply { setBackgroundColor(0x24FFFFFF) }
         row.addView(sep, LinearLayout.LayoutParams(px(1), px(24)).apply { marginStart = px(14); marginEnd = px(14) })
         val mNames = listOf("CPU", "GPU", "RAM", "SUHU")
+        val groupViews = arrayOfNulls<View>(5)
         for (i in 0 until 4) {
             val grp = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
             grp.addView(textView(mNames[i], 10f, LABEL, true).apply { letterSpacing = 0.1f })
@@ -1303,7 +1304,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             grp.addView(v, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(4) })
             thinVals[i] = v
             thinGroups[i] = grp
-            row.addView(grp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = if (i == 0) 0 else px(14) })
+            groupViews[i] = grp
         }
         val bg = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
         bg.addView(textView("BAT", 10f, LABEL, true).apply { letterSpacing = 0.1f })
@@ -1311,7 +1312,20 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         bg.addView(bv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(4) })
         thinBatGrp = bg; thinBatV = bv
         bg.visibility = if (prefs.flMBatt) View.VISIBLE else View.GONE
-        row.addView(bg, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(14) })
+        groupViews[4] = bg
+        // urutan metrik di kapsul dipilih pengguna (huruf C G R T B)
+        var firstG = true
+        for (ch in prefs.flOrder) {
+            val gi = "CGRTB".indexOf(ch)
+            val gv = if (gi >= 0) groupViews[gi] else null
+            if (gv != null && gv.parent == null) {
+                row.addView(gv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = if (firstG) 0 else px(14) })
+                firstG = false
+            }
+        }
+        for (gv in groupViews) if (gv != null && gv.parent == null) {
+            row.addView(gv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(14) })
+        }
         val spacer = View(ctx)
         row.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
         // tombol cepat: profil (ketuk = ganti), Overdrive, rekam data FPS

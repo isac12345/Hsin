@@ -100,6 +100,13 @@ class Prefs(ctx: Context) {
     var flMTemp: Boolean
         get() = sp.getBoolean("fl_m_temp", true)
         set(v) { sp.edit().putBoolean("fl_m_temp", v).apply() }
+    /** Urutan metrik di kapsul: huruf C=CPU G=GPU R=RAM T=suhu B=baterai. */
+    var flOrder: String
+        get() {
+            val v = sp.getString("fl_order", "CGRTB") ?: "CGRTB"
+            return if (v.length == 5 && "CGRTB".all { it in v }) v else "CGRTB"
+        }
+        set(v) { sp.edit().putString("fl_order", v).apply() }
     var flMBatt: Boolean
         get() = sp.getBoolean("fl_m_batt", false)
         set(v) { sp.edit().putBoolean("fl_m_batt", v).apply() }
@@ -130,6 +137,10 @@ class Prefs(ctx: Context) {
     var fpsSessions: List<FpsSession>
         get() = (sp.getString("fps_sessions", "") ?: "").lines().mapNotNull { FpsSession.decode(it) }
         set(v) { sp.edit().putString("fps_sessions", v.take(12).joinToString("\n") { it.encode() }).apply() }
+    /** Riwayat uji performa: "epoch|mode|tunggal|banyak", terbaru di atas, maksimal 10. */
+    var benchHist: List<List<String>>
+        get() = (sp.getString("bench_hist", "") ?: "").lines().map { it.split('|') }.filter { it.size >= 4 }
+        set(v) { sp.edit().putString("bench_hist", v.take(10).joinToString("\n") { it.joinToString("|") }).apply() }
     var flGraph: Boolean
         get() = sp.getBoolean("fl_graph", true)
         set(v) { sp.edit().putBoolean("fl_graph", v).apply() }
