@@ -210,7 +210,7 @@ class BubbleService : Service() {
         when (intent?.action) {
             ACT_SET -> intent.getStringExtra(EXTRA_P)?.let {
                 if (it == "puncak") {
-                    if (gamePkg.isEmpty()) Toast.makeText(this, "Buka game dulu untuk mode Puncak", Toast.LENGTH_SHORT).show()
+                    if (gamePkg.isEmpty()) Toast.makeText(this, trn("Buka game dulu untuk mode Puncak"), Toast.LENGTH_SHORT).show()
                     else toggleOvd(!ovdOn)
                 } else setProfile(it)
             }
@@ -288,7 +288,7 @@ class BubbleService : Service() {
         val start = !recOn
         scope.launch {
             val r = if (start) Hsin.recStart() else Hsin.recStop()
-            if (!r.ok) Toast.makeText(this@BubbleService, "Gagal mengakses rekaman", Toast.LENGTH_SHORT).show()
+            if (!r.ok) Toast.makeText(this@BubbleService, trn("Gagal mengakses rekaman"), Toast.LENGTH_SHORT).show()
             Hsin.status()?.let {
                 recOn = it.rec
                 profile = it.profile

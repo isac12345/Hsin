@@ -246,7 +246,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setGameOpt(pkg: String, key: String, v: String) {
         viewModelScope.launch {
             val r = Hsin.setGameOpt(pkg, key, v)
-            if (r.code != 0) toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
+            if (r.code != 0) toast((r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal").removePrefix("ERROR:").trim())
         }
     }
 
@@ -272,7 +272,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     // ---------- util ----------
     private var toastJob: Job? = null
     fun toast(s: String) {
-        msg = s
+        msg = trn(s.removePrefix("ERROR:").trim())
         toastJob?.cancel()
         toastJob = viewModelScope.launch { delay(2600); msg = null }
     }

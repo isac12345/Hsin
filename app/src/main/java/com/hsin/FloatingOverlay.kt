@@ -159,7 +159,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             csvBuf.setLength(0)
             csvBuf.append("t_detik,paket,fps,gpu_persen,gpu_mhz,cpu_persen,suhu_soc,suhu_baterai,profil,overdrive\n")
             paintCsv()
-            Toast.makeText(ctx, "Rekam data FPS dimulai", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, trn("Rekam data FPS dimulai"), Toast.LENGTH_SHORT).show()
         } else {
             csvOn = false
             FpsLog.on = false
@@ -171,7 +171,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun paintCsv() {
         paintThinBtns()
         paintMenu()
-        csvBtnLbl?.text = if (csvOn) "Stop FPS" else "Rekam FPS"
+        csvBtnLbl?.text = if (csvOn) "Stop FPS" else trn("Rekam FPS")
         csvDot?.background = GradientDrawable().apply {
             shape = if (csvOn) GradientDrawable.RECTANGLE else GradientDrawable.OVAL
             cornerRadius = pf(3)
@@ -195,7 +195,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun saveCsv() {
         if (csvRows == 0) {
-            Toast.makeText(ctx, "Tidak ada data FPS yang terekam", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, trn("Tidak ada data FPS yang terekam"), Toast.LENGTH_SHORT).show()
             return
         }
         val text = csvBuf.toString()
@@ -540,6 +540,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         return sm
     }
 
+    @Suppress("DEPRECATION")
+    private fun hzNow(): Int = try { Math.round(wm.defaultDisplay.refreshRate) } catch (_: Throwable) { 60 }
+
     private fun apply(s: Sample) {
         if (prefs.bubbleHidden) return
         if (recOn) tickTimer()
@@ -551,7 +554,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val shown: Float? = if ((raw == null || raw < 1f) && holdFps > 0f && nowMs - holdAt < 2500L && idleRun < 3) holdFps else raw
         val fpsText = when {
             !prefs.flMFps -> null
-            shown == null -> "--"
+            shown == null -> hzNow().toString()   // tidak ada pembaca FPS (app biasa): tampilkan refresh rate layar
             else -> shown.toInt().toString()
         }
         val fv = s.fps
@@ -569,7 +572,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         idleRun = if (s.fps != null && s.fps < 0.5f) idleRun + 1 else 0
         if (fv != null) { lastFps = fv.toInt(); for (o in orbs) o.setFps(fv) }
         if (mode == MODE_MENU) updateMenuInfo(s.tempC)
-        val lbl = if (idleRun >= 3) "IDLE" else "FPS"
+        val lbl = if (shown == null) "Hz" else if (idleRun >= 3) "IDLE" else "FPS"
         setText(fpsPillLbl, lbl)
         setText(fpsThinLbl, lbl)
         setText(fpsBigLbl, lbl)
@@ -1162,9 +1165,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         // tahan tombol mode = langsung ke Puncak
         menuBtns[0].setOnLongClickListener {
             markActive()
-            if (odOn) Toast.makeText(ctx, "Sudah di mode Puncak", Toast.LENGTH_SHORT).show()
+            if (odOn) Toast.makeText(ctx, "✓ " + trn("Sudah di mode Puncak"), Toast.LENGTH_SHORT).show()
             else if (odAvail) onOvd?.invoke(true)
-            else Toast.makeText(ctx, "Puncak hanya aktif saat game berjalan", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(ctx, "ℹ " + trn("Puncak hanya aktif saat game berjalan"), Toast.LENGTH_SHORT).show()
             true
         }
         val info = textView("", 11f, TEXT, true).apply {
@@ -1383,7 +1386,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val box = FrameLayout(ctx).apply {
             background = roundBg(0x2EE5484D, pf(22), 0)
             isClickable = true
-            contentDescription = "Mulai rekam"
+            contentDescription = trn("Mulai rekam")
             setOnClickListener { onRec?.invoke() }
         }
         val dot = View(ctx).apply {
@@ -1406,7 +1409,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val dot = View(ctx)
         csvDot = dot
         row.addView(dot, LinearLayout.LayoutParams(px(12), px(12)))
-        val lbl = textView(if (csvOn) "Stop FPS" else "Rekam FPS", 13f, Color.WHITE, true)
+        val lbl = textView(if (csvOn) "Stop FPS" else trn("Rekam FPS"), 13f, Color.WHITE, true)
         csvBtnLbl = lbl
         row.addView(lbl, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = px(8) })
         paintCsv()
@@ -1506,7 +1509,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         add(big)
 
         val grid = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        val names = listOf("CPU PAKAI", "GPU PAKAI", "RAM PAKAI", "SUHU HP")
+        val names = listOf("CPU PAKAI", "GPU PAKAI", "RAM PAKAI", trn("SUHU HP"))
         for (i in 0 until 4) {
             grid.addView(card(names[i], i), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = if (i == 0) 0 else px(8) })
         }
@@ -1568,7 +1571,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             minimumHeight = px(44)
             isClickable = true
             setOnClickListener {
-                if (!odAvail && !odOn) Toast.makeText(ctx, "Buka game terdaftar dulu, Puncak hanya untuk game", Toast.LENGTH_SHORT).show()
+                if (!odAvail && !odOn) Toast.makeText(ctx, "ℹ " + trn("Buka game terdaftar dulu, Puncak hanya untuk game"), Toast.LENGTH_SHORT).show()
                 else onOvd?.invoke(!odOn)
             }
         }
@@ -1608,13 +1611,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 odFlame?.color = Color.WHITE; odFlame?.invalidate()
                 odName?.setTextColor(Color.WHITE)
                 odSmall?.setTextColor(OD_TEXT)
-                setText(odSmall, if (odLevel == "safe") "Puncak aktif, dibatasi karena panas" else if (odLevel == "mid") "Puncak aktif, diturunkan sedikit karena hangat" else "Puncak aktif sampai game ditutup")
+                setText(odSmall, if (odLevel == "safe") trn("Puncak aktif, dibatasi karena panas") else if (odLevel == "mid") trn("Puncak aktif, diturunkan sedikit karena hangat") else trn("Puncak aktif sampai game ditutup"))
             } else {
                 row.background = roundBg(0x1AFF4D5E, pf(10), 0x8CFF4D5E.toInt())
                 odFlame?.color = OD_TEXT; odFlame?.invalidate()
                 odName?.setTextColor(OD_TEXT)
                 odSmall?.setTextColor(HINT)
-                setText(odSmall, if (odAvail) "Puncak: tenaga penuh, turun sendiri kalau panas" else "Puncak butuh game yang sedang dibuka")
+                setText(odSmall, if (odAvail) "Puncak: tenaga penuh, turun sendiri kalau panas" else trn("Puncak butuh game yang sedang dibuka"))
             }
             row.alpha = if (!odOn && !odAvail) 0.6f else 1f
         }

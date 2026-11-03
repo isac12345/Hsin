@@ -319,7 +319,13 @@ fun HsinApp(vm: AppViewModel) {
                 val m = vm.msg
                 if (m != null) {
                     Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 24.dp, start = 24.dp, end = 24.dp)) {
-                        Box(Modifier.clip(RoundedCornerShape(16.dp)).background(SP.gold).padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        // jenis pesan: gagal/tidak = merah, sukses = hijau, lainnya = emas; ikon di depan
+                        val bad = Regex("(?i)gagal|tidak |error|could not|not ").containsMatchIn(m)
+                        val good = Regex("(?i)disimpan|saved|diganti|dihapus|selesai|berhasil|aktif|ditambahkan|dikembalikan|dipertahankan|restored|kept|changed").containsMatchIn(m)
+                        val tone = if (bad) Color(0xFFFF6B78) else if (good) Color(0xFF4FE3C1) else SP.gold
+                        Row(Modifier.clip(RoundedCornerShape(16.dp)).background(tone).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SText(if (bad) "⚠" else if (good) "✓" else "ℹ", 14.sp, SP.ink, FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
                             SText(m, 13.sp, SP.ink, FontWeight.Medium)
                         }
                     }
