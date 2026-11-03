@@ -75,11 +75,11 @@ jobs:
           test -f "$APK"
           mkdir -p module/companion dist
           cp "$APK" module/companion/HSINBubble.apk
-          cp "$APK" "dist/HSIN-v6.3.7.apk"
-          (cd module && zip -r9 -q "../dist/HSIN-v6.3.7-module.zip" . -x '*.git*')
+          cp "$APK" "dist/HSIN-v6.3.8.apk"
+          (cd module && zip -r9 -q "../dist/HSIN-v6.3.8-module.zip" . -x '*.git*')
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HSIN-v6.3.7
+          name: HSIN-v6.3.8
           path: dist/*
