@@ -539,14 +539,14 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
 
 @Composable
 internal fun AlatTab(vm: AppViewModel, land: Boolean) {
-    var sub by remember { mutableIntStateOf(0) }
+    var sub by remember { mutableIntStateOf(UiState.toolsSub) }
     LaunchedEffect(vm.modPath) {
         vm.go("tools")
         vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet()
     }
     val names = listOf(tx("Mesin", "Engine"), tx("Layar", "Display"), tx("Bersih", "Clean"), tx("Log", "Logs"), tx("Sistem", "System"))
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HChips(names, sub) { sub = it }
+        HChips(names, sub) { sub = it; UiState.toolsSub = it }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             when (sub) {
                 0 -> AlatMesin(vm, land)
@@ -640,18 +640,33 @@ private fun AlatBersih(vm: AppViewModel, land: Boolean) {
     })
 }
 
+/** Penjelasan ramah untuk peringatan yang sebenarnya normal. */
+private fun logHint(m: String): Pair<String, String>? = when {
+    m.contains("cmd game set gagal") -> "ROM tidak menerima perintah Game Mode untuk game ini. Tidak masalah, tweak lain tetap jalan." to "This ROM does not accept the Game Mode command for this game. Harmless; other tweaks still work."
+    m.contains("performance cap freq") -> "Batas GPU 1500 MHz adalah maksimum HP ini, jadi normal." to "The 1500 MHz GPU cap is this phone's hardware maximum, so it is normal."
+    m.contains("thermal") && m.contains("dicek") -> "Pengecekan suhu sesaat sebelum menerapkan mode. Normal." to "A quick temperature check before applying a mode. Normal."
+    else -> null
+}
+
 @Composable
 private fun AlatLog(vm: AppViewModel) {
     val filters = listOf("ALL" to tx("Semua", "All"), "ERROR" to "Error", "CPU" to "CPU", "GAME" to "Game", "INPUT" to "Input")
     Section(tx("CATATAN MODUL", "MODULE LOG")) {
         HChips(filters.map { it.second }, filters.indexOfFirst { it.first == vm.logFilter }.coerceAtLeast(0)) { vm.logFilter = filters[it].first }
-        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(10).reversed()
+        // baris kembar digabung (x2); peringatan umum diberi penjelasan singkat
+        val raw = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(16).reversed()
+        val shown = ArrayList<Pair<LogLine, Int>>()
+        for (l in raw) { val last = shown.lastOrNull(); if (last != null && last.first.cat == l.cat && last.first.msg == l.msg) shown[shown.size - 1] = last.first to (last.second + 1) else shown.add(l to 1) }
         if (shown.isEmpty()) SText(tx("Belum ada log.", "No log yet."), 12.sp, SP.faint)
-        shown.forEach { l ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                SText(relTime(l.timeMs), 11.sp, SP.faint, modifier = Modifier.width(34.dp))
-                SText(l.cat, 11.sp, SP.gold, FontWeight.Medium, modifier = Modifier.width(78.dp))
-                SText((l.status + " " + l.msg).trim(), 11.sp, SP.dim, modifier = Modifier.weight(1f))
+        shown.take(10).forEach { (l, n) ->
+            val hint = logHint(l.msg)
+            Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(Modifier.fillMaxWidth()) {
+                    SText(relTime(l.timeMs), 11.sp, SP.faint, modifier = Modifier.width(34.dp))
+                    SText(l.cat, 11.sp, SP.gold, FontWeight.Medium, modifier = Modifier.width(78.dp))
+                    SText((l.status + " " + l.msg).trim() + if (n > 1) "  ×$n" else "", 11.sp, SP.dim, modifier = Modifier.weight(1f))
+                }
+                if (hint != null) SText("ℹ " + tx(hint.first, hint.second), 10.sp, Color(0xFF4FE3C1), modifier = Modifier.padding(start = 112.dp))
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

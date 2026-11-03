@@ -90,4 +90,72 @@ private val EN: Map<String, String> = mapOf(
 )
 
 @Composable
-fun tr(s: String): String = if (LocalEn.current) EN[s] ?: s else s
+fun tr(s: String): String = if (LocalEn.current) EN2[s] ?: EN[s] ?: s else s
+
+/** Terjemahan tambahan: pesan toast, status sibuk, dan teks floating. */
+private val EN2: Map<String, String> = mapOf(
+    "Izinkan 'tampil di atas app lain' dulu" to "Allow 'display over other apps' first",
+    "Refresh rate game: ikut sistem" to "Game refresh rate: follow system",
+    "Tersimpan. Profil game dipakai selama game jalan" to "Saved. The game profile is used while the game runs",
+    "Gagal menyimpan pengaturan" to "Could not save settings", "Gagal menyimpan batas suhu" to "Could not save the temperature limit",
+    "Boot guard aktif" to "Boot guard on", "Sebagian gagal disimpan" to "Some items could not be saved",
+    "Menyimpan game..." to "Saving game...", "Info layar belum terbaca" to "Screen info not read yet",
+    "Tidak dikonfirmasi, resolusi dikembalikan" to "Not confirmed, resolution restored",
+    "Tutup semua app" to "Close all apps",
+    "Semua app pihak ketiga ditutup, termasuk game yang sedang jalan. HSIN, Termux, dan manager root tidak ikut ditutup." to "All third-party apps are closed, including the running game. HSIN, Termux and the root manager are not closed.",
+    "MGLRU gagal menyala (kernel tidak mendukung)" to "MGLRU could not turn on (kernel does not support it)",
+    "MGLRU dikembalikan ke semula" to "MGLRU restored to its original value",
+    "Mencari game terpasang..." to "Searching installed games...", "Tidak ada game baru yang dikenal" to "No new known games",
+    "Belum ada game yang dibuka. Buka game lewat HSIN lalu coba lagi." to "No game opened yet. Open a game through HSIN and try again.",
+    "Tidak ada hasil dari modul." to "No result from the module.", "Mengembalikan ke normal..." to "Restoring to normal...",
+    "Tidak bisa terhubung ke GitHub." to "Could not reach GitHub.", "Mendaftarkan game..." to "Registering game...",
+    "Deteksi ulang selesai" to "Re-detect finished", "Modul tidak ditemukan" to "Module not found", "Gagal membaca gambar" to "Could not read the image",
+    "Mengganti render..." to "Changing renderer...", "Mengatur MGLRU..." to "Setting MGLRU...", "Menjalankan TRIM..." to "Running TRIM...",
+    "Membuat arsip laporan..." to "Creating report archive...", "Mengekspor log..." to "Exporting log...", "Membekukan..." to "Freezing...",
+    "Membersihkan RAM..." to "Cleaning RAM...", "Menutup app..." to "Closing apps...", "Mendeteksi ulang..." to "Re-detecting...",
+    "Memuat ulang..." to "Reloading...", "Mencari modul..." to "Searching module...", "Mendiagnosa FPS..." to "Diagnosing FPS...",
+    "Menghapus..." to "Removing...", "Dimuat ulang" to "Reloaded", "Health check diperbarui" to "Health check updated", "Log disalin" to "Log copied",
+    "Background diganti" to "Background changed", "Background dihapus" to "Background removed", "Banner diganti" to "Banner changed", "Banner default dipakai" to "Default banner in use",
+    "Resolusi dipertahankan" to "Resolution kept", "Resolusi dikembalikan" to "Resolution restored", "Resolusi direset" to "Resolution reset",
+    "Dexopt dibatalkan" to "Dexopt cancelled", "Floating selalu tampil" to "Always show floating",
+    "Buka game dulu untuk mode Puncak" to "Open a game first for Peak mode", "Gagal mengakses rekaman" to "Could not access the recording",
+    "Orb disembunyikan · ketuk untuk memunculkan" to "Orb hidden · tap to show it", "Rekam data FPS dimulai" to "FPS recording started",
+    "Rekam FPS" to "Record FPS", "Tidak ada data FPS yang terekam" to "No FPS data recorded", "Sudah di mode Puncak" to "Already in Peak mode",
+    "Puncak hanya aktif saat game berjalan" to "Peak only works while a game is running", "Mulai rekam" to "Start recording", "SUHU HP" to "PHONE TEMP",
+    "Buka game terdaftar dulu, Puncak hanya untuk game" to "Open a registered game first; Peak is for games only",
+    "Puncak aktif, dibatasi karena panas" to "Peak on, limited because of heat", "Puncak aktif, diturunkan sedikit karena hangat" to "Peak on, lowered slightly because it is warm",
+    "Puncak aktif sampai game ditutup" to "Peak stays on until the game closes", "Puncak butuh game yang sedang dibuka" to "Peak needs a game that is open",
+    "Game terakhir" to "Last game", "Belum ada" to "None yet", "Modul HSIN tidak terbaca" to "HSIN module not readable", "Modul tidak terbaca" to "Module not readable",
+    "Aktif, mode aman (panas)" to "On, safe mode (hot)", "Aktif, turun sedikit (panas)" to "On, slightly lowered (hot)", "Butuh game aktif" to "Needs an active game",
+    "Belum bisa dicek di ROM ini. Cek setelah game dibuka." to "Cannot be checked on this ROM. Check after the game is open.",
+    "HUD: gelap pekat, sudut tegas. Kaca: tembus pandang dan membulat (blur butuh Android 12 ke atas dan ROM yang mendukung)." to "HUD: solid dark, sharp corners. Glass: see-through and rounded (blur needs Android 12+ and a supporting ROM).",
+    "Urutan di kapsul" to "Order in the capsule", "Selalu tampil" to "Always show",
+    "floating menyala terus (tidak hanya saat game) supaya kelihatan FPS-nya jalan atau tidak" to "floating stays on (not only in games) so you can tell whether FPS is running",
+    "persen baterai di kapsul" to "battery percent in the capsule", "Rekam FPS otomatis" to "Auto-record FPS",
+    "mulai saat game dibuka, simpan ke file saat game ditutup" to "starts when a game opens, saved to a file when it closes",
+    "App yang dibekukan tidak jalan sama sekali di latar belakang dan ikonnya hilang, tapi datanya aman. Cairkan kapan saja dari sini. App sistem, launcher, keyboard, dan HSIN tidak bisa dibekukan." to "Frozen apps do not run at all in the background and their icon disappears, but data is safe. Unfreeze any time from here. System apps, launcher, keyboard and HSIN cannot be frozen.",
+    "CAIRKAN SEMUA" to "UNFREEZE ALL",
+    "Belum ada sesi. Main game dengan floating aktif, sesi tersimpan otomatis (minimal ±10 detik)." to "No sessions yet. Play a game with floating on; sessions save automatically (at least ~10 s).",
+    "Ketuk dua sesi untuk dibandingkan (misal Hemat vs Puncak di game yang sama)." to "Tap two sessions to compare them (e.g. Saver vs Peak in the same game).",
+    "Menguji (±6 detik)..." to "Testing (~6 s)...", "Batas pengisian" to "Charge limit", "batas persen kernel" to "kernel percent limit", "Batas isi" to "Charge cap",
+    "Menghentikan pengisian di persen tertentu supaya baterai lebih awet. Berhasil atau tidaknya tergantung kernel HP: HSIN mencari node pengisian yang bisa dipakai." to "Stops charging at a set percent so the battery lasts longer. Whether it works depends on the phone kernel: HSIN looks for a usable charging node.",
+    "OFF = isi sampai penuh seperti biasa. Batas dipulihkan otomatis saat HP restart dan dimatikan saat modul dihapus." to "OFF = charge to full as usual. The limit is restored automatically after a restart and removed when the module is deleted.",
+    "Hemat daya tanpa ngelag. Cocok untuk game ringan dan pemakaian harian." to "Saves power without lag. Good for light games and daily use.",
+    "Lancar dan adem untuk sesi panjang" to "Smooth and cool for long sessions",
+    "Cukup kencang untuk kebanyakan game, suhu dan baterai tetap terjaga." to "Fast enough for most games, with temperature and battery kept in check.",
+    "Tenaga tinggi untuk game berat" to "High power for heavy games", "CPU dan GPU agresif, tetap dijaga pengaman panas." to "Aggressive CPU and GPU, still guarded by thermal protection.",
+    "CPU dan GPU dikunci frekuensi tertinggi, batas panas dilonggarkan. Paling kencang, HP lebih hangat." to "CPU and GPU locked at top frequency, heat limit relaxed. Fastest, but the phone gets warmer.",
+    "Mode Puncak aktif" to "Peak mode on", "Mode gagal diterapkan" to "Mode could not be applied", "game booster" to "game booster",
+)
+
+fun trn(s: String): String {
+    if (!UiState.en) return s
+    EN2[s]?.let { return it }
+    EN[s]?.let { return it }
+    var r = s
+    val frag = listOf(" disimpan" to " saved", " dihapus" to " removed", " game ditambahkan" to " games added", " game baru ditambahkan" to " new games added",
+        " app ditutup" to " apps closed", "Batas suhu " to "Temperature limit ", "Dexopt selesai: " to "Dexopt finished: ", " berhasil, " to " ok, ", " gagal" to " failed")
+    for ((a, b) in frag) r = r.replace(a, b)
+    return r
+}
+

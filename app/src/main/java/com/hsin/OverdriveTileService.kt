@@ -26,13 +26,13 @@ class OverdriveTileService : TileService() {
         scope.launch {
             val s = Hsin.status()
             if (s == null) {
-                Toast.makeText(applicationContext, "Modul HSIN tidak terbaca", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, trn("Modul HSIN tidak terbaca"), Toast.LENGTH_SHORT).show()
                 return@launch
             }
             if (s.ovd) {
                 Hsin.ovdStop()
             } else if (s.gamePkg.isEmpty()) {
-                Toast.makeText(applicationContext, "Buka game terdaftar dulu, Puncak hanya untuk game", Toast.LENGTH_LONG).show()
+                Toast.makeText(applicationContext, trn("Buka game terdaftar dulu, Puncak hanya untuk game"), Toast.LENGTH_LONG).show()
             } else {
                 val r = Hsin.ovdStart()
                 if (!r.ok) {
@@ -54,11 +54,11 @@ class OverdriveTileService : TileService() {
         }
         if (android.os.Build.VERSION.SDK_INT >= 29) {
             t.subtitle = when {
-                s == null -> "Modul tidak terbaca"
-                s.ovd && s.ovdLevel == "safe" -> "Aktif, mode aman (panas)"
-                s.ovd && s.ovdLevel == "mid" -> "Aktif, turun sedikit (panas)"
+                s == null -> trn("Modul tidak terbaca")
+                s.ovd && s.ovdLevel == "safe" -> trn("Aktif, mode aman (panas)")
+                s.ovd && s.ovdLevel == "mid" -> trn("Aktif, turun sedikit (panas)")
                 s.ovd -> "Aktif"
-                s.gamePkg.isEmpty() -> "Butuh game aktif"
+                s.gamePkg.isEmpty() -> trn("Butuh game aktif")
                 else -> "Mati"
             }
         }

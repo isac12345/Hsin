@@ -12,10 +12,10 @@ class LastGameTileService : TileService() {
         super.onStartListening()
         val t = qsTile ?: return
         val pkg = last()
-        t.label = "Game terakhir"
+        t.label = trn("Game terakhir")
         if (pkg.isEmpty()) {
             t.state = Tile.STATE_UNAVAILABLE
-            if (android.os.Build.VERSION.SDK_INT >= 29) t.subtitle = "Belum ada"
+            if (android.os.Build.VERSION.SDK_INT >= 29) t.subtitle = trn("Belum ada")
         } else {
             t.state = Tile.STATE_INACTIVE
             val name = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (_: Exception) { pkg }

@@ -148,7 +148,7 @@ gh_opt_set() {
     case "$2" in
         PRIO|DND) case "$3" in on|off|default) ;; *) echo "ERROR: nilai $2 harus on|off|default"; return 1 ;; esac ;;
         LITE) case "$3" in 1|default) ;; *) echo "ERROR: nilai LITE harus 1|default"; return 1 ;; esac ;;
-        OVD) case "$3" in on|default) ;; *) echo "ERROR: nilai OVD harus on|default"; return 1 ;; esac ;;
+        OVD) case "$3" in on|off|default) ;; *) echo "ERROR: nilai OVD harus on|off|default"; return 1 ;; esac ;;
         HZ)
             case "$3" in
                 off|default) ;;
@@ -170,7 +170,7 @@ gh_opt_set() {
     grep -v "^$(_gh_re "$1"):$2=" "$GH_OPTS" > "$GH_OPTS.tmp.$$" 2>/dev/null
     _gos_rm=0
     [ "$3" = "default" ] && _gos_rm=1
-    case "$2" in gamemode|downscale|fps|preload) [ "$3" = off ] && _gos_rm=1 ;; esac
+    case "$2" in gamemode|downscale|fps|preload|OVD) [ "$3" = off ] && _gos_rm=1 ;; esac
     [ "$_gos_rm" = 1 ] || printf '%s:%s=%s\n' "$1" "$2" "$3" >> "$GH_OPTS.tmp.$$"
     mv -f "$GH_OPTS.tmp.$$" "$GH_OPTS" && echo "OK: $1 $2=$3"
 }

@@ -127,7 +127,9 @@ object Hsin {
         if (!PKG_RE.matches(pkg)) return Root.Res(1, "ERROR: package tidak valid")
         if (key !in setOf("PRIO", "DND", "LITE", "HZ", "OVD")) return Root.Res(1, "ERROR: opsi tidak dikenal")
         if (v !in setOf("on", "off", "1", "default") && v.toIntOrNull() !in 30..240) return Root.Res(1, "ERROR: nilai tidak valid")
-        return ctl("gameopt set $pkg $key $v")
+        // modul lama menolak OVD=off; "default" artinya sama (ikut global)
+        val vv = if (key == "OVD" && v == "off") "default" else v
+        return ctl("gameopt set $pkg $key $vv")
     }
 
     /** Overdrive: hanya untuk game terdaftar yang sedang aktif. Pesan gagal ada di Res.out. */

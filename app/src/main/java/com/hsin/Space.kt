@@ -229,6 +229,7 @@ object UiState {
     var portrait by mutableStateOf(false)
     var tab by mutableIntStateOf(0)
     var gameIdx by mutableIntStateOf(0)
+    var toolsSub by mutableIntStateOf(0)   // sub-tab Alat terakhir, supaya Back dari fitur kembali ke tempat semula
     var splashDone = false          // loading hanya sekali per pembukaan app (bukan tiap kembali ke Beranda)
     var ritual by mutableStateOf("")   // paket game yang sedang diluncurkan lewat ritual
     fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz() } }
