@@ -301,6 +301,8 @@ fun HsinApp(vm: AppViewModel) {
                                     "tools" -> ToolsScreen(vm)
                                     "dexopt" -> DexoptScreen(vm)
                                     "ramkeep" -> RamKeepScreen(vm)
+                                    "freeze" -> FreezeScreen(vm)
+                                    "charge" -> ChargeScreen(vm)
                                     "memfx" -> MemFxScreen(vm)
                                     "perf" -> PerfScreen(vm)
                                     "batlab" -> BatLabScreen(vm)
