@@ -689,6 +689,10 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
                 HBtn(tx("Bekukan app", "Freeze apps"), Modifier.weight(1f)) { vm.go("freeze") }
                 HBtn(tx("Batas pengisian", "Charge limit"), Modifier.weight(1f)) { vm.go("charge") }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HBtn(tx("Riwayat sesi FPS", "FPS sessions"), Modifier.weight(1f)) { vm.go("sessions") }
+                HBtn(tx("Uji performa", "Benchmark"), Modifier.weight(1f)) { vm.go("bench") }
+            }
         }
         Section(tx("DIAGNOSA DAN PEMULIHAN", "DIAGNOSTICS AND RECOVERY"), 50) {
             Text(tx("FPS tampil '--'? Tombol ini menunjukkan sumber FPS mana yang berjalan untuk game terakhir.", "FPS shows '--'? This shows which FPS source works for the last game."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
