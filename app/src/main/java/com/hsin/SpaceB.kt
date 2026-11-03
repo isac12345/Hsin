@@ -369,6 +369,14 @@ private fun SessionCard(vm: AppViewModel, col: Color) {
                     SessStat("1% low", "${last.low1} FPS", col)
                     SessStat(tx("Mode", "Mode"), mode, col)
                 }
+                if (last.jank > 0 || last.bigJank > 0 || last.stab > 0 || last.watt10 > 0) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        SessStat("Jank", "${last.jank} / ${last.bigJank}", col)
+                        SessStat(tx("Kestabilan", "Stability"), "${last.stab}%", col)
+                        SessStat(tx("Frame maks", "Max frame"), "${last.maxFt} ms", col)
+                        SessStat(tx("Daya", "Power"), if (last.watt10 > 0) "${last.watt10 / 10}.${last.watt10 % 10} W" else "--", col)
+                    }
+                }
             }
             if (lastPkg.isNotEmpty()) {
                 HBtn(tx("▶  LANJUT: ", "▶  RESUME: ") + vm.label(lastPkg), Modifier.fillMaxWidth(), col, solid = true) { UiState.startRitual(lastPkg) }

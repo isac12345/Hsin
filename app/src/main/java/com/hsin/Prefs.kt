@@ -78,6 +78,10 @@ class Prefs(ctx: Context) {
     var flAlpha: Int
         get() = sp.getInt("fl_alpha", 88).coerceIn(40, 100)
         set(v) { sp.edit().putInt("fl_alpha", v.coerceIn(40, 100)).apply() }
+    /** Gaya floating: 0 standar, 1 HUD gelap tegas, 2 kaca lembut. */
+    var flStyle: Int
+        get() = sp.getInt("fl_style", 0).coerceIn(0, 2)
+        set(v) { sp.edit().putInt("fl_style", v.coerceIn(0, 2)).apply() }
     var flStartThin: Boolean
         get() = sp.getBoolean("fl_start_thin", false)
         set(v) { sp.edit().putBoolean("fl_start_thin", v).apply() }

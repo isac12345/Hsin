@@ -124,8 +124,13 @@ data class FpsSession(
     val secs: Int,
     val ovdPct: Int,
     val profile: String,
+    val jank: Int = 0,
+    val bigJank: Int = 0,
+    val maxFt: Int = 0,        // frame time terpanjang (ms)
+    val stab: Int = 0,         // kestabilan FPS 0-100 (100 = sangat stabil)
+    val watt10: Int = 0,       // daya rata-rata, satuan 0,1 W (0 = tidak diketahui)
 ) {
-    fun encode(): String = "$epoch|$pkg|$avg|$low1|$samples|$secs|$ovdPct|$profile"
+    fun encode(): String = "$epoch|$pkg|$avg|$low1|$samples|$secs|$ovdPct|$profile|$jank|$bigJank|$maxFt|$stab|$watt10"
 
     companion object {
         fun decode(l: String): FpsSession? {
@@ -135,7 +140,21 @@ data class FpsSession(
                 p[0].toLongOrNull() ?: return null, p[1],
                 p[2].toIntOrNull() ?: return null, p[3].toIntOrNull() ?: return null,
                 p[4].toIntOrNull() ?: 0, p[5].toIntOrNull() ?: 0, p[6].toIntOrNull() ?: 0, p[7],
+                p.getOrNull(8)?.toIntOrNull() ?: 0, p.getOrNull(9)?.toIntOrNull() ?: 0,
+                p.getOrNull(10)?.toIntOrNull() ?: 0, p.getOrNull(11)?.toIntOrNull() ?: 0,
+                p.getOrNull(12)?.toIntOrNull() ?: 0,
             )
+        }
+
+        /** Kestabilan 0-100 dari koefisien variasi FPS (CV 0% = 100, CV 40%+ = 0). */
+        fun stability(v: List<Float>): Int {
+            if (v.size < 5) return 0
+            val m = v.average()
+            if (m <= 0.0) return 0
+            var ss = 0.0
+            for (x in v) ss += (x - m) * (x - m)
+            val cv = Math.sqrt(ss / v.size) / m
+            return Math.round((1.0 - (cv / 0.4)).coerceIn(0.0, 1.0) * 100).toInt()
         }
 
         /** (rata-rata, 1% terendah) dari daftar FPS; null bila terlalu sedikit sampel. */
