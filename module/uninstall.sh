@@ -3,6 +3,11 @@
 
 # --- HSIN cleanup ---
 WORK_DIR="${HSIN_WORK_DIR:-/data/adb/hsin}"
+# kembalikan pengisian normal dan cairkan app yang dibekukan, supaya tidak ada yang tertinggal
+[ -f "$(dirname "$0")/common/charge.sh" ] && sh "$(dirname "$0")/common/charge.sh" off >/dev/null 2>&1
+if [ -f "$WORK_DIR/frozen.list" ]; then
+    while IFS= read -r _fz; do [ -n "$_fz" ] && pm enable --user 0 "$_fz" >/dev/null 2>&1; done < "$WORK_DIR/frozen.list"
+fi
 
 # modul31: hentikan daemon HSIN (monitor + watchdog + pgr-log) via
 # kecocokan cmdline, JANGAN bunuh PID buta (pid bisa dipakai ulang).

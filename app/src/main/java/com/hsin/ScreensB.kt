@@ -550,6 +550,73 @@ fun RamKeepScreen(vm: AppViewModel) {
     }
 }
 
+// ---------------------------------------------------------------- BEKUKAN APP
+@Composable
+fun FreezeScreen(vm: AppViewModel) {
+    BackBtn { vm.back() }
+    HsinCard {
+        Label("Bekukan app")
+        txt("App yang dibekukan tidak jalan sama sekali di latar belakang dan ikonnya hilang, tapi datanya aman. Cairkan kapan saja dari sini. App sistem, launcher, keyboard, dan HSIN tidak bisa dibekukan.", 12.sp, muted())
+        if (vm.frozen.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Label("Sedang dibekukan · ${vm.frozen.size}")
+            vm.frozen.forEach { p ->
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AppIcon(p, 32.dp)
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        txt(vm.label(p), 13.sp, maxLines = 1)
+                        txt(p, 11.sp, muted(), maxLines = 1)
+                    }
+                    SmallPill("CAIRKAN", { vm.unfreezeApp(p) })
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Pill("CAIRKAN SEMUA", { vm.unfreezeApp("") })
+        }
+    }
+    HsinCard {
+        val list = vm.thirdParty.filter { it.pkg !in vm.frozen }
+        Label("Pilih app untuk dibekukan · ${list.size}")
+        if (vm.thirdParty.isEmpty()) txt("Membaca daftar app...", 12.sp, muted(), modifier = Modifier.padding(top = 10.dp))
+        list.forEach { a ->
+            Row(Modifier.fillMaxWidth().clickable { vm.freezeApp(a.pkg) }.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(a.pkg, 36.dp)
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    txt(a.label, 13.sp, maxLines = 1)
+                    txt(a.pkg, 11.sp, muted(), maxLines = 1)
+                }
+                txt("BEKUKAN", 11.sp, Mint)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- BATAS PENGISIAN
+@Composable
+fun ChargeScreen(vm: AppViewModel) {
+    BackBtn { vm.back() }
+    val ci = vm.chargeInfo
+    val kind = ci["kind"].orEmpty()
+    val lim = ci["limit"]?.toIntOrNull() ?: 100
+    val steps = listOf(100, 95, 90, 85, 80, 70)
+    HsinCard {
+        Label("Batas pengisian")
+        txt("Menghentikan pengisian di persen tertentu supaya baterai lebih awet. Berhasil atau tidaknya tergantung kernel HP: HSIN mencari node pengisian yang bisa dipakai.", 12.sp, muted())
+        Spacer(Modifier.height(10.dp))
+        when (kind) {
+            "", "none" -> txt(if (ci.isEmpty()) "Memeriksa HP..." else "HP ini tidak punya kontrol pengisian yang bisa diatur. Fitur ini tidak tersedia di perangkatmu.", 13.sp)
+            else -> {
+                txt("Jenis kontrol: " + (if (kind == "thr") "batas persen kernel" else "saklar pengisian + penjaga HSIN"), 12.sp, muted())
+                txt("Baterai ${ci["level"].orEmpty()}% · ${ci["status"].orEmpty()}", 13.sp)
+                Spacer(Modifier.height(8.dp))
+                Label("Batas isi")
+                Seg(steps.map { if (it == 100) "OFF" else "$it%" }, steps.indexOf(lim).coerceAtLeast(0), { vm.setChargeLimit(steps[it]) })
+                txt("OFF = isi sampai penuh seperti biasa. Batas dipulihkan otomatis saat HP restart dan dimatikan saat modul dihapus.", 11.sp, muted(), modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------- BATTERY LAB
 @Composable
 fun BatLabScreen(vm: AppViewModel) {

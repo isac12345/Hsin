@@ -683,6 +683,13 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
                 }
             }
         }
+        Section(tx("FITUR TAMBAHAN", "EXTRAS"), 45) {
+            Text(tx("Bekukan app yang tidak dipakai, dan batasi pengisian baterai (tergantung HP).", "Freeze unused apps, and cap battery charging (device dependent)."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HBtn(tx("Bekukan app", "Freeze apps"), Modifier.weight(1f)) { vm.go("freeze") }
+                HBtn(tx("Batas pengisian", "Charge limit"), Modifier.weight(1f)) { vm.go("charge") }
+            }
+        }
         Section(tx("DIAGNOSA DAN PEMULIHAN", "DIAGNOSTICS AND RECOVERY"), 50) {
             Text(tx("FPS tampil '--'? Tombol ini menunjukkan sumber FPS mana yang berjalan untuk game terakhir.", "FPS shows '--'? This shows which FPS source works for the last game."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
             HBtn(tx("DIAGNOSA FPS", "FPS DIAGNOSIS"), Modifier.fillMaxWidth()) { vm.fpsDiag() }

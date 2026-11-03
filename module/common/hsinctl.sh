@@ -448,6 +448,42 @@ cmd_hud() {
     esac
 }
 
+# Bekukan app: pm disable-user (data aman, ikon hilang, tidak jalan di latar). Hanya app pengguna yang boleh.
+FREEZE_LIST="$STATE_DIR/frozen.list"
+freeze_protected() {
+    case "$1" in
+        android|com.hsin|com.android.*|com.google.android.gms*|com.google.android.gsf*|*launcher*|*inputmethod*|*keyboard*|com.unisoc.*|com.sprd.*|com.topjohnwu.magisk|me.weishu.kernelsu|*.systemui|*.settings|*.dialer|*.phone) return 0 ;;
+    esac
+    return 1
+}
+cmd_freeze() {
+    case "$1" in
+        list) [ -f "$FREEZE_LIST" ] && cat "$FREEZE_LIST"; return 0 ;;
+        on)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            freeze_protected "$2" && { echo "ERROR: app sistem/penting tidak boleh dibekukan"; return 1; }
+            pm path "$2" >/dev/null 2>&1 || { echo "ERROR: app tidak terpasang"; return 1; }
+            am force-stop "$2" >/dev/null 2>&1
+            pm disable-user --user 0 "$2" >/dev/null 2>&1 || { echo "ERROR: gagal membekukan"; return 1; }
+            grep -qx "$2" "$FREEZE_LIST" 2>/dev/null || echo "$2" >> "$FREEZE_LIST"
+            echo "OK: $2 dibekukan"
+            ;;
+        off)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            pm enable --user 0 "$2" >/dev/null 2>&1
+            [ -f "$FREEZE_LIST" ] && grep -vx "$2" "$FREEZE_LIST" > "$FREEZE_LIST.tmp" 2>/dev/null; [ -f "$FREEZE_LIST.tmp" ] && mv "$FREEZE_LIST.tmp" "$FREEZE_LIST"
+            echo "OK: $2 dicairkan"
+            ;;
+        alloff)
+            [ -f "$FREEZE_LIST" ] || { echo "OK: tidak ada yang dibekukan"; return 0; }
+            while IFS= read -r _fz; do [ -n "$_fz" ] && pm enable --user 0 "$_fz" >/dev/null 2>&1; done < "$FREEZE_LIST"
+            rm -f "$FREEZE_LIST"
+            echo "OK: semua dicairkan"
+            ;;
+        *) echo "Usage: freeze list|on <pkg>|off <pkg>|alloff"; return 1 ;;
+    esac
+}
+
 cmd_restore() {
     sh "$COMMON/overdrive.sh" stop darurat >/dev/null 2>&1
     gh_recover >/dev/null 2>&1
@@ -458,6 +494,7 @@ cmd_restore() {
         command -v gb_restore >/dev/null 2>&1 && gb_restore
     ) >/dev/null 2>&1
     wm size reset >/dev/null 2>&1
+    sh "$COMMON/charge.sh" off >/dev/null 2>&1
     echo "OK: semua dikembalikan ke normal"
 }
 
@@ -546,6 +583,8 @@ case "$1" in
     memclean) cmd_memclean "$2" ;;
     refresh) cmd_refresh "$2" "$3" ;;
     hud) cmd_hud "$2" "$3" ;;
+    charge) sh "$COMMON/charge.sh" "$2" "$3" ;;
+    freeze) cmd_freeze "$2" "$3" ;;
     rec) sh "$COMMON/screenrec.sh" "$2" "$3" ;;
     autoctl) cmd_autoctl "$2" ;;
     renderrestore) _gh_render_restore; [ -f "$GH_REND_PREV" ] && echo "pending: $(cat "$GH_REND_PREV")" || echo "OK: tidak ada penanda; renderer=$(getprop debug.hwui.renderer)" ;;

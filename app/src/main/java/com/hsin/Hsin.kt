@@ -203,6 +203,13 @@ object Hsin {
         return ctl("hud diag $pkg", 25_000L).out.trim()
     }
 
+    suspend fun chargeStatus(): Map<String, String> = kv(ctl("charge status").out)
+    suspend fun chargeSet(n: Int): String = ctl("charge set $n", 20_000L).out.lines().lastOrNull { it.isNotBlank() }.orEmpty()
+    suspend fun freezeList(): List<String> = ctl("freeze list").out.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    suspend fun freezeOn(pkg: String): String = ctl("freeze on $pkg", 25_000L).out.lines().lastOrNull { it.isNotBlank() }.orEmpty()
+    suspend fun freezeOff(pkg: String): String = ctl("freeze off $pkg", 25_000L).out.lines().lastOrNull { it.isNotBlank() }.orEmpty()
+    suspend fun freezeAllOff(): String = ctl("freeze alloff", 40_000L).out.lines().lastOrNull { it.isNotBlank() }.orEmpty()
+
     suspend fun restoreAll(): String = ctl("restore", 40_000L).out.trim()
 
     suspend fun ovdStart(): Root.Res = ctl("ovd start", 20_000L)

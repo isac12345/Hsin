@@ -62,8 +62,8 @@ jobs:
           BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           mkdir -p module/bin
           ok=0
-          "$BIN/aarch64-linux-android29-clang" -Os -Wall -o module/bin/hsin-fpsd-arm64 native/hsin-fpsd.c -lbinder_ndk && ok=$((ok+1)) || echo "::warning::build arm64 gagal"
-          "$BIN/armv7a-linux-androideabi29-clang" -Os -Wall -o module/bin/hsin-fpsd-arm32 native/hsin-fpsd.c -lbinder_ndk && ok=$((ok+1)) || echo "::warning::build arm32 gagal"
+          "$BIN/aarch64-linux-android29-clang" -Os -Wall -o module/bin/hsin-fpsd-arm64 native/hsin-fpsd.c -ldl && ok=$((ok+1)) || echo "::warning::build arm64 gagal"
+          "$BIN/armv7a-linux-androideabi29-clang" -Os -Wall -o module/bin/hsin-fpsd-arm32 native/hsin-fpsd.c -ldl && ok=$((ok+1)) || echo "::warning::build arm32 gagal"
           "$BIN/llvm-strip" module/bin/hsin-fpsd-* 2>/dev/null || true
           ls -la module/bin
           echo "daemon FPS terbangun: $ok dari 2"
@@ -75,11 +75,11 @@ jobs:
           test -f "$APK"
           mkdir -p module/companion dist
           cp "$APK" module/companion/HSINBubble.apk
-          cp "$APK" "dist/HSIN-v6.3.5.apk"
-          (cd module && zip -r9 -q "../dist/HSIN-v6.3.5-module.zip" . -x '*.git*')
+          cp "$APK" "dist/HSIN-v6.3.6.apk"
+          (cd module && zip -r9 -q "../dist/HSIN-v6.3.6-module.zip" . -x '*.git*')
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HSIN-v6.3.5
+          name: HSIN-v6.3.6
           path: dist/*

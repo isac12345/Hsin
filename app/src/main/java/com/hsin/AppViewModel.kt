@@ -41,7 +41,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         "auto" to "dash", "therm" to "dash",
         "stats" to "games", "detect" to "games", "edit" to "games", "addgame" to "games",
         "bgbanner" to "custom", "bubble" to "custom", "theme" to "custom",
-        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "memfx" to "tools", "perf" to "tools",
+        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "memfx" to "tools", "perf" to "tools",
     )
     val tab: String get() = parents[route] ?: route
 
@@ -61,6 +61,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             "fulllog" -> viewModelScope.launch { loadFullLog() }
             "addgame", "detect" -> ensureApps()
             "dexopt", "ramkeep" -> ensureThirdParty()
+            "freeze" -> { ensureThirdParty(); viewModelScope.launch { frozen = Hsin.freezeList() } }
+            "charge" -> viewModelScope.launch { chargeInfo = Hsin.chargeStatus() }
             "memfx" -> viewModelScope.launch { conf = Hsin.conf(); loadMem() }
             "perf" -> loadFpsFiles()
             "dash", "therm" -> viewModelScope.launch { flags = Hsin.flags() }
@@ -781,6 +783,32 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             val path = Hsin.exportLog()
             busy = null
             toast(if (path != null) "Log disimpan: $path" else "Gagal mengekspor log")
+        }
+    }
+
+    var frozen by mutableStateOf<List<String>>(emptyList())
+    var chargeInfo by mutableStateOf<Map<String, String>>(emptyMap())
+    fun freezeApp(pkg: String) {
+        viewModelScope.launch {
+            busy = "Membekukan..."
+            val r = Hsin.freezeOn(pkg)
+            frozen = Hsin.freezeList()
+            busy = null
+            msg = r
+        }
+    }
+    fun unfreezeApp(pkg: String) {
+        viewModelScope.launch {
+            val r = if (pkg.isEmpty()) Hsin.freezeAllOff() else Hsin.freezeOff(pkg)
+            frozen = Hsin.freezeList()
+            msg = r
+        }
+    }
+    fun setChargeLimit(n: Int) {
+        viewModelScope.launch {
+            val r = Hsin.chargeSet(n)
+            chargeInfo = Hsin.chargeStatus()
+            msg = r
         }
     }
 

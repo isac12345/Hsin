@@ -413,6 +413,11 @@ if [ -f "$MODDIR/common/render_manager.sh" ]; then
     sh "$MODDIR/common/render_manager.sh" apply >> "$LOG_FILE" 2>&1
     echo "[INFO] render backend re-apply selesai" >> "$LOG_FILE"
 fi
+# 11. Batas pengisian pilihan user: hidupkan lagi penjaga bila ada (hanya HP tanpa node batas persen).
+if [ -f "$WORK_DIR/charge_limit" ] && [ -f "$MODDIR/common/charge.sh" ]; then
+    read -r _cl < "$WORK_DIR/charge_limit" 2>/dev/null
+    [ -n "$_cl" ] && sh "$MODDIR/common/charge.sh" set "$_cl" >> "$LOG_FILE" 2>&1
+fi
 echo "[BOOT] boot service selesai penuh" >> "$LOG_FILE"
 
 exit 0
