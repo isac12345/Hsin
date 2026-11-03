@@ -23,6 +23,56 @@ LAYER_CACHE="$STATE_DIR/.hud_layer"
 SYS_THERMAL="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
 SYS_POWER="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}"
 
+# ---- daemon FPS native (module/bin/hsin-fpsd-*): baca frame langsung lewat binder, tanpa fork dumpsys.
+# Kalau tidak ada/gagal, semua jalur lama di bawah tetap dipakai. HSIN_FPSD=0 mematikannya.
+FPSD_DIR="$STATE_DIR"
+FPSD_OUT="$STATE_DIR/fpsd.out"
+FPSD_PKG="$STATE_DIR/fpsd.pkg"
+FPSD_ON="${HSIN_FPSD:-1}"
+FPSD_N=0
+FPSD_BAD=0
+fpsd_bin() {
+    _fb_mod="${HSIN_MODDIR:-${0%/common/*}}"
+    if [ -e /system/lib64/libbinder_ndk.so ]; then _fb_a=arm64; _fb_b=arm32; else _fb_a=arm32; _fb_b=arm64; fi
+    for _fb_x in "$_fb_a" "$_fb_b"; do
+        [ -x "$_fb_mod/bin/hsin-fpsd-$_fb_x" ] && { printf '%s' "$_fb_mod/bin/hsin-fpsd-$_fb_x"; return 0; }
+    done
+    return 1
+}
+# Hidupkan daemon bila belum jalan (dicek tiap ~10 sampel). Gagal selftest = tandai, jangan dicoba lagi.
+fpsd_ensure() {
+    [ "$FPSD_ON" = 1 ] && [ "$FPSD_BAD" = 0 ] || return 1
+    FPSD_N=$((FPSD_N + 1))
+    [ $((FPSD_N % 10)) -eq 1 ] || return 0
+    _fe_pid=""
+    [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fe_pid < "$STATE_DIR/fpsd.pid"
+    if [ -n "$_fe_pid" ] && kill -0 "$_fe_pid" 2>/dev/null; then return 0; fi
+    _fe_bin=$(fpsd_bin) || { FPSD_BAD=1; return 1; }
+    if ! "$_fe_bin" --selftest >/dev/null 2>&1; then FPSD_BAD=1; return 1; fi
+    ( "$_fe_bin" "$FPSD_DIR" >/dev/null 2>&1 & )
+    return 0
+}
+# Hasil daemon bila segar (< 4 dtk) dan untuk game yang sama. FL_LAT diisi baris timestamp.
+fpsd_read() {
+    FL_LAT=""
+    [ "$FPSD_ON" = 1 ] && [ "$FPSD_BAD" = 0 ] || return 1
+    printf '%s' "$1" > "$FPSD_PKG" 2>/dev/null
+    [ -r "$FPSD_OUT" ] || return 1
+    _fr_m=$(stat -c %Y "$FPSD_OUT" 2>/dev/null) || return 1
+    _fr_n=$(date +%s)
+    [ $((_fr_n - _fr_m)) -le 4 ] || return 1
+    _fr_pkg=""; _fr_lat=""
+    while IFS= read -r _fr_l; do
+        case "$_fr_l" in
+            pkg=*) _fr_pkg="${_fr_l#pkg=}" ;;
+            lat=*) _fr_lat="${_fr_l#lat=}" ;;
+        esac
+    done < "$FPSD_OUT"
+    [ "$_fr_pkg" = "$1" ] && [ -n "$_fr_lat" ] || return 1
+    FL_LAT="$_fr_lat"
+    return 0
+}
+
 # FPS cara Smollming: counter SurfaceFlinger 1013 (selisih per detik), fallback
 # ke latency per layer kalau counter gagal/diam 3x berturut-turut.
 CNT_PREV=""
@@ -229,6 +279,8 @@ fps_layer() {
     _fl_pkg="$1"
     FL_LAT=""
     _fl_layer=""
+    fpsd_ensure
+    if fpsd_read "$_fl_pkg"; then return 0; fi
     command -v dumpsys >/dev/null 2>&1 || return 1
     if [ -f "$LAYER_CACHE" ]; then
         IFS='|' read -r _fl_cp _fl_cl < "$LAYER_CACHE"
@@ -380,6 +432,13 @@ trap '[ "$TS_ON" = 1 ] && dumpsys SurfaceFlinger --timestats -disable >/dev/null
 diag() {
     _dg_pkg="$1"
     echo "paket: ${_dg_pkg:-(kosong)}"
+    _dg_fb=$(fpsd_bin 2>/dev/null)
+    if [ -z "$_dg_fb" ]; then echo "daemon FPS: TIDAK ADA di modul ini (pakai jalur dumpsys)"; else
+        echo "daemon FPS: $("$_dg_fb" --selftest 2>&1 | head -n 1)"
+        [ -r "$STATE_DIR/fpsd.status" ] && echo "status daemon: $(head -n 1 "$STATE_DIR/fpsd.status")"
+        _dg_p=""; [ -r "$STATE_DIR/fpsd.pid" ] && read -r _dg_p < "$STATE_DIR/fpsd.pid"
+        if [ -n "$_dg_p" ] && kill -0 "$_dg_p" 2>/dev/null; then echo "proses daemon: jalan (pid $_dg_p)"; else echo "proses daemon: tidak jalan"; fi
+    fi
     _dg_a=$(service call SurfaceFlinger 1013 2>&1 | head -n 1)
     case "$_dg_a" in *"Parcel(00000000"*) echo "counter SurfaceFlinger: ADA" ;; *) echo "counter SurfaceFlinger: TIDAK ADA" ;; esac
     _dg_l=$(layer_candidates "$_dg_pkg" 2>/dev/null)

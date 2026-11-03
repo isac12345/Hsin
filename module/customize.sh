@@ -268,6 +268,7 @@ rm -rf "$MODPATH/uperf/modules"
 # ---------------------------------------------------------
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/service.sh" 0 0 0755
+for _b in "$MODPATH"/bin/hsin-fpsd-*; do [ -f "$_b" ] && set_perm "$_b" 0 0 0755; done
 set_perm "$MODPATH/common/detect.sh" 0 0 0755
 set_perm "$MODPATH/common/engine.sh" 0 0 0755
 set_perm "$MODPATH/common/game_manager.sh" 0 0 0755
