@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.TypedValue
@@ -120,6 +121,25 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var sesOvdTicks = 0
     private var sesProfile = ""
     private val sesFps = ArrayList<Float>(1024)
+    private var sesJank = 0
+    private var sesBig = 0
+    private var sesMaxFt = 0
+    private var sesWattSum = 0L
+    private var sesWattN = 0
+
+    /** Daya sesaat dalam 0,1 W dari arus x tegangan baterai (0 = tidak terbaca). Satuan arus berbeda tiap kernel, ditebak dari besarnya. */
+    private fun readWatt10(): Int {
+        return try {
+            val bm = ctx.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+            val cur = Math.abs(bm.getLongProperty(android.os.BatteryManager.BATTERY_PROPERTY_CURRENT_NOW))
+            if (cur <= 0L) return 0
+            val bi = ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val mv = bi?.getIntExtra(android.os.BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
+            if (mv <= 0) return 0
+            val ma = if (cur > 20000L) cur / 1000.0 else cur.toDouble()   // >20000 dianggap mikroampere
+            Math.round(ma * mv / 1_000_000.0 * 10.0).toInt().coerceIn(0, 300)
+        } catch (_: Exception) { 0 }
+    }
     private val recFps = ArrayList<Float>(512)
 
     // ---- rekam data FPS ke CSV (bukan video) ----
@@ -207,6 +227,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         sesOvdTicks = 0
         sesProfile = profile
         sesFps.clear()
+        sesJank = 0; sesBig = 0; sesMaxFt = 0; sesWattSum = 0L; sesWattN = 0
     }
 
     private fun endSession() {
@@ -215,7 +236,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (st != null) {
             val n = sesFps.size
             onSession?.invoke(FpsSession(sesStart, sesPkg, st.first, st.second, n,
-                ((System.currentTimeMillis() - sesStart) / 1000L).toInt(), sesOvdTicks * 100 / n, sesProfile))
+                ((System.currentTimeMillis() - sesStart) / 1000L).toInt(), sesOvdTicks * 100 / n, sesProfile,
+                sesJank, sesBig, sesMaxFt, FpsSession.stability(sesFps),
+                if (sesWattN > 0) (sesWattSum / sesWattN).toInt() else 0))
         }
         sesFps.clear()
         sesPkg = ""
@@ -381,7 +404,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     // ---------------- data ----------------
 
-    private class Sample(val fps: Float?, val gpu: Int?, val gpuMhz: Int?, val cpu: Int?, val tempC: Float?, val socC: Float? = null, val batC: Float? = null)
+    private class Sample(val fps: Float?, val gpu: Int?, val gpuMhz: Int?, val cpu: Int?, val tempC: Float?, val socC: Float? = null, val batC: Float? = null,
+                         val jank: Int = 0, val bigJank: Int = 0, val maxFtMs: Int = 0)
+    private var jankLastTs = 0L
+    private var jankAcc = 0
+    private var bigAcc = 0
+    private var maxAcc = 0
 
     private suspend fun loop(pkg: String) {
         try {
@@ -456,6 +484,20 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                             if (v < first) first = v
                         }
                     }
+                    // jank: frame lebih lama dari 2x rata-rata 3 frame sebelumnya DAN > 83 ms; big jank > 125 ms.
+                    // Hanya frame baru (di atas jankLastTs) yang dihitung, jendela sampel saling tumpang tindih.
+                    var jk = 0; var bj = 0; var mx = 0
+                    if (jankLastTs > 0L) {
+                        for (i in 4 until arr.size) {
+                            if (arr[i] <= jankLastTs) continue
+                            val d = (arr[i] - arr[i - 1]) / 1_000_000L
+                            val a3 = (arr[i - 1] - arr[i - 4]) / 3_000_000L
+                            if (d > mx) mx = d.toInt()
+                            if (d > 83L && d > 2L * a3) { jk++; if (d > 125L) bj++ }
+                        }
+                    }
+                    jankLastTs = last
+                    jankAcc = jk; bigAcc = bj; maxAcc = mx
                     val span = last - first
                     if (n > 1 && span > 0L) {
                         val f = ((n - 1) * 1_000_000_000.0 / span).toFloat()
@@ -493,7 +535,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val socC = (soc / 1000f).takeIf { it in 1f..105f }
         val batC = (bat / 1000f).takeIf { it in 1f..105f }
         val t = socC ?: batC
-        return Sample(fps, gpu, gpuMhz, cpu, t, socC, batC)
+        val sm = Sample(fps, gpu, gpuMhz, cpu, t, socC, batC, jankAcc, bigAcc, maxAcc)
+        jankAcc = 0; bigAcc = 0; maxAcc = 0
+        return sm
     }
 
     private fun apply(s: Sample) {
@@ -512,7 +556,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         val fv = s.fps
         if (fv != null && fv >= 1f) {
-            if (sesPkg.isNotEmpty() && sesFps.size < 7200) { sesFps.add(fv); if (odOn) sesOvdTicks++ }
+            if (sesPkg.isNotEmpty() && sesFps.size < 7200) {
+                sesFps.add(fv); if (odOn) sesOvdTicks++
+                sesJank += s.jank; sesBig += s.bigJank
+                if (s.maxFtMs > sesMaxFt) sesMaxFt = s.maxFtMs
+                val w = readWatt10()
+                if (w > 0) { sesWattSum += w; sesWattN++ }
+            }
             if (recOn && recFps.size < 3600) recFps.add(fv)
         }
         // Layar diam (tidak ada frame baru) memang 0 FPS; 3 detik berturut-turut ditandai IDLE supaya tidak dikira error.
@@ -645,6 +695,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         p.gravity = Gravity.TOP or Gravity.START
         p.x = savedX()
         p.y = savedY()
+        if (prefs.flStyle == 2 && Build.VERSION.SDK_INT >= 31) {
+            // kaca: blur latar jika ROM mengizinkan (kalau tidak, tetap tembus pandang)
+            p.flags = p.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            p.blurBehindRadius = 28
+        }
         lp = p
         try {
             wm.addView(r, p)
@@ -927,12 +982,26 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         return busy
     }
 
+    private var enterT0 = 0L
     private val frame = object : Runnable {
         override fun run() {
             if (!loopOn) return
             val now = SystemClock.uptimeMillis()
             val r = root
             if (r == null || !attached) { loopOn = false; return }
+            // masuk panel/kapsul: membesar halus + memudar masuk (jam sendiri, tidak ikut skala animasi sistem)
+            if (enterT0 != 0L) {
+                val v: View? = if (mode == MODE_PANEL) panel else if (mode == MODE_THIN) thin else null
+                if (v != null) {
+                    val t = if (prefs.reduceAnim) 1f else ((now - enterT0) / 240f).coerceIn(0f, 1f)
+                    val e = easeOut(t)
+                    v.alpha = e
+                    val sc = 0.92f + 0.08f * e
+                    v.pivotX = 0f; v.pivotY = 0f
+                    v.scaleX = sc; v.scaleY = sc
+                    if (t >= 1f) { v.alpha = 1f; v.scaleX = 1f; v.scaleY = 1f; enterT0 = 0L }
+                } else enterT0 = 0L
+            }
             if (mode == MODE_MENU) {
                 popFrame(now)
                 if (now - lastActive > 6000L) setMode(MODE_PILL)
@@ -976,6 +1045,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         mode = n
         applyMode()
+        if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
         root?.post { clamp() }
@@ -1136,7 +1206,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun panelColor(): Int {
         val a = (prefs.flAlpha / 100f * 255).toInt().coerceIn(0, 255)
-        return Color.argb(a, 20, 20, 22)
+        return when (prefs.flStyle) {
+            1 -> Color.argb(maxOf(a, 200), 11, 13, 16)          // HUD: hampir hitam pekat
+            2 -> Color.argb((a * 0.42f).toInt().coerceAtLeast(70), 255, 255, 255)  // kaca: putih tembus
+            else -> Color.argb(a, 20, 20, 22)
+        }
     }
 
     private fun accentColor(): Int {
@@ -1150,12 +1224,25 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    private fun roundBg(color: Int, radius: Float, stroke: Int): GradientDrawable =
-        GradientDrawable().apply {
+    private fun roundBg(colorIn: Int, radiusIn: Float, strokeIn: Int): GradientDrawable {
+        var color = colorIn; var radius = radiusIn; var stroke = strokeIn
+        when (prefs.flStyle) {
+            1 -> {                                   // HUD: sudut kecil, garis tipis
+                radius *= 0.55f
+                if (color == CARD) color = 0x0DFFFFFF
+            }
+            2 -> {                                   // kaca: sudut besar, garis terang
+                radius *= 1.15f
+                if (color == CARD) color = 0x24FFFFFF
+                if (stroke == BORDER) stroke = 0x4DFFFFFF
+            }
+        }
+        return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
             if (stroke != 0) setStroke(px(1), stroke)
         }
+    }
 
     private fun textView(s: String, sizePx: Float, color: Int, bold: Boolean): TextView =
         TextView(ctx).apply {
@@ -1677,7 +1764,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             val ringCol = if (low) 0xFFE5484D.toInt() else accent
             val breath = (0.5f + 0.5f * kotlin.math.sin(phase * 2f * Math.PI.toFloat()))
             p.style = Paint.Style.FILL
-            p.color = Color.argb(235, 20, 20, 22)
+            p.color = when (prefs.flStyle) {
+                1 -> Color.argb(250, 11, 13, 16)
+                2 -> Color.argb(95, 255, 255, 255)
+                else -> Color.argb(235, 20, 20, 22)
+            }
             canvas.drawCircle(c, c, c - pf(1), p)
             p.style = Paint.Style.STROKE
             p.strokeWidth = pf(1.5f) + pf(1.5f) * breath
