@@ -147,6 +147,7 @@ private fun FloatingSettings(vm: AppViewModel) {
                 }
             }
         }
+        ToggleRow("Selalu tampil", "floating menyala terus (tidak hanya saat game) supaya kelihatan FPS-nya jalan atau tidak", p.flAlways) { p.flAlways = it; vm.flChanged() }
         ToggleRow("Baterai", "persen baterai di kapsul", p.flMBatt) { p.flMBatt = it; vm.flChanged() }
         ToggleRow("Rekam FPS otomatis", "mulai saat game dibuka, simpan ke file saat game ditutup", p.flAutoLog) { p.flAutoLog = it; vm.flChanged() }
         ToggleRow("Grafik FPS", null, p.flGraph) { p.flGraph = it; vm.flChanged() }

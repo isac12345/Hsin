@@ -72,7 +72,9 @@ class BubbleService : Service() {
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == null) return@OnSharedPreferenceChangeListener
-        if (key == "fl_start_thin") {
+        if (key == "fl_always") {
+            rebuild()
+        } else if (key == "fl_start_thin") {
             flJob?.cancel()
             flJob = scope.launch { delay(100); floating?.applyStartMode() }
         } else if (key.startsWith("fl_") && key != "fl_x_p" && key != "fl_y_p" && key != "fl_x_l" && key != "fl_y_l") {
@@ -175,10 +177,10 @@ class BubbleService : Service() {
 
     private var screenOn: android.content.BroadcastReceiver? = null
 
-    /** Orb hanya muncul saat game berjalan (atau saat merekam FPS); di luar itu disembunyikan. */
+    /** Orb selalu tampil bila "Floating selalu tampil" aktif (bawaan); bila mati, hanya saat game berjalan atau merekam FPS. */
     private fun orbAllowed(): Boolean =
         !(prefs.bubbleHidden || (!prefs.bubbleOn && !prefs.hudOn) || !Settings.canDrawOverlays(this)) &&
-            (gamePkg.isNotEmpty() || FpsLog.on || recOn)
+            (prefs.flAlways || gamePkg.isNotEmpty() || FpsLog.on || recOn)
 
     /** Minta sistem jangan membekukan/membunuh service ini: whitelist hemat daya, bucket aktif, oom. Butuh root, gagal diam-diam. */
     private fun harden() {

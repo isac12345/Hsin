@@ -117,6 +117,9 @@ class Prefs(ctx: Context) {
     var bgDim: Int
         get() = sp.getInt("bg_dim", 1).coerceIn(0, 2)
         set(v) { sp.edit().putInt("bg_dim", v.coerceIn(0, 2)).apply() }
+    var flAlways: Boolean
+        get() = sp.getBoolean("fl_always", true)
+        set(v) { sp.edit().putBoolean("fl_always", v).apply() }
     var flAutoLog: Boolean
         get() = sp.getBoolean("fl_auto_log", false)
         set(v) { sp.edit().putBoolean("fl_auto_log", v).apply() }
