@@ -88,6 +88,16 @@ apply_profile() {
     sh "$COMMON/apply_now.sh" "$1" manual >> "$LOG_FILE" 2>&1
 }
 
+# Jenis app dari nama paket (daftar sederhana; game ditangani monitor.sh).
+app_category() {
+    case "$1" in
+        com.google.android.youtube|com.google.android.youtube.*|com.netflix.*|tv.twitch.*|com.vanced.*|org.schabi.newpipe*|com.mxtech.*|org.videolan.*|com.amazon.avod.*|com.disney.*|com.vidio.*|com.bstar.*|tv.danmaku.*|app.revanced.*) echo video ;;
+        com.instagram.*|com.facebook.*|com.whatsapp*|com.twitter.*|com.x.*|org.telegram.*|org.thunderdog.*|com.zhiliaoapp.*|com.ss.android.ugc.*|com.snapchat.*|com.discord|com.reddit.*|com.linkedin.*|jp.naver.line.*|com.threads.*|com.pinterest) echo social ;;
+        com.spotify.*|com.google.android.apps.youtube.music|com.soundcloud.*|com.apple.android.music|deezer.android.*|com.aspiro.*|com.shazam.*|com.joox.*) echo music ;;
+        com.android.chrome|org.mozilla.*|com.opera.*|com.brave.*|com.microsoft.emmx|com.kiwibrowser.*|com.duckduckgo.*|com.vivaldi.*|com.google.android.apps.chrome*) echo browser ;;
+    esac
+}
+
 # ---------- auto-profile ----------
 auto_rules_tick() {
     # selama game aktif, monitor.sh yang memutuskan
@@ -111,6 +121,16 @@ auto_rules_tick() {
     if [ -z "$_want" ] && [ "$(conf_get AUTO_CHG_ON 0)" = "1" ] && [ "$_charging" = "1" ]; then
         _want=$(conf_get AUTO_CHG_PROFILE balanced)
         reason="charging"
+    fi
+    # per jenis app (CAT_ON=1): video/sosmed/musik/browser di depan -> profil pilihan (CAT_<JENIS>=battery|balanced|performance|none)
+    if [ -z "$_want" ] && [ "$(conf_get CAT_ON 0)" = "1" ]; then
+        _fg=$(rdf "$STATE_DIR/.hud_foreground_pkg")
+        _ct=$(app_category "$_fg")
+        if [ -n "$_ct" ]; then
+            _cu=$(printf '%s' "$_ct" | tr 'a-z' 'A-Z')
+            _cp=$(conf_get "CAT_$_cu" none)
+            if valid_profile "$_cp"; then _want=$_cp; reason="jenis app $_ct"; fi
+        fi
     fi
     [ -n "$_want" ] && ! valid_profile "$_want" && _want=""
 

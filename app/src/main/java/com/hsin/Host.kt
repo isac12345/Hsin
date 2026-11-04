@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -266,7 +267,7 @@ fun HsinApp(vm: AppViewModel) {
     CompositionLocalProvider(LocalUi provides ui, LocalClock provides clock, LocalEn provides UiState.en) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             BackHandler(enabled = vm.route != "dash") {
-                if (vm.route in setOf("games", "custom", "tools")) vm.go("dash") else if (!vm.back()) vm.go("dash")
+                if (vm.route in setOf("games", "custom", "tools", "records")) vm.go("dash") else if (!vm.back()) vm.go("dash")
             }
             BackHandler(enabled = vm.route == "dash" && UiState.tab != 0 && UiState.ritual.isEmpty()) { UiState.tab = 0 }
             BackHandler(enabled = UiState.ritual.isNotEmpty()) { UiState.ritual = "" }
@@ -279,7 +280,7 @@ fun HsinApp(vm: AppViewModel) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                             Box(
                                 Modifier.clip(CircleShape).background(SP.glass).border(1.dp, SP.gold.copy(alpha = 0.6f), CircleShape).tap {
-                                    if (vm.route in setOf("games", "custom", "tools")) vm.go("dash") else if (!vm.back()) vm.go("dash")
+                                    if (vm.route in setOf("games", "custom", "tools", "records")) vm.go("dash") else if (!vm.back()) vm.go("dash")
                                 }.padding(horizontal = 12.dp, vertical = 5.dp)
                             ) { SText("‹ " + tx("Kembali", "Back"), 12.sp, SP.gold, FontWeight.SemiBold) }
                         }

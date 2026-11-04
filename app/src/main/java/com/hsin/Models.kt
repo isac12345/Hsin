@@ -129,8 +129,16 @@ data class FpsSession(
     val maxFt: Int = 0,        // frame time terpanjang (ms)
     val stab: Int = 0,         // kestabilan FPS 0-100 (100 = sangat stabil)
     val watt10: Int = 0,       // daya rata-rata, satuan 0,1 W (0 = tidak diketahui)
+    val gAvg: Int = 0,         // versi "Gameplay": 5 detik pertama (loading) diabaikan
+    val gLow1: Int = 0,
+    val gStab: Int = 0,
+    val sFps: List<Int> = emptyList(),    // deret per detik (diperkecil maks 90 titik)
+    val sTemp: List<Int> = emptyList(),
+    val sWatt: List<Int> = emptyList(),   // satuan 0,1 W
+    val sJank: List<Int> = emptyList(),
 ) {
-    fun encode(): String = "$epoch|$pkg|$avg|$low1|$samples|$secs|$ovdPct|$profile|$jank|$bigJank|$maxFt|$stab|$watt10"
+    fun encode(): String = "$epoch|$pkg|$avg|$low1|$samples|$secs|$ovdPct|$profile|$jank|$bigJank|$maxFt|$stab|$watt10|$gAvg|$gLow1|$gStab|" +
+        sFps.joinToString(",") + "|" + sTemp.joinToString(",") + "|" + sWatt.joinToString(",") + "|" + sJank.joinToString(",")
 
     companion object {
         fun decode(l: String): FpsSession? {
@@ -143,7 +151,25 @@ data class FpsSession(
                 p.getOrNull(8)?.toIntOrNull() ?: 0, p.getOrNull(9)?.toIntOrNull() ?: 0,
                 p.getOrNull(10)?.toIntOrNull() ?: 0, p.getOrNull(11)?.toIntOrNull() ?: 0,
                 p.getOrNull(12)?.toIntOrNull() ?: 0,
+                p.getOrNull(13)?.toIntOrNull() ?: 0, p.getOrNull(14)?.toIntOrNull() ?: 0, p.getOrNull(15)?.toIntOrNull() ?: 0,
+                ints(p.getOrNull(16)), ints(p.getOrNull(17)), ints(p.getOrNull(18)), ints(p.getOrNull(19)),
             )
+        }
+
+        private fun ints(s: String?): List<Int> = if (s.isNullOrEmpty()) emptyList() else s.split(',').mapNotNull { it.toIntOrNull() }
+
+        /** Perkecil deret menjadi maks [n] titik: rata-rata tiap ember (atau jumlah bila [sum]). */
+        fun down(v: List<Number>, n: Int = 90, sum: Boolean = false): List<Int> {
+            if (v.isEmpty()) return emptyList()
+            if (v.size <= n) return v.map { it.toDouble().let { d -> Math.round(d).toInt() } }
+            val out = ArrayList<Int>(n)
+            for (i in 0 until n) {
+                val a = i * v.size / n; val b = maxOf(a + 1, (i + 1) * v.size / n)
+                var t = 0.0
+                for (j in a until b) t += v[j].toDouble()
+                out.add(Math.round(if (sum) t else t / (b - a)).toInt())
+            }
+            return out
         }
 
         /** Kestabilan 0-100 dari koefisien variasi FPS (CV 0% = 100, CV 40%+ = 0). */

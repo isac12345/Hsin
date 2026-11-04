@@ -121,6 +121,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var sesOvdTicks = 0
     private var sesProfile = ""
     private val sesFps = ArrayList<Float>(1024)
+    private val sesTempL = ArrayList<Float>(1024)
+    private val sesWattL = ArrayList<Int>(1024)
+    private val sesJankL = ArrayList<Int>(1024)
     private var sesJank = 0
     private var sesBig = 0
     private var sesMaxFt = 0
@@ -226,7 +229,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         sesStart = System.currentTimeMillis()
         sesOvdTicks = 0
         sesProfile = profile
-        sesFps.clear()
+        sesFps.clear(); sesTempL.clear(); sesWattL.clear(); sesJankL.clear()
         sesJank = 0; sesBig = 0; sesMaxFt = 0; sesWattSum = 0L; sesWattN = 0
     }
 
@@ -235,10 +238,14 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val st = FpsSession.stats(sesFps)
         if (st != null) {
             val n = sesFps.size
+            val gp = if (n > 15) sesFps.subList(5, n) else sesFps   // versi Gameplay: abaikan 5 detik pertama
+            val gst = FpsSession.stats(gp) ?: st
             onSession?.invoke(FpsSession(sesStart, sesPkg, st.first, st.second, n,
                 ((System.currentTimeMillis() - sesStart) / 1000L).toInt(), sesOvdTicks * 100 / n, sesProfile,
                 sesJank, sesBig, sesMaxFt, FpsSession.stability(sesFps),
-                if (sesWattN > 0) (sesWattSum / sesWattN).toInt() else 0))
+                if (sesWattN > 0) (sesWattSum / sesWattN).toInt() else 0,
+                gst.first, gst.second, FpsSession.stability(gp),
+                FpsSession.down(sesFps), FpsSession.down(sesTempL), FpsSession.down(sesWattL), FpsSession.down(sesJankL, sum = true)))
         }
         sesFps.clear()
         sesPkg = ""
@@ -565,6 +572,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 if (s.maxFtMs > sesMaxFt) sesMaxFt = s.maxFtMs
                 val w = readWatt10()
                 if (w > 0) { sesWattSum += w; sesWattN++ }
+                sesTempL.add(s.tempC ?: 0f); sesWattL.add(if (w > 0) w else 0); sesJankL.add(s.jank)
             }
             if (recOn && recFps.size < 3600) recFps.add(fv)
         }

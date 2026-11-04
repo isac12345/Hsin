@@ -37,6 +37,38 @@ bitrate() {
     printf '%s' $((_b * 1000000))
 }
 
+conf_get() {
+    [ -f "$CONF_FILE" ] && sed -n "s/^$1=//p" "$CONF_FILE" 2>/dev/null | tail -n 1
+}
+
+# Argumen --size untuk REC_SIZE=720|1080 (sisi pendek). Kosong = ukuran asli layar. Tidak pernah memperbesar.
+size_arg() {
+    _sz=$(conf_get REC_SIZE)
+    case "$_sz" in 720|1080) ;; *) return 0 ;; esac
+    _ws=$(wm size 2>/dev/null | sed -n 's/^[A-Za-z ]*size: *//p' | tail -n 1)
+    _w=${_ws%x*}; _h=${_ws#*x}
+    case "$_w$_h" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$_w" -lt "$_h" ]; then _sh=$_w; _lg=$_h; else _sh=$_h; _lg=$_w; fi
+    [ "$_sz" -lt "$_sh" ] || return 0
+    _lg2=$(( _lg * _sz / _sh )); _lg2=$(( _lg2 / 2 * 2 ))
+    _rot=$(dumpsys input 2>/dev/null | sed -n 's/.*[Ss]urface[Oo]rientation: *\([0-3]\).*/\1/p' | head -n 1)
+    case "$_rot" in 1|3) printf '%s' "--size ${_lg2}x${_sz}" ;; *) printf '%s' "--size ${_sz}x${_lg2}" ;; esac
+}
+
+TOUCH_ORIG="$STATE_DIR/.rec_touch_orig"
+touch_on() {
+    [ "$(conf_get REC_TOUCH)" = 1 ] || return 0
+    settings get system show_touches > "$TOUCH_ORIG" 2>/dev/null
+    settings put system show_touches 1 2>/dev/null
+}
+touch_restore() {
+    [ -f "$TOUCH_ORIG" ] || return 0
+    _to=$(cat "$TOUCH_ORIG" 2>/dev/null)
+    case "$_to" in 1) ;; *) _to=0 ;; esac
+    settings put system show_touches "$_to" 2>/dev/null
+    rm -f "$TOUCH_ORIG"
+}
+
 # Dijalankan di latar belakang oleh `start`.
 rec_loop() {
     echo "$$" > "$PID_FILE"
@@ -46,12 +78,15 @@ rec_loop() {
     _fail=0
     _sid=$(date '+%Y%m%d_%H%M%S')
     _seg="$SEG_SECS"
+    touch_on
     while [ ! -f "$STOP_FILE" ]; do
         # satu sesi = satu nama dasar; potongan hanya muncul kalau batas waktu tercapai
         if [ "$_n" -eq 1 ]; then _f="$OUT_DIR/HSIN_${_sid}.mp4"; else _f="$OUT_DIR/HSIN_${_sid}_p$_n.mp4"; fi
         printf '%s\n' "$_f" > "$CUR_FILE"
         _t0=$(cut -d. -f1 /proc/uptime 2>/dev/null)
-        screenrecord --bit-rate "$_br" --time-limit "$_seg" "$_f" >/dev/null 2>&1
+        _sa=$(size_arg)
+        # shellcheck disable=SC2086
+        screenrecord --bit-rate "$_br" --time-limit "$_seg" $_sa "$_f" >/dev/null 2>&1
         _t1=$(cut -d. -f1 /proc/uptime 2>/dev/null)
         am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://$_f" >/dev/null 2>&1
         # screenrecord langsung gagal (mis. layar terkunci / DRM / binary tidak ada): jangan putar tanpa henti
@@ -67,6 +102,7 @@ rec_loop() {
         fi
         _n=$((_n + 1))
     done
+    touch_restore
     rm -f "$PID_FILE" "$STOP_FILE" "$CUR_FILE"
 }
 

@@ -674,17 +674,26 @@ fun BenchScreen(vm: AppViewModel) {
     key(vm.benchVer) {
         HsinCard {
             Label("Uji performa CPU")
-            txt("Menjalankan hitungan berat 3 detik pada satu inti, lalu 3 detik pada semua inti. Jalankan di tiap mode (Hemat, Seimbang, Performa, Puncak) lalu bandingkan skornya. Biarkan HP tidak dipakai selama uji, dan beri jeda agar suhu tidak ikut mempengaruhi.", 12.sp, muted())
-            Pill(if (vm.benchBusy) "Menguji (±6 detik)..." else "MULAI UJI (mode: ${profileLabel(vm.status.profile)})", { vm.runBench() }, solid = !vm.benchBusy, enabled = !vm.benchBusy)
+            txt("Menjalankan hitungan berat 3 detik pada satu inti, lalu 3 detik pada semua inti. Biarkan HP tidak dipakai selama uji. Uji semua mode berjalan sendiri sekitar 1 menit (ada jeda dingin) lalu mengembalikan mode awalmu.", 12.sp, muted())
+            if (vm.benchBusy && vm.benchStep.isNotEmpty()) txt(vm.benchStep, 13.sp, Mint, FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
+            Pill(if (vm.benchBusy) "Menguji..." else "UJI SEMUA MODE (otomatis)", { vm.runBenchAll() }, solid = !vm.benchBusy, enabled = !vm.benchBusy)
+            Pill(if (vm.benchBusy) "Menguji..." else "UJI MODE SAAT INI (${profileLabel(vm.status.profile)})", { vm.runBench() }, enabled = !vm.benchBusy)
         }
         val h = vm.prefs.benchHist
         if (h.isNotEmpty()) HsinCard {
             Label("Hasil (juta iterasi, makin tinggi makin kencang)")
-            h.forEach { r ->
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    txt(r[1], 13.sp, modifier = Modifier.weight(1f))
-                    txt("1 inti ${r[2]}", 12.sp, muted(), modifier = Modifier.weight(1f))
-                    txt("semua ${r[3]}", 12.sp, modifier = Modifier.weight(1f))
+            val mx = (h.maxOfOrNull { it[3].toLongOrNull() ?: 0L } ?: 1L).coerceAtLeast(1L)
+            h.take(8).forEach { r ->
+                val all = r[3].toLongOrNull() ?: 0L
+                Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        txt(r[1], 13.sp, modifier = Modifier.weight(1f))
+                        txt("1 inti ${r[2]}", 12.sp, muted(), modifier = Modifier.weight(1f))
+                        txt("semua ${r[3]}", 12.sp, modifier = Modifier.weight(1f))
+                    }
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.08f))) {
+                        Box(Modifier.fillMaxWidth(all.toFloat() / mx).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Mint))
+                    }
                 }
             }
         }
@@ -706,7 +715,7 @@ fun ChargeScreen(vm: AppViewModel) {
         when (kind) {
             "", "none" -> txt(if (ci.isEmpty()) "Memeriksa HP..." else "HP ini tidak punya kontrol pengisian yang bisa diatur. Fitur ini tidak tersedia di perangkatmu.", 13.sp)
             else -> {
-                txt("Jenis kontrol: " + (if (kind == "thr") "batas persen kernel" else "saklar pengisian + penjaga HSIN"), 12.sp, muted())
+                txt("Jenis kontrol: " + (if (kind == "thr") "batas persen kernel" else if (kind == "stop") "saklar stop_chg (eksperimen) + penjaga HSIN" else "saklar pengisian + penjaga HSIN"), 12.sp, muted())
                 txt("Baterai ${ci["level"].orEmpty()}% · ${ci["status"].orEmpty()}", 13.sp)
                 Spacer(Modifier.height(8.dp))
                 Label("Batas isi")

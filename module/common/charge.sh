@@ -26,11 +26,23 @@ detect() {
     for n in "$PS/battery/input_suspend" "$PS/usb/input_suspend"; do
         [ -w "$n" ] && { CH_KIND=susp; CH_NODE="$n"; return 0; }
     done
+    # Eksperimen (Transsion/itel): saklar "stop_chg". Nilai normal = nilai awal yang terbaca saat pertama dipakai (tanpa asumsi arah).
+    for n in /sys/devices/platform/*/stop_chg /sys/class/*/stop_chg /sys/kernel/*/stop_chg /sys/devices/platform/*/*/stop_chg; do
+        [ -w "$n" ] && { CH_KIND=stop; CH_NODE="$n"; return 0; }
+    done
     return 1
 }
 
-chg_on()  { case "$CH_KIND" in en) printf '1' > "$CH_NODE" ;; susp) printf '0' > "$CH_NODE" ;; esac; }
-chg_off() { case "$CH_KIND" in en) printf '0' > "$CH_NODE" ;; susp) printf '1' > "$CH_NODE" ;; esac; }
+STOP_ORIG="$STATE/.stop_chg_orig"
+stop_norm() {   # nilai "isi normal"
+    if [ ! -s "$STOP_ORIG" ]; then rd "$CH_NODE" > "$STOP_ORIG"; fi
+    read -r _so < "$STOP_ORIG"
+    case "$_so" in 0|1) printf '%s' "$_so" ;; *) printf '0' ;; esac
+}
+stop_val() { if [ "$(stop_norm)" = 0 ]; then printf '1'; else printf '0'; fi; }
+
+chg_on()  { case "$CH_KIND" in en) printf '1' > "$CH_NODE" ;; susp) printf '0' > "$CH_NODE" ;; stop) stop_norm > "$CH_NODE" ;; esac; }
+chg_off() { case "$CH_KIND" in en) printf '0' > "$CH_NODE" ;; susp) printf '1' > "$CH_NODE" ;; stop) stop_val > "$CH_NODE" ;; esac; }
 
 level() { rd "$PS/battery/capacity"; }
 
@@ -79,16 +91,26 @@ case "$1" in
             printf '%s\n' "$2" > "$LIMIT_FILE"
             echo "OK: batas $2% (node kernel)"
         else
+            if [ "$CH_KIND" = stop ]; then
+                # uji aman: bila sedang mengisi, saklar harus benar-benar menghentikan pengisian; kalau tidak, batalkan
+                _st=$(rd "$PS/battery/status")
+                if [ "$_st" = "Charging" ]; then
+                    chg_off; sleep 4
+                    _st2=$(rd "$PS/battery/status")
+                    chg_on
+                    [ "$_st2" = "Charging" ] && { echo "ERROR: saklar stop_chg tidak menghentikan pengisian di HP ini"; exit 3; }
+                fi
+            fi
             printf '%s\n' "$2" > "$LIMIT_FILE"
             ( sh "$0" loop >/dev/null 2>&1 & )
-            echo "OK: batas $2% (penjaga HSIN)"
+            echo "OK: batas $2% (penjaga HSIN$([ "$CH_KIND" = stop ] && printf ', eksperimen'))"
         fi
         ;;
     off)
         stop_loop
         detect
         rm -f "$LIMIT_FILE"
-        case "$CH_KIND" in thr) printf '100' > "$CH_NODE" 2>/dev/null ;; en|susp) chg_on ;; esac
+        case "$CH_KIND" in thr) printf '100' > "$CH_NODE" 2>/dev/null ;; en|susp|stop) chg_on ;; esac
         echo "OK: pengisian normal"
         ;;
     loop) do_loop ;;
