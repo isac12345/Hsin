@@ -285,6 +285,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var hintRec: View? = null
     private var graph: GraphView? = null
     private var panelBox: LinearLayout? = null
+    private var themeTitle: TextView? = null
+    private var tileRec: View? = null
+    private var tileFps: View? = null
 
     private var profile = "none"
     private var recOn = false
@@ -368,6 +371,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         fpsBigLbl = null
         fpsThinLbl = null
         panelBox = null
+        themeTitle = null; tileRec = null; tileFps = null
         mode = m
         if (!prefs.bubbleHidden) {
             build()
@@ -809,6 +813,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun savePos() {
         val p = lp ?: return
+        if (mode == MODE_PANEL && prefs.flStyle >= 3) return
         val off = if (mode == MODE_MENU) menuPad() else 0
         if (landscape()) {
             prefs.flXl = p.x + off
@@ -1004,13 +1009,23 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (enterT0 != 0L) {
                 val v: View? = if (mode == MODE_PANEL) panel else if (mode == MODE_THIN) thin else null
                 if (v != null) {
-                    val t = if (prefs.reduceAnim) 1f else ((now - enterT0) / 240f).coerceIn(0f, 1f)
+                    val st = prefs.flStyle
+                    val t = if (prefs.reduceAnim) 1f else ((now - enterT0) / (if (st >= 3 && v === panel) 340f else 240f)).coerceIn(0f, 1f)
                     val e = easeOut(t)
+                    if (st >= 3 && v === panel) {
+                        // tema gaming: panel meluncur masuk dari tepinya sendiri
+                        v.alpha = 0.25f + 0.75f * e
+                        v.scaleX = 1f; v.scaleY = 1f
+                        v.translationY = when (st) { 3 -> -(1f - e) * v.height; 4 -> (1f - e) * v.height; else -> 0f }
+                        v.translationX = if (st == 5) (1f - e) * v.width else 0f
+                        if (t >= 1f) { v.alpha = 1f; v.translationX = 0f; v.translationY = 0f; enterT0 = 0L }
+                    } else {
                     v.alpha = e
                     val sc = 0.92f + 0.08f * e
                     v.pivotX = 0f; v.pivotY = 0f
                     v.scaleX = sc; v.scaleY = sc
                     if (t >= 1f) { v.alpha = 1f; v.scaleX = 1f; v.scaleY = 1f; enterT0 = 0L }
+                    }
                 } else enterT0 = 0L
             }
             if (mode == MODE_MENU) {
@@ -1051,12 +1066,14 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (old == n) return
         val p = lp
         if (p != null && attached) {
+            if (old == MODE_PANEL && prefs.flStyle >= 3) { p.x = savedX(); p.y = savedY() }
             if (old == MODE_MENU) { p.x += menuPad(); p.y += menuPad() }
             if (n == MODE_MENU) { p.x -= menuPad(); p.y -= menuPad() }
         }
         mode = n
         applyMode()
         if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
+        if (n == MODE_PANEL) anchorPanel()
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
         root?.post { clamp() }
@@ -1269,7 +1286,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun textView(s: String, sizePx: Float, color: Int, bold: Boolean): TextView =
         TextView(ctx).apply {
-            text = s
+            text = trn(s)
             setTextColor(color)
             setTextSize(TypedValue.COMPLEX_UNIT_PX, pf(sizePx))
             typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
@@ -1458,6 +1475,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private fun buildPanel(): View {
+        if (prefs.flStyle >= 3) return buildGamePanel(prefs.flStyle)
         val box = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(px(16), px(16), px(16), px(16))
@@ -1559,6 +1577,229 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         return box
     }
 
+
+    // ---------------- panel tema gaming (tata letak sendiri per tema) ----------------
+
+    private fun panelBg(edge: Int): GradientDrawable {
+        val st = prefs.flStyle
+        if (st < 3) return roundBg(panelColor(), pf(20), edge)
+        val r = pf(28)
+        val radii = when (st) {
+            3 -> floatArrayOf(0f, 0f, 0f, 0f, r, r, r, r)          // turun dari atas
+            4 -> floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)          // naik dari bawah
+            else -> floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)       // laci kanan
+        }
+        val neon = if (edge == BORDER) themeNeon(st) else edge
+        return GradientDrawable().apply {
+            setColor(panelColor())
+            cornerRadii = radii
+            setStroke(px(2), neon)
+        }
+    }
+
+    private fun lpw(w: Int, h: Int, wt: Float = 0f, ms: Int = 0, mt: Int = 0) =
+        LinearLayout.LayoutParams(w, h, wt).apply { marginStart = ms; topMargin = mt }
+
+    /** Tombol bulat bertanda (tema gaming). */
+    private fun roundTile(label: String, col: Int, glyph: String, onClick: () -> Unit, list: Boolean = false): Pair<View, View> {
+        val circle = FrameLayout(ctx).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xFF22252E.toInt()); setStroke(px(2), col) }
+            isClickable = true
+            setOnClickListener { markActive(); onClick() }
+        }
+        circle.addView(textView(glyph, 15f, col, true).apply { gravity = Gravity.CENTER }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        val lbl = textView(label, 11f, 0xFFCFD2DD.toInt(), true).apply { gravity = Gravity.CENTER }
+        val box = LinearLayout(ctx).apply {
+            orientation = if (list) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            setOnClickListener { markActive(); onClick() }
+        }
+        if (list) {
+            box.gravity = Gravity.CENTER_VERTICAL
+            box.setPadding(px(8), px(5), px(8), px(5))
+            box.background = roundBg(0x14FFFFFF, pf(10), 0)
+            lbl.gravity = Gravity.CENTER_VERTICAL
+            box.addView(circle, LinearLayout.LayoutParams(px(32), px(32)))
+            box.addView(lbl, lpw(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, ms = px(10)))
+        } else {
+            box.addView(circle, LinearLayout.LayoutParams(px(46), px(46)))
+            box.addView(lbl, lpw(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, mt = px(4)))
+        }
+        return Pair(box, circle)
+    }
+
+    private fun paintTiles() {
+        val rc = tileRec; val fc = tileFps
+        if (rc != null) rc.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (recOn) RED else 0xFF22252E.toInt()); setStroke(px(2), RED) }
+        if (fc != null) fc.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (csvOn) themeNeon(prefs.flStyle) else 0xFF22252E.toInt()); setStroke(px(2), themeNeon(prefs.flStyle)) }
+        val tt = themeTitle
+        if (tt != null) { tt.text = trn(modeName()).uppercase(); tt.setTextColor(accentColor()) }
+    }
+
+    private fun buildSegRow(vertical: Boolean): LinearLayout {
+        val seg = LinearLayout(ctx).apply {
+            orientation = if (vertical) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            setPadding(px(4), px(4), px(4), px(4))
+            background = roundBg(CARD, pf(14), 0)
+        }
+        segButtons = ArrayList()
+        for ((i, k) in PROFILE_KEYS.withIndex()) {
+            val b = textView(PROFILE_TEXT[i], 12f, SEG_TEXT, true).apply {
+                gravity = Gravity.CENTER; isClickable = true
+                setOnClickListener { if (!odOn) onProfile?.invoke(k) }
+            }
+            if (vertical) seg.addView(b, lpw(LinearLayout.LayoutParams.MATCH_PARENT, px(36), mt = if (i == 0) 0 else px(4)))
+            else seg.addView(b, lpw(0, px(40), 1f, if (i == 0) 0 else px(5)))
+            segButtons.add(b)
+        }
+        val odChip = buildOdRow()
+        if (vertical) seg.addView(odChip, lpw(LinearLayout.LayoutParams.MATCH_PARENT, px(36), mt = px(4)))
+        else seg.addView(odChip, lpw(0, px(40), 1.15f, px(5)))
+        segRow = seg
+        return seg
+    }
+
+    private fun anchorPanel() {
+        val st = prefs.flStyle
+        if (st < 3) return
+        val r = root ?: return
+        if (!attached) return
+        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val sh = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        panel?.let { pv ->
+            val l = pv.layoutParams
+            val want = if (st == 5) sh else FrameLayout.LayoutParams.WRAP_CONTENT
+            if (l != null && l.height != want) { l.height = want; pv.layoutParams = l }
+        }
+        val vto = r.viewTreeObserver
+        vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                val p = lp ?: return
+                if (mode != MODE_PANEL || !attached) return
+                val w = r.width; val h = r.height
+                if (w <= 0 || h <= 0) return
+                p.x = if (st == 5) sw - w else (sw - w) / 2
+                p.y = if (st == 4) sh - h else 0
+                try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
+            }
+        })
+        r.requestLayout()
+    }
+
+    private fun buildGamePanel(st: Int): View {
+        val neon = themeNeon(st)
+        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        panelBox = box
+        box.background = panelBg(BORDER)
+        val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
+        val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
+
+        val title = textView("", 15f, accentColor(), true).apply { letterSpacing = 0.12f; gravity = Gravity.CENTER }
+        themeTitle = title
+        val nb = textView("--", if (st == 5) 34f else 38f, TEXT, true).apply { letterSpacing = -0.02f }
+        fpsBig = nb
+        val l3 = fpsLabel(12f, 0.1f); fpsBigLbl = l3
+        val (tRec, cRec) = roundTile("Rekam", RED, "●", { onRec?.invoke() }, st == 5)
+        val (tFps, cFps) = roundTile("Rekam FPS", neon, "≈", { toggleFpsLog() }, st == 5)
+        val (tClose, _) = roundTile("Ringkas", 0xFFCFD2DD.toInt(), "–", { setMode(MODE_PILL) }, st == 5)
+        val (tHide, _) = roundTile("Sembunyikan", 0xFF8A93A6.toInt(), "×", { hide() }, st == 5)
+        tileRec = cRec; tileFps = cFps
+
+        // baris rekam (muncul hanya saat merekam)
+        val top = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        top.addView(View(ctx).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(RED) } }, LinearLayout.LayoutParams(px(12), px(12)))
+        top.addView(textView("00:00", 18f, TEXT, true).apply { tag = "timer" }, lpw(WRAP, WRAP, ms = px(8)))
+        top.addView(textView("REC", 11f, REC_TAG, true).apply { letterSpacing = 0.12f }, lpw(WRAP, WRAP, ms = px(8)))
+        top.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f))
+        top.addView(recButton(true), LinearLayout.LayoutParams(WRAP, px(40)))
+        topRow = top
+        val recHint = textView("Profil terkunci selama merekam. Satu sesi = satu file video.", 10f, HINT, false)
+        hintRec = recHint
+
+        fun hdr(): View = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(textView("HSIN", 12f, neon, true).apply { letterSpacing = 0.25f }, lpw(0, WRAP, 1f))
+            addView(title, lpw(WRAP, WRAP))
+            addView(View(ctx), lpw(0, 1, 1f))
+            addView(nb); addView(l3, lpw(WRAP, WRAP, ms = px(4)))
+        }
+        fun tilesRow(): LinearLayout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            for (t in listOf(tRec, tFps, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
+        }
+
+        when (st) {
+            3 -> {   // Kartu Miring: panel lebar turun dari atas
+                box.setPadding(px(18), px(12), px(18), px(16))
+                box.addView(hdr(), lpw(MATCH, WRAP))
+                val grid = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+                val names = listOf("CPU PAKAI", "GPU PAKAI", "RAM PAKAI", "SUHU HP")
+                for (i in 0 until 4) grid.addView(card(names[i], i), lpw(0, WRAP, 1f, if (i == 0) 0 else px(8)))
+                gridRow = grid
+                box.addView(grid, lpw(MATCH, WRAP, mt = px(12)))
+                box.addView(top, lpw(MATCH, WRAP, mt = px(10)))
+                val foot = tilesRow(); footRow = foot
+                box.addView(foot, lpw(MATCH, WRAP, mt = px(12)))
+                box.addView(recHint, lpw(MATCH, WRAP, mt = px(8)))
+                box.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(12)))
+                odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 10f; box.addView(o, lpw(MATCH, WRAP, mt = px(6))); odStatusLine = o }
+                box.layoutParams = FrameLayout.LayoutParams(minOf(px(560), (sw * 0.78f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
+            }
+            4 -> {   // Dasbor Bundar: panel bawah bersayap, CPU kiri, GPU kanan
+                box.setPadding(px(14), px(12), px(14), px(12))
+                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+                val left = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                left.addView(card("CPU PAKAI", 0), lpw(MATCH, WRAP))
+                left.addView(card("RAM PAKAI", 2), lpw(MATCH, WRAP, mt = px(8)))
+                val right = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                right.addView(card("GPU PAKAI", 1), lpw(MATCH, WRAP))
+                right.addView(card("SUHU HP", 3), lpw(MATCH, WRAP, mt = px(8)))
+                val mid = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+                mid.addView(hdr(), lpw(MATCH, WRAP))
+                mid.addView(top, lpw(MATCH, WRAP, mt = px(8)))
+                val foot = tilesRow(); footRow = foot
+                mid.addView(foot, lpw(MATCH, WRAP, mt = px(8)))
+                mid.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
+                mid.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(8)))
+                odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 10f; mid.addView(o, lpw(MATCH, WRAP, mt = px(4))); odStatusLine = o }
+                row.addView(left, lpw(px(96), WRAP))
+                row.addView(mid, lpw(0, WRAP, 1f, px(10)))
+                row.addView(right, lpw(px(96), WRAP, ms = px(10)))
+                gridRow = row
+                box.addView(row, lpw(MATCH, WRAP))
+                box.layoutParams = FrameLayout.LayoutParams(minOf(px(640), (sw * 0.86f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
+            }
+            else -> { // Kubus Energi: laci kanan penuh, strip angka vertikal
+                box.setPadding(px(8), px(12), px(12), px(12))
+                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+                val strip = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                val names = listOf("CPU", "GPU", "RAM", "SUHU")
+                for (i in 0 until 4) strip.addView(card(names[i], i), lpw(MATCH, WRAP, mt = if (i == 0) 0 else px(6)))
+                gridRow = strip
+                val main = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                main.addView(hdr(), lpw(MATCH, WRAP))
+                main.addView(top, lpw(MATCH, WRAP, mt = px(8)))
+                val foot = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                for (t in listOf(tRec, tFps, tClose, tHide)) foot.addView(t, lpw(MATCH, WRAP, mt = px(5)))
+                footRow = foot
+                main.addView(foot, lpw(MATCH, WRAP, mt = px(10)))
+                main.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
+                main.addView(View(ctx), lpw(MATCH, 0, 1f))
+                main.addView(buildSegRow(true), lpw(MATCH, WRAP, mt = px(8)))
+                odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 10f; main.addView(o, lpw(MATCH, WRAP, mt = px(4))); odStatusLine = o }
+                row.addView(strip, lpw(px(84), MATCH))
+                row.addView(main, lpw(0, MATCH, 1f, px(10)))
+                box.addView(row, lpw(MATCH, MATCH))
+                box.layoutParams = FrameLayout.LayoutParams(minOf(px(320), (sw * 0.5f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
+            }
+        }
+        paintTiles()
+        return box
+    }
+
     private fun card(label: String, idx: Int): View {
         val box = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -1637,12 +1878,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 odFlame?.color = OD_TEXT; odFlame?.invalidate()
                 odName?.setTextColor(OD_TEXT)
                 odSmall?.setTextColor(HINT)
-                setText(odSmall, if (odAvail) "Puncak: tenaga penuh, turun sendiri kalau panas" else trn("Puncak butuh game yang sedang dibuka"))
+                setText(odSmall, if (odAvail) trn("Puncak: tenaga penuh, turun sendiri kalau panas") else trn("Puncak butuh game yang sedang dibuka"))
             }
             row.alpha = if (!odOn && !odAvail) 0.6f else 1f
         }
         val edge = if (odOn) OD_GLOW else BORDER
-        panelBox?.background = roundBg(panelColor(), pf(20), if (recOn) 0x8CE5484D.toInt() else edge)
+        panelBox?.background = panelBg(if (recOn) 0x8CE5484D.toInt() else edge)
         pill?.background = roundBg(panelColor(), pf(24), edge)
         thin?.background = roundBg(panelColor(), pf(26), edge)
     }
@@ -1674,6 +1915,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun paintSeg() {
         paintMenu()
         paintThinBtns()
+        paintTiles()
         if (segButtons.size < 3) return
         val acc = accentColor()
         val chipCol = intArrayOf(P_BATTERY, P_BALANCED, P_PERF)
@@ -1694,7 +1936,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         topRow?.visibility = if (recOn) View.VISIBLE else View.GONE
         footRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         hintRec?.visibility = if (recOn) View.VISIBLE else View.GONE
-        panelBox?.background = roundBg(panelColor(), pf(20), if (recOn) 0x8CE5484D.toInt() else if (odOn) OD_GLOW else BORDER)
+        panelBox?.background = panelBg(if (recOn) 0x8CE5484D.toInt() else if (odOn) OD_GLOW else BORDER)
         if (recOn && recStart == 0L) recStart = SystemClock.elapsedRealtime()
         tickTimer()
     }

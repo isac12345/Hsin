@@ -522,7 +522,7 @@ internal fun rememberLive(vm: AppViewModel, active: Boolean): Live {
         if (!active || vm.modPath.isEmpty()) return@LaunchedEffect
         var pt = 0L; var pi = 0L
         while (true) {
-            val r = Root.exec("sh '${vm.modPath}/common/hud_sample.sh' --once x", 10_000L)
+            val r = Root.exec("sh '${vm.modPath}/common/hud_sample.sh' --once x; echo cpu=\$(head -n 1 /proc/stat)", 10_000L)
             val m = HashMap<String, String>()
             for (l in r.out.lines()) { val i = l.indexOf('='); if (i > 0) m[l.substring(0, i)] = l.substring(i + 1).trim() }
             var cpu = -1

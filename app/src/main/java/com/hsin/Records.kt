@@ -93,6 +93,7 @@ private fun ScreenRecPane(vm: AppViewModel) {
     }
     LaunchedEffect(vm.recOn, vm.modPath, reload) {
         if (vm.modPath.isEmpty()) return@LaunchedEffect
+        if (!vm.recOn) delay(1500)
         val r = Root.exec("for f in \$(sh '${vm.modPath}/common/screenrec.sh' list 12); do echo \"\$f|\$(stat -c %s \"\$f\" 2>/dev/null)\"; done", 12_000L)
         files = r.out.lines().mapNotNull { l ->
             val p = l.trim().split('|')
