@@ -80,8 +80,19 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putInt("fl_alpha", v.coerceIn(40, 100)).apply() }
     /** Gaya floating: 0 standar, 1 HUD gelap tegas, 2 kaca lembut. */
     var flStyle: Int
-        get() = sp.getInt("fl_style", 0).coerceIn(0, 2)
-        set(v) { sp.edit().putInt("fl_style", v.coerceIn(0, 2)).apply() }
+        get() = sp.getInt("fl_style", 0).coerceIn(0, 5)
+        set(v) { sp.edit().putInt("fl_style", v.coerceIn(0, 5)).apply() }
+    /** Tema app: 0 klasik, 1 Kartu Miring, 2 Dasbor Bundar, 3 Kubus Energi. */
+    var appTheme: Int
+        get() = sp.getInt("app_theme", 0).coerceIn(0, 3)
+        set(v) { sp.edit().putInt("app_theme", v.coerceIn(0, 3)).apply() }
+    /** Suara dalam app (disintesis sendiri), default mati. */
+    var soundOn: Boolean
+        get() = sp.getBoolean("sound_on", false)
+        set(v) { sp.edit().putBoolean("sound_on", v).apply() }
+    var soundVol: Int
+        get() = sp.getInt("sound_vol", 60).coerceIn(10, 100)
+        set(v) { sp.edit().putInt("sound_vol", v.coerceIn(10, 100)).apply() }
     var flStartThin: Boolean
         get() = sp.getBoolean("fl_start_thin", false)
         set(v) { sp.edit().putBoolean("fl_start_thin", v).apply() }

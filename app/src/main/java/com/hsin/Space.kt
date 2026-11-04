@@ -222,20 +222,24 @@ object UiState {
     var view: android.view.View? = null
     fun setHaptics(p: Prefs, on: Boolean) { haptics = on; p.haptics = on }
     /** Getar halus (bisa dimatikan di Pengaturan). */
+    var sndPrefs: Prefs? = null
     fun buzz() {
+        sndPrefs?.let { SoundFx.play(it, "click") }
         if (!haptics) return
         try { view?.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK) } catch (_: Exception) {}
     }
+    fun buzz2() { try { view?.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK) } catch (_: Exception) {} }
     var portrait by mutableStateOf(false)
     var tab by mutableIntStateOf(0)
     var gameIdx by mutableIntStateOf(0)
     var toolsSub by mutableIntStateOf(0)   // sub-tab Alat terakhir, supaya Back dari fitur kembali ke tempat semula
     var splashDone = false          // loading hanya sekali per pembukaan app (bukan tiap kembali ke Beranda)
     var ritual by mutableStateOf("")   // paket game yang sedang diluncurkan lewat ritual
-    fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz() } }
+    fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz(); sndPrefs?.let { SoundFx.play(it, "ritual") } } }
     private var inited = false
     fun init(p: Prefs) {
         if (inited) return
+        sndPrefs = p
         haptics = p.haptics
         reduceAnim = p.reduceAnim
         bgDim = p.bgDim
@@ -281,8 +285,8 @@ internal fun profMode(profile: String, ovd: Boolean): String =
     if (ovd) "puncak" else when (profile) { "battery" -> "hemat"; "performance" -> "performa"; else -> "seimbang" }
 
 fun AppViewModel.chooseMode(key: String) {
-    UiState.buzz()
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
+    if (!prefs.soundOn) UiState.buzz() else { if (UiState.haptics) UiState.buzz2(); SoundFx.play(prefs, if (key == "puncak") "overdrive" else prof) }
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
     viewModelScope.launch {
         if (key != "puncak") Hsin.ovdStop()
@@ -593,6 +597,11 @@ private fun SettingsTab(vm: AppViewModel) {
                 Seg(listOf("Indonesia", "English"), if (UiState.en) 1 else 0) { UiState.setEn(vm.prefs, it == 1) }
                 SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
                 Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
+                SText(tx("Tema tampilan (Beranda + floating di game)", "Look theme (Home + in-game floating)"), 12.sp, SP.dim)
+                Seg(listOf(tx("Klasik", "Classic"), tx("Kartu Miring", "Slant"), tx("Dasbor Bundar", "Round"), tx("Kubus Energi", "Cube")), vm.prefs.appTheme) {
+                    vm.prefs.appTheme = it; if (it > 0) vm.prefs.flStyle = 2 + it else if (vm.prefs.flStyle > 2) vm.prefs.flStyle = 0
+                    vm.flChanged(); UiState.themeTick++; SoundFx.play(vm.prefs, "tab")
+                }
                 SText(tx("Gelap latar (kalau pakai gambar sendiri)", "Background dimming (custom image)"), 12.sp, SP.dim)
                 Seg(listOf(tx("Ringan", "Light"), tx("Sedang", "Medium"), tx("Pekat", "Dark")), UiState.bgDim) { UiState.bgDim = it; vm.prefs.bgDim = it }
                 SText(tx("Tampilan layar", "Screen layout"), 12.sp, SP.dim)
@@ -602,6 +611,11 @@ private fun SettingsTab(vm: AppViewModel) {
         SetupCheck(vm)
         SwitchRow(tx("Getar halus", "Haptic feedback"), tx("Getar ringan saat ganti mode dan mulai ritual.", "Light vibration when switching mode and starting the ritual."), UiState.haptics, 50) { UiState.setHaptics(vm.prefs, it) }
         SwitchRow(tx("Kurangi animasi", "Reduce animation"), tx("Perpindahan layar langsung tanpa gerak, hemat tenaga.", "Instant transitions with no motion, saves power."), UiState.reduceAnim, 55) { UiState.setReduce(vm.prefs, it) }
+        SwitchRow(tx("Suara app", "App sounds"), tx("Bunyi klik, ganti mode, dan ritual (dibuat sendiri, tanpa file). Bawaan mati.", "Click, mode-switch and ritual sounds (synthesized, no files). Off by default."), vm.prefs.soundOn, 56) { vm.prefs.soundOn = it; if (it) SoundFx.play(vm.prefs, "ritual") }
+        if (vm.prefs.soundOn) {
+            SText(tx("Volume suara", "Sound volume"), 12.sp, SP.dim)
+            Seg(listOf("30%", "60%", "100%"), when { vm.prefs.soundVol <= 30 -> 0; vm.prefs.soundVol <= 60 -> 1; else -> 2 }) { vm.prefs.soundVol = intArrayOf(30, 60, 100)[it]; SoundFx.play(vm.prefs, "tab") }
+        }
         SwitchRow(tx("Floating orb", "Floating orb"), tx("Cincin FPS melayang di game: ketuk untuk menu ganti mode, rekam, dan detail.", "FPS ring floating in games: tap for the menu to switch mode, record and see details."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
         SwitchRow(tx("Tampilkan FPS di floating", "Show FPS in floating"), tx("Angka FPS, CPU, GPU, dan suhu.", "FPS, CPU, GPU and temperature readout."), vm.hudOn, 90) { vm.updateHudOn(it) }
         SwitchRow(tx("Jangan ganggu saat game", "Do not disturb in games"), tx("Notifikasi dibisukan selama game, balik normal setelah ditutup.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON"), 120) { vm.setFlag("GAME_DND_ON", it) }
