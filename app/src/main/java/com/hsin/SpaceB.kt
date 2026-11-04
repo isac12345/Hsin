@@ -544,7 +544,7 @@ internal fun AlatTab(vm: AppViewModel, land: Boolean) {
         vm.go("tools")
         vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet()
     }
-    val names = listOf(tx("Mesin", "Engine"), tx("Layar", "Display"), tx("Bersih", "Clean"), tx("Log", "Logs"), tx("Sistem", "System"))
+    val names = listOf(tx("Performa", "Performance"), tx("Layar", "Display"), tx("Bersih", "Clean"), tx("Baterai", "Battery"), tx("Alat", "Tools"), tx("Log", "Logs"))
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HChips(names, sub) { sub = it; UiState.toolsSub = it }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -552,8 +552,9 @@ internal fun AlatTab(vm: AppViewModel, land: Boolean) {
                 0 -> AlatMesin(vm, land)
                 1 -> AlatLayar(vm)
                 2 -> AlatBersih(vm, land)
-                3 -> AlatLog(vm)
-                else -> AlatSistem(vm, land)
+                3 -> AlatBaterai(vm)
+                4 -> AlatSistem(vm, land)
+                else -> AlatLog(vm)
             }
             Spacer(Modifier.height(6.dp))
         }
@@ -596,6 +597,10 @@ private fun AlatMesin(vm: AppViewModel, land: Boolean) {
                 Text(tx("Dikunci ke angka itu selama game lalu dikembalikan. Tidak semua ROM menurut.", "Locked to that rate during the game, then restored. Not every ROM obeys."), color = SP.dim, fontSize = 11.sp)
             }
         }
+        Section(tx("UJI PERFORMA", "BENCHMARK"), 120) {
+            Text(tx("Uji CPU di semua mode otomatis dan lihat perbandingannya.", "Test the CPU in every mode automatically and compare the results."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            HBtn(tx("Buka uji performa", "Open benchmark"), Modifier.fillMaxWidth()) { vm.go("bench") }
+        }
     })
 }
 
@@ -634,10 +639,25 @@ private fun AlatBersih(vm: AppViewModel, land: Boolean) {
             Text(tx("Dipakai kalau app terasa lambat dibuka setelah update. Butuh beberapa menit.", "Use when apps open slowly after an update. Takes a few minutes."), color = SP.faint, fontSize = 10.sp)
             HBtn(tx("Memori dan penyetelan", "Memory tuning"), Modifier.fillMaxWidth()) { vm.go("memfx") }
             Text(tx("Dipakai kalau game sering tertutup sendiri karena RAM penuh.", "Use when games close themselves because RAM is full."), color = SP.faint, fontSize = 10.sp)
-            HBtn(tx("Lab baterai", "Battery lab"), Modifier.fillMaxWidth()) { vm.go("batlab") }
-            Text(tx("Dipakai untuk membandingkan pemakaian baterai antar mode.", "Use to compare battery use between modes."), color = SP.faint, fontSize = 10.sp)
+        }
+        Section(tx("BEKUKAN APP", "FREEZE APPS"), 60) {
+            Text(tx("Bekukan app yang tidak dipakai supaya tidak jalan di latar belakang. Bisa dicairkan kapan saja.", "Freeze unused apps so they never run in the background. Can be unfrozen any time."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            HBtn(tx("Buka Bekukan app", "Open Freeze apps"), Modifier.fillMaxWidth()) { vm.go("freeze") }
         }
     })
+}
+
+@Composable
+private fun AlatBaterai(vm: AppViewModel) {
+    Section(tx("PENGISIAN", "CHARGING")) {
+        Text(tx("Batasi pengisian di persen tertentu supaya baterai awet (tergantung kernel HP).", "Cap charging at a set percent so the battery lasts longer (kernel dependent)."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+        HBtn(tx("Batas pengisian", "Charge limit"), Modifier.fillMaxWidth()) { vm.go("charge") }
+    }
+    Section(tx("PEMAKAIAN", "USAGE"), 40) {
+        Text(tx("Bandingkan pemakaian baterai antar mode dan lihat kesehatan baterai.", "Compare battery use between modes and see battery health."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+        HBtn(tx("Lab baterai", "Battery lab"), Modifier.fillMaxWidth()) { vm.go("batlab") }
+        HBtn(tx("Mode otomatis (baterai / mengisi)", "Auto mode (battery / charging)"), Modifier.fillMaxWidth()) { vm.go("auto") }
+    }
 }
 
 /** Penjelasan ramah untuk peringatan yang sebenarnya normal. */
@@ -696,17 +716,6 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
                     SText((if (st == "OK") "✓ " else if (st == "GAGAL") "✗ " else "– ") + name, 12.sp, if (st == "OK") Color(0xFF4FE3C1) else if (st == "GAGAL") SP.red else SP.dim, FontWeight.Medium)
                     Text(note, color = SP.faint, fontSize = 10.sp)
                 }
-            }
-        }
-        Section(tx("FITUR TAMBAHAN", "EXTRAS"), 45) {
-            Text(tx("Bekukan app yang tidak dipakai, dan batasi pengisian baterai (tergantung HP).", "Freeze unused apps, and cap battery charging (device dependent)."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HBtn(tx("Bekukan app", "Freeze apps"), Modifier.weight(1f)) { vm.go("freeze") }
-                HBtn(tx("Batas pengisian", "Charge limit"), Modifier.weight(1f)) { vm.go("charge") }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HBtn(tx("Riwayat sesi FPS", "FPS sessions"), Modifier.weight(1f)) { vm.go("sessions") }
-                HBtn(tx("Uji performa", "Benchmark"), Modifier.weight(1f)) { vm.go("bench") }
             }
         }
         Section(tx("DIAGNOSA DAN PEMULIHAN", "DIAGNOSTICS AND RECOVERY"), 50) {

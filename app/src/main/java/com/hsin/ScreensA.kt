@@ -158,6 +158,21 @@ fun AutoScreen(vm: AppViewModel) {
         Label("Game dibuka")
         KV("Otomatis lewat profil per game", "›")
     }
+    // profil otomatis per jenis app (dijalankan modul tiap ±10 dtk, tidak mengganggu game)
+    val catOn = vm.confStr("CAT_ON", "0") == "1"
+    HsinCard {
+        Label("Per jenis app")
+        ToggleRow("Aktif", "Video, sosmed, musik, dan browser di depan memakai profil pilihanmu; kembali normal saat keluar.", catOn) { vm.setConfKey("CAT_ON", if (it) "1" else "0") }
+        if (catOn) {
+            val opts = listOf("none") + PROFILE_KEYS
+            val optLabels = listOf("OFF") + PROFILE_LABELS
+            listOf("VIDEO" to "Video", "SOCIAL" to "Sosmed", "MUSIC" to "Musik", "BROWSER" to "Browser").forEach { (k, name) ->
+                val cur = vm.confStr("CAT_$k", "none")
+                Label(name, Modifier.padding(top = 6.dp))
+                Seg(optLabels, opts.indexOf(cur).coerceAtLeast(0), { vm.setConfKey("CAT_$k", opts[it]) })
+            }
+        }
+    }
     Pill("SIMPAN", { vm.saveAuto(battOn, pct.toInt(), battProf, chgOn, chgProf) }, solid = true)
 }
 

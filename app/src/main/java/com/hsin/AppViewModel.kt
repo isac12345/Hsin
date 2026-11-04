@@ -38,17 +38,17 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var route by mutableStateOf("dash")
     var editPkg by mutableStateOf("")
     private val parents = mapOf(
-        "auto" to "dash", "therm" to "dash",
-        "stats" to "games", "detect" to "games", "edit" to "games", "addgame" to "games",
+        "auto" to "tools", "therm" to "tools",
+        "stats" to "custom", "detect" to "games", "edit" to "games", "addgame" to "games",
         "bgbanner" to "custom", "bubble" to "custom", "theme" to "custom",
-        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "sessions" to "games", "bench" to "tools", "memfx" to "tools", "perf" to "tools",
+        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "sessions" to "records", "bench" to "tools", "memfx" to "tools", "perf" to "records",
     )
     val tab: String get() = parents[route] ?: route
 
     fun go(r: String) {
-        if (r == "tools" || r == "games" || r == "custom") {
+        if (r == "tools" || r == "games" || r == "custom" || r == "records") {
             route = "dash"
-            UiState.tab = when (r) { "games" -> 1; "tools" -> 3; else -> 4 }
+            UiState.tab = when (r) { "games" -> 1; "records" -> 2; "tools" -> 3; else -> 4 }
             if (r == "tools") viewModelScope.launch { refreshTools() }
             if (r == "games") viewModelScope.launch { games = Hsin.games(); sessions = Hsin.sessions() }
             return
@@ -790,34 +790,66 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var benchVer by mutableStateOf(0)
     var cmpA by mutableStateOf(-1)
     var cmpB by mutableStateOf(-1)
+    var benchStep by mutableStateOf("")
+    private suspend fun cpuBench(): Pair<Long, Long> = withContext(Dispatchers.Default) {
+        fun run(threads: Int): Long {
+            val total = java.util.concurrent.atomic.AtomicLong(0)
+            val end = System.nanoTime() + 3_000_000_000L
+            val ts = (0 until threads).map {
+                Thread {
+                    var n = 0L; var x = 1.0001
+                    while (System.nanoTime() < end) {
+                        for (i in 0 until 20000) { x = x * 1.0000001 + 0.0000001; if (x > 1e9) x = 1.0001 }
+                        n += 20000
+                    }
+                    total.addAndGet(n + (x.toLong() and 0))
+                }.also { it.start() }
+            }
+            ts.forEach { it.join() }
+            return total.get() / 1_000_000L
+        }
+        Pair(run(1), run(Runtime.getRuntime().availableProcessors().coerceAtLeast(2)))
+    }
+
     /** Uji CPU 3 dtk tunggal + 3 dtk semua inti; skor = juta iterasi. Dibandingkan antar mode. */
     fun runBench() {
         if (benchBusy) return
         benchBusy = true
         viewModelScope.launch {
-            val (one, all) = withContext(Dispatchers.Default) {
-                fun run(threads: Int): Long {
-                    val total = java.util.concurrent.atomic.AtomicLong(0)
-                    val end = System.nanoTime() + 3_000_000_000L
-                    val ts = (0 until threads).map {
-                        Thread {
-                            var n = 0L; var x = 1.0001
-                            while (System.nanoTime() < end) {
-                                for (i in 0 until 20000) { x = x * 1.0000001 + 0.0000001; if (x > 1e9) x = 1.0001 }
-                                n += 20000
-                            }
-                            total.addAndGet(n + (x.toLong() and 0))
-                        }.also { it.start() }
-                    }
-                    ts.forEach { it.join() }
-                    return total.get() / 1_000_000L
-                }
-                Pair(run(1), run(Runtime.getRuntime().availableProcessors().coerceAtLeast(2)))
-            }
+            val (one, all) = cpuBench()
             val mode = profileLabel(status.profile)
             prefs.benchHist = listOf(listOf(System.currentTimeMillis().toString(), mode, one.toString(), all.toString())) + prefs.benchHist
             benchBusy = false
             benchVer++
+        }
+    }
+
+    /** Uji otomatis Hemat, Seimbang, Performa berurutan dengan jeda dingin; profil awal dipulihkan. Puncak butuh game, jadi tidak ikut. */
+    fun runBenchAll() {
+        if (benchBusy) return
+        benchBusy = true
+        viewModelScope.launch {
+            val orig = status.profile
+            try {
+                val seq = listOf("battery", "balanced", "performance")
+                seq.forEachIndexed { i, p ->
+                    benchStep = trn("Mode ") + profileLabel(p) + " (" + (i + 1) + "/3)"
+                    Hsin.setProfile(p)
+                    delay(2500)
+                    val (one, all) = cpuBench()
+                    prefs.benchHist = listOf(listOf(System.currentTimeMillis().toString(), profileLabel(p), one.toString(), all.toString())) + prefs.benchHist
+                    benchVer++
+                    if (i < seq.size - 1) {
+                        for (t in 12 downTo 1) { benchStep = trn("Jeda dingin ") + t + " " + trn("dtk"); delay(1000) }
+                    }
+                }
+            } finally {
+                if (orig in PROFILE_KEYS) Hsin.setProfile(orig)
+                benchStep = ""
+                benchBusy = false
+                benchVer++
+                toast("Uji semua mode selesai")
+            }
         }
     }
     var frozen by mutableStateOf<List<String>>(emptyList())

@@ -120,6 +120,12 @@ class Prefs(ctx: Context) {
     var flAlways: Boolean
         get() = sp.getBoolean("fl_always", true)
         set(v) { sp.edit().putBoolean("fl_always", v).apply() }
+    var recCountdown: Boolean
+        get() = sp.getBoolean("rec_countdown", true)
+        set(v) { sp.edit().putBoolean("rec_countdown", v).apply() }
+    var recWithFps: Boolean
+        get() = sp.getBoolean("rec_with_fps", false)
+        set(v) { sp.edit().putBoolean("rec_with_fps", v).apply() }
     var flAutoLog: Boolean
         get() = sp.getBoolean("fl_auto_log", false)
         set(v) { sp.edit().putBoolean("fl_auto_log", v).apply() }
@@ -139,7 +145,7 @@ class Prefs(ctx: Context) {
     /** Riwayat sesi FPS, terbaru di atas, maksimal 12 baris (FpsSession.encode). */
     var fpsSessions: List<FpsSession>
         get() = (sp.getString("fps_sessions", "") ?: "").lines().mapNotNull { FpsSession.decode(it) }
-        set(v) { sp.edit().putString("fps_sessions", v.take(12).joinToString("\n") { it.encode() }).apply() }
+        set(v) { sp.edit().putString("fps_sessions", v.take(20).joinToString("\n") { it.encode() }).apply() }
     /** Riwayat uji performa: "epoch|mode|tunggal|banyak", terbaru di atas, maksimal 10. */
     var benchHist: List<List<String>>
         get() = (sp.getString("bench_hist", "") ?: "").lines().map { it.split('|') }.filter { it.size >= 4 }
