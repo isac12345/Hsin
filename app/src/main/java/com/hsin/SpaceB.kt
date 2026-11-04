@@ -230,7 +230,7 @@ internal fun StatRow(vm: AppViewModel, live: Live, col: Color) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         StatBox("CPU", live.cpu.toFloat(), 100f, "%", 0, col, Modifier.weight(1f).rise(300))
         if (live.gpuPct >= 0) StatBox("GPU", live.gpuPct.toFloat(), 100f, "%", 0, col, Modifier.weight(1f).rise(340))
-        else StatBox("GPU", live.gpuMhz.toFloat(), 1000f, "", 0, col, Modifier.weight(1f).rise(340))
+        else StatBox("GPU", live.gpuMhz.toFloat(), 1000f, "M", 0, col, Modifier.weight(1f).rise(340))
         StatBox(tx("Suhu", "Temp"), live.tempC.toFloat(), 60f, "°", 0, col, Modifier.weight(1f).rise(380))
         StatBox("RAM", u, tot, "G", 1, col, Modifier.weight(1f).rise(420))
     }

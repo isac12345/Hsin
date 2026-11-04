@@ -145,6 +145,10 @@ private val EN2: Map<String, String> = mapOf(
     "Cukup kencang untuk kebanyakan game, suhu dan baterai tetap terjaga." to "Fast enough for most games, with temperature and battery kept in check.",
     "Tenaga tinggi untuk game berat" to "High power for heavy games", "CPU dan GPU agresif, tetap dijaga pengaman panas." to "Aggressive CPU and GPU, still guarded by thermal protection.",
     "CPU dan GPU dikunci frekuensi tertinggi, batas panas dilonggarkan. Paling kencang, HP lebih hangat." to "CPU and GPU locked at top frequency, heat limit relaxed. Fastest, but the phone gets warmer.",
+    "Hemat" to "Saver", "Seimbang" to "Balanced", "Performa" to "Performance", "Puncak" to "Peak", "Rekam" to "Record", "Berhenti" to "Stop",
+    "CPU PAKAI" to "CPU USE", "GPU PAKAI" to "GPU USE", "RAM PAKAI" to "RAM USE", "SUHU HP" to "PHONE TEMP", "SUHU" to "TEMP", "Ringkas" to "Compact", "Sembunyikan" to "Hide",
+    "Ketuk: ringkas\nTahan: sembunyikan" to "Tap: compact\nHold: hide", "Profil terkunci selama merekam. Satu sesi = satu file video." to "Profile locked while recording. One session = one video file.",
+    "Puncak: tenaga penuh, turun sendiri kalau panas" to "Peak: full power, steps down by itself when hot",
     "Mode Puncak aktif" to "Peak mode on", "Mode gagal diterapkan" to "Mode could not be applied", "game booster" to "game booster",
 )
 
