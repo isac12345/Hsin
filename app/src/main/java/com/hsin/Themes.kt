@@ -100,8 +100,9 @@ private fun HomeSlant(vm: AppViewModel, live: Live, col: Color, land: Boolean) {
         }
     } else {
         BoxWithConstraints(Modifier.fillMaxSize()) {
+            val dd = minOf(maxWidth - 28.dp, 300.dp)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                CoreDial(vm, minOf(maxWidth - 28.dp, 300.dp))
+                CoreDial(vm, dd)
                 side(Modifier.fillMaxWidth())
             }
         }
