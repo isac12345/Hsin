@@ -50,8 +50,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 
-private val Mint = Color(0xFF4FE3C1)
-
 // =====================================================================
 //  REKAMAN: 3 tab (Layar | FPS | Sesi)
 // =====================================================================
@@ -107,9 +105,9 @@ private fun ScreenRecPane(vm: AppViewModel) {
         if (withFps && FpsLog.on != starting) vm.toggleFpsLog()
     }
     val land = !UiState.portrait
-    val body: @Composable () -> Unit = {
+    val left: @Composable () -> Unit = {
         // ---- kiri: tombol rekam bulat + pengaturan
-        Column(Modifier.then(if (land) Modifier.weight(1f) else Modifier.fillMaxWidth()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Glass(Modifier.fillMaxWidth().rise(30)) {
                 Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val pulse = ownAnim(if (vm.recOn) 1f else 0f, 300)
@@ -145,8 +143,10 @@ private fun ScreenRecPane(vm: AppViewModel) {
                 Text(tx("Tanpa suara: perekam bawaan Android tidak bisa menangkap suara internal maupun mikrofon.", "No audio: Android's built-in recorder cannot capture internal audio or the microphone."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
             }
         }
+    }
+    val right: @Composable () -> Unit = {
         // ---- kanan: galeri video
-        Column(Modifier.then(if (land) Modifier.weight(1f) else Modifier.fillMaxWidth()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section(tx("VIDEO TERSIMPAN", "SAVED VIDEOS"), 90) {
                 if (files.isEmpty()) SText(tx("Belum ada video. Hasil disimpan di Movies/HSIN.", "No videos yet. Saved to Movies/HSIN."), 12.sp, SP.faint)
                 files.forEach { f ->
@@ -168,8 +168,10 @@ private fun ScreenRecPane(vm: AppViewModel) {
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         item {
-            if (land) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { body() }
-            else Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }
+            if (land) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { left() }
+                Box(Modifier.weight(1f)) { right() }
+            } else Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) { left(); right() }
         }
     }
 }
