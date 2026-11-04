@@ -530,6 +530,11 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                 HBtn(tx("Semua opsi", "All options")) { vm.editPkg = g.pkg; vm.go("edit") }
                 HBtn(tx("Hapus", "Remove"), color = SP.red) { vm.removeGame(g.pkg) }
             }
+            HBtn(tx("Perbaiki FPS game ini", "Fix FPS for this game"), Modifier.fillMaxWidth()) { vm.fpsDiagFor(g.pkg) }
+            if (vm.diagText.isNotEmpty() && vm.diagPkg == g.pkg) {
+                Text(vm.diagText, color = SP.dim, fontSize = 11.sp, lineHeight = 15.sp)
+                SText(tx("Kalau FPS masih kosong: buka game dulu 10 detik lalu tekan tombol ini lagi.", "If FPS is still empty: open the game for 10 seconds, then press this again."), 10.sp, SP.faint)
+            }
         }
     }
 }

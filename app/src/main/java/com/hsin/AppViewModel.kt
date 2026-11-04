@@ -685,6 +685,22 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     var diagText by mutableStateOf("")
+    var diagPkg by mutableStateOf("")
+    /** Diagnosa FPS untuk satu game tertentu (tombol "Perbaiki FPS game ini" di rak game): tunggu sabar sampai 3 kali. */
+    fun fpsDiagFor(pkg: String) {
+        viewModelScope.launch {
+            busy = "Mendiagnosa FPS..."
+            diagPkg = pkg
+            var out = ""
+            for (i in 0 until 3) {
+                out = Hsin.fpsDiag(pkg)
+                if (out.isNotBlank() && !out.contains("tidak ada frame", true)) break
+                delay(2000)
+            }
+            diagText = out.ifEmpty { "Tidak ada hasil dari modul. Buka game dulu lalu coba lagi." }
+            busy = null
+        }
+    }
     fun fpsDiag() {
         viewModelScope.launch {
             busy = "Mendiagnosa FPS..."

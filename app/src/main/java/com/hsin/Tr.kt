@@ -149,6 +149,8 @@ private val EN2: Map<String, String> = mapOf(
     "CPU PAKAI" to "CPU USE", "GPU PAKAI" to "GPU USE", "RAM PAKAI" to "RAM USE", "SUHU HP" to "PHONE TEMP", "SUHU" to "TEMP", "Ringkas" to "Compact", "Sembunyikan" to "Hide",
     "Ketuk: ringkas\nTahan: sembunyikan" to "Tap: compact\nHold: hide", "Profil terkunci selama merekam. Satu sesi = satu file video." to "Profile locked while recording. One session = one video file.",
     "Puncak: tenaga penuh, turun sendiri kalau panas" to "Peak: full power, steps down by itself when hot",
+    "Bersih RAM" to "Clean RAM", "Jangan ganggu" to "Do not disturb", "RAM dibersihkan (app latar belakang)" to "RAM cleaned (background apps)", "Gagal membersihkan RAM" to "Could not clean RAM",
+    "Jangan ganggu aktif saat game" to "Do not disturb is on during games", "Jangan ganggu dimatikan" to "Do not disturb is off",
     "Mode Puncak aktif" to "Peak mode on", "Mode gagal diterapkan" to "Mode could not be applied", "game booster" to "game booster",
 )
 

@@ -274,6 +274,7 @@ fun HsinApp(vm: AppViewModel) {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 if (vm.route == "dash") {
                     SpaceRoot(vm)
+                    if (UiState.animLevel == 2) FancyFx(vm)
                 } else {
                     Backdrop(vm)
                     Column(Modifier.fillMaxSize().systemBarsPadding()) {
