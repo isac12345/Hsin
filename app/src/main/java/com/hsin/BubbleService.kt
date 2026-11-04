@@ -111,6 +111,20 @@ class BubbleService : Service() {
         f.onProfile = { p -> setProfile(p) }
         f.onRec = { toggleRec() }
         f.onOvd = { on -> toggleOvd(on) }
+        f.onRam = {
+            scope.launch {
+                val r = Root.exec("am kill-all", 8_000L)
+                Toast.makeText(this@BubbleService, if (r.code == 0) "✓ " + trn("RAM dibersihkan (app latar belakang)") else "ℹ " + trn("Gagal membersihkan RAM"), Toast.LENGTH_SHORT).show()
+            }
+        }
+        f.onDnd = {
+            scope.launch {
+                val cur = try { Hsin.flags()["GAME_DND_ON"] == true } catch (_: Exception) { false }
+                Hsin.setFlag("GAME_DND_ON", !cur)
+                floating?.setDnd(!cur)
+                Toast.makeText(this@BubbleService, if (!cur) "✓ " + trn("Jangan ganggu aktif saat game") else "ℹ " + trn("Jangan ganggu dimatikan"), Toast.LENGTH_SHORT).show()
+            }
+        }
         f.onSession = { st0 ->
             scope.launch {
                 // profil yang dicatat = yang tertinggi antara profil aktif dan profil yang diatur untuk game itu
@@ -125,6 +139,7 @@ class BubbleService : Service() {
         }
         f.onHidden = { floating?.detach() }
         floating = f
+        scope.launch { try { f.setDnd(Hsin.flags()["GAME_DND_ON"] == true) } catch (_: Exception) { } }
         rebuild()
         scope.launch {
             while (isActive) {

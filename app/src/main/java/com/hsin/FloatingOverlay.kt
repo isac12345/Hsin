@@ -82,6 +82,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     var onRec: (() -> Unit)? = null
     var onHidden: (() -> Unit)? = null
     var onOvd: ((Boolean) -> Unit)? = null
+    var onRam: (() -> Unit)? = null
+    var onDnd: (() -> Unit)? = null
+    private var dndOn = false
+    fun setDnd(on: Boolean) { dndOn = on; paintTiles() }
     var onSession: ((FpsSession) -> Unit)? = null
 
     private val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -288,6 +292,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var themeTitle: TextView? = null
     private var tileRec: View? = null
     private var tileFps: View? = null
+    private var tileDnd: View? = null
 
     private var profile = "none"
     private var recOn = false
@@ -371,7 +376,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         fpsBigLbl = null
         fpsThinLbl = null
         panelBox = null
-        themeTitle = null; tileRec = null; tileFps = null
+        themeTitle = null; tileRec = null; tileFps = null; tileDnd = null
         mode = m
         if (!prefs.bubbleHidden) {
             build()
@@ -1633,6 +1638,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val rc = tileRec; val fc = tileFps
         if (rc != null) rc.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (recOn) RED else 0xFF22252E.toInt()); setStroke(px(2), RED) }
         if (fc != null) fc.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (csvOn) themeNeon(prefs.flStyle) else 0xFF22252E.toInt()); setStroke(px(2), themeNeon(prefs.flStyle)) }
+        tileDnd?.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (dndOn) 0xFFE8B95A.toInt() else 0xFF22252E.toInt()); setStroke(px(2), 0xFFE8B95A.toInt()) }
         val tt = themeTitle
         if (tt != null) { tt.text = trn(modeName()).uppercase(); tt.setTextColor(accentColor()) }
     }
@@ -1704,6 +1710,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val l3 = fpsLabel(12f, 0.1f); fpsBigLbl = l3
         val (tRec, cRec) = roundTile("Rekam", RED, "●", { onRec?.invoke() }, st == 5)
         val (tFps, cFps) = roundTile("Rekam FPS", neon, "≈", { toggleFpsLog() }, st == 5)
+        val (tRam, _) = roundTile("Bersih RAM", 0xFF4FE3C1.toInt(), "◎", { onRam?.invoke() }, false)
+        val (tDnd, cDnd) = roundTile("Jangan ganggu", 0xFFE8B95A.toInt(), "☾", { onDnd?.invoke() }, false)
+        tileDnd = cDnd
         val (tClose, _) = roundTile("Ringkas", 0xFFCFD2DD.toInt(), "–", { setMode(MODE_PILL) }, st == 5)
         val (tHide, _) = roundTile("Sembunyikan", 0xFF8A93A6.toInt(), "×", { hide() }, st == 5)
         tileRec = cRec; tileFps = cFps
@@ -1728,7 +1737,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         fun tilesRow(): LinearLayout = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-            for (t in listOf(tRec, tFps, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
+            for (t in listOf(tRec, tFps, tRam, tDnd, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
         }
 
         when (st) {
@@ -1783,12 +1792,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 main.addView(hdr(), lpw(MATCH, WRAP))
                 main.addView(top, lpw(MATCH, WRAP, mt = px(8)))
                 val foot = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                for (t in listOf(tRec, tFps, tClose, tHide)) foot.addView(t, lpw(MATCH, WRAP, mt = px(5)))
+                val all = listOf(tRec, tFps, tRam, tDnd, tClose, tHide)
+                for (r in 0 until 2) {
+                    val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+                    for (c in 0 until 3) line.addView(all[r * 3 + c], lpw(0, WRAP, 1f))
+                    foot.addView(line, lpw(MATCH, WRAP, mt = px(if (r == 0) 0 else 6)))
+                }
                 footRow = foot
                 main.addView(foot, lpw(MATCH, WRAP, mt = px(10)))
                 main.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
                 main.addView(View(ctx), lpw(MATCH, 0, 1f))
-                main.addView(buildSegRow(true), lpw(MATCH, WRAP, mt = px(8)))
+                main.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(8)))
                 odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 10f; main.addView(o, lpw(MATCH, WRAP, mt = px(4))); odStatusLine = o }
                 row.addView(strip, lpw(px(84), MATCH))
                 row.addView(main, lpw(0, MATCH, 1f, px(10)))

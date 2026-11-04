@@ -219,6 +219,8 @@ object UiState {
     var reduceAnim = false
     var bgDim by mutableStateOf(1)
     fun setReduce(p: Prefs, on: Boolean) { reduceAnim = on; p.reduceAnim = on; themeTick++ }
+    var animLevel by mutableStateOf(1)
+    fun setAnim(p: Prefs, lvl: Int) { animLevel = lvl; p.animLevel = lvl; reduceAnim = lvl == 0; themeTick++ }
     var view: android.view.View? = null
     fun setHaptics(p: Prefs, on: Boolean) { haptics = on; p.haptics = on }
     /** Getar halus (bisa dimatikan di Pengaturan). */
@@ -242,6 +244,7 @@ object UiState {
         sndPrefs = p
         haptics = p.haptics
         reduceAnim = p.reduceAnim
+        animLevel = p.animLevel
         bgDim = p.bgDim
         inited = true
         en = p.sp.getBoolean("hsin_en", false)
@@ -610,7 +613,13 @@ private fun SettingsTab(vm: AppViewModel) {
         }
         SetupCheck(vm)
         SwitchRow(tx("Getar halus", "Haptic feedback"), tx("Getar ringan saat ganti mode dan mulai ritual.", "Light vibration when switching mode and starting the ritual."), UiState.haptics, 50) { UiState.setHaptics(vm.prefs, it) }
-        SwitchRow(tx("Kurangi animasi", "Reduce animation"), tx("Perpindahan layar langsung tanpa gerak, hemat tenaga.", "Instant transitions with no motion, saves power."), UiState.reduceAnim, 55) { UiState.setReduce(vm.prefs, it) }
+        Glass(Modifier.fillMaxWidth().rise(55)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SText(tx("Gaya animasi", "Animation style"), 13.sp, SP.text, FontWeight.Medium)
+                Seg(listOf(tx("Minimal", "Minimal"), "Normal", tx("Mewah", "Fancy")), UiState.animLevel) { UiState.setAnim(vm.prefs, it); SoundFx.play(vm.prefs, "tab") }
+                SText(tx("Minimal: tanpa gerak, hemat tenaga. Normal: halus. Mewah: garis pindai, kilau warna mode, dan efek ala game.", "Minimal: no motion, saves power. Normal: smooth. Fancy: scan line, mode-colour glow and game-style effects."), 11.sp, SP.faint)
+            }
+        }
         SwitchRow(tx("Suara app", "App sounds"), tx("Bunyi klik, ganti mode, dan ritual (dibuat sendiri, tanpa file). Bawaan mati.", "Click, mode-switch and ritual sounds (synthesized, no files). Off by default."), vm.prefs.soundOn, 56) { vm.prefs.soundOn = it; if (it) SoundFx.play(vm.prefs, "ritual") }
         if (vm.prefs.soundOn) {
             SText(tx("Volume suara", "Sound volume"), 12.sp, SP.dim)
