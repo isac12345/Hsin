@@ -121,7 +121,7 @@ private fun FloatingSettings(vm: AppViewModel) {
             { al = it; val n = SystemClock.uptimeMillis(); if (n - alT > 150) { alT = n; p.flAlpha = it.toInt() } },
             { p.flAlpha = al.toInt(); vm.flChanged() })
         Label("Gaya floating", Modifier.padding(top = 10.dp))
-        Seg(listOf("STANDAR", "HUD GELAP", "KACA"), p.flStyle, { p.flStyle = it; vm.flChanged() })
+        Seg(listOf("STANDAR", "HUD", "KACA", "KARTU", "BUNDAR", "KUBUS"), p.flStyle, { p.flStyle = it; vm.flChanged() })
         txt("HUD: gelap pekat, sudut tegas. Kaca: tembus pandang dan membulat (blur butuh Android 12 ke atas dan ROM yang mendukung).", 11.sp, muted())
         Label("Tampilan awal", Modifier.padding(top = 10.dp))
         Seg(listOf("ORB", "KAPSUL"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })

@@ -273,6 +273,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     private var toastJob: Job? = null
     fun toast(s: String) {
         msg = trn(s.removePrefix("ERROR:").trim())
+        SoundFx.play(prefs, if (s.startsWith("ERROR") || s.startsWith("Gagal")) "bad" else "good")
         toastJob?.cancel()
         toastJob = viewModelScope.launch { delay(2600); msg = null }
     }

@@ -1220,9 +1220,15 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         return when (prefs.flStyle) {
             1 -> Color.argb(maxOf(a, 200), 11, 13, 16)          // HUD: hampir hitam pekat
             2 -> Color.argb((a * 0.42f).toInt().coerceAtLeast(70), 255, 255, 255)  // kaca: putih tembus
+            3 -> Color.argb(maxOf(a, 215), 12, 15, 26)           // Kartu Miring
+            4 -> Color.argb(maxOf(a, 215), 12, 12, 18)           // Dasbor Bundar
+            5 -> Color.argb(maxOf(a, 225), 7, 9, 15)             // Kubus Energi
             else -> Color.argb(a, 20, 20, 22)
         }
     }
+
+    /** Warna neon tiap tema gaming: 3 cyan, 4 merah, 5 cyan terang. */
+    private fun themeNeon(st: Int): Int = when (st) { 4 -> 0xFFFF1F3D.toInt(); 3 -> 0xFF22D3EE.toInt(); else -> 0xFF2DE0FF.toInt() }
 
     private fun accentColor(): Int {
         if (odOn) return OD
@@ -1248,10 +1254,16 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 if (stroke == BORDER) stroke = 0x4DFFFFFF
             }
         }
+        val st = prefs.flStyle
+        if (st >= 3) {                               // tema gaming: sudut tajam + garis neon warna tema
+            radius *= if (st == 4) 0.9f else 0.3f
+            if (color == CARD) color = 0x1AFFFFFF
+            if (stroke == BORDER) stroke = themeNeon(st)
+        }
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
-            if (stroke != 0) setStroke(px(1), stroke)
+            if (stroke != 0) setStroke(if (st >= 3) px(2) else px(1), stroke)
         }
     }
 
@@ -1792,9 +1804,21 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             p.color = when (prefs.flStyle) {
                 1 -> Color.argb(250, 11, 13, 16)
                 2 -> Color.argb(95, 255, 255, 255)
+                3 -> Color.argb(250, 12, 15, 26)
+                4 -> Color.argb(250, 12, 12, 18)
+                5 -> Color.argb(250, 7, 9, 15)
                 else -> Color.argb(235, 20, 20, 22)
             }
             canvas.drawCircle(c, c, c - pf(1), p)
+            if (prefs.flStyle >= 3) {               // lingkar neon berputar (tema gaming)
+                val nc = themeNeon(prefs.flStyle)
+                p.style = Paint.Style.STROKE; p.strokeWidth = pf(2.5f); p.color = nc; p.strokeCap = Paint.Cap.ROUND
+                rect.set(pf(2f), pf(2f), w - pf(2f), w - pf(2f))
+                val rot = (System.currentTimeMillis() % 3000L) / 3000f * 360f
+                canvas.drawArc(rect, rot, 80f, false, p)
+                canvas.drawArc(rect, rot + 180f, 80f, false, p)
+                p.style = Paint.Style.FILL
+            }
             p.style = Paint.Style.STROKE
             p.strokeWidth = pf(1.5f) + pf(1.5f) * breath
             p.color = Color.argb((50 + 110 * breath).toInt(), Color.red(ringCol), Color.green(ringCol), Color.blue(ringCol))

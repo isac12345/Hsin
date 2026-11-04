@@ -225,7 +225,7 @@ private fun MiniChip(dot: Color, t: String) {
 }
 
 @Composable
-private fun StatRow(vm: AppViewModel, live: Live, col: Color) {
+internal fun StatRow(vm: AppViewModel, live: Live, col: Color) {
     val (u, tot) = ramInfo(LocalContext.current)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         StatBox("CPU", live.cpu.toFloat(), 100f, "%", 0, col, Modifier.weight(1f).rise(300))
@@ -262,7 +262,7 @@ private fun gameModeLine(vm: AppViewModel, g: GameEntry): String {
 }
 
 @Composable
-private fun GamePicker(vm: AppViewModel) {
+internal fun GamePicker(vm: AppViewModel) {
     val gs = vm.games
     Glass(Modifier.fillMaxWidth().rise(240)) {
         if (gs.isEmpty()) {
@@ -287,7 +287,7 @@ private fun GamePicker(vm: AppViewModel) {
 }
 
 @Composable
-private fun ActionRow(vm: AppViewModel, col: Color) {
+internal fun ActionRow(vm: AppViewModel, col: Color) {
     val gs = vm.games
     val dnd = vm.flag("GAME_DND_ON")
     Row(Modifier.fillMaxWidth().rise(300), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -309,6 +309,7 @@ private fun ActionRow(vm: AppViewModel, col: Color) {
 
 @Composable
 internal fun HomeTab(vm: AppViewModel, land: Boolean) {
+    if (vm.prefs.appTheme != 0 && UiState.themeTick >= 0) { ThemedHome(vm, land); return }
     val live = rememberLive(vm, true)
     val cm = curMode(vm)
     val col = if (cm.isEmpty()) SP.gold else info(cm).color
@@ -323,7 +324,7 @@ internal fun HomeTab(vm: AppViewModel, land: Boolean) {
                     StatRow(vm, live, col)
                     GamePicker(vm)
                     ActionRow(vm, col)
-                    SessionCard(vm, col)
+                    ResumeButton(vm, col)
                 }
             }
         }
@@ -337,7 +338,7 @@ internal fun HomeTab(vm: AppViewModel, land: Boolean) {
                 StatRow(vm, live, col)
                 GamePicker(vm)
                 ActionRow(vm, col)
-                SessionCard(vm, col)
+                ResumeButton(vm, col)
             }
         }
     }
