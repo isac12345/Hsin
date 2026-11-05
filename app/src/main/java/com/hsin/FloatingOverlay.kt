@@ -1076,6 +1076,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (n == MODE_MENU) { p.x -= menuPad(); p.y -= menuPad() }
         }
         mode = n
+        if (n == MODE_MENU || n == MODE_PANEL) SoundFx.play(prefs, "open") else if (old == MODE_MENU || old == MODE_PANEL) SoundFx.play(prefs, "close")
         applyMode()
         if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
         if (n == MODE_PANEL) anchorPanel()

@@ -237,7 +237,7 @@ object UiState {
     var toolsSub by mutableIntStateOf(0)   // sub-tab Alat terakhir, supaya Back dari fitur kembali ke tempat semula
     var splashDone = false          // loading hanya sekali per pembukaan app (bukan tiap kembali ke Beranda)
     var ritual by mutableStateOf("")   // paket game yang sedang diluncurkan lewat ritual
-    fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz(); sndPrefs?.let { SoundFx.play(it, "ritual") } } }
+    fun startRitual(pkg: String) { if (ritual.isEmpty()) { ritual = pkg; buzz(); sndPrefs?.let { SoundFx.play(it, "ignition") } } }
     private var inited = false
     fun init(p: Prefs) {
         if (inited) return
@@ -620,7 +620,7 @@ private fun SettingsTab(vm: AppViewModel) {
                 SText(tx("Minimal: tanpa gerak, hemat tenaga. Normal: halus. Mewah: garis pindai, kilau warna mode, dan efek ala game.", "Minimal: no motion, saves power. Normal: smooth. Fancy: scan line, mode-colour glow and game-style effects."), 11.sp, SP.faint)
             }
         }
-        SwitchRow(tx("Suara app", "App sounds"), tx("Bunyi klik, ganti mode, dan ritual (dibuat sendiri, tanpa file). Bawaan mati.", "Click, mode-switch and ritual sounds (synthesized, no files). Off by default."), vm.prefs.soundOn, 56) { vm.prefs.soundOn = it; if (it) SoundFx.play(vm.prefs, "ritual") }
+        SwitchRow(tx("Suara app", "App sounds"), tx("Bunyi klik, ganti mode, dan ritual (dibuat sendiri, tanpa file). Bawaan mati.", "Click, mode-switch and ritual sounds (synthesized, no files). Off by default."), vm.prefs.soundOn, 56) { vm.prefs.soundOn = it; if (it) SoundFx.play(vm.prefs, "ignition") }
         if (vm.prefs.soundOn) {
             SText(tx("Volume suara", "Sound volume"), 12.sp, SP.dim)
             Seg(listOf("30%", "60%", "100%"), when { vm.prefs.soundVol <= 30 -> 0; vm.prefs.soundVol <= 60 -> 1; else -> 2 }) { vm.prefs.soundVol = intArrayOf(30, 60, 100)[it]; SoundFx.play(vm.prefs, "tab") }

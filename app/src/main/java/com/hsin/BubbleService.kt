@@ -112,6 +112,7 @@ class BubbleService : Service() {
         f.onRec = { toggleRec() }
         f.onOvd = { on -> toggleOvd(on) }
         f.onRam = {
+            SoundFx.play(prefs, "clean")
             scope.launch {
                 val r = Root.exec("am kill-all", 8_000L)
                 Toast.makeText(this@BubbleService, if (r.code == 0) "✓ " + trn("RAM dibersihkan (app latar belakang)") else "ℹ " + trn("Gagal membersihkan RAM"), Toast.LENGTH_SHORT).show()
@@ -267,6 +268,7 @@ class BubbleService : Service() {
     private fun setProfile(p: String) {
         if (p !in PROFILE_KEYS) return
         profile = p
+        SoundFx.play(prefs, p)
         floating?.setProfileState(p, recOn)
         updateNotification()
         scope.launch {
@@ -289,6 +291,7 @@ class BubbleService : Service() {
 
     // ---------- rekam ----------
     private fun toggleOvd(on: Boolean) {
+        SoundFx.play(prefs, if (on) "boost" else "boostoff")
         scope.launch {
             val r = if (on) Hsin.ovdStart() else Hsin.ovdStop()
             if (on && !r.ok) {
