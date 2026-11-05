@@ -83,6 +83,16 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     var onHidden: (() -> Unit)? = null
     var onOvd: ((Boolean) -> Unit)? = null
     var onRam: (() -> Unit)? = null
+    var onShot: (() -> Unit)? = null
+    var onPause: (() -> Unit)? = null
+    private var fpsTarget = 0f
+    private var fpsDisp = 0f
+    private var fpsTextOn = false
+    private var flashUntil = 0L
+    private var flashOn = false
+    private var scanView: ScanView? = null
+    private var scanT0 = 0L
+    @Volatile var noFpsTicks = 0
     var onDnd: (() -> Unit)? = null
     private var dndOn = false
     fun setDnd(on: Boolean) { dndOn = on; paintTiles() }
@@ -376,7 +386,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         fpsBigLbl = null
         fpsThinLbl = null
         panelBox = null
-        themeTitle = null; tileRec = null; tileFps = null; tileDnd = null
+        themeTitle = null; tileRec = null; tileFps = null; tileDnd = null; scanView = null
         mode = m
         if (!prefs.bubbleHidden) {
             build()
@@ -593,7 +603,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         setText(fpsPillLbl, lbl)
         setText(fpsThinLbl, lbl)
         setText(fpsBigLbl, lbl)
-        if (fpsText != null) {
+        noFpsTicks = if (s.fps == null) noFpsTicks + 1 else 0
+        if (prefs.flStyle >= 3) {
+            // tema gaming: angka FPS menghitung naik halus (diatur di loop frame) dan berkedip merah saat patah
+            if (fpsText != null) { fpsTarget = fpsText.toFloatOrNull() ?: fpsTarget; fpsTextOn = true } else fpsTextOn = false
+            if (s.jank > 0 || s.bigJank > 0) flashUntil = nowMs + 450L
+        } else if (fpsText != null) {
             setText(fpsPill, fpsText)
             setText(fpsMenu, fpsText)
             setText(fpsThin, fpsText)
@@ -683,6 +698,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         f.addView(menu)
         f.addView(panel)
         f.addView(thin)
+        val sv = ScanView(); sv.visibility = View.GONE; scanView = sv
+        f.addView(sv, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         root = f
         paintSeg()
         applyRec()
@@ -1051,6 +1068,24 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (now - lastTick >= 33L) {
                 lastTick = now
                 for (o in orbs) o.tick(now)
+                if (prefs.flStyle >= 3 && fpsTextOn) {
+                    val d = fpsTarget - fpsDisp
+                    fpsDisp = if (kotlin.math.abs(d) > 0.4f) fpsDisp + d * 0.3f else fpsTarget
+                    val txt = fpsDisp.toInt().toString()
+                    val fl = now < flashUntil
+                    setText(fpsPill, txt); setText(fpsMenu, txt); setText(fpsThin, txt)
+                    if (mode == MODE_PANEL) setText(fpsBig, txt)
+                    if (fl != flashOn) {
+                        flashOn = fl
+                        val col = if (fl) RED else TEXT
+                        fpsPill?.setTextColor(col); fpsMenu?.setTextColor(col); fpsThin?.setTextColor(col); fpsBig?.setTextColor(col)
+                    }
+                }
+                val sv = scanView
+                if (sv != null && sv.visibility == View.VISIBLE) {
+                    val t = (now - scanT0) / 520f
+                    if (t >= 1f) sv.visibility = View.GONE else { sv.pos = t; sv.invalidate() }
+                }
             }
             r.postOnAnimation(this)
         }
@@ -1080,6 +1115,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         applyMode()
         if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
         if (n == MODE_PANEL) anchorPanel()
+        if ((n == MODE_PANEL || n == MODE_THIN) && prefs.flStyle >= 3) { scanT0 = SystemClock.uptimeMillis(); scanView?.visibility = View.VISIBLE }
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
         root?.post { clamp() }
@@ -1714,6 +1750,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val (tRam, _) = roundTile("Bersih RAM", 0xFF4FE3C1.toInt(), "◎", { onRam?.invoke() }, false)
         val (tDnd, cDnd) = roundTile("Jangan ganggu", 0xFFE8B95A.toInt(), "☾", { onDnd?.invoke() }, false)
         tileDnd = cDnd
+        val (tShot, _) = roundTile("Screenshot", 0xFF60A5FA.toInt(), "▣", { onShot?.invoke() }, false)
+        val (tPause, _) = roundTile("Jeda", 0xFFF5A524.toInt(), "‖", { onPause?.invoke() }, false)
         val (tClose, _) = roundTile("Ringkas", 0xFFCFD2DD.toInt(), "–", { setMode(MODE_PILL) }, st == 5)
         val (tHide, _) = roundTile("Sembunyikan", 0xFF8A93A6.toInt(), "×", { hide() }, st == 5)
         tileRec = cRec; tileFps = cFps
@@ -1738,7 +1776,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         fun tilesRow(): LinearLayout = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-            for (t in listOf(tRec, tFps, tRam, tDnd, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
+            for (t in listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
         }
 
         when (st) {
@@ -1770,7 +1808,14 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 val mid = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
                 mid.addView(hdr(), lpw(MATCH, WRAP))
                 mid.addView(top, lpw(MATCH, WRAP, mt = px(8)))
-                val foot = tilesRow(); footRow = foot
+                val foot = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+                val all4 = listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)
+                for (r in 0 until 2) {
+                    val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+                    for (c in 0 until 4) line.addView(all4[r * 4 + c], lpw(0, WRAP, 1f))
+                    foot.addView(line, lpw(MATCH, WRAP, mt = px(if (r == 0) 0 else 4)))
+                }
+                footRow = foot
                 mid.addView(foot, lpw(MATCH, WRAP, mt = px(8)))
                 mid.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
                 mid.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(8)))
@@ -1793,11 +1838,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 main.addView(hdr(), lpw(MATCH, WRAP))
                 main.addView(top, lpw(MATCH, WRAP, mt = px(8)))
                 val foot = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                val all = listOf(tRec, tFps, tRam, tDnd, tClose, tHide)
-                for (r in 0 until 2) {
+                val all = listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)
+                for (r in 0 until 3) {
                     val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-                    for (c in 0 until 3) line.addView(all[r * 3 + c], lpw(0, WRAP, 1f))
-                    foot.addView(line, lpw(MATCH, WRAP, mt = px(if (r == 0) 0 else 6)))
+                    for (c in 0 until 3) { val ix = r * 3 + c; if (ix < all.size) line.addView(all[ix], lpw(0, WRAP, 1f)) else line.addView(View(ctx), lpw(0, 1, 1f)) }
+                    foot.addView(line, lpw(MATCH, WRAP, mt = px(if (r == 0) 0 else 4)))
                 }
                 footRow = foot
                 main.addView(foot, lpw(MATCH, WRAP, mt = px(10)))
@@ -2051,6 +2096,23 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (scaleX != sc) { scaleX = sc; scaleY = sc }
         }
 
+        private fun shapePath(sty: Int, w: Float): Path {
+            val pth = Path(); val m = pf(2f); val c = w / 2f
+            if (sty == 3) {
+                val k = w * 0.24f
+                pth.moveTo(m + k, m); pth.lineTo(w - m, m); pth.lineTo(w - m, w - m - k); pth.lineTo(w - m - k, w - m); pth.lineTo(m, w - m); pth.lineTo(m, m + k); pth.close()
+            } else {
+                val r = c - m
+                for (i in 0 until 6) {
+                    val a = Math.toRadians(-90.0 + 60.0 * i)
+                    val x = c + (r * Math.cos(a)).toFloat(); val y = c + (r * Math.sin(a)).toFloat()
+                    if (i == 0) pth.moveTo(x, y) else pth.lineTo(x, y)
+                }
+                pth.close()
+            }
+            return pth
+        }
+
         override fun onDraw(canvas: Canvas) {
             val w = width.toFloat()
             val c = w / 2f
@@ -2066,14 +2128,37 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 5 -> Color.argb(250, 7, 9, 15)
                 else -> Color.argb(235, 20, 20, 22)
             }
-            canvas.drawCircle(c, c, c - pf(1), p)
-            if (prefs.flStyle >= 3) {               // lingkar neon berputar (tema gaming)
-                val nc = themeNeon(prefs.flStyle)
+            val sty = prefs.flStyle
+            if (sty == 3 || sty == 5) {
+                // bentuk sendiri per tema: 3 = kotak sudut terpotong, 5 = heksagon; isi gelap + garis neon dengan sorot berjalan
+                val sp = shapePath(sty, w)
+                canvas.drawPath(sp, p)
+                val nc = themeNeon(sty)
+                p.style = Paint.Style.STROKE; p.strokeWidth = pf(2f); p.color = (nc and 0x00FFFFFF) or 0x66000000
+                canvas.drawPath(sp, p)
+                val pm = android.graphics.PathMeasure(sp, true)
+                val len = pm.length
+                val start = (System.currentTimeMillis() % 2400L) / 2400f * len
+                val seg = Path()
+                p.strokeWidth = pf(3.2f); p.color = nc; p.strokeCap = Paint.Cap.ROUND
+                pm.getSegment(start, minOf(start + len * 0.22f, len), seg, true)
+                canvas.drawPath(seg, p)
+                if (start + len * 0.22f > len) { val s2 = Path(); pm.getSegment(0f, start + len * 0.22f - len, s2, true); canvas.drawPath(s2, p) }
+                p.style = Paint.Style.FILL
+            } else canvas.drawCircle(c, c, c - pf(1), p)
+            if (sty == 4) {                         // Dasbor Bundar: cincin merah berputar + tanda skala
+                val nc = themeNeon(4)
                 p.style = Paint.Style.STROKE; p.strokeWidth = pf(2.5f); p.color = nc; p.strokeCap = Paint.Cap.ROUND
                 rect.set(pf(2f), pf(2f), w - pf(2f), w - pf(2f))
                 val rot = (System.currentTimeMillis() % 3000L) / 3000f * 360f
                 canvas.drawArc(rect, rot, 80f, false, p)
                 canvas.drawArc(rect, rot + 180f, 80f, false, p)
+                p.strokeWidth = pf(1.2f); p.color = 0x66FFFFFF
+                for (k in 0 until 24) {
+                    val a = Math.toRadians(k * 15.0)
+                    val r1 = c - pf(3.5f); val r2 = c - pf(if (k % 6 == 0) 8f else 5.5f)
+                    canvas.drawLine(c + (r1 * Math.cos(a)).toFloat(), c + (r1 * Math.sin(a)).toFloat(), c + (r2 * Math.cos(a)).toFloat(), c + (r2 * Math.sin(a)).toFloat(), p)
+                }
                 p.style = Paint.Style.FILL
             }
             p.style = Paint.Style.STROKE
@@ -2088,6 +2173,22 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             p.color = ringCol
             p.strokeCap = Paint.Cap.ROUND
             canvas.drawArc(rect, -90f, 360f * frac, false, p)
+        }
+    }
+
+    /** Garis pindai neon yang menyapu panel saat muncul (tema gaming). */
+    private inner class ScanView : View(ctx) {
+        var pos = 0f
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            val nc = themeNeon(prefs.flStyle)
+            val y = pos * height
+            val band = pf(70f)
+            p.shader = android.graphics.LinearGradient(0f, y - band, 0f, y, intArrayOf(0x00000000, (nc and 0x00FFFFFF) or 0x44000000), null, android.graphics.Shader.TileMode.CLAMP)
+            canvas.drawRect(0f, y - band, width.toFloat(), y, p)
+            p.shader = null
+            p.color = nc
+            canvas.drawRect(0f, y - pf(1.5f), width.toFloat(), y + pf(1.5f), p)
         }
     }
 

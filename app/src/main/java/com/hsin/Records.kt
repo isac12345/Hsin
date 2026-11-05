@@ -199,6 +199,7 @@ private fun ScreenRecPane(vm: AppViewModel) {
 // ---------------------------------------------------------------- FPS
 @Composable
 private fun FpsRecPane(vm: AppViewModel) {
+    var flt by remember { mutableStateOf("") }
     LaunchedEffect(vm.modPath, FpsLog.saved) { vm.loadFpsFiles() }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -208,7 +209,29 @@ private fun FpsRecPane(vm: AppViewModel) {
             }
         }
         if (vm.fpsFiles.isEmpty()) item { SText(tx("Belum ada rekaman FPS.", "No FPS records yet."), 13.sp, SP.faint) }
-        items(vm.fpsFiles, key = { it.name }) { r -> RecCard(vm, r) }
+        else {
+            val shown = vm.fpsFiles.filter { flt.isEmpty() || it.pkg == flt }
+            item {
+                // ringkasan ala Smollming: jumlah rekaman, rata-rata, tertinggi
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val avgAll = if (shown.isEmpty()) 0 else Math.round(shown.map { it.avg }.average()).toInt()
+                    val hi = shown.maxOfOrNull { Math.round(it.avg).toInt() } ?: 0
+                    for ((k, v) in listOf(tx("Rekaman", "Recordings") to "${shown.size}", tx("Rata-rata", "Average") to "$avgAll", tx("Tertinggi", "Highest") to "$hi")) {
+                        Glass(Modifier.weight(1f), radius = 14, alt = true) {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) { SText(k, 11.sp, SP.dim); SText(v, 20.sp, SP.text, FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+            val pk = vm.fpsFiles.map { it.pkg }.distinct()
+            if (pk.size > 1) item {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val labels = listOf(tx("Semua", "All")) + pk.map { vm.label(it) }
+                    HChips(labels, if (flt.isEmpty()) 0 else pk.indexOf(flt) + 1) { flt = if (it == 0) "" else pk[it - 1] }
+                }
+            }
+            items(shown, key = { it.name }) { r -> RecCard(vm, r) }
+        }
     }
 }
 

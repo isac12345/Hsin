@@ -213,9 +213,65 @@ internal fun ThemedHome(vm: AppViewModel, land: Boolean) {
     val live = rememberLive(vm, true)
     val cm = curMode(vm)
     val col = if (cm.isEmpty()) SP.gold else info(cm).color
-    when (vm.prefs.appTheme) {
-        1 -> HomeSlant(vm, live, col, land)
-        2 -> HomeRound(vm, live, col, land)
-        else -> HomeCube(vm, live, col, land)
+    Box(Modifier.fillMaxSize()) {
+        ThemeDeco(vm.prefs.appTheme, col)
+        when (vm.prefs.appTheme) {
+            1 -> HomeSlant(vm, live, col, land)
+            2 -> HomeRound(vm, live, col, land)
+            else -> HomeCube(vm, live, col, land)
+        }
+    }
+}
+
+/** Dekorasi latar tiap tema (di belakang konten, tidak menangkap sentuhan). */
+@Composable
+private fun ThemeDeco(theme: Int, col: Color) {
+    val clock = LocalClock.current
+    Canvas(Modifier.fillMaxSize()) {
+        val t = clock.floatValue
+        val w = size.width; val h = size.height
+        when (theme) {
+            1 -> {   // batang miring bercahaya di kiri dan kanan
+                val bh = 16.dp.toPx(); val gap = 8.dp.toPx(); val sk = bh * 0.9f
+                for (side in 0..1) for (i in 0 until 6) {
+                    val y = h * 0.12f + i * (bh + gap)
+                    val len = (60 + (i * 17 + (t * 20f).toInt() * (if (side == 0) 1 else 2)) % 70).dp.toPx()
+                    val x0 = if (side == 0) 6.dp.toPx() else w - 6.dp.toPx() - len
+                    val path = Path().apply { moveTo(x0 + sk, y); lineTo(x0 + len, y); lineTo(x0 + len - sk, y + bh); lineTo(x0, y + bh); close() }
+                    drawPath(path, col.copy(alpha = 0.05f + 0.025f * ((i + (t * 2f).toInt()) % 4)))
+                }
+                drawLine(col.copy(alpha = 0.5f), Offset(0f, 1.dp.toPx()), Offset(w * 0.35f, 1.dp.toPx()), 2.dp.toPx())
+                drawLine(col.copy(alpha = 0.5f), Offset(w, h - 1.dp.toPx()), Offset(w * 0.65f, h - 1.dp.toPx()), 2.dp.toPx())
+            }
+            2 -> {   // lingkar skala besar berputar pelan di tengah
+                val c = Offset(w / 2f, h / 2f); val r = minOf(w, h) * 0.52f
+                rotate(t * 4f, c) {
+                    for (k in 0 until 72) {
+                        val a = Math.toRadians(k * 5.0)
+                        val r2 = r - (if (k % 6 == 0) 10.dp.toPx() else 5.dp.toPx())
+                        drawLine(col.copy(alpha = if (k % 6 == 0) 0.28f else 0.12f), Offset(c.x + r * cos(a).toFloat(), c.y + r * sin(a).toFloat()), Offset(c.x + r2 * cos(a).toFloat(), c.y + r2 * sin(a).toFloat()), 1.dp.toPx())
+                    }
+                }
+                drawCircle(col.copy(alpha = 0.08f), r * 0.78f, c, style = Stroke(1.dp.toPx()))
+            }
+            else -> { // kisi heksagon samar + garis energi naik
+                val s = 34.dp.toPx(); val hh = s * 0.866f
+                var row = 0; var y = 0f
+                while (y < h + hh) {
+                    var x = if (row % 2 == 0) 0f else s * 0.75f
+                    while (x < w + s) {
+                        val p = Path()
+                        for (i in 0 until 6) { val a = Math.toRadians(60.0 * i); val px = x + s * 0.5f * cos(a).toFloat(); val py = y + s * 0.5f * sin(a).toFloat(); if (i == 0) p.moveTo(px, py) else p.lineTo(px, py) }
+                        p.close(); drawPath(p, col.copy(alpha = 0.045f), style = Stroke(1.dp.toPx()))
+                        x += s * 1.5f
+                    }
+                    y += hh * 0.5f; row++
+                }
+                for (i in 0 until 5) {
+                    val x = w * (0.1f + 0.2f * i); val yy = h - ((t * 40f + i * 90f) % h)
+                    drawLine(col.copy(alpha = 0.22f), Offset(x, yy), Offset(x, yy - 38.dp.toPx()), 2.dp.toPx())
+                }
+            }
+        }
     }
 }
