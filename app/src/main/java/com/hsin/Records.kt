@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.hsin.zrec.ZRec
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
@@ -105,33 +106,50 @@ private fun ScreenRecPane(vm: AppViewModel) {
         vm.toggleRec()
         if (withFps && FpsLog.on != starting) vm.toggleFpsLog()
     }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val eng = vm.prefs.recEngine
+    var zMode by remember { mutableIntStateOf(0) }
+    var zSecs by remember { mutableIntStateOf(0) }
+    var zv by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { var prev = 0; while (true) { zMode = com.hsin.zrec.ZRec.mode(); zSecs = com.hsin.zrec.ZRec.secs(); if (prev >= 2 && zMode == 0) reload++; prev = zMode; delay(500) } }
+    val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { com.hsin.zrec.ZRec.start(ctx) }
+    fun zStart() {
+        val needAudio = com.hsin.zrec.ZRec.getB(ctx, com.hsin.zrec.ZRec.MIC, false) || com.hsin.zrec.ZRec.getB(ctx, com.hsin.zrec.ZRec.INT, false)
+        if (needAudio && ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) permLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        else com.hsin.zrec.ZRec.start(ctx)
+    }
+    val recNow = if (eng == 1) zMode >= 2 else vm.recOn
     val land = !UiState.portrait
     val left: @Composable () -> Unit = {
         // ---- kiri: tombol rekam bulat + pengaturan
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Glass(Modifier.fillMaxWidth().rise(30)) {
                 Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val pulse = ownAnim(if (vm.recOn) 1f else 0f, 300)
+                    val pulse = ownAnim(if (recNow) 1f else 0f, 300)
                     val clock = LocalClock.current
-                    Box(Modifier.size(128.dp).tap { if (vm.recOn) startStop() else if (count == 0) { if (cdOn) scope.launch { for (i in 3 downTo 1) { count = i; delay(1000) }; count = 0; startStop() } else startStop() } }, contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(128.dp).tap { if (eng == 1) { if (zMode >= 2) com.hsin.zrec.ZRec.stop(ctx) else if (zMode == 0) zStart() } else if (vm.recOn) startStop() else if (count == 0) { if (cdOn) scope.launch { for (i in 3 downTo 1) { count = i; delay(1000) }; count = 0; startStop() } else startStop() } }, contentAlignment = Alignment.Center) {
                         Canvas(Modifier.fillMaxSize()) {
-                            val c = if (vm.recOn) SP.red else SP.gold
-                            val beat = if (vm.recOn && !UiState.reduceAnim) (0.5f + 0.5f * Math.sin(clock.floatValue * 6.0).toFloat()) else 0f
+                            val c = if (recNow) SP.red else SP.gold
+                            val beat = if (recNow && !UiState.reduceAnim) (0.5f + 0.5f * Math.sin(clock.floatValue * 6.0).toFloat()) else 0f
                             drawCircle(c.copy(alpha = 0.10f + 0.12f * beat), radius = size.minDimension / 2f)
                             drawCircle(c, radius = size.minDimension / 2f - 3.dp.toPx(), style = Stroke(3.dp.toPx()))
                             val inner = size.minDimension * (0.30f - 0.07f * pulse)
-                            if (vm.recOn) drawRect(c, topLeft = Offset(center.x - inner * 0.9f, center.y - inner * 0.9f), size = Size(inner * 1.8f, inner * 1.8f))
+                            if (recNow) drawRect(c, topLeft = Offset(center.x - inner * 0.9f, center.y - inner * 0.9f), size = Size(inner * 1.8f, inner * 1.8f))
                             else drawCircle(c, radius = inner)
                         }
                     }
                     SText(
-                        if (vm.recOn) fmtTime((now - t0).coerceAtLeast(0L)) else if (count > 0) "$count" else tx("Siap merekam", "Ready to record"),
-                        if (vm.recOn || count > 0) 26.sp else 13.sp, if (vm.recOn) SP.red else SP.text, FontWeight.Bold
+                        if (eng == 1) (when (zMode) { 0 -> tx("Siap merekam", "Ready to record"); 1 -> tx("Mulai...", "Starting..."); 4 -> tx("Menyimpan...", "Saving..."); else -> fmtTime(zSecs * 1000L) })
+                        else if (vm.recOn) fmtTime((now - t0).coerceAtLeast(0L)) else if (count > 0) "$count" else tx("Siap merekam", "Ready to record"),
+                        if (recNow || count > 0) 26.sp else 13.sp, if (recNow) SP.red else SP.text, FontWeight.Bold
                     )
-                    SText(if (vm.recOn) tx("Ketuk untuk berhenti", "Tap to stop") else tx("Ketuk lingkaran untuk mulai", "Tap the circle to start"), 11.sp, SP.dim)
+                    SText(if (recNow) tx("Ketuk untuk berhenti", "Tap to stop") else if (eng == 1) tx("Ketuk lingkaran, setujui izin rekam layar", "Tap the circle, allow screen capture") else tx("Ketuk lingkaran untuk mulai", "Tap the circle to start"), 11.sp, SP.dim)
                 }
             }
             Section(tx("PENGATURAN REKAM", "RECORD SETTINGS"), 60) {
+                SText(tx("Mesin rekam", "Recorder engine"), 11.sp, SP.dim)
+                HChips(listOf(tx("Cepat (root)", "Fast (root)"), tx("Suara (mic/internal)", "Sound (mic/internal)")), eng) { vm.prefs.recEngine = it; reload++ }
+                if (eng == 1) ZSettings(ctx, zv) { zv++ } else {
                 SText(tx("Resolusi", "Resolution"), 11.sp, SP.dim)
                 val sizes = listOf("native", "1080", "720")
                 HChips(listOf(tx("Asli", "Native"), "1080p", "720p"), sizes.indexOf(recSize).coerceAtLeast(0)) { vm.setConfKey("REC_SIZE", sizes[it]) }
@@ -141,7 +159,8 @@ private fun ScreenRecPane(vm: AppViewModel) {
                 HSwitch(tx("Hitung mundur 3 detik", "3-second countdown"), tx("Sempat pindah ke game dulu.", "Time to switch to the game first."), cdOn) { vm.prefs.recCountdown = it; reload++ }
                 HSwitch(tx("Tampilkan sentuhan layar", "Show screen touches"), tx("Titik sentuh ikut terlihat di video, kembali normal setelah selesai.", "Touch dots show in the video; restored when done."), touch) { vm.setConfKey("REC_TOUCH", if (it) "1" else "0") }
                 HSwitch(tx("Ikut rekam FPS", "Also record FPS"), tx("Mulai dan berhenti bersamaan dengan video.", "Starts and stops together with the video."), withFps) { vm.prefs.recWithFps = it; reload++ }
-                Text(tx("Tanpa suara: perekam bawaan Android tidak bisa menangkap suara internal maupun mikrofon.", "No audio: Android's built-in recorder cannot capture internal audio or the microphone."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
+                Text(tx("Mesin Cepat tanpa suara. Mau suara game atau mikrofon: pilih mesin Suara di atas.", "Fast engine has no audio. For game sound or the mic, pick the Sound engine above."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
+                }
             }
         }
     }
@@ -386,4 +405,30 @@ private suspend fun exportImage(ctx: Context, vm: AppViewModel, s: FpsSession, e
         tmp.delete()
         if (r.code == 0) "PNG: Download/$name" else "Gagal menyimpan gambar"
     } catch (_: Exception) { "Gagal menyimpan gambar" }
+}
+
+/** Pengaturan mesin Suara (dipinjam dari app Zani): resolusi, frame rate, orientasi, codec, bitrate, sumber audio. */
+@Composable
+private fun ZSettings(ctx: android.content.Context, ver: Int, bump: () -> Unit) {
+    ver.hashCode()
+    fun gi(k: String, d: Int) = ZRec.getI(ctx, k, d)
+    fun si(k: String, v: Int) { ZRec.setI(ctx, k, v); bump() }
+    val res = listOf(0, 1080, 720, 480); val fps = listOf(24, 30, 60, 90, 120); val brs = listOf(0, 4, 8, 16, 24)
+    SText(tx("Resolusi", "Resolution"), 11.sp, SP.dim)
+    HChips(listOf(tx("Layar", "Screen"), "1080p", "720p", "480p"), res.indexOf(gi(ZRec.RES, 720)).coerceAtLeast(0)) { si(ZRec.RES, res[it]) }
+    SText(tx("Frame rate (120 hanya kalau layar 120 Hz)", "Frame rate (120 only on a 120 Hz screen)"), 11.sp, SP.dim)
+    HChips(fps.map { "$it" }, fps.indexOf(gi(ZRec.FPS, 30)).coerceAtLeast(0)) { si(ZRec.FPS, fps[it]) }
+    SText(tx("Orientasi", "Orientation"), 11.sp, SP.dim)
+    HChips(listOf("Auto", tx("Potret", "Portrait"), tx("Lanskap", "Landscape")), gi(ZRec.ORI, 0).coerceIn(0, 2)) { si(ZRec.ORI, it) }
+    SText(tx("Codec (H.264 paling aman dan ringan)", "Codec (H.264 is safest and lightest)"), 11.sp, SP.dim)
+    HChips(listOf("H.264", "HEVC"), gi(ZRec.CODEC, 0).coerceIn(0, 1)) { si(ZRec.CODEC, it) }
+    SText(tx("Bitrate (Mbps)", "Bitrate (Mbps)"), 11.sp, SP.dim)
+    HChips(brs.map { if (it == 0) "Auto" else "$it" }, brs.indexOf(gi(ZRec.BR, 0)).coerceAtLeast(0)) { si(ZRec.BR, brs[it]) }
+    SText(tx("Sumber audio", "Audio source"), 11.sp, SP.dim)
+    val mic = ZRec.getB(ctx, ZRec.MIC, false); val int = ZRec.getB(ctx, ZRec.INT, false)
+    val src = if (mic && int) 3 else if (int) 2 else if (mic) 1 else 0
+    HChips(listOf(tx("Mati", "Off"), "Mic", tx("Internal", "Internal"), "Mic+Internal"), src) { ZRec.setB(ctx, ZRec.MIC, it == 1 || it == 3); ZRec.setB(ctx, ZRec.INT, it >= 2); bump() }
+    Text(tx("Internal = suara dari dalam HP (game/aplikasi), butuh Android 10+. Game yang melarang perekaman suara tetap bisu.", "Internal = sound from inside the phone (games/apps), needs Android 10+. Games that block audio capture stay silent."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
+    HSwitch(tx("Batas aman otomatis", "Automatic safe limits"), tx("Sesuaikan fps, resolusi, bitrate ke kemampuan encoder dan layar HP.", "Fits fps, resolution and bitrate to the encoder and screen."), ZRec.getB(ctx, ZRec.SAFE, true)) { ZRec.setB(ctx, ZRec.SAFE, it); bump() }
+    HSwitch(tx("Hitung mundur 3 detik", "3-second countdown"), tx("Sempat pindah ke game dulu.", "Time to switch to the game first."), ZRec.getB(ctx, ZRec.CD, true)) { ZRec.setB(ctx, ZRec.CD, it); bump() }
 }

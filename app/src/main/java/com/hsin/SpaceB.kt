@@ -821,6 +821,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
         if (vm.bubbleOn && android.provider.Settings.canDrawOverlays(ctx)) { BubbleService.start(ctx); setRes(4, if (en) "Ready" else "Siap") } else setRes(4, if (en) "Off" else "Mati")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 5
+        SoundFx.play(vm.prefs, "launch")
         val r = Hsin.launchGame(pkg)
         setRes(5, if (r.ok) (if (en) "Go" else "Mulai") else (if (en) "Failed" else "Gagal"))
         if (r.ok) {

@@ -91,8 +91,12 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("sound_on", false)
         set(v) { sp.edit().putBoolean("sound_on", v).apply() }
     var soundVol: Int
-        get() = sp.getInt("sound_vol", 60).coerceIn(10, 100)
+        get() = sp.getInt("sound_vol", 100).coerceIn(10, 100)
         set(v) { sp.edit().putInt("sound_vol", v.coerceIn(10, 100)).apply() }
+    /** Mesin rekam layar: 0 cepat (root, tanpa suara), 1 suara (mic/internal, minta izin tiap rekam). */
+    var recEngine: Int
+        get() = sp.getInt("rec_engine", 0).coerceIn(0, 1)
+        set(v) { sp.edit().putInt("rec_engine", v.coerceIn(0, 1)).apply() }
     var flStartThin: Boolean
         get() = sp.getBoolean("fl_start_thin", false)
         set(v) { sp.edit().putBoolean("fl_start_thin", v).apply() }

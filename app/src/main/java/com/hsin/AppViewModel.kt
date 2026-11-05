@@ -915,6 +915,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                     .filter { !isProtected(it, prot) && it !in keep && it !in front }
             }
             val mb = Hsin.cleanRam(targets)
+            SoundFx.play(prefs, "clean")
             busy = null
             toast(if (mb > 0) "RAM bebas bertambah sekitar $mb MB" else "Selesai, tidak ada RAM tambahan yang bisa dibebaskan")
         }
