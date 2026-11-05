@@ -121,8 +121,14 @@ private fun FloatingSettings(vm: AppViewModel) {
             { al = it; val n = SystemClock.uptimeMillis(); if (n - alT > 150) { alT = n; p.flAlpha = it.toInt() } },
             { p.flAlpha = al.toInt(); vm.flChanged() })
         Label("Gaya floating", Modifier.padding(top = 10.dp))
-        Seg(listOf("STANDAR", "HUD", "KACA", "KARTU", "BUNDAR", "KUBUS"), p.flStyle, { p.flStyle = it; vm.flChanged() })
-        txt("HUD: gelap pekat, sudut tegas. Kaca: tembus pandang dan membulat (blur butuh Android 12 ke atas dan ROM yang mendukung).", 11.sp, muted())
+        Seg(listOf("KARTU", "BUNDAR", "KUBUS"), p.flStyle - 3, { p.flStyle = it + 3; p.appTheme = it + 1; UiState.themeTick++; vm.flChanged() })
+        Label("Posisi panel", Modifier.padding(top = 10.dp))
+        Seg(listOf("OTOMATIS", "ATAS", "BAWAH", "KIRI", "KANAN"), p.flPanelPos, { p.flPanelPos = it; vm.flChanged() })
+        var pw by remember { mutableStateOf(p.flPanelW.toFloat()) }
+        SliderRow("Lebar panel", pw, 70f..130f, "${pw.toInt()}%",
+            { pw = it },
+            { p.flPanelW = pw.toInt(); vm.flChanged() })
+        txt("Posisi dan lebar berlaku saat panel dibuka dari orb. Ukuran di atas mengatur semuanya.", 11.sp, muted())
         Label("Tampilan awal", Modifier.padding(top = 10.dp))
         Seg(listOf("ORB", "KAPSUL"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })
         ToggleRow("Kapsul tembus sentuh", "Kapsul hanya tampil, sentuhan diteruskan ke game. Matikan di sini untuk menggesernya lagi.", p.flBarThrough) { p.flBarThrough = it; vm.flChanged() }

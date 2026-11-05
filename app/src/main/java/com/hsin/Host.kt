@@ -251,8 +251,7 @@ fun HsinApp(vm: AppViewModel) {
     }
     LaunchedEffect(UiState.portrait) {
         (ctx as? android.app.Activity)?.requestedOrientation =
-            if (UiState.portrait) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-            else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
     LaunchedEffect(vm.askOverlay) {
         if (vm.askOverlay) {
