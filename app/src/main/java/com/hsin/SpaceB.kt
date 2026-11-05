@@ -294,7 +294,7 @@ internal fun ActionRow(vm: AppViewModel, col: Color) {
         HBtn(tx("RAM", "RAM"), Modifier.width(64.dp), col) { vm.cleanRam() }
         HBtn(tx("DND", "DND"), Modifier.width(64.dp), col, solid = dnd) { vm.setFlag("GAME_DND_ON", !dnd) }
         val clock = LocalClock.current
-        val sh = RoundedCornerShape(12.dp)
+        val sh: androidx.compose.ui.graphics.Shape = if (vm.prefs.appTheme != 0) CutShape else RoundedCornerShape(12.dp)
         Box(
             Modifier.weight(1f).tap { if (gs.isNotEmpty()) UiState.startRitual(gs[UiState.gameIdx.coerceIn(0, gs.size - 1)].pkg) else vm.go("addgame") }
                 .clip(sh).background(Brush.horizontalGradient(listOf(col, lerpColor(col, SP.goldHi, 0.5f))))

@@ -66,6 +66,7 @@ class BubbleService : Service() {
     private var hudPkg = ""
     private var recOn = false
     private var ovdOn = false
+    private var fpsRetryFor = ""
     private var lastFps = 0
     private var protectedFor = ""
     private var flJob: Job? = null
@@ -111,6 +112,18 @@ class BubbleService : Service() {
         f.onProfile = { p -> setProfile(p) }
         f.onRec = { toggleRec() }
         f.onOvd = { on -> toggleOvd(on) }
+        f.onShot = {
+            if (prefs.recEngine == 1) com.hsin.zrec.ZRec.shot(this)
+            else scope.launch {
+                val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
+                val r = Root.exec("mkdir -p /sdcard/Pictures/HSIN && screencap -p /sdcard/Pictures/HSIN/HSIN_$ts.png", 10_000L)
+                Toast.makeText(this@BubbleService, if (r.code == 0) "✓ " + trn("Screenshot tersimpan di Pictures/HSIN") else "ℹ " + trn("Gagal mengambil screenshot"), Toast.LENGTH_SHORT).show()
+            }
+        }
+        f.onPause = {
+            if (prefs.recEngine == 1 && com.hsin.zrec.ZRec.mode() >= 2) com.hsin.zrec.ZRec.pause(this)
+            else Toast.makeText(this, "ℹ " + trn("Jeda hanya untuk mesin rekam Suara"), Toast.LENGTH_SHORT).show()
+        }
         f.onRam = {
             SoundFx.play(prefs, "clean")
             scope.launch {
@@ -142,6 +155,26 @@ class BubbleService : Service() {
         floating = f
         scope.launch { try { f.setDnd(Hsin.flags()["GAME_DND_ON"] == true) } catch (_: Exception) { } }
         rebuild()
+        // status rekam mesin Suara: cek tiap detik supaya timer dan tombol floating ikut
+        scope.launch {
+            while (isActive) {
+                if (prefs.recEngine == 1) {
+                    val on = com.hsin.zrec.ZRec.mode() >= 2
+                    if (on != recOn) { recOn = on; floating?.setProfileState(profile, recOn); updateNotification() }
+                }
+                // game terbuka tapi FPS tidak terbaca ±15 dtk: coba cari sumber lain sekali per game
+                if (gamePkg.isNotEmpty() && (floating?.noFpsTicks ?: 0) > 15 && fpsRetryFor != gamePkg) {
+                    fpsRetryFor = gamePkg
+                    val g = gamePkg
+                    launch {
+                        try { Hsin.fpsDiag(g) } catch (_: Exception) { }
+                        Toast.makeText(this@BubbleService, "ℹ " + trn("FPS belum terbaca, HSIN mencoba sumber lain"), Toast.LENGTH_LONG).show()
+                    }
+                }
+                if (gamePkg.isEmpty()) fpsRetryFor = ""
+                delay(1000)
+            }
+        }
         scope.launch {
             while (isActive) {
                 val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
@@ -172,7 +205,7 @@ class BubbleService : Service() {
                         protectedFor = hudPkg
                         protectSelf()
                     }
-                    recOn = s.rec
+                    recOn = s.rec || (prefs.recEngine == 1 && com.hsin.zrec.ZRec.mode() >= 2)
                     floating?.setOvd(s.ovd, s.ovdLevel, s.gamePkg.isNotEmpty())
                     floating?.setSession(s.gamePkg)
                     floating?.setProfileState(profile, recOn)
@@ -303,6 +336,12 @@ class BubbleService : Service() {
     }
 
     private fun toggleRec() {
+        if (prefs.recEngine == 1) {
+            // mesin Suara (MediaProjection): mulai lewat dialog izin sistem, berhenti lewat layanan
+            val m = com.hsin.zrec.ZRec.mode()
+            if (m == 0) com.hsin.zrec.ZRec.start(this) else if (m >= 2) com.hsin.zrec.ZRec.stop(this)
+            return
+        }
         val start = !recOn
         scope.launch {
             val r = if (start) Hsin.recStart() else Hsin.recStop()
