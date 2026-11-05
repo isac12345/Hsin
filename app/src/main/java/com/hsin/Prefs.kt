@@ -80,12 +80,20 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putInt("fl_alpha", v.coerceIn(40, 100)).apply() }
     /** Gaya floating: 0 standar, 1 HUD gelap tegas, 2 kaca lembut. */
     var flStyle: Int
-        get() = sp.getInt("fl_style", 0).coerceIn(0, 5)
-        set(v) { sp.edit().putInt("fl_style", v.coerceIn(0, 5)).apply() }
+        get() = sp.getInt("fl_style", 3).coerceIn(3, 5)
+        set(v) { sp.edit().putInt("fl_style", v.coerceIn(3, 5)).apply() }
+    /** Posisi panel: 0 otomatis (ikut tema), 1 atas, 2 bawah, 3 kiri, 4 kanan. */
+    var flPanelPos: Int
+        get() = sp.getInt("fl_panel_pos", 0).coerceIn(0, 4)
+        set(v) { sp.edit().putInt("fl_panel_pos", v.coerceIn(0, 4)).apply() }
+    /** Lebar panel dalam persen (70..130). */
+    var flPanelW: Int
+        get() = sp.getInt("fl_panel_w", 100).coerceIn(70, 130)
+        set(v) { sp.edit().putInt("fl_panel_w", v.coerceIn(70, 130)).apply() }
     /** Tema app: 0 klasik, 1 Kartu Miring, 2 Dasbor Bundar, 3 Kubus Energi. */
     var appTheme: Int
-        get() = sp.getInt("app_theme", 0).coerceIn(0, 3)
-        set(v) { sp.edit().putInt("app_theme", v.coerceIn(0, 3)).apply() }
+        get() = sp.getInt("app_theme", 1).coerceIn(1, 3)
+        set(v) { sp.edit().putInt("app_theme", v.coerceIn(1, 3)).apply() }
     /** Suara dalam app (disintesis sendiri), default mati. */
     var soundOn: Boolean
         get() = sp.getBoolean("sound_on", false)

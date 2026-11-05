@@ -248,7 +248,7 @@ object UiState {
         bgDim = p.bgDim
         inited = true
         en = p.sp.getBoolean("hsin_en", false)
-        portrait = p.sp.getBoolean("hsin_portrait", false)
+        portrait = false
     }
     fun setEn(p: Prefs, v: Boolean) { en = v; p.sp.edit().putBoolean("hsin_en", v).apply() }
     fun setPortrait(p: Prefs, v: Boolean) { portrait = v; p.sp.edit().putBoolean("hsin_portrait", v).apply() }
@@ -601,14 +601,12 @@ private fun SettingsTab(vm: AppViewModel) {
                 SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
                 Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
                 SText(tx("Tema tampilan (Beranda + floating di game)", "Look theme (Home + in-game floating)"), 12.sp, SP.dim)
-                Seg(listOf(tx("Klasik", "Classic"), tx("Kartu Miring", "Slant"), tx("Dasbor Bundar", "Round"), tx("Kubus Energi", "Cube")), vm.prefs.appTheme) {
-                    vm.prefs.appTheme = it; if (it > 0) vm.prefs.flStyle = 2 + it else if (vm.prefs.flStyle > 2) vm.prefs.flStyle = 0
+                Seg(listOf(tx("Kartu Miring", "Slant"), tx("Dasbor Bundar", "Round"), tx("Kubus Energi", "Cube")), vm.prefs.appTheme - 1) {
+                    vm.prefs.appTheme = it + 1; vm.prefs.flStyle = 3 + it
                     vm.flChanged(); UiState.themeTick++; SoundFx.play(vm.prefs, "tab")
                 }
                 SText(tx("Gelap latar (kalau pakai gambar sendiri)", "Background dimming (custom image)"), 12.sp, SP.dim)
                 Seg(listOf(tx("Ringan", "Light"), tx("Sedang", "Medium"), tx("Pekat", "Dark")), UiState.bgDim) { UiState.bgDim = it; vm.prefs.bgDim = it }
-                SText(tx("Tampilan layar", "Screen layout"), 12.sp, SP.dim)
-                Seg(listOf(tx("Landscape", "Landscape"), tx("Potret", "Portrait")), if (UiState.portrait) 1 else 0) { UiState.setPortrait(vm.prefs, it == 1) }
             }
         }
         SetupCheck(vm)

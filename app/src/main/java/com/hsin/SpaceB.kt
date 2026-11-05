@@ -797,6 +797,8 @@ internal fun RitualOverlay(vm: AppViewModel) {
     fun setRes(i: Int, v: String) { results.value = results.value.toMutableList().also { it[i] = v } }
 
     LaunchedEffect(pkg) {
+        var tries = 0
+        while (vm.games.none { it.pkg == pkg } && tries < 8) { delay(250); tries++ }   // daftar game belum dimuat (dibuka dari tile)
         val g = vm.games.firstOrNull { it.pkg == pkg }
         val opts = Hsin.gameOpts(pkg)
         val fx = Hsin.gamefx(pkg)
@@ -810,13 +812,16 @@ internal fun RitualOverlay(vm: AppViewModel) {
         val gProf = g?.profile ?: "balanced"
         vm.prefs.lastGame = pkg
         val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
+        setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else " ✗")
         delay(350)
-        setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else if (en) " ✗" else " ✗")
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 2; delay(450)
+        if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         setRes(2, fx["downscale"].orEmpty().toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%")
-        step = 3; delay(450); setRes(3, if (vm.flag("GAME_DND_ON") && opts["LITE"] != "1") (if (en) "On" else "Aktif") else (if (en) "Off" else "Mati"))
+        step = 3; delay(450)
+        if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
+        setRes(3, if (vm.flag("GAME_DND_ON") && opts["LITE"] != "1") (if (en) "On" else "Aktif") else (if (en) "Off" else "Mati"))
         step = 4; delay(450)
         if (vm.bubbleOn && android.provider.Settings.canDrawOverlays(ctx)) { BubbleService.start(ctx); setRes(4, if (en) "Ready" else "Siap") } else setRes(4, if (en) "Off" else "Mati")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
