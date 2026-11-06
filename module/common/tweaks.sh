@@ -167,8 +167,9 @@ tw_conf_get() { sed -n "s/^TW_$1=//p" "$TW_CONF" 2>/dev/null | tail -n 1; }
 # ---------------------------------------------------------------- profil
 # Nilai default per profil. thermal_trip TIDAK otomatis di Puncak: harus
 # diaktifkan user lewat Performance (risiko overheat).
+# $2=force: terapkan refresh walau game aktif (dipakai Puncak saat game tidak punya Hz sendiri).
 tw_apply_profile() {
-    _p="$1"
+    _p="$1"; _force="$2"
     case "$_p" in battery|balanced|performance|peak) ;; *) return 0 ;; esac
     tw_caps_ensure
 
@@ -186,7 +187,7 @@ tw_apply_profile() {
     _v=$(tw_conf_get MALI);      [ -n "$_v" ] && _m="$_v"
 
     # Refresh per mode; saat game aktif refresh dipegang gamehooks.
-    if command -v settings >/dev/null 2>&1 && [ ! -f "$TW_STATE/.gh_active" ]; then tw_refresh_set "$_r"; fi
+    if command -v settings >/dev/null 2>&1 && { [ "$_force" = force ] || [ ! -f "$TW_STATE/.gh_active" ]; }; then tw_refresh_set "$_r"; fi
     tw_has HAS_AUDIO_MIXER && tw_dac_set "$_d"
     tw_has HAS_TURBO && tw_turbo_set "$_t"
     tw_has HAS_MALI && tw_mali_set_str "$_m"
@@ -274,13 +275,35 @@ tw_set_global() { # $1=KEY $2=VALUE
             case "$_v" in reset) wm density reset >/dev/null 2>&1 ;; *) tw_density_set "$_v" ;; esac ;;
         perf_turbo) tw_turbo_set "$_v" ;;
         perf_mali) tw_mali_set_str "$_v" ;;
-        perf_trip) tw_trip_set "$_v" ;;
+        perf_trip) if [ "$_v" = 0 ]; then tw_trip_restore; else tw_trip_set "$_v"; fi ;;
         perf_cpuidle) tw_idle_set "$_v" ;;
         tools_dac) tw_dac_set "$_v" ;;
         tools_bypass) tw_bypass_set "$_v" ;;
         tools_led) tw_led_set "$_v" ;;
     esac
     echo "OK: $_k=$_v"
+}
+
+# Nilai bawaan untuk tweak yang tidak dipegang profil: dikembalikan langsung saat override dihapus.
+tw_default_of() {
+    case "$1" in
+        NIGHT) tw_night_set 0 ;;
+        FONT_SCALE) tw_font_set 1.0 ;;
+        DENSITY) wm density reset >/dev/null 2>&1 ;;
+        LED) tw_led_set off ;;
+        BYPASS) tw_bypass_set 0 ;;
+        CPUIDLE) tw_idle_set 0 ;;
+        TRIP) tw_trip_restore ;;
+    esac
+}
+
+tw_trip_restore() {
+    [ -s "$TW_ORIG" ] || return 0
+    _z=/sys/class/thermal/thermal_zone0
+    _b0=$(sed -n 's/^TRIP0=//p' "$TW_ORIG" 2>/dev/null)
+    _b1=$(sed -n 's/^TRIP1=//p' "$TW_ORIG" 2>/dev/null)
+    tw_num "$_b0" && tw_wr "$_z/trip_point_0_temp" "$_b0"
+    tw_num "$_b1" && tw_wr "$_z/trip_point_1_temp" "$_b1"
 }
 
 # Hapus satu override (kembali ke nilai otomatis per profil).
@@ -291,7 +314,8 @@ tw_unset() {
         perf_cpuidle) _sk=CPUIDLE ;; tools_dac) _sk=DAC_GAIN ;; tools_bypass) _sk=BYPASS ;; tools_led) _sk=LED ;;
         *) echo "ERROR: KEY tidak dikenal"; return 1 ;;
     esac
-    [ -f "$TW_CONF" ] && { grep -v "^TW_${_sk}=" "$TW_CONF" > "$TW_CONF.tmp.$$" 2>/dev/null; mv -f "$TW_CONF.tmp.$$" "$TW_CONF" 2>/dev/null; }
+    [ -f "$TW_CONF" ] && { grep -v "^TW_${_sk}=" "$TW_CONF" > "$TW_CONF.tmp.$$" 2>/dev/null; mv -f "$TW_CONF.tmp.$$" "$TW_CONF" 2>/dev/null; chmod 600 "$TW_CONF" 2>/dev/null; }
+    tw_default_of "$_sk"
     _p=$(sed -n '1p' "$TW_STATE/active_profile" 2>/dev/null | tr -d '[:space:]')
     case "$_p" in battery|balanced|performance|peak) ;; *) _p=balanced ;; esac
     tw_apply_profile "$_p"
@@ -299,6 +323,9 @@ tw_unset() {
 }
 
 tw_reset() {
+    for _rk in $(sed -n 's/^TW_\([A-Z_]*\)=.*/\1/p' "$TW_CONF" 2>/dev/null); do
+        tw_default_of "$_rk"
+    done
     rm -f "$TW_CONF" 2>/dev/null
     # kembalikan trip thermal ke nilai asli kalau pernah dinaikkan
     if [ -s "$TW_ORIG" ]; then

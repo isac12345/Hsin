@@ -19,6 +19,7 @@
 #   sebagai string, urutan dari `sort -n`).
 
 STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
+case "$0" in */*) OVD_DIR="${0%/*}" ;; *) OVD_DIR="." ;; esac
 OVD_ACTIVE="$STATE_DIR/.ovd_active"
 OVD_PREV="$STATE_DIR/.ovd_prev"
 OVD_PID="$STATE_DIR/.ovd_pid"
@@ -178,6 +179,17 @@ apply_extras() {
     return 0
 }
 
+# Nilai profil dari tweaks.sh (refresh, audio, turbo, GPU). Refresh game sendiri (Hz per game) tidak ditimpa.
+ovd_tw() {
+    [ -f "$OVD_DIR/tweaks.sh" ] || return 0
+    HSIN_STATE_DIR="$STATE_DIR"
+    . "$OVD_DIR/tweaks.sh" 2>/dev/null || return 0
+    command -v tw_apply_profile >/dev/null 2>&1 || return 0
+    _otp=$(rd "$STATE_DIR/.gh_active"); _otz=""
+    [ -n "$_otp" ] && _otz=$(sh "$OVD_DIR/hsinctl.sh" gamefps get "$_otp" 2>/dev/null | sed -n 's/^hz=//p')
+    case "$_otz" in ''|default|off) tw_apply_profile "$1" force ;; *) tw_apply_profile "$1" ;; esac
+}
+
 # apply_floors <persen_cpu> <persen_gpu>; hanya menulis bila nilai berbeda. Return 1 kalau tidak ada yang bisa ditulis.
 apply_floors() {
     _any=1
@@ -281,6 +293,10 @@ do_stop() {
     restore_prev
     rm -f "$OVD_ACTIVE" "$OVD_PID"
     if [ "$_was" = 1 ]; then
+        _oap=$(sed -n '1p' "$STATE_DIR/active_profile" 2>/dev/null | tr -d '[:space:]')
+        case "$_oap" in battery|balanced|performance) ovd_tw "$_oap" ;; esac
+    fi
+    if [ "$_was" = 1 ]; then
         printf '%s\n' "$_why" > "$OVD_LAST" 2>/dev/null
         ovd_log RESTORED "Overdrive selesai ($_why), nilai asli kembali, uperf/fas-rs dilanjutkan"
     fi
@@ -307,6 +323,7 @@ do_start() {
         restore_prev; echo "ERROR: node frekuensi tidak bisa ditulis"; return 1
     fi
     apply_extras
+    ovd_tw peak
     freeze_engines
     printf '%s\nfull\n' "$_pkg" > "$OVD_ACTIVE"
     rm -f "$OVD_LAST" "$OVD_PID"

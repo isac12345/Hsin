@@ -352,6 +352,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         flags = Hsin.flags()
         games = Hsin.games()
         sessions = Hsin.sessions()
+        if (!prefs.gameOptsClean613 && games.isNotEmpty()) {
+            for (g in games) {
+                val o = Hsin.gameOpts(g.pkg)
+                if (o["LITE"] != null) Hsin.setGameOpt(g.pkg, "LITE", "default")
+                if (o["HZ"] != null && Hsin.gamefx(g.pkg)["fps"].let { it == null || it == "off" }) Hsin.setGameOpt(g.pkg, "HZ", "default")
+            }
+            prefs.gameOptsClean613 = true
+        }
         Hsin.health()?.let { health = it }
         device = Hsin.device()
         Hsin.render()?.let { render = it; renderChoice = it.current }
