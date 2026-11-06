@@ -95,6 +95,10 @@ class Prefs(ctx: Context) {
     var appTheme: Int
         get() = sp.getInt("app_theme", 1).coerceIn(1, 3)
         set(v) { sp.edit().putInt("app_theme", v.coerceIn(1, 3)).apply() }
+    /** Pembersihan sekali: sisa opsi per game lama (Mode ringan, Hz tanpa batas FPS). */
+    var gameOptsClean613: Boolean
+        get() = sp.getBoolean("game_opts_clean_613", false)
+        set(v) { sp.edit().putBoolean("game_opts_clean_613", v).apply() }
     /** Suara dalam app (disintesis sendiri), default mati. */
     var soundOn: Boolean
         get() = sp.getBoolean("sound_on", false)
