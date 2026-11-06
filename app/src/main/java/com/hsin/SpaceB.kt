@@ -464,15 +464,6 @@ private fun GameTile(vm: AppViewModel, g: GameEntry, sel: Boolean, index: Int, m
     }
 }
 
-/** Refresh rate otomatis per mode: Hemat 60, Seimbang 90, Performa 120, Puncak setinggi layar. Dipilih dari daftar yang layar dukung. */
-internal fun hzForMode(modeKey: String, avail: List<Int>): Int? {
-    if (avail.isEmpty()) return null
-    val cap = when (modeKey) { "hemat" -> 60; "seimbang" -> 90; "performa" -> 120; else -> Int.MAX_VALUE }
-    return avail.filter { it <= cap }.maxOrNull() ?: avail.minOrNull()
-}
-
-private val FPS_KEYS = listOf("off", "30", "45", "60", "90", "120")
-
 @Composable
 private fun GameDetail(vm: AppViewModel, g: GameEntry) {
     var ver by remember { mutableIntStateOf(0) }
@@ -514,21 +505,30 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             }
             val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
             if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
-            SText(tx("Refresh rate layar saat main", "Screen refresh rate while playing"), 11.sp, SP.dim)
-            val rates by produceState<List<Int>>(emptyList(), g.pkg) { value = Hsin.refreshList() }
-            if (rates.isNotEmpty()) {
-                val pinned = vm.prefs.hzPinned(g.pkg)
-                val curHz = opts["HZ"]?.toIntOrNull()
-                val selHz = if (!pinned) 0 else (rates.indexOf(curHz) + 1).coerceAtLeast(0)
-                HChips(listOf(tx("Otomatis", "Auto")) + rates.map { "$it Hz" }, selHz, col) { i ->
-                    if (i == 0) { vm.prefs.setHzPinned(g.pkg, false); vm.setGameOpt(g.pkg, "HZ", hzForMode(cur, rates)?.toString() ?: "default") }
-                    else { vm.prefs.setHzPinned(g.pkg, true); vm.setGameOpt(g.pkg, "HZ", rates[i - 1].toString()) }
-                    ver++
-                }
+            SText(tx("Rendering", "Rendering"), 11.sp, SP.dim)
+            val rend by produceState("default", g.pkg, ver) { value = Hsin.gameRender(g.pkg) }
+            val rKeys = listOf("default", "skiagl", "skiavk")
+            HChips(listOf(tx("Bawaan", "Default"), "SkiaGL", "Vulkan"), rKeys.indexOf(rend).coerceAtLeast(0), col) {
+                vm.setGameRender(g.pkg, rKeys[it]) { ver++ }
             }
-            SText(tx("Batas FPS", "FPS cap"), 11.sp, SP.dim)
-            HChips(FPS_KEYS.map { if (it == "off") tx("Bebas", "Free") else it }, FPS_KEYS.indexOf(fx["fps"] ?: "off").coerceAtLeast(0), col) {
-                vm.setGameFx(g.pkg, "fps", FPS_KEYS[it]); ver++
+            SText(tx("Game Mode Android", "Android Game Mode"), 11.sp, SP.dim)
+            val gmKeys = listOf("off", "standard", "performance", "battery")
+            HChips(listOf(tx("Mati", "Off"), tx("Standar", "Standard"), tx("Performa", "Performance"), tx("Hemat", "Battery")), gmKeys.indexOf(fx["gamemode"] ?: "off").coerceAtLeast(0), col) {
+                vm.setGameFx(g.pkg, "gamemode", gmKeys[it]); ver++
+            }
+            // Satu kontrol FPS: batas FPS game + refresh layar ikut (tidak pernah di atas layar).
+            val maxHz = vm.refreshRates.maxOrNull() ?: 120
+            val fpsCur = fx["fps"]?.toIntOrNull()
+            SText(tx("Batas FPS (refresh layar ikut)", "FPS cap (screen refresh follows)"), 11.sp, SP.dim)
+            val presets = listOf(30, 45, 60, 90, 120).filter { it <= maxHz }
+            HChips(listOf(tx("Otomatis", "Auto")) + presets.map { "$it" }, if (fpsCur == null) 0 else (presets.indexOf(fpsCur) + 1).let { if (it == 0) -1 else it }, col) {
+                vm.setGameFps(g.pkg, if (it == 0) "off" else presets[it - 1].toString()) { ver++ }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                fun step(d: Int) { vm.setGameFps(g.pkg, ((fpsCur ?: 60) + d).coerceIn(10, maxHz).toString()) { ver++ } }
+                HBtn("−5", Modifier.width(64.dp)) { step(-5) }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { SText(if (fpsCur == null) tx("Otomatis", "Auto") else "$fpsCur FPS", 14.sp, col, FontWeight.Bold) }
+                HBtn("+5", Modifier.width(64.dp)) { step(5) }
             }
             var more by remember(g.pkg) { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -536,19 +536,6 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                 HBtn(if (more) tx("Lainnya ▴", "More ▴") else tx("Lainnya ▾", "More ▾")) { more = !more }
             }
             if (more) {
-                fun tri(k: String) = when (opts[k]) { "on" -> 1; "off" -> 2; else -> 0 }
-                val triLbl = listOf(tx("Ikut umum", "Global"), tx("Nyala", "On"), tx("Mati", "Off"))
-                SText(tx("Fokus game (prioritas + jangan ganggu)", "Game focus (priority + do not disturb)"), 11.sp, SP.dim)
-                HChips(triLbl, tri("PRIO"), col) { i ->
-                    val v = when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }
-                    vm.setGameOpt(g.pkg, "PRIO", v); vm.setGameOpt(g.pkg, "DND", v); ver++
-                }
-                HSwitch(tx("Muat game ke cache dulu", "Preload game cache"), tx("Loading awal lebih cepat, butuh RAM bebas.", "Faster first load, needs free RAM."), fx["preload"] == "on", col) {
-                    vm.setGameFx(g.pkg, "preload", if (it) "on" else "off"); ver++
-                }
-                HSwitch(tx("Mode ringan", "Light mode"), tx("Hanya ganti profil, tanpa prioritas, DND, dan refresh rate.", "Profile only, no priority, DND or refresh rate."), opts["LITE"] == "1", col) {
-                    vm.setGameOpt(g.pkg, "LITE", if (it) "1" else "default"); ver++
-                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     HBtn(tx("Perbaiki FPS", "Fix FPS"), Modifier.weight(1f)) { vm.fpsDiagFor(g.pkg) }
                     HBtn(tx("Hapus game", "Remove game"), Modifier.weight(1f), color = SP.red) { vm.removeGame(g.pkg) }
@@ -572,6 +559,9 @@ internal fun AlatTab(vm: AppViewModel, land: Boolean) {
     LaunchedEffect(vm.modPath) {
         vm.go("tools")
         vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet()
+        vm.loadTweaks()
+        // refresh rate sekarang satu pengaturan (tab Layar); buang kunci lama "refresh saat game"
+        if (vm.refreshHz != "off") vm.updateRefreshHz("off")
     }
     val names = listOf(tx("Performa", "Performance"), tx("Layar", "Display"), tx("Bersih", "Clean"), tx("Baterai", "Battery"), tx("Alat", "Tools"), tx("Log", "Logs"))
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -602,6 +592,19 @@ private fun TwoCol(land: Boolean, left: @Composable () -> Unit, right: @Composab
     }
 }
 
+private fun twCap(vm: AppViewModel, k: String) = vm.tw[k] == "1"
+
+/** Pilihan tetap untuk satu tweak: indeks 0 = otomatis (ikut mode) bila [auto] true. */
+@Composable
+private fun TwChips(vm: AppViewModel, key: String, overKey: String, labels: List<String>, values: List<String>, auto: Boolean = true) {
+    val cur = vm.twOver[overKey]
+    val idx = if (cur == null) (if (auto) 0 else -1) else values.indexOf(cur).let { if (it < 0) (if (auto) 0 else -1) else it + (if (auto) 1 else 0) }
+    val all = if (auto) listOf(tx("Otomatis", "Auto")) + labels else labels
+    HChips(all, idx.coerceAtLeast(0)) { i ->
+        if (auto && i == 0) vm.setTweak(key, null) else vm.setTweak(key, values[if (auto) i - 1 else i])
+    }
+}
+
 @Composable
 private fun AlatMesin(vm: AppViewModel, land: Boolean) {
     TwoCol(land, {
@@ -619,11 +622,16 @@ private fun AlatMesin(vm: AppViewModel, land: Boolean) {
             HSwitch(tx("Prioritas game", "Game priority"), tx("Proses game diberi prioritas CPU, I/O, dan memori.", "Game process gets CPU, I/O and memory priority."), !vm.flag("GAME_PRIO_OFF")) { vm.setFlag("GAME_PRIO_OFF", !it) }
             HSwitch(tx("Jangan ganggu otomatis", "Auto Do Not Disturb"), tx("Notifikasi dibisukan selama game, dipulihkan saat keluar.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON")) { vm.setFlag("GAME_DND_ON", it) }
         }
-        if (vm.refreshRates.isNotEmpty()) {
-            Section(tx("REFRESH RATE SAAT GAME", "GAME REFRESH RATE"), 90) {
-                val keys = listOf("off") + vm.refreshRates.map { it.toString() }
-                HChips(keys.map { if (it == "off") tx("Sistem", "System") else "$it Hz" }, keys.indexOf(vm.refreshHz).coerceAtLeast(0)) { vm.updateRefreshHz(keys[it]) }
-                Text(tx("Dikunci ke angka itu selama game lalu dikembalikan. Tidak semua ROM menurut.", "Locked to that rate during the game, then restored. Not every ROM obeys."), color = SP.dim, fontSize = 11.sp)
+        if (twCap(vm, "HAS_MALI") || twCap(vm, "HAS_TURBO") || twCap(vm, "HAS_CPUIDLE") || twCap(vm, "HAS_TRIP")) {
+            Section(tx("GPU DAN DAYA", "GPU AND POWER"), 90) {
+                Text(tx("Otomatis mengikuti mode (Hemat sampai Puncak). Pilih manual hanya kalau perlu.", "Automatic follows the mode (Battery to Peak). Pick manually only if needed."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+                if (twCap(vm, "HAS_MALI")) {
+                    SText(tx("Dorongan GPU", "GPU boost"), 11.sp, SP.dim)
+                    TwChips(vm, "perf_mali", "MALI", listOf(tx("Rendah", "Low"), tx("Sedang", "Medium"), tx("Tinggi", "High")), listOf("0:8:88", "50:4:90", "100:1:100"))
+                }
+                if (twCap(vm, "HAS_TURBO")) HSwitch(tx("Turbo CPU", "CPU turbo"), tx("Membuka batas turbo bawaan kernel. Otomatis menyala di Puncak.", "Unlocks the kernel turbo limit. On automatically in Peak."), vm.tw["perf_turbo"] == "1") { vm.setTweak("perf_turbo", if (it) "1" else "0") }
+                if (twCap(vm, "HAS_CPUIDLE")) HSwitch(tx("Matikan tidur dalam inti besar", "Disable deep idle on big cores"), tx("Respons lebih cepat, baterai lebih boros.", "Faster response, uses more battery."), vm.tw["perf_cpuidle"] == "1") { vm.setTweak("perf_cpuidle", if (it) "1" else "0") }
+                if (twCap(vm, "HAS_TRIP")) HSwitch(tx("Naikkan batas suhu +10°", "Raise thermal limit +10°"), tx("Hati-hati: HP bisa lebih panas sebelum dikurangi. Matikan kalau terasa terlalu panas.", "Careful: the phone can get hotter before throttling. Turn off if it feels too hot."), (vm.twOver["TRIP"]?.toIntOrNull() ?: 0) > 0, SP.red) { vm.setTweak("perf_trip", if (it) "10000" else "0") }
             }
         }
         Section(tx("UJI PERFORMA", "BENCHMARK"), 120) {
@@ -636,6 +644,25 @@ private fun AlatMesin(vm: AppViewModel, land: Boolean) {
 @Composable
 private fun AlatLayar(vm: AppViewModel) {
     val ri = vm.resInfo
+    Section(tx("REFRESH RATE", "REFRESH RATE")) {
+        val rates = vm.refreshRates
+        if (rates.isNotEmpty()) {
+            val cur = vm.twOver["REFRESH_HZ"]?.toIntOrNull()
+            HChips(listOf(tx("Otomatis", "Auto")) + rates.map { "$it Hz" }, if (cur == null) 0 else (rates.indexOf(cur) + 1).coerceAtLeast(0)) { i ->
+                if (i == 0) vm.setTweak("display_refresh", null) else vm.setTweak("display_refresh", rates[i - 1].toString())
+            }
+        }
+        Text(tx("Otomatis: Hemat 60, Seimbang 90, Performa 120, Puncak setinggi layar. Pilihan manual berlaku di semua mode. Batas FPS tiap game diatur di tab Game.", "Auto: Battery 60, Balanced 90, Performance 120, Peak as high as the panel. A manual pick applies in every mode. Each game's FPS cap is set in the Games tab."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+    }
+    if (twCap(vm, "HAS_NIGHT") || twCap(vm, "HAS_SETTINGS")) Section(tx("TAMPILAN", "APPEARANCE"), 40) {
+        if (twCap(vm, "HAS_NIGHT")) HSwitch(tx("Mode malam", "Night light"), tx("Warna layar lebih hangat, nyaman di mata.", "Warmer screen colours, easier on the eyes."), vm.tw["display_night"] == "1") { vm.setTweak("display_night", if (it) "1" else "0") }
+        if (twCap(vm, "HAS_SETTINGS")) {
+            SText(tx("Ukuran teks sistem", "System text size"), 11.sp, SP.dim)
+            val fv = listOf("0.9", "1.0", "1.15", "1.3")
+            val fc = vm.tw["display_font_scale"]?.toFloatOrNull() ?: 1f
+            HChips(listOf(tx("Kecil", "Small"), "Normal", tx("Besar", "Large"), tx("Lebih besar", "Larger")), fv.indexOfFirst { Math.abs(it.toFloat() - fc) < 0.05f }.coerceAtLeast(1)) { vm.setTweak("display_font_scale", fv[it]) }
+        }
+    }
     Section(tx("LAYAR HP", "PHONE DISPLAY")) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f)) {
@@ -755,6 +782,20 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
             HBtn(tx("KEMBALIKAN SEMUA KE NORMAL", "RESTORE EVERYTHING"), Modifier.fillMaxWidth(), SP.red) { vm.restoreAll() }
         }
     }, {
+        if (twCap(vm, "HAS_AUDIO_MIXER") || twCap(vm, "HAS_BYPASS") || twCap(vm, "HAS_LED")) {
+            Section(tx("AUDIO, LED, DAYA", "AUDIO, LED, POWER"), 10) {
+                if (twCap(vm, "HAS_AUDIO_MIXER")) {
+                    SText(tx("Gain audio", "Audio gain"), 11.sp, SP.dim)
+                    TwChips(vm, "tools_dac", "DAC_GAIN", listOf("28", "32", "36"), listOf("28", "32", "36"))
+                }
+                if (twCap(vm, "HAS_BYPASS")) HSwitch(tx("Bypass charging", "Bypass charging"), tx("Saat mengisi, daya langsung ke HP tanpa lewat baterai. Menyala sendiri di Puncak.", "While charging, power goes straight to the phone, not the battery. On automatically in Peak."), vm.tw["tools_bypass"] == "1") { vm.setTweak("tools_bypass", if (it) "1" else "0") }
+                if (twCap(vm, "HAS_LED")) {
+                    SText(tx("Lampu LED", "LED light"), 11.sp, SP.dim)
+                    TwChips(vm, "tools_led", "LED", listOf(tx("Mati", "Off"), tx("Merah", "Red"), tx("Hijau", "Green"), tx("Biru", "Blue")), listOf("off", "red", "green", "blue"), auto = false)
+                }
+                HBtn(tx("Kembalikan semua tweak ke otomatis", "Reset all tweaks to automatic"), Modifier.fillMaxWidth(), SP.red) { vm.resetTweaks() }
+            }
+        }
         Section(tx("PERANGKAT", "DEVICE"), 20) {
             val d = vm.device
             KVRow("SoC", d["SOC_VENDOR"].orEmpty().ifEmpty { "—" })
@@ -839,15 +880,12 @@ internal fun RitualOverlay(vm: AppViewModel) {
         delay(350)
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
-        if (opts["LITE"] != "1" && !vm.prefs.hzPinned(pkg)) {
-            hzForMode(mode.key, Hsin.refreshList())?.let { hz -> if (opts["HZ"] != hz.toString()) Hsin.setGameOpt(pkg, "HZ", hz.toString()) }
-        }
         step = 2; delay(450)
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         setRes(2, fx["downscale"].orEmpty().toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%")
         step = 3; delay(450)
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
-        setRes(3, if (vm.flag("GAME_DND_ON") && opts["LITE"] != "1") (if (en) "On" else "Aktif") else (if (en) "Off" else "Mati"))
+        setRes(3, if (vm.flag("GAME_DND_ON")) (if (en) "On" else "Aktif") else (if (en) "Off" else "Mati"))
         step = 4; delay(450)
         if (vm.bubbleOn && android.provider.Settings.canDrawOverlays(ctx)) { BubbleService.start(ctx); setRes(4, if (en) "Ready" else "Siap") } else setRes(4, if (en) "Off" else "Mati")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }

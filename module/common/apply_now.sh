@@ -195,6 +195,10 @@ if [ "$?" -ne 0 ]; then
     exit 1
 fi
 
+# Tweaks global (display/perf/tools), bukan per game.
+HSIN_STATE_DIR="$STATE_DIR"
+[ -f "$MODDIR/tweaks.sh" ] && . "$MODDIR/tweaks.sh" 2>/dev/null
+
 load_profile "$apply_profile"
 if [ "$?" -ne 0 ]; then
     apply_log "ERROR" "load_profile failed for profile=$apply_profile"
@@ -214,6 +218,9 @@ tune_network
 tune_gpu
 tune_sched
 tune_input
+
+# Tweaks global per profil (kalau modulnya ada).
+command -v tw_apply_profile >/dev/null 2>&1 && tw_apply_profile "$ACTIVE_PROFILE"
 
 # Engine mapping: set fas-rs mode per profil (powersave/balance/performance/fast).
 # Tidak kill apa pun — hanya echo mode via powercfg.sh.

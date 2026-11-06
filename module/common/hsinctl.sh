@@ -37,6 +37,8 @@
 #   autoctl start|stop|status daemon auto-profile
 #   log [N]                   N baris terakhir hsin.log
 #   restore                   kembalikan semua ke normal (Puncak, DND, refresh rate, render, resolusi, frekuensi game)
+#   tweak caps|list|get <KEY>|set <KEY> <VAL>|reset|profile <mode>   tweak global (display/perf/tools), BUKAN per game
+#   gamefps get <pkg> | set <pkg> <10-240|off>   satu nilai FPS: batas FPS game + refresh layar (digabung)
 #   modinfo                   module.prop
 
 COMMON="$(dirname "$(readlink -f "$0")")"
@@ -51,6 +53,8 @@ mkdir -p "$STATE_DIR" 2>/dev/null
 HSIN_STATE_DIR="$STATE_DIR"
 [ -f "$COMMON/gamehooks.sh" ] && . "$COMMON/gamehooks.sh"
 [ -f "$COMMON/gamescan.sh" ] && . "$COMMON/gamescan.sh"
+# Tweaks global (display/perf/tools). Per game tetap di gamehooks.
+[ -f "$COMMON/tweaks.sh" ] && . "$COMMON/tweaks.sh"
 
 FLAG_WHITELIST="GB_FASRS_FORCE_HSIN GB_COOLDOWN_EXTREME NO_CPUSET THERMAL_GUARD_OFF BOOT_GUARD_OFF GAME_PRIO_OFF GAME_DND_ON"
 
@@ -553,6 +557,42 @@ cmd_log() {
     return 0
 }
 
+cmd_tweak() {
+    command -v tw_apply_profile >/dev/null 2>&1 || { echo "ERROR: tweaks.sh tidak ada"; return 1; }
+    case "$1" in
+        caps) tw_caps_ensure; cat "$TW_CAPS" 2>/dev/null ;;
+        list|status) tw_list ;;
+        get)
+            [ -n "$2" ] || { echo "Usage: tweak get <KEY>"; return 1; }
+            tw_list | sed -n "s/^$2=//p"
+            ;;
+        set)
+            [ -n "$2" ] || { echo "Usage: tweak set <KEY> <VAL>"; return 1; }
+            tw_set_global "$2" "$3"
+            ;;
+        reset) tw_reset ;;
+        unset) tw_unset "$2" ;;
+        over) sed -n 's/^TW_\([A-Z_]*\)=\(.*\)/\1=\2/p' "$TW_CONF" 2>/dev/null ;;
+        profile) tw_apply_profile "$2" ;;
+        *) echo "Usage: tweak caps|list|over|get <KEY>|set <KEY> <VAL>|unset <KEY>|reset|profile <mode>"; return 1 ;;
+    esac
+}
+
+cmd_gamefps() {
+    case "$1" in
+        get)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            printf 'fps=%s\n' "$(gh_opt_get "$2" fps off)"
+            printf 'hz=%s\n' "$(gh_opt_get "$2" HZ default)"
+            ;;
+        set)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            tw_game_fps "$2" "$3"
+            ;;
+        *) echo "Usage: gamefps get <pkg> | set <pkg> <10-240|off>"; return 1 ;;
+    esac
+}
+
 case "$1" in
     status) cmd_status ;;
     profile) cmd_profile "$2" ;;
@@ -592,6 +632,8 @@ case "$1" in
     livecheck) sh "$COMMON/livecheck.sh" ;;
     trim) sh "$COMMON/trim.sh" "$2" ;;
     gamefx) cmd_gamefx "$2" "$3" "$4" "$5" ;;
+    gamefps) cmd_gamefps "$2" "$3" "$4" ;;
+    tweak) cmd_tweak "$2" "$3" "$4" ;;
     mitigation) cmd_mitigation "$2" "$3" "$4" ;;
     shield) shift; sh "$COMMON/shield.sh" "$@" ;;
     bugreport) sh "$COMMON/bugreport.sh" ;;
