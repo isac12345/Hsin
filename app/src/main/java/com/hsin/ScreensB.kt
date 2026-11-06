@@ -128,7 +128,7 @@ private fun FloatingSettings(vm: AppViewModel) {
         SliderRow("Lebar panel", pw, 70f..130f, "${pw.toInt()}%",
             { pw = it },
             { p.flPanelW = pw.toInt(); vm.flChanged() })
-        txt("Posisi dan lebar berlaku saat panel dibuka dari orb. Ukuran di atas mengatur semuanya.", 11.sp, muted())
+        txt("Posisi dan lebar dipakai saat panel dibuka dari orb. Ukuran di atas berlaku untuk orb dan panel.", 11.sp, muted())
         Label("Tampilan awal", Modifier.padding(top = 10.dp))
         Seg(listOf("ORB", "KAPSUL"), if (p.flStartThin) 1 else 0, { p.flStartThin = it == 1; vm.flChanged() })
         ToggleRow("Kapsul tembus sentuh", "Kapsul hanya tampil, sentuhan diteruskan ke game. Matikan di sini untuk menggesernya lagi.", p.flBarThrough) { p.flBarThrough = it; vm.flChanged() }
