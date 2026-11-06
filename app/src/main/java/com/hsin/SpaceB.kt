@@ -464,6 +464,13 @@ private fun GameTile(vm: AppViewModel, g: GameEntry, sel: Boolean, index: Int, m
     }
 }
 
+/** Refresh rate otomatis per mode: Hemat 60, Seimbang 90, Performa 120, Puncak setinggi layar. Dipilih dari daftar yang layar dukung. */
+internal fun hzForMode(modeKey: String, avail: List<Int>): Int? {
+    if (avail.isEmpty()) return null
+    val cap = when (modeKey) { "hemat" -> 60; "seimbang" -> 90; "performa" -> 120; else -> Int.MAX_VALUE }
+    return avail.filter { it <= cap }.maxOrNull() ?: avail.minOrNull()
+}
+
 private val FPS_KEYS = listOf("off", "30", "45", "60", "90", "120")
 
 @Composable
@@ -507,6 +514,18 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             }
             val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
             if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
+            SText(tx("Refresh rate layar saat main", "Screen refresh rate while playing"), 11.sp, SP.dim)
+            val rates by produceState<List<Int>>(emptyList(), g.pkg) { value = Hsin.refreshList() }
+            if (rates.isNotEmpty()) {
+                val pinned = vm.prefs.hzPinned(g.pkg)
+                val curHz = opts["HZ"]?.toIntOrNull()
+                val selHz = if (!pinned) 0 else (rates.indexOf(curHz) + 1).coerceAtLeast(0)
+                HChips(listOf(tx("Otomatis", "Auto")) + rates.map { "$it Hz" }, selHz, col) { i ->
+                    if (i == 0) { vm.prefs.setHzPinned(g.pkg, false); vm.setGameOpt(g.pkg, "HZ", hzForMode(cur, rates)?.toString() ?: "default") }
+                    else { vm.prefs.setHzPinned(g.pkg, true); vm.setGameOpt(g.pkg, "HZ", rates[i - 1].toString()) }
+                    ver++
+                }
+            }
             SText(tx("Batas FPS", "FPS cap"), 11.sp, SP.dim)
             HChips(FPS_KEYS.map { if (it == "off") tx("Bebas", "Free") else it }, FPS_KEYS.indexOf(fx["fps"] ?: "off").coerceAtLeast(0), col) {
                 vm.setGameFx(g.pkg, "fps", FPS_KEYS[it]); ver++
@@ -820,6 +839,9 @@ internal fun RitualOverlay(vm: AppViewModel) {
         delay(350)
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
+        if (opts["LITE"] != "1" && !vm.prefs.hzPinned(pkg)) {
+            hzForMode(mode.key, Hsin.refreshList())?.let { hz -> if (opts["HZ"] != hz.toString()) Hsin.setGameOpt(pkg, "HZ", hz.toString()) }
+        }
         step = 2; delay(450)
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         setRes(2, fx["downscale"].orEmpty().toDoubleOrNull()?.let { "${Math.round(it * 100)}%" } ?: "100%")

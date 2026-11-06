@@ -1,7 +1,7 @@
 id=hsin
 name=HSIN
-version=v6.11.0
-versionCode=81
+version=v6.12.0
+versionCode=82
 author=somwan
 description=HSIN game booster: mode Hemat/Seimbang/Performa/Puncak, floating orb FPS, rekam layar, resolusi per game. Mesin Uperf + fas-rs, kredit di app.
 updateJson=
