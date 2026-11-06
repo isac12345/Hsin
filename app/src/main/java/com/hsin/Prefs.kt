@@ -10,6 +10,9 @@ class Prefs(ctx: Context) {
     var bubbleOn: Boolean
         get() = sp.getBoolean("bubble_on", false)
         set(v) { sp.edit().putBoolean("bubble_on", v).apply() }
+    /** True kalau user mengunci refresh rate game ini sendiri (bukan otomatis ikut mode). */
+    fun hzPinned(pkg: String): Boolean = sp.getBoolean("hzpin_$pkg", false)
+    fun setHzPinned(pkg: String, v: Boolean) { sp.edit().putBoolean("hzpin_$pkg", v).apply() }
     var lastGame: String
         get() = sp.getString("last_game", "") ?: ""
         set(v) { sp.edit().putString("last_game", v).apply() }

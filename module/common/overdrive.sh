@@ -160,7 +160,22 @@ save_prev() {
         printf 'cpu|%s|%s|%s\n' "$_p" "$(rd "$_p/scaling_min_freq")" "$(rd "$_p/scaling_max_freq")" >> "$OVD_PREV.tmp"
     done
     _g=$(gpu_dir) && printf 'gpu|%s|%s|%s\n' "$_g" "$(rd "$_g/min_freq")" "$(rd "$_g/max_freq")" >> "$OVD_PREV.tmp"
+    # ekstra khusus Puncak: node opsional, hanya dicatat kalau ada dan bisa ditulis (HP lain otomatis dilewati)
+    for _x in /sys/kernel/turbo/common/turbo_enable /sys/devices/system/cpu/cpu6/cpuidle/state1/disable /sys/devices/system/cpu/cpu7/cpuidle/state1/disable; do
+        [ -w "$_x" ] && printf 'ext|%s|%s|\n' "$_x" "$(rd "$_x")" >> "$OVD_PREV.tmp"
+    done
+    command -v settings >/dev/null 2>&1 && printf 'sg|game_bypass_charging|%s|\n' "$(settings get global game_bypass_charging 2>/dev/null | tr -d '\r\n')" >> "$OVD_PREV.tmp"
     mv -f "$OVD_PREV.tmp" "$OVD_PREV"
+}
+
+# Ekstra Puncak: turbo nyala, deep idle core besar mati, charging bypass (kalau didukung ROM). Dipulihkan di restore_prev.
+apply_extras() {
+    [ -w /sys/kernel/turbo/common/turbo_enable ] && wr /sys/kernel/turbo/common/turbo_enable 1
+    for _x in /sys/devices/system/cpu/cpu6/cpuidle/state1/disable /sys/devices/system/cpu/cpu7/cpuidle/state1/disable; do
+        [ -w "$_x" ] && wr "$_x" 1
+    done
+    command -v settings >/dev/null 2>&1 && settings put global game_bypass_charging 1 >/dev/null 2>&1
+    return 0
 }
 
 # apply_floors <persen_cpu> <persen_gpu>; hanya menulis bila nilai berbeda. Return 1 kalau tidak ada yang bisa ditulis.
@@ -201,6 +216,9 @@ restore_prev() {
             gpu) [ -d "$_d" ] || continue
                  num "$_mn" && wr "$_d/min_freq" "$_mn"
                  num "$_mx" && wr "$_d/max_freq" "$_mx" ;;
+            ext) [ -w "$_d" ] && num "$_mn" && wr "$_d" "$_mn" ;;
+            sg) command -v settings >/dev/null 2>&1 || continue
+                case "$_mn" in ''|null) settings delete global "$_d" >/dev/null 2>&1 ;; *) settings put global "$_d" "$_mn" >/dev/null 2>&1 ;; esac ;;
         esac
     done < "$OVD_PREV"
     rm -f "$OVD_PREV"
@@ -288,6 +306,7 @@ do_start() {
     if ! apply_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"; then
         restore_prev; echo "ERROR: node frekuensi tidak bisa ditulis"; return 1
     fi
+    apply_extras
     freeze_engines
     printf '%s\nfull\n' "$_pkg" > "$OVD_ACTIVE"
     rm -f "$OVD_LAST" "$OVD_PID"
