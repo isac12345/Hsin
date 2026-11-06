@@ -202,12 +202,17 @@ fun SText(
 
 @Composable
 fun Glass(modifier: Modifier = Modifier, radius: Int = 12, alt: Boolean = false, content: @Composable () -> Unit) {
-    val sh = RoundedCornerShape(radius.dp)
+    val th = UiState.theme
+    val sh: androidx.compose.ui.graphics.Shape = when (th) {
+        1 -> CutShape
+        3 -> OctShape
+        else -> RoundedCornerShape((radius * 1.5f).dp)
+    }
     Box(
         modifier
             .clip(sh)
             .background(if (alt) SP.glassLo else SP.glass)
-            .border(0.6.dp, SP.line, sh)
+            .border(if (th == 2) 0.6.dp else 0.8.dp, if (th == 2) SP.line else SP.gold.copy(alpha = 0.28f), sh)
     ) { content() }
 }
 
@@ -219,6 +224,8 @@ object UiState {
     var reduceAnim = false
     var bgDim by mutableStateOf(1)
     fun setReduce(p: Prefs, on: Boolean) { reduceAnim = on; p.reduceAnim = on; themeTick++ }
+    /** Tema app aktif: 1 Apex, 2 Turbo, 3 Nitro. */
+    var theme by mutableStateOf(1)
     var animLevel by mutableStateOf(1)
     fun setAnim(p: Prefs, lvl: Int) { animLevel = lvl; p.animLevel = lvl; reduceAnim = lvl == 0; themeTick++ }
     var view: android.view.View? = null
@@ -245,6 +252,7 @@ object UiState {
         haptics = p.haptics
         reduceAnim = p.reduceAnim
         animLevel = p.animLevel
+        theme = p.appTheme
         bgDim = p.bgDim
         inited = true
         en = p.sp.getBoolean("hsin_en", false)
@@ -320,7 +328,7 @@ fun SpaceRoot(vm: AppViewModel) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF0C0C0E))) {
         val land = maxWidth > maxHeight
         val compact = maxHeight < 420.dp
-        Image(painterResource(R.drawable.wallpaper_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        Image(painterResource(themeWall(UiState.theme)), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
                 if (land) Brush.horizontalGradient(listOf(Color(0xE60A0A0C), Color(0x990A0A0C), Color(0x330A0A0C)))
@@ -329,9 +337,19 @@ fun SpaceRoot(vm: AppViewModel) {
         )
         Embers()
         if (land) {
-            Row(Modifier.fillMaxSize().systemBarsPadding()) {
-                NavRail(compact)
-                SpaceContent(vm, true, Modifier.weight(1f).fillMaxHeight())
+            when (UiState.theme) {
+                2 -> Column(Modifier.fillMaxSize().systemBarsPadding()) {
+                    SpaceContent(vm, true, Modifier.weight(1f).fillMaxWidth())
+                    NavTurbo(compact)
+                }
+                3 -> Row(Modifier.fillMaxSize().systemBarsPadding()) {
+                    SpaceContent(vm, true, Modifier.weight(1f).fillMaxHeight())
+                    NavNitro(compact)
+                }
+                else -> Row(Modifier.fillMaxSize().systemBarsPadding()) {
+                    NavApex(compact)
+                    SpaceContent(vm, true, Modifier.weight(1f).fillMaxHeight())
+                }
             }
         } else {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
@@ -422,12 +440,12 @@ private fun Embers() {
 
 // ===================== navigasi =====================
 @Composable
-private fun navName(i: Int): String = when (i) {
+internal fun navName(i: Int): String = when (i) {
     0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); 3 -> tx("Alat", "Tools"); else -> tx("Pengaturan", "Settings")
 }
 
 @Composable
-private fun NavIcon(i: Int, color: Color, modifier: Modifier = Modifier) {
+internal fun NavIcon(i: Int, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier.size(24.dp)) {
         val w = size.width; val h = size.height
         val st = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
@@ -600,9 +618,9 @@ private fun SettingsTab(vm: AppViewModel) {
                 Seg(listOf("Indonesia", "English"), if (UiState.en) 1 else 0) { UiState.setEn(vm.prefs, it == 1) }
                 SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
                 Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
-                SText(tx("Tema tampilan (Beranda + floating di game)", "Look theme (Home + in-game floating)"), 12.sp, SP.dim)
-                Seg(listOf(tx("Kartu Miring", "Slant"), tx("Dasbor Bundar", "Round"), tx("Kubus Energi", "Cube")), vm.prefs.appTheme - 1) {
-                    vm.prefs.appTheme = it + 1; vm.prefs.flStyle = 3 + it
+                SText(tx("Tema (tampilan app dan floating di game)", "Theme (app and in-game floating)"), 12.sp, SP.dim)
+                Seg(listOf("Apex", "Turbo", "Nitro"), vm.prefs.appTheme - 1) {
+                    vm.prefs.appTheme = it + 1; UiState.theme = it + 1; vm.prefs.flStyle = 3 + it
                     vm.flChanged(); UiState.themeTick++; SoundFx.play(vm.prefs, "tab")
                 }
                 SText(tx("Gelap latar (kalau pakai gambar sendiri)", "Background dimming (custom image)"), 12.sp, SP.dim)

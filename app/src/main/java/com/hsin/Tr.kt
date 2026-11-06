@@ -156,7 +156,7 @@ private val EN2: Map<String, String> = mapOf(
     "Per jenis app" to "Per app type", "Bekukan app" to "Freeze apps", "Gaya floating" to "Floating style", "Jenis kontrol: " to "Control type: ", "Riwayat sesi FPS" to "FPS session history",
     "Uji performa CPU" to "CPU performance test", "Hasil (juta iterasi, makin tinggi makin kencang)" to "Result (million iterations, higher is faster)",
     "Menjalankan hitungan berat 3 detik pada satu inti, lalu 3 detik pada semua inti. Biarkan HP tidak dipakai selama uji. Uji semua mode berjalan sendiri sekitar 1 menit (ada jeda dingin) lalu mengembalikan mode awalmu." to "Runs a heavy calculation for 3 seconds on one core, then 3 seconds on all cores. Leave the phone alone during the test. Test all modes runs by itself for about 1 minute (with cooling pauses) and then restores your original mode.",
-    "STANDAR" to "STANDARD", "KACA" to "GLASS", "KARTU" to "CARD", "BUNDAR" to "ROUND", "KUBUS" to "CUBE", "KAPSUL" to "CAPSULE",
+    "STANDAR" to "STANDARD", "KACA" to "GLASS", "KAPSUL" to "CAPSULE",
     "UJI SEMUA MODE (otomatis)" to "TEST ALL MODES (automatic)", "Menguji..." to "Testing...", "Uji semua mode selesai" to "Test all modes finished",
     "Mode Puncak aktif" to "Peak mode on", "Mode gagal diterapkan" to "Mode could not be applied", "game booster" to "game booster",
 )

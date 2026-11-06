@@ -73,8 +73,8 @@ class Prefs(ctx: Context) {
 
     // ---------- floating overlay (tahap 2) ----------
     var flScale: Int
-        get() = sp.getInt("fl_scale", 100).coerceIn(70, 140)
-        set(v) { sp.edit().putInt("fl_scale", v.coerceIn(70, 140)).apply() }
+        get() = sp.getInt("fl_scale2", 112).coerceIn(70, 160)
+        set(v) { sp.edit().putInt("fl_scale2", v.coerceIn(70, 160)).apply() }
     var flAlpha: Int
         get() = sp.getInt("fl_alpha", 88).coerceIn(40, 100)
         set(v) { sp.edit().putInt("fl_alpha", v.coerceIn(40, 100)).apply() }
@@ -90,7 +90,7 @@ class Prefs(ctx: Context) {
     var flPanelW: Int
         get() = sp.getInt("fl_panel_w", 100).coerceIn(70, 130)
         set(v) { sp.edit().putInt("fl_panel_w", v.coerceIn(70, 130)).apply() }
-    /** Tema app: 0 klasik, 1 Kartu Miring, 2 Dasbor Bundar, 3 Kubus Energi. */
+    /** Tema app: 1 Apex, 2 Turbo, 3 Nitro. */
     var appTheme: Int
         get() = sp.getInt("app_theme", 1).coerceIn(1, 3)
         set(v) { sp.edit().putInt("app_theme", v.coerceIn(1, 3)).apply() }

@@ -534,11 +534,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             }
         }
         val fps: Float? = when {
-            lat.isNotEmpty() -> fpsLat
+            lat.isNotEmpty() -> fpsLat?.coerceAtMost(maxHz)
             x10 == null || ts.isEmpty() -> null
             ts == prevTs -> 0f
             x10 < 0 || x10 > 2400 -> null      // di atas 240 FPS = angka ngawur (mis. daftar layer berubah)
-            else -> x10 / 10f
+            else -> (x10 / 10f).coerceAtMost(maxHz)   // FPS tidak mungkin melebihi refresh rate layar
         }
         if (ts.isNotEmpty()) prevTs = ts
 
@@ -568,6 +568,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     @Suppress("DEPRECATION")
+    /** Refresh rate tertinggi yang didukung layar; FPS yang terbaca tidak boleh melewatinya. */
+    private val maxHz: Float by lazy {
+        try { wm.defaultDisplay.supportedModes.maxOf { it.refreshRate }.coerceIn(30f, 240f) } catch (_: Throwable) { 120f }
+    }
+
     private fun hzNow(): Int = try { Math.round(wm.defaultDisplay.refreshRate) } catch (_: Throwable) { 60 }
 
     private fun apply(s: Sample) {
