@@ -37,6 +37,89 @@ internal val CutShape: Shape = GenericShape { s, _ ->
     moveTo(k, 0f); lineTo(s.width, 0f); lineTo(s.width, s.height - k); lineTo(s.width - k, s.height); lineTo(0f, s.height); lineTo(0f, k); close()
 }
 
+/** Segi enam (gaya Nitro). */
+internal val HexShape: Shape = GenericShape { s, _ ->
+    moveTo(s.width * 0.5f, 0f); lineTo(s.width, s.height * 0.25f); lineTo(s.width, s.height * 0.75f)
+    lineTo(s.width * 0.5f, s.height); lineTo(0f, s.height * 0.75f); lineTo(0f, s.height * 0.25f); close()
+}
+
+/** Segi delapan: keempat sudut dipotong (kartu gaya Nitro). */
+internal val OctShape: Shape = GenericShape { s, _ ->
+    val k = minOf(s.height * 0.2f, 20f)
+    moveTo(k, 0f); lineTo(s.width - k, 0f); lineTo(s.width, k); lineTo(s.width, s.height - k)
+    lineTo(s.width - k, s.height); lineTo(k, s.height); lineTo(0f, s.height - k); lineTo(0f, k); close()
+}
+
+/** Gambar bawaan tiap tema: latar, banner, logo. */
+internal fun themeWall(t: Int): Int = when (t) { 1 -> R.drawable.art_blossom; 3 -> R.drawable.art_spark; else -> R.drawable.wallpaper_default }
+internal fun themeBanner(t: Int): Int = when (t) { 1 -> R.drawable.banner_default; 3 -> R.drawable.art_cream; else -> R.drawable.art_fire }
+internal fun themeLogo(t: Int): Int = when (t) { 1 -> R.drawable.art_gold; 3 -> R.drawable.art_cream; else -> R.drawable.icon_default }
+
+/** Tombol navigasi bertema: bentuk mengikuti tema, aktif diisi warna aksen. */
+@Composable
+internal fun ThemedNavBtn(i: Int, shape: Shape, w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp, label: Boolean) {
+    val sel = UiState.tab == i
+    val a = ownAnim(if (sel) 1f else 0f, 200)
+    val col = lerpColor(SP.dim, SP.ink, a)
+    Column(Modifier.tap { UiState.tab = i }, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(w, h).clip(shape).background(lerpColor(Color(0xFF171B26), SP.gold, a))
+                .border(1.dp, SP.gold.copy(alpha = 0.35f + 0.4f * a), shape),
+            contentAlignment = Alignment.Center
+        ) { NavIcon(i, col) }
+        if (label) SText(navName(i), 9.sp, lerpColor(SP.dim, SP.gold, a), modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+internal fun LogoThemed(dp: Int) {
+    val th = UiState.theme
+    val sh: Shape = when (th) { 1 -> CutShape; 3 -> HexShape; else -> CircleShape }
+    androidx.compose.foundation.Image(
+        androidx.compose.ui.res.painterResource(themeLogo(th)), null,
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = Modifier.size(dp.dp).clip(sh).border(1.5.dp, SP.gold, sh)
+    )
+}
+
+/** Apex: rel kiri, tombol miring. */
+@Composable
+internal fun NavApex(compact: Boolean) {
+    Column(
+        Modifier.width(if (compact) 68.dp else 86.dp).fillMaxHeight().background(Color(0xB3080A10)).verticalScroll(rememberScrollState()).padding(vertical = if (compact) 6.dp else 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp)
+    ) {
+        LogoThemed(if (compact) 34 else 46)
+        for (i in 0 until 5) ThemedNavBtn(i, SlantShape, 56.dp, if (compact) 36.dp else 42.dp, !compact)
+    }
+}
+
+/** Turbo: dock kapsul di bawah, tombol bulat. */
+@Composable
+internal fun NavTurbo(compact: Boolean) {
+    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp, top = 2.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier.clip(CircleShape).background(Color(0xE6080A10)).border(1.5.dp, SP.gold.copy(alpha = 0.7f), CircleShape).padding(horizontal = 14.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically
+        ) {
+            LogoThemed(34)
+            for (i in 0 until 5) ThemedNavBtn(i, CircleShape, 42.dp, 42.dp, false)
+        }
+    }
+}
+
+/** Nitro: rel kanan, tombol segi enam. */
+@Composable
+internal fun NavNitro(compact: Boolean) {
+    Column(
+        Modifier.width(if (compact) 68.dp else 86.dp).fillMaxHeight().background(Color(0xB3080C14)).verticalScroll(rememberScrollState()).padding(vertical = if (compact) 6.dp else 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp)
+    ) {
+        LogoThemed(if (compact) 34 else 46)
+        for (i in 0 until 5) ThemedNavBtn(i, HexShape, if (compact) 44.dp else 52.dp, if (compact) 46.dp else 56.dp, !compact)
+    }
+}
+
 /** Tombol Lanjut game terakhir (pengganti kartu sesi di Beranda; detail sesi ada di halaman Rekaman). */
 @Composable
 internal fun ResumeButton(vm: AppViewModel, col: Color) {

@@ -150,7 +150,7 @@ fun Backdrop(vm: AppViewModel) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = when (UiState.bgDim) { 0 -> 0.3f; 2 -> 0.7f; else -> 0.5f })))
     } else {
         // tanpa background pilihan: pakai wallpaper bawaan HSIN supaya tidak ada layar kosong/hitam
-        Image(painterResource(R.drawable.wallpaper_default), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Image(painterResource(themeWall(UiState.theme)), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xCC0A0A0C), Color(0xE60A0A0C)))))
     }
 }
@@ -162,7 +162,7 @@ fun Banner(vm: AppViewModel) {
         if (custom != null) {
             Image(custom.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else if (vm.bannerReady) {
-            Image(painterResource(R.drawable.banner_default), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(painterResource(themeBanner(UiState.theme)), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
         Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
@@ -247,7 +247,11 @@ fun HsinApp(vm: AppViewModel) {
     val clock = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         val t0 = withFrameNanos { it }
-        while (true) clock.floatValue = (withFrameNanos { it } - t0) / 1_000_000_000f
+        var last = 0L
+        while (true) {
+            val n = withFrameNanos { it }
+            if (n - last >= 14_000_000L) { last = n; clock.floatValue = (n - t0) / 1_000_000_000f }   // maksimal ~60 pembaruan/detik, hemat di layar 120 Hz
+        }
     }
     LaunchedEffect(UiState.portrait) {
         (ctx as? android.app.Activity)?.requestedOrientation =

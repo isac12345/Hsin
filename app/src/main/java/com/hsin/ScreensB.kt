@@ -112,7 +112,7 @@ private fun FloatingSettings(vm: AppViewModel) {
         // dan pasti saat dilepas. Layar ini baru dibuat ulang (flChanged) sekali, setelah slider dilepas.
         var sz by remember { mutableStateOf(p.flScale.toFloat()) }
         var szT by remember { mutableStateOf(0L) }
-        SliderRow("Ukuran", sz, 70f..140f, "${sz.toInt()}%",
+        SliderRow("Ukuran", sz, 70f..160f, "${sz.toInt()}%",
             { sz = it; val n = SystemClock.uptimeMillis(); if (n - szT > 150) { szT = n; p.flScale = it.toInt() } },
             { p.flScale = sz.toInt(); vm.flChanged() })
         var al by remember { mutableStateOf(p.flAlpha.toFloat()) }
@@ -121,7 +121,7 @@ private fun FloatingSettings(vm: AppViewModel) {
             { al = it; val n = SystemClock.uptimeMillis(); if (n - alT > 150) { alT = n; p.flAlpha = it.toInt() } },
             { p.flAlpha = al.toInt(); vm.flChanged() })
         Label("Gaya floating", Modifier.padding(top = 10.dp))
-        Seg(listOf("KARTU", "BUNDAR", "KUBUS"), p.flStyle - 3, { p.flStyle = it + 3; p.appTheme = it + 1; UiState.themeTick++; vm.flChanged() })
+        Seg(listOf("APEX", "TURBO", "NITRO"), p.flStyle - 3, { p.flStyle = it + 3; p.appTheme = it + 1; UiState.theme = it + 1; UiState.themeTick++; vm.flChanged() })
         Label("Posisi panel", Modifier.padding(top = 10.dp))
         Seg(listOf("OTOMATIS", "ATAS", "BAWAH", "KIRI", "KANAN"), p.flPanelPos, { p.flPanelPos = it; vm.flChanged() })
         var pw by remember { mutableStateOf(p.flPanelW.toFloat()) }
