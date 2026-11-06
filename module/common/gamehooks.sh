@@ -184,6 +184,7 @@ gh_opt_get() {
 # $1=pkg -> baris "KEY=nilai" untuk opsi yang diset khusus game ini
 gh_opt_list() {
     [ -f "$GH_OPTS" ] || return 0
+    [ -n "$1" ] || { cat "$GH_OPTS" 2>/dev/null; return 0; }
     sed -n "s/^$(_gh_re "$1")://p" "$GH_OPTS" 2>/dev/null
 }
 
@@ -344,6 +345,12 @@ _gh_refresh_on() {
     # pelapis: settings
     settings put system min_refresh_rate "${_ghh}.0" >/dev/null 2>&1
     settings put system peak_refresh_rate "${_ghh}.0" >/dev/null 2>&1
+    # ROM Transsion (itel) memakai tran_refresh_mode untuk membatasi Hz; tanpa ini peak diabaikan
+    if [ ! -f "$GH_REF_PREV.tran" ]; then
+        _ghh_tr=$(settings get system tran_refresh_mode 2>/dev/null | tr -d '\r\n[:space:]')
+        printf '%s\n' "${_ghh_tr:-null}" > "$GH_REF_PREV.tran" 2>/dev/null
+    fi
+    settings put system tran_refresh_mode "$_ghh" >/dev/null 2>&1
     # utama: backdoor SurfaceFlinger
     _ghh_idx=$(_gh_sf_index_for "$_ghh")
     if _gh_num "$_ghh_idx" && _gh_sf_call "$_ghh_idx"; then
@@ -394,6 +401,11 @@ _gh_refresh_off() {
             *) settings put system "$_ghr_key" "$_ghr_val" >/dev/null 2>&1 ;;
         esac
     done
+    if [ -f "$GH_REF_PREV.tran" ]; then
+        read -r _ghr_tr < "$GH_REF_PREV.tran" 2>/dev/null
+        rm -f "$GH_REF_PREV.tran"
+        case "$_ghr_tr" in ''|null) settings delete system tran_refresh_mode >/dev/null 2>&1 ;; *) settings put system tran_refresh_mode "$_ghr_tr" >/dev/null 2>&1 ;; esac
+    fi
     _gh_log RESTORED "refresh rate dikembalikan"
 }
 

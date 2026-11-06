@@ -305,7 +305,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     // ---------- util ----------
     private var toastJob: Job? = null
     fun toast(s: String) {
-        msg = trn(s.removePrefix("ERROR:").trim())
+        msg = trn(s.removePrefix("ERROR:").removePrefix("OK:").trim())
         SoundFx.play(prefs, if (s.startsWith("ERROR") || s.startsWith("Gagal")) "bad" else "good")
         toastJob?.cancel()
         toastJob = viewModelScope.launch { delay(2600); msg = null }
@@ -918,21 +918,21 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             val r = Hsin.freezeOn(pkg)
             frozen = Hsin.freezeList()
             busy = null
-            msg = r
+            toast(r)
         }
     }
     fun unfreezeApp(pkg: String) {
         viewModelScope.launch {
             val r = if (pkg.isEmpty()) Hsin.freezeAllOff() else Hsin.freezeOff(pkg)
             frozen = Hsin.freezeList()
-            msg = r
+            toast(r)
         }
     }
     fun setChargeLimit(n: Int) {
         viewModelScope.launch {
             val r = Hsin.chargeSet(n)
             chargeInfo = Hsin.chargeStatus()
-            msg = r
+            toast(r)
         }
     }
 
