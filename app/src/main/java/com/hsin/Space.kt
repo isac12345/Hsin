@@ -726,10 +726,10 @@ private fun CheckRow(name: String, ok: Boolean, hint: String, fix: (() -> Unit)?
 
 @Composable
 private fun Seg(options: List<String>, sel: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(CircleShape).background(Color(0x22FFFFFF)).padding(3.dp)) {
+    Row(Modifier.fillMaxWidth().clip(btnShape()).background(Color(0x22FFFFFF)).padding(3.dp)) {
         options.forEachIndexed { i, o ->
             val a = ownAnim(if (i == sel) 1f else 0f, 200)
-            Box(Modifier.weight(1f).tap { onPick(i) }.clip(CircleShape).background(lerpColor(Color.Transparent, SP.gold, a)).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.weight(1f).tap { onPick(i) }.clip(btnShape()).background(lerpColor(Color.Transparent, SP.gold, a)).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                 SText(o, 12.sp, lerpColor(SP.text, SP.ink, a), FontWeight.Medium)
             }
         }

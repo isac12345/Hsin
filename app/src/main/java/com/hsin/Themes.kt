@@ -50,6 +50,12 @@ internal val OctShape: Shape = GenericShape { s, _ ->
     lineTo(s.width - k, s.height); lineTo(k, s.height); lineTo(0f, s.height - k); lineTo(0f, k); close()
 }
 
+/** Bentuk tombol/chip mengikuti tema: Apex miring, Turbo kapsul, Nitro segi delapan. */
+internal fun btnShape(): Shape = when (UiState.theme) { 1 -> SlantShape; 3 -> OctShape; else -> androidx.compose.foundation.shape.RoundedCornerShape(50) }
+
+/** Bentuk kartu besar mengikuti tema. */
+internal fun cardShape(): Shape = when (UiState.theme) { 1 -> CutShape; 3 -> OctShape; else -> androidx.compose.foundation.shape.RoundedCornerShape(24.dp) }
+
 /** Gambar bawaan tiap tema: latar, banner, logo. */
 internal fun themeWall(t: Int): Int = when (t) { 1 -> R.drawable.art_blossom; 3 -> R.drawable.art_spark; else -> R.drawable.wallpaper_default }
 internal fun themeBanner(t: Int): Int = when (t) { 1 -> R.drawable.banner_default; 3 -> R.drawable.art_cream; else -> R.drawable.art_fire }
