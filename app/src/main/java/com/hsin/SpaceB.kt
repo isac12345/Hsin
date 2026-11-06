@@ -6,7 +6,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -607,12 +606,12 @@ private fun twCap(vm: AppViewModel, k: String) = vm.tw[k] == "1"
 @Composable
 private fun Gate(ok: Boolean, content: @Composable () -> Unit) {
     if (ok) { content(); return }
-    Box(Modifier.alpha(0.38f)) {
+    Box(Modifier.alpha(0.38f)) { val _b = this
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             content()
             Text(tx("Tidak didukung di HP ini", "Not supported on this phone"), color = SP.dim, fontSize = 10.sp)
         }
-        Box(Modifier.matchParentSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {})
+        Box(_b.run { Modifier.matchParentSize() }.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {})
     }
 }
 
