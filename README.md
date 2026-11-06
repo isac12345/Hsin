@@ -1,4 +1,4 @@
-# HSIN v6.13.0
+# HSIN v6.13.1
 
 Game booster (modul Magisk/KernelSU/APatch + app) dengan tampilan game space. Mesin modul diambil dari HSIN
 (Uperf + fas-rs + Overdrive + game hooks), jadi fiturnya sama dan sudah teruji di perangkat. Beda: nama dan tampilan.
@@ -19,7 +19,7 @@ Game booster (modul Magisk/KernelSU/APatch + app) dengan tampilan game space. Me
 - Bahasa Indonesia / English.
 
 ## Pasang
-Flash `HSIN-v6.13.0-module.zip` (APK ikut terpasang) → reboot → buka HSIN. Modul ini memakai id yang sama dengan HSIN,
+Flash `HSIN-v6.13.1-module.zip` (APK ikut terpasang) → reboot → buka HSIN. Modul ini memakai id yang sama dengan HSIN,
 jadi menggantikannya. Hapus app HSIN Control lama supaya tidak ada dua app.
 
 ## Build
