@@ -102,7 +102,7 @@ fun HsinCard(
     content: @Composable () -> Unit,
 ) {
     val ui = LocalUi.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = cardShape()
     var m = modifier
         .fillMaxWidth()
         .padding(bottom = 10.dp)
@@ -132,13 +132,13 @@ fun Divider() {
 fun Seg(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val ui = LocalUi.current
     Row(
-        modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(3.dp),
+        modifier.fillMaxWidth().padding(vertical = 4.dp).clip(btnShape()).background(Color.Black.copy(alpha = 0.45f)).padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEachIndexed { i, o ->
             val on = i == selected
             Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                Modifier.weight(1f).clip(btnShape())
                     .background(if (on) ui.accent else Color.Transparent)
                     .clickable { onSelect(i) }.padding(vertical = 10.dp, horizontal = 1.dp),
                 contentAlignment = Alignment.Center,
@@ -163,8 +163,8 @@ fun Pill(
     val bg = if (solid) ui.accent else Color.Transparent
     val fg = if (solid) Ink else if (enabled) Paper else muted()
     Box(
-        modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(bg)
-            .border(BorderStroke(0.6.dp, if (highlight) Mint else if (solid) ui.accent else Color.White.copy(alpha = 0.22f)), RoundedCornerShape(12.dp))
+        modifier.fillMaxWidth().padding(top = 8.dp).clip(btnShape()).background(bg)
+            .border(BorderStroke(0.6.dp, if (highlight) Mint else if (solid) ui.accent else Color.White.copy(alpha = 0.22f)), btnShape())
             .clickable(enabled = enabled, onClick = onClick).padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) { txt(text, 12.sp, fg, FontWeight.SemiBold, spacing = 0.8.sp, maxLines = 1) }

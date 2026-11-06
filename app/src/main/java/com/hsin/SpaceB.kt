@@ -72,7 +72,7 @@ import kotlin.math.sin
 
 @Composable
 internal fun HBtn(t: String, modifier: Modifier = Modifier, color: Color = SP.gold, solid: Boolean = false, onClick: () -> Unit) {
-    val sh = RoundedCornerShape(12.dp)
+    val sh = btnShape()
     Box(
         modifier.tap(onClick).clip(sh)
             .background(if (solid) color else SP.glassLo)
@@ -103,7 +103,7 @@ internal fun HChips(options: List<String>, sel: Int, color: Color = SP.gold, onP
         options.forEachIndexed { i, o ->
             val a = ownAnim(if (i == sel) 1f else 0f, 200)
             Box(
-                Modifier.tap { onPick(i) }.clip(RoundedCornerShape(10.dp))
+                Modifier.tap { onPick(i) }.clip(btnShape())
                     .background(lerpColor(Color(0x22FFFFFF), color, a))
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
@@ -407,7 +407,16 @@ internal fun GameTab(vm: AppViewModel, land: Boolean) {
     }
     val idx = UiState.gameIdx.coerceIn(0, gs.size - 1)
     val g = gs[idx]
-    if (land) {
+    if (land && UiState.theme == 2) {   // Turbo: rak game berupa baris geser di atas, detail di bawah
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                gs.forEachIndexed { i, e -> GameTile(vm, e, i == idx, i, Modifier.width(92.dp)) }
+                HBtn("+", Modifier.width(56.dp)) { vm.go("addgame") }
+                HBtn(tx("Pindai", "Scan"), Modifier.width(80.dp)) { vm.scanAndAdd() }
+            }
+            GameDetail(vm, g)
+        }
+    } else if (land) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(0.85f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SText(tx("RAK GAME", "GAME SHELF"), 11.sp, SP.gold, FontWeight.SemiBold, 1.5.sp)
@@ -440,11 +449,13 @@ internal fun GameTab(vm: AppViewModel, land: Boolean) {
 @Composable
 private fun GameTile(vm: AppViewModel, g: GameEntry, sel: Boolean, index: Int, modifier: Modifier) {
     val a = ownAnim(if (sel) 1f else 0f, 220)
-    val sh = RoundedCornerShape(16.dp)
+    val th = UiState.theme
+    val sh: androidx.compose.ui.graphics.Shape = when (th) { 1 -> SlantShape; 3 -> HexShape; else -> RoundedCornerShape(28.dp) }
+    val vp = if (th == 3) 16.dp else 10.dp
     Column(
         modifier.tap { UiState.gameIdx = index }.graphicsLayer { val k = 1f + 0.04f * a; scaleX = k; scaleY = k }
             .clip(sh).background(lerpColor(SP.glass, Color(0xCC2A2214), a))
-            .border(1.dp, lerpColor(SP.line, SP.gold, a), sh).padding(horizontal = 8.dp, vertical = 10.dp),
+            .border(1.dp, lerpColor(SP.line, SP.gold, a), sh).padding(horizontal = 8.dp, vertical = vp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         AppIcon(g.pkg, 50.dp)
@@ -500,37 +511,30 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             HChips(FPS_KEYS.map { if (it == "off") tx("Bebas", "Free") else it }, FPS_KEYS.indexOf(fx["fps"] ?: "off").coerceAtLeast(0), col) {
                 vm.setGameFx(g.pkg, "fps", FPS_KEYS[it]); ver++
             }
-            HSwitch(tx("Mode Puncak otomatis", "Auto Peak mode"), tx("Tenaga penuh tiap game ini dibuka; berhenti saat panas atau baterai < 15%.", "Full power every time this game opens; stops when hot or battery < 15%."), opts["OVD"] == "on", col) {
-                vm.setGameOpt(g.pkg, "OVD", if (it) "on" else "default"); ver++
-            }
-            HSwitch(tx("Mode ringan", "Light mode"), tx("Hanya profil yang jalan; tanpa prioritas, DND, dan refresh rate.", "Profile only; no priority, DND or refresh rate."), opts["LITE"] == "1", col) {
-                vm.setGameOpt(g.pkg, "LITE", if (it) "1" else "default"); ver++
-            }
             var more by remember(g.pkg) { mutableStateOf(false) }
-            HBtn(if (more) tx("Lanjutan ▴", "Advanced ▴") else tx("Lanjutan ▾", "Advanced ▾"), Modifier.fillMaxWidth()) { more = !more }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HBtn(tx("▶  LUNCURKAN", "▶  LAUNCH"), Modifier.weight(1f), col, solid = true) { UiState.startRitual(g.pkg) }
+                HBtn(if (more) tx("Lainnya ▴", "More ▴") else tx("Lainnya ▾", "More ▾")) { more = !more }
+            }
             if (more) {
                 fun tri(k: String) = when (opts[k]) { "on" -> 1; "off" -> 2; else -> 0 }
                 val triLbl = listOf(tx("Ikut umum", "Global"), tx("Nyala", "On"), tx("Mati", "Off"))
-                fun setTri(k: String, i: Int) { vm.setGameOpt(g.pkg, k, when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }); ver++ }
-                SText(tx("Prioritas proses", "Process priority"), 11.sp, SP.dim)
-                HChips(triLbl, tri("PRIO"), col) { setTri("PRIO", it) }
-                SText(tx("Jangan ganggu (DND)", "Do not disturb"), 11.sp, SP.dim)
-                HChips(triLbl, tri("DND"), col) { setTri("DND", it) }
-                SText(tx("Game Mode Android", "Android Game Mode"), 11.sp, SP.dim)
-                val gmKeys = listOf("off", "standard", "performance", "battery")
-                HChips(listOf(tx("Mati", "Off"), tx("Standar", "Standard"), "Performa", "Hemat"), gmKeys.indexOf(fx["gamemode"] ?: "off").coerceAtLeast(0), col) {
-                    vm.setGameFx(g.pkg, "gamemode", gmKeys[it]); ver++
+                SText(tx("Fokus game (prioritas + jangan ganggu)", "Game focus (priority + do not disturb)"), 11.sp, SP.dim)
+                HChips(triLbl, tri("PRIO"), col) { i ->
+                    val v = when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }
+                    vm.setGameOpt(g.pkg, "PRIO", v); vm.setGameOpt(g.pkg, "DND", v); ver++
                 }
                 HSwitch(tx("Muat game ke cache dulu", "Preload game cache"), tx("Loading awal lebih cepat, butuh RAM bebas.", "Faster first load, needs free RAM."), fx["preload"] == "on", col) {
                     vm.setGameFx(g.pkg, "preload", if (it) "on" else "off"); ver++
                 }
+                HSwitch(tx("Mode ringan", "Light mode"), tx("Hanya ganti profil, tanpa prioritas, DND, dan refresh rate.", "Profile only, no priority, DND or refresh rate."), opts["LITE"] == "1", col) {
+                    vm.setGameOpt(g.pkg, "LITE", if (it) "1" else "default"); ver++
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HBtn(tx("Perbaiki FPS", "Fix FPS"), Modifier.weight(1f)) { vm.fpsDiagFor(g.pkg) }
+                    HBtn(tx("Hapus game", "Remove game"), Modifier.weight(1f), color = SP.red) { vm.removeGame(g.pkg) }
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HBtn(tx("▶  LUNCURKAN", "▶  LAUNCH"), Modifier.weight(1f), col, solid = true) { UiState.startRitual(g.pkg) }
-                HBtn(tx("Semua opsi", "All options")) { vm.editPkg = g.pkg; vm.go("edit") }
-                HBtn(tx("Hapus", "Remove"), color = SP.red) { vm.removeGame(g.pkg) }
-            }
-            HBtn(tx("Perbaiki FPS game ini", "Fix FPS for this game"), Modifier.fillMaxWidth()) { vm.fpsDiagFor(g.pkg) }
             if (vm.diagText.isNotEmpty() && vm.diagPkg == g.pkg) {
                 Text(vm.diagText, color = SP.dim, fontSize = 11.sp, lineHeight = 15.sp)
                 SText(tx("Kalau FPS masih kosong: buka game dulu 10 detik lalu tekan tombol ini lagi.", "If FPS is still empty: open the game for 10 seconds, then press this again."), 10.sp, SP.faint)
@@ -856,18 +860,31 @@ internal fun RitualOverlay(vm: AppViewModel) {
                 drawCircle(col.copy(alpha = 0.55f * sin(y * 3.1416f)), (1.5f + i % 3) * density, Offset(x * size.width, y * size.height))
             }
         }
+        val progAll = ownAnim(((step.coerceIn(0, 6)) / 6f), 400)
+        val th = UiState.theme
         val content: @Composable (Modifier, Modifier) -> Unit = { m1, m2 ->
             Column(m1, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.size(if (wide) 110.dp else 96.dp).graphicsLayer { val k = 1f + 0.03f * sin(clock.floatValue * 3f); scaleX = k; scaleY = k }
                     .drawBehind { drawCircle(Brush.radialGradient(listOf(col.copy(alpha = 0.5f), Color.Transparent), center, size.minDimension), size.minDimension) },
-                    contentAlignment = Alignment.Center) { AppIcon(pkg, 72.dp) }
+                    contentAlignment = Alignment.Center) {
+                    AppIcon(pkg, 72.dp)
+                    when (th) {
+                        1 -> Box(Modifier.matchParentSize().border(2.dp, col, CutShape))
+                        3 -> Box(Modifier.matchParentSize().border(2.dp, col, HexShape))
+                        else -> Canvas(Modifier.matchParentSize()) {
+                            val w = 3.dp.toPx()
+                            drawArc(Color(0x33FFFFFF), 0f, 360f, false, Offset(w, w), androidx.compose.ui.geometry.Size(size.width - 2 * w, size.height - 2 * w), style = Stroke(w))
+                            drawArc(col, -90f, 360f * progAll, false, Offset(w, w), androidx.compose.ui.geometry.Size(size.width - 2 * w, size.height - 2 * w), style = Stroke(w, cap = StrokeCap.Round))
+                        }
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 SText(vm.label(pkg), 18.sp, SP.text, FontWeight.Bold)
                 SText(tx("Mode ", "Mode ") + (if (en) mode.nameEn else mode.nameId), 12.sp, col, FontWeight.SemiBold)
             }
             Column(m2, verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 SText(if (done) tx("Selamat bermain", "Have fun") else tx("Menyiapkan HP kamu...", "Getting your phone ready..."), 17.sp, SP.text, FontWeight.Bold)
-                val prog = ownAnim(((step.coerceIn(0, 6)) / 6f), 400)
+                val prog = progAll
                 Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0x22FFFFFF))) { Box(Modifier.fillMaxWidth(prog).fillMaxHeight().background(col)) }
                 Spacer(Modifier.height(2.dp))
                 for (i in 0 until 6) {
