@@ -9,7 +9,7 @@
 # GAGAL kalau nilainya beda. versionCode APK hasil build juga dipatch
 # dari version.txt yang sama.
 HSIN_COMPANION_PKG="com.hsin"
-HSIN_COMPANION_VER=83
+HSIN_COMPANION_VER=84
 
 # $1 = path APK, $2 = flag file (berisi versionCode yang terakhir dipasang
 # oleh helper ini). Return 0 = APK sudah current (atau baru dipasang).
