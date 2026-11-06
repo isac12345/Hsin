@@ -534,7 +534,7 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                 Box(Modifier.weight(1f)) { Field(fpsTxt, { fpsTxt = it.filter { c -> c.isDigit() }.take(3) }, tx("Angka bebas 10-$maxHz", "Any number 10-$maxHz"), numeric = true) }
                 HBtn(tx("Terapkan", "Apply"), Modifier.width(110.dp)) {
                     val n = fpsTxt.toIntOrNull()
-                    if (n == null || n < 10 || n > maxHz) vm.msg = fpsErr
+                    if (n == null || n < 10 || n > maxHz) vm.toast(fpsErr)
                     else vm.setGameFps(g.pkg, n.toString()) { ver++ }
                 }
             }

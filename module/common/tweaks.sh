@@ -222,8 +222,18 @@ tw_list() {
     sed -n 's/^\(HAS_[A-Z_]*\)=\(.*\)/\1=\2/p' "$TW_CAPS" 2>/dev/null
 }
 
+# Simpan nilai asli sekali (sebelum override pertama) supaya "otomatis" mengembalikan nilai user.
+tw_keep_orig() { # $1=nama $2=nilai sekarang
+    [ -f "$TW_STATE/.tw_orig_$1" ] || printf '%s\n' "$2" > "$TW_STATE/.tw_orig_$1" 2>/dev/null
+}
+tw_orig_of() { sed -n '1p' "$TW_STATE/.tw_orig_$1" 2>/dev/null | tr -d '\r\n'; }
+
 tw_set_global() { # $1=KEY $2=VALUE
     _k="$1"; _v="$2"
+    case "$_k" in
+        display_night) _o=$(settings get secure night_display_activated 2>/dev/null | tr -d '\r\n'); case "$_o" in 0|1) tw_keep_orig night "$_o" ;; esac ;;
+        display_font_scale) _o=$(settings get system font_scale 2>/dev/null | tr -d '\r\n'); case "$_o" in ''|null) _o=1.0 ;; esac; tw_keep_orig font "$_o" ;;
+    esac
     case "$_v" in *[!A-Za-z0-9._,:-]*) echo "ERROR: nilai tidak valid"; return 1 ;; esac
     case "$_k" in
         display_refresh)
@@ -287,8 +297,8 @@ tw_set_global() { # $1=KEY $2=VALUE
 # Nilai bawaan untuk tweak yang tidak dipegang profil: dikembalikan langsung saat override dihapus.
 tw_default_of() {
     case "$1" in
-        NIGHT) tw_night_set 0 ;;
-        FONT_SCALE) tw_font_set 1.0 ;;
+        NIGHT) _o=$(tw_orig_of night); tw_night_set "${_o:-0}"; rm -f "$TW_STATE/.tw_orig_night" ;;
+        FONT_SCALE) _o=$(tw_orig_of font); tw_font_set "${_o:-1.0}"; rm -f "$TW_STATE/.tw_orig_font" ;;
         DENSITY) wm density reset >/dev/null 2>&1 ;;
         LED) tw_led_set off ;;
         BYPASS) tw_bypass_set 0 ;;
@@ -356,11 +366,11 @@ tw_game_fps() {
             echo "OK: $_pkg fps=off"; return 0 ;;
     esac
     tw_num "$_fps" && [ "$_fps" -ge 10 ] && [ "$_fps" -le 240 ] || { echo "ERROR: fps 10-240 atau off"; return 1; }
-    gh_opt_set "$_pkg" fps "$_fps" >/dev/null 2>&1
-    # refresh layar tidak bisa di atas REFRESH_MAX; di bawah 30 Hz tidak didukung, jadi ikut sistem.
-    _hz="$_fps"
+    # FPS tidak pernah di atas refresh maksimal layar; di bawah 30 Hz refresh tidak dipaksa, ikut sistem.
     _max=$(sed -n 's/^REFRESH_MAX=//p' "$TW_CAPS" 2>/dev/null | tail -n 1)
-    tw_num "$_max" && [ "$_hz" -gt "$_max" ] && _hz="$_max"
+    tw_num "$_max" && [ "$_fps" -gt "$_max" ] && _fps="$_max"
+    gh_opt_set "$_pkg" fps "$_fps" >/dev/null 2>&1
+    _hz="$_fps"
     if [ "$_hz" -ge 30 ]; then
         gh_opt_set "$_pkg" HZ "$_hz" >/dev/null 2>&1
     else

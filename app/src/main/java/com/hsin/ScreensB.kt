@@ -91,7 +91,7 @@ private fun FloatingSettings(vm: AppViewModel) {
                 2 -> p.flMRam = true
                 else -> p.flMTemp = true
             }
-            vm.msg = "Minimal FPS atau satu metrik harus aktif"
+            vm.toast("Minimal FPS atau satu metrik harus aktif")
         }
         vm.flChanged()
     }
@@ -475,7 +475,7 @@ fun SessionsScreen(vm: AppViewModel) {
         Pill("SALIN RINGKASAN", {
             val t = list.joinToString("\n") { s -> "${vm.label(s.pkg)} | ${if (s.ovdPct >= 50) "Puncak" else profileLabel(s.profile)} | ${s.avg} FPS | 1% low ${s.low1} | jank ${s.jank}/${s.bigJank} | stabil ${s.stab}% | ${s.secs}s" + if (s.watt10 > 0) " | ${s.watt10 / 10.0} W" else "" }
             (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("HSIN", t))
-            vm.msg = "Ringkasan disalin"
+            vm.toast("Ringkasan disalin")
         })
     }
 }

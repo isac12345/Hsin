@@ -95,15 +95,22 @@ case "$1" in
                 # uji aman: bila sedang mengisi, saklar harus benar-benar menghentikan pengisian; kalau tidak, batalkan
                 _st=$(rd "$PS/battery/status")
                 if [ "$_st" = "Charging" ]; then
-                    chg_off; sleep 4
-                    _st2=$(rd "$PS/battery/status")
+                    # status baterai di ROM ini bisa lambat berubah: cek status DAN arus, sampai 8 dtk
+                    chg_off; _ok=0; _i=0
+                    while [ "$_i" -lt 8 ]; do
+                        sleep 1; _i=$((_i + 1))
+                        [ "$(rd "$PS/battery/status")" != "Charging" ] && { _ok=1; break; }
+                        _cur=$(rd "$PS/battery/current_now"); _cur=${_cur#-}
+                        case "$_cur" in ''|*[!0-9]*) ;; *) [ "$_cur" -lt 50000 ] && { _ok=1; break; } ;; esac
+                    done
                     chg_on
-                    [ "$_st2" = "Charging" ] && { echo "ERROR: saklar stop_chg tidak menghentikan pengisian di HP ini"; exit 3; }
+                    # tidak terbukti: tetap simpan, penjaga HSIN yang menegakkan batas; beri tahu user
+                    [ "$_ok" = 1 ] || _warn=" (saklar belum terkonfirmasi saat mengisi)"
                 fi
             fi
             printf '%s\n' "$2" > "$LIMIT_FILE"
             ( sh "$0" loop >/dev/null 2>&1 & )
-            echo "OK: batas $2% (penjaga HSIN$([ "$CH_KIND" = stop ] && printf ', eksperimen'))"
+            echo "OK: batas $2% (penjaga HSIN$([ "$CH_KIND" = stop ] && printf ', eksperimen'))${_warn}"
         fi
         ;;
     off)
