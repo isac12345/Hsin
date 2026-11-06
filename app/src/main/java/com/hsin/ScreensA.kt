@@ -53,86 +53,6 @@ fun renderName(k: String): String = when (k) {
     else -> k
 }
 
-// ---------------------------------------------------------------- DASH
-@Composable
-fun DashScreen(vm: AppViewModel) {
-    val st = vm.status
-    if (vm.loaded && (!vm.rootOk || vm.modPath.isEmpty())) {
-        HsinCard {
-            Label("Perlu perhatian")
-            txt(
-                if (!vm.rootOk) "Akses root belum diberikan. Buka manager root (KernelSU/Magisk) dan izinkan HSIN."
-                else "Modul HSIN tidak ditemukan. Flash modulnya dulu, lalu cari ulang.",
-                12.sp, Amber,
-            )
-            Pill("CARI ULANG", { vm.findModule() })
-        }
-    }
-    if (vm.loaded && vm.rootOk && vm.modPath.isNotEmpty()) {
-        val modVer = st.ver
-        if (!vm.statusOk) {
-            HsinCard {
-                Label("Versi")
-                txt("Modul belum kompatibel dengan app ini (hsinctl tidak ada). Flash HSIN v${vm.appVer}.", 12.sp, Amber)
-            }
-        } else if (modVer > 0 && modVer != vm.appVer) {
-            HsinCard {
-                Label("Versi")
-                txt("Modul v$modVer, app v${vm.appVer}. Pasang keduanya dari build yang sama.", 12.sp, Amber)
-            }
-        }
-    }
-    HsinCard { ToggleRow("Tampilkan bubble", null, vm.bubbleOn) { vm.updateBubbleOn(it) } }
-
-    HsinCard {
-        Label("Current profile")
-        txt(profileLabel(st.profile), 28.sp, weight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
-        Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(st.profile), { vm.setProfile(PROFILE_KEYS[it]) })
-        if (st.gamePkg.isNotEmpty()) {
-            txt("Dikunci game: ${vm.label(st.gamePkg)}", 12.sp, Amber, modifier = Modifier.padding(top = 6.dp))
-        }
-    }
-
-    val nRules = (if (vm.confStr("AUTO_BATT_ON", "0") == "1") 1 else 0) + (if (vm.confStr("AUTO_CHG_ON", "0") == "1") 1 else 0)
-    HsinCard(onClick = { vm.go("auto") }) {
-        Label("Auto-profile")
-        KV(if (nRules == 0) "Belum ada aturan aktif" else "$nRules aturan aktif", "›")
-    }
-    HsinCard(onClick = { vm.go("therm") }) {
-        Label("Proteksi thermal")
-        KV("Batas ${st.thermalWarmC}°C · " + if (vm.flag("THERMAL_GUARD_OFF")) "mati" else "aktif", "›")
-    }
-
-    HsinCard {
-        Label("Status game")
-        KV("Suhu baterai", "%.1f°C".format(st.tempC))
-        Divider()
-        KV("Mode fas-rs", st.fasrsMode.ifEmpty { "—" })
-        Divider()
-        KV("Sesi", if (st.gamePkg.isEmpty()) "—" else "${vm.label(st.gamePkg)} · ${fmtClock(st.gameSecs)}")
-    }
-
-    HsinCard {
-        Label("Render")
-        var open by remember { mutableStateOf(false) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                Box(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.6f))
-                        .clickable { open = true }.padding(horizontal = 14.dp, vertical = 14.dp),
-                ) { txt(renderName(vm.renderChoice) + "  ▾", 13.sp) }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    vm.render.available.forEach { k ->
-                        DropdownMenuItem(text = { Text(renderName(k), fontFamily = Mono) }, onClick = { vm.renderChoice = k; open = false })
-                    }
-                }
-            }
-            Box(Modifier.width(10.dp))
-            Box(Modifier.width(120.dp)) { Pill("APPLY", { vm.applyRender() }, solid = true, modifier = Modifier.padding(top = 0.dp)) }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- AUTO-PROFILE
 @Composable
 fun AutoScreen(vm: AppViewModel) {
@@ -153,10 +73,6 @@ fun AutoScreen(vm: AppViewModel) {
         Label("Lagi charging")
         ToggleRow("Aktif", null, chgOn) { chgOn = it }
         Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(chgProf), { chgProf = PROFILE_KEYS[it] })
-    }
-    HsinCard(onClick = { vm.go("games") }) {
-        Label("Game dibuka")
-        KV("Otomatis lewat profil per game", "›")
     }
     // profil otomatis per jenis app (dijalankan modul tiap ±10 dtk, tidak mengganggu game)
     val catOn = vm.confStr("CAT_ON", "0") == "1"
@@ -217,45 +133,6 @@ fun ThermScreen(vm: AppViewModel) {
         KV("Kritis", "95°C")
         Divider()
         KV("Boost balik", "< ${w - 5}°C")
-    }
-}
-
-// ---------------------------------------------------------------- GAMES
-@Composable
-fun GamesScreen(vm: AppViewModel) {
-    HsinCard {
-        var q by remember { mutableStateOf("") }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { Label("Game · ${vm.games.size}") }
-            Box(
-                Modifier.size(44.dp).clip(CircleShape).background(LocalUi.current.accent).clickable { vm.go("addgame") },
-                contentAlignment = Alignment.Center,
-            ) { txt("+", 22.sp, Ink, FontWeight.Medium) }
-        }
-        Pill("AUTO-DETECT GAME", { vm.go("detect") }, highlight = true)
-        Field(q, { q = it }, "Cari game...")
-        val list = vm.games.filter { q.isBlank() || vm.label(it.pkg).contains(q, true) || it.pkg.contains(q, true) }
-        if (list.isEmpty()) {
-            txt(if (vm.games.isEmpty()) "Belum ada game. Tekan + atau Auto-detect." else "Tidak ada yang cocok.", 12.sp, muted(), modifier = Modifier.padding(top = 10.dp))
-        }
-        list.forEach { g ->
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(g.pkg)
-                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    txt(vm.label(g.pkg), 14.sp, weight = FontWeight.Medium, maxLines = 1)
-                    Box(Modifier.padding(top = 4.dp)) {
-                        SmallPill(profileLabel(g.profile) + " · FAS-RS" + if (g.fps.isNotEmpty()) " · ${g.fps} FPS" else "")
-                    }
-                }
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    SmallPill("LUNCUR", { vm.launchGame(g.pkg) }, highlight = true)
-                    SmallPill("EDIT", { vm.editPkg = g.pkg; vm.go("edit") })
-                    SmallPill("HAPUS", {
-                        vm.dialog = Dlg.Confirm("Hapus game", "Hapus ${vm.label(g.pkg)} dari daftar? Game kembali ditangani seperti app biasa.", "HAPUS") { vm.removeGame(g.pkg) }
-                    })
-                }
-            }
-        }
     }
 }
 
@@ -349,107 +226,6 @@ fun DetectScreen(vm: AppViewModel) {
     }
 }
 
-// ---------------------------------------------------------------- EDIT GAME
-@Composable
-fun EditScreen(vm: AppViewModel) {
-    BackBtn { vm.back() }
-    val pkg = vm.editPkg
-    val g = vm.games.firstOrNull { it.pkg == pkg }
-    var prof by remember(pkg) { mutableStateOf(PROFILE_KEYS.indexOf(g?.profile ?: "balanced").coerceAtLeast(0)) }
-    var fps by remember(pkg) { mutableStateOf(g?.fps ?: "") }
-    HsinCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppIcon(pkg)
-            Column(Modifier.padding(start = 10.dp)) {
-                txt(vm.label(pkg), 14.sp, weight = FontWeight.Medium, maxLines = 1)
-                txt(pkg, 11.sp, muted(), maxLines = 1)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Label("Profil")
-        Seg(PROFILE_LABELS, prof, { prof = it })
-        Label("FPS target (opsional, mis. 30,60,90)")
-        Field(fps, { fps = it.filter { c -> c.isDigit() || c == ',' } }, "30,60", numeric = false)
-        Pill("SIMPAN", { vm.addGame(pkg, fps, PROFILE_KEYS[prof]) { vm.back() } }, solid = true)
-    }
-
-    // Opsi khusus game: GLOBAL = ikut pengaturan umum, ON/OFF = timpa untuk game ini saja.
-    var opts by remember(pkg) { mutableStateOf<Map<String, String>>(emptyMap()) }
-    LaunchedEffect(pkg) { opts = Hsin.gameOpts(pkg) }
-    fun triIdx(k: String) = when (opts[k]) { "on" -> 1; "off" -> 2; else -> 0 }
-    fun setTri(k: String, i: Int) {
-        val v = when (i) { 1 -> "on"; 2 -> "off"; else -> "default" }
-        opts = if (v == "default") opts - k else opts + (k to v)
-        vm.setGameOpt(pkg, k, v)
-    }
-    val lite = opts["LITE"] == "1"
-    HsinCard {
-        Label("Pengaturan game ini")
-        ToggleRow("Mode ringan", "matikan prioritas, DND, dan refresh rate untuk game ini; hanya profil yang jalan", lite) {
-            opts = if (it) opts + ("LITE" to "1") else opts - "LITE"
-            vm.setGameOpt(pkg, "LITE", if (it) "1" else "default")
-        }
-        if (!lite) {
-            ToggleRow("Mode Puncak otomatis", "mesin sendiri tanpa Uperf/fas-rs tiap game ini dibuka; berhenti saat panas, baterai <15%, layar mati, atau game ditutup", opts["OVD"] == "on") {
-                opts = if (it) opts + ("OVD" to "on") else opts - "OVD"
-                vm.setGameOpt(pkg, "OVD", if (it) "on" else "default")
-            }
-            Label("Prioritas proses")
-            Seg(listOf("GLOBAL", "ON", "OFF"), triIdx("PRIO"), { setTri("PRIO", it) })
-            Label("DND otomatis")
-            Seg(listOf("GLOBAL", "ON", "OFF"), triIdx("DND"), { setTri("DND", it) })
-            if (vm.refreshRates.isNotEmpty()) {
-                Label("Refresh rate")
-                val hzKeys = listOf("default", "off") + vm.refreshRates.map { it.toString() }
-                val cur = opts["HZ"] ?: "default"
-                Seg(
-                    hzKeys.map { when (it) { "default" -> "GLOBAL"; "off" -> "SISTEM"; else -> "$it Hz" } },
-                    hzKeys.indexOf(cur).coerceAtLeast(0),
-                    { i ->
-                        val v = hzKeys[i]
-                        opts = if (v == "default") opts - "HZ" else opts + ("HZ" to v)
-                        vm.setGameOpt(pkg, "HZ", v)
-                    },
-                )
-            }
-            txt("GLOBAL = ikut pengaturan umum di tab Pengaturan; SISTEM = layar tidak dipaksa untuk game ini. Berlaku saat game berikutnya dibuka.", 11.sp, muted())
-        }
-    }
-
-    // Game Mode API (Android 12+): mode, downscale, target FPS, preload. "off" = tidak diatur.
-    LaunchedEffect(pkg) { vm.loadGameFx(pkg) }
-    val fx = vm.gameFx
-    fun fxIdx(k: String, keys: List<String>) = keys.indexOf(fx[k] ?: "off").coerceAtLeast(0)
-    HsinCard {
-        Label("Game Mode Android")
-        val gmKeys = listOf("off", "standard", "performance", "battery")
-        Label("Mode")
-        Seg(listOf("OFF", "STANDAR", "PERFORMA", "HEMAT"), fxIdx("gamemode", gmKeys), { vm.setGameFx(pkg, "gamemode", gmKeys[it]) })
-        val fKeys = listOf("off", "30", "45", "60", "90", "120")
-        Label("Target FPS")
-        Seg(listOf("OFF", "30", "45", "60", "90", "120"), fxIdx("fps", fKeys), { vm.setGameFx(pkg, "fps", fKeys[it]) })
-        ToggleRow("Preload cache", "baca file game ke cache lebih dulu supaya loading awal lebih cepat (butuh RAM bebas)", fx["preload"] == "on") {
-            vm.setGameFx(pkg, "preload", if (it) "on" else "off")
-        }
-        txt("Dipasang saat game dibuka lewat tombol Luncurkan, dan dibuang saat game selesai. Resolusi game diatur di tab Game. Butuh Android 12 ke atas; tidak semua ROM menurut.", 11.sp, muted())
-    }
-
-    val rKeys = listOf("default") + vm.render.available.filter { it != "default" }
-    var rend by remember(pkg) { mutableStateOf("default") }
-    LaunchedEffect(pkg) { rend = Hsin.gameRender(pkg) }
-    HsinCard {
-        Label("Render khusus game")
-        Seg(
-            rKeys.map { if (it == "default") "GLOBAL" else it.uppercase() },
-            rKeys.indexOf(rend).coerceAtLeast(0),
-            { i -> rend = rKeys[i]; vm.setGameRender(pkg, rKeys[i]) },
-        )
-        txt("Berlaku hanya jika game dibuka lewat tombol di bawah. Game yang sedang jalan tidak berubah; tutup dulu.", 11.sp, muted())
-        Spacer(Modifier.height(6.dp))
-        Pill("LUNCURKAN", { vm.launchGame(pkg) })
-    }
-}
-
 // ---------------------------------------------------------------- TAMBAH GAME
 @Composable
 fun AddGameScreen(vm: AppViewModel) {
@@ -464,6 +240,7 @@ fun AddGameScreen(vm: AppViewModel) {
             Box(Modifier.weight(1f)) { txt("GAMES", 16.sp, weight = FontWeight.Medium, spacing = 3.sp) }
             SmallPill("CLOSE", { vm.back() })
         }
+        Pill("DETEKSI GAME OTOMATIS  ›", { vm.go("detect") })
         Field(q, { q = it }, "Cari aplikasi...")
         Box(Modifier.fillMaxWidth().height(300.dp)) {
             if (vm.apps.isEmpty()) txt("Membaca daftar app...", 12.sp, muted(), modifier = Modifier.padding(top = 12.dp))

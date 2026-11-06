@@ -645,21 +645,11 @@ private fun SettingsTab(vm: AppViewModel) {
         SwitchRow(tx("Floating orb", "Floating orb"), tx("Cincin FPS melayang di game: ketuk untuk menu ganti mode, rekam, dan detail.", "FPS ring floating in games: tap for the menu to switch mode, record and see details."), vm.bubbleOn, 60) { vm.updateBubbleOn(it) }
         SwitchRow(tx("Tampilkan FPS di floating", "Show FPS in floating"), tx("Angka FPS, CPU, GPU, dan suhu.", "FPS, CPU, GPU and temperature readout."), vm.hudOn, 90) { vm.updateHudOn(it) }
         SwitchRow(tx("Jangan ganggu saat game", "Do not disturb in games"), tx("Notifikasi dibisukan selama game, balik normal setelah ditutup.", "Mutes notifications during games and restores them afterwards."), vm.flag("GAME_DND_ON"), 120) { vm.setFlag("GAME_DND_ON", it) }
-        if (vm.refreshRates.isNotEmpty()) {
-            Glass(Modifier.fillMaxWidth().rise(150)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SText(tx("Refresh rate saat game", "Refresh rate in games"), 14.sp, SP.text, FontWeight.Medium)
-                    val opts = listOf("off") + vm.refreshRates.map { it.toString() }
-                    Seg(opts.map { if (it == "off") tx("Sistem", "System") else "$it Hz" }, opts.indexOf(vm.refreshHz).coerceAtLeast(0)) { vm.updateRefreshHz(opts[it]) }
-                }
-            }
-        }
         Row(Modifier.fillMaxWidth().rise(180), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HBtn(tx("Tampilan orb", "Orb look"), Modifier.weight(1f)) { vm.go("bubble") }
-            HBtn(tx("Tema dan warna", "Theme and color"), Modifier.weight(1f)) { vm.go("theme") }
+            HBtn(tx("Latar dan banner", "Background and banner"), Modifier.weight(1f)) { vm.go("bgbanner") }
         }
         Row(Modifier.fillMaxWidth().rise(210), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HBtn(tx("Latar dan banner", "Background and banner"), Modifier.weight(1f)) { vm.go("bgbanner") }
             HBtn(tx("Statistik sesi", "Session stats"), Modifier.weight(1f)) { vm.go("stats") }
         }
         Glass(Modifier.fillMaxWidth().rise(240)) {

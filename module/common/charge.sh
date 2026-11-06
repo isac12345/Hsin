@@ -27,7 +27,7 @@ detect() {
         [ -w "$n" ] && { CH_KIND=susp; CH_NODE="$n"; return 0; }
     done
     # Eksperimen (Transsion/itel): saklar "stop_chg". Nilai normal = nilai awal yang terbaca saat pertama dipakai (tanpa asumsi arah).
-    for n in /sys/devices/platform/*/stop_chg /sys/class/*/stop_chg /sys/kernel/*/stop_chg /sys/devices/platform/*/*/stop_chg; do
+    for n in /sys/devices/platform/*/stop_chg /sys/class/*/stop_chg /sys/class/*/*/stop_chg /sys/kernel/*/stop_chg /sys/devices/platform/*/*/stop_chg; do
         [ -w "$n" ] && { CH_KIND=stop; CH_NODE="$n"; return 0; }
     done
     return 1

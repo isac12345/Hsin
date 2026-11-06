@@ -208,6 +208,39 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         else if (!prefs.bubbleOn) BubbleService.stop(app)
     }
 
+    // ---------- tweak global (Layar / Performa / Alat) ----------
+    var tw by mutableStateOf<Map<String, String>>(emptyMap())
+    var twOver by mutableStateOf<Map<String, String>>(emptyMap())
+
+    fun loadTweaks() {
+        viewModelScope.launch { tw = Hsin.tweakList(); twOver = Hsin.tweakOver() }
+    }
+
+    /** v = null: kembali otomatis (ikut mode). */
+    fun setTweak(key: String, v: String?) {
+        viewModelScope.launch {
+            val r = if (v == null) Hsin.tweakUnset(key) else Hsin.tweakSet(key, v)
+            if (r.code != 0 || r.out.contains("ERROR")) toast((r.out.lines().firstOrNull { it.startsWith("ERROR") } ?: "Gagal").removePrefix("ERROR:").trim())
+            tw = Hsin.tweakList(); twOver = Hsin.tweakOver()
+        }
+    }
+
+    fun resetTweaks() {
+        viewModelScope.launch {
+            Hsin.tweakReset()
+            tw = Hsin.tweakList(); twOver = Hsin.tweakOver()
+            toast("Tweak kembali otomatis")
+        }
+    }
+
+    fun setGameFps(pkg: String, v: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            val r = Hsin.setGameFps(pkg, v)
+            if (r.code != 0 || r.out.contains("ERROR")) toast((r.out.lines().firstOrNull { it.startsWith("ERROR") } ?: "Gagal").removePrefix("ERROR:").trim())
+            onDone()
+        }
+    }
+
     fun updateRefreshHz(v: String) {
         viewModelScope.launch {
             val r = Hsin.setRefresh(v)

@@ -111,6 +111,14 @@ else
     exit 1
 fi
 
+# Tweaks global (display/perf/tools) + scan kemampuan device sekali.
+if [ -f "$MODDIR/common/tweaks.sh" ]; then
+    HSIN_STATE_DIR="$WORK_DIR"
+    . "$MODDIR/common/tweaks.sh"
+    tw_caps_ensure
+    echo "[BOOT] tahap tweaks.sh selesai" >> "$LOG_FILE"
+fi
+
 # 3.1 Load GameBoost Engine (sumber gameboost.sh)
 if [ -f "$MODDIR/common/gameboost.sh" ]; then
     . "$MODDIR/common/gameboost.sh"
@@ -173,6 +181,8 @@ tune_network
 tune_gpu
 tune_sched
 tune_input
+
+command -v tw_apply_profile >/dev/null 2>&1 && tw_apply_profile "$ACTIVE_PROFILE"
 
 # M2: CPU Ownership — deteksi fas-rs vs HSIN fallback
 # Bila fas-rs hidup → powercfg.sh; bila mati → tune_cpu_freq fallback

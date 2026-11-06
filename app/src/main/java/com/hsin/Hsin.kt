@@ -236,6 +236,36 @@ object Hsin {
         return ctl("refresh set $v")
     }
 
+    // ---- tweak global (display / performa / alat), bukan per game ----
+    private val TW_KEYS = setOf("display_refresh", "display_night", "display_font_scale", "perf_turbo", "perf_mali",
+        "perf_trip", "perf_cpuidle", "tools_dac", "tools_bypass", "tools_led")
+    private val TW_VAL = Regex("^[A-Za-z0-9._:-]+$")
+
+    /** Nilai sekarang + HAS_* (kemampuan HP). */
+    suspend fun tweakList(): Map<String, String> = kv(ctl("tweak list", 25_000L).out)
+
+    /** Override yang dipilih user (kunci tanpa override = otomatis ikut mode). */
+    suspend fun tweakOver(): Map<String, String> = kv(ctl("tweak over").out)
+
+    suspend fun tweakSet(key: String, v: String): Root.Res {
+        if (key !in TW_KEYS || !TW_VAL.matches(v)) return Root.Res(1, "ERROR: nilai tidak valid")
+        return ctl("tweak set $key $v", 25_000L)
+    }
+
+    suspend fun tweakReset(): Root.Res = ctl("tweak reset", 25_000L)
+
+    suspend fun tweakUnset(key: String): Root.Res {
+        if (key !in TW_KEYS) return Root.Res(1, "ERROR: opsi tidak dikenal")
+        return ctl("tweak unset $key", 25_000L)
+    }
+
+    /** Satu nilai FPS untuk game: batas FPS + refresh layar (10..240 atau off). */
+    suspend fun setGameFps(pkg: String, v: String): Root.Res {
+        if (!PKG_RE.matches(pkg)) return Root.Res(1, "ERROR: package tidak valid")
+        if (v != "off" && v.toIntOrNull() !in 10..240) return Root.Res(1, "ERROR: fps 10-240 atau off")
+        return ctl("gamefps set $pkg $v")
+    }
+
     suspend fun recStart(): Root.Res = ctl("rec start", 15_000L)
     suspend fun recStop(): Root.Res = ctl("rec stop", 30_000L)
 
