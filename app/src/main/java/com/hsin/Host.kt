@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -245,7 +246,17 @@ fun HsinApp(vm: AppViewModel) {
     ThemeHolder.accent.value = accent
     val ui = UiCfg(accent, vm.cardAlpha, vm.contrast / 100f, vm.saver)
     val clock = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
+        (ctx as? android.app.Activity)?.let { PerfGuard.attach(it) }
+        PerfGuard.onDemote = {
+            UiState.demote(vm.prefs)
+            vm.toast(if (UiState.en) "Animation turned off to keep the app smooth. Turn it on again in Settings." else "Animasi dimatikan otomatis agar app tetap lancar. Bisa dinyalakan lagi di Pengaturan.")
+        }
+        onDispose { PerfGuard.onDemote = null; PerfGuard.detach() }
+    }
+    // Jam animasi hanya berjalan saat animasi menyala: mati = tidak ada frame berkala sama sekali
+    LaunchedEffect(UiState.animLevel) {
+        if (UiState.animLevel == 0) return@LaunchedEffect
         val t0 = withFrameNanos { it }
         var last = 0L
         while (true) {
@@ -277,7 +288,6 @@ fun HsinApp(vm: AppViewModel) {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 if (vm.route == "dash") {
                     SpaceRoot(vm)
-                    if (UiState.animLevel == 2) FancyFx(vm)
                 } else {
                     Backdrop(vm)
                     Column(Modifier.fillMaxSize().systemBarsPadding()) {
