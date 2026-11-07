@@ -1,6 +1,16 @@
 package com.hsin
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -360,6 +370,56 @@ private fun ThemeDeco(theme: Int, col: Color) {
                     val x = w * (0.1f + 0.2f * i); val yy = h - ((t * 40f + i * 90f) % h)
                     drawLine(col.copy(alpha = 0.22f), Offset(x, yy), Offset(x, yy - 38.dp.toPx()), 2.dp.toPx())
                 }
+            }
+        }
+    }
+}
+
+
+/** Bukaan lingkaran dari tengah (tema Nitro). p = 0..1. */
+class IrisShape(private val p: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val r = Math.hypot(size.width.toDouble(), size.height.toDouble()).toFloat() / 2f * (0.08f + 0.92f * p)
+        val c = Offset(size.width / 2f, size.height / 2f)
+        return Outline.Generic(Path().apply { addOval(Rect(c.x - r, c.y - r, c.x + r, c.y + r)) })
+    }
+}
+
+/** Efek singkat saat mode berganti, beda per tema. Digambar di draw phase, nol biaya saat tidak jalan. */
+@Composable
+internal fun ModeFx(vm: AppViewModel) {
+    val cm = curMode(vm)
+    val col = if (cm.isEmpty()) SP.gold else info(cm).color
+    val tick = remember { mutableIntStateOf(0) }
+    val first = remember { booleanArrayOf(true) }
+    LaunchedEffect(cm) { if (first[0]) first[0] = false else tick.intValue++ }
+    val key = tick.intValue
+    if (key == 0 || UiState.reduceAnim) return
+    val p = popKeyS(key, 640)
+    val th = UiState.theme
+    Canvas(Modifier.fillMaxSize()) {
+        val t = p.floatValue
+        if (t >= 1f) return@Canvas
+        val fade = 1f - t
+        val big = maxOf(size.width, size.height)
+        when (th) {
+            2 -> drawCircle(col.copy(alpha = fade * 0.8f), radius = t * big * 0.6f, center = center, style = Stroke(6f))
+            3 -> {
+                val r = t * big * 0.6f
+                val hex = Path()
+                for (i in 0 until 6) {
+                    val a = Math.toRadians(60.0 * i - 90.0)
+                    val x = center.x + r * Math.cos(a).toFloat(); val y = center.y + r * Math.sin(a).toFloat()
+                    if (i == 0) hex.moveTo(x, y) else hex.lineTo(x, y)
+                }
+                hex.close()
+                drawPath(hex, col.copy(alpha = fade * 0.7f), style = Stroke(6f))
+            }
+            else -> {
+                val w = size.width * 0.3f; val skew = size.height * 0.2f
+                val x = -w + (size.width + 2f * w) * t
+                val band = Path().apply { moveTo(x, 0f); lineTo(x + w, 0f); lineTo(x + w - skew, size.height); lineTo(x - skew, size.height); close() }
+                drawPath(band, Brush.horizontalGradient(listOf(Color.Transparent, col.copy(alpha = 0.38f), Color.Transparent), startX = x - skew, endX = x + w))
             }
         }
     }

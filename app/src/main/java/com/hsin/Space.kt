@@ -112,8 +112,9 @@ fun tx(id: String, en: String): String = if (LocalEn.current) en else id
 
 val LocalClock = staticCompositionLocalOf<FloatState> { mutableFloatStateOf(0f) }
 
+/** Versi hemat: mengembalikan state yang dibaca di graphicsLayer/draw, jadi tidak memicu recomposition tiap frame. */
 @Composable
-fun ownAnim(target: Float, msIn: Int = 300): Float {
+fun ownAnimS(target: Float, msIn: Int = 300): androidx.compose.runtime.FloatState {
     val ms = if (UiState.reduceAnim) 1 else msIn
     val s = remember { mutableFloatStateOf(target) }
     LaunchedEffect(target) {
@@ -129,12 +130,15 @@ fun ownAnim(target: Float, msIn: Int = 300): Float {
             }
         }
     }
-    return s.floatValue
+    return s
 }
 
-/** Mulai dari 0 lalu naik ke 1 tiap `key` berubah (dipakai untuk judul mode, nama game, dll). */
 @Composable
-fun popKey(key: Any, msIn: Int = 340): Float {
+fun ownAnim(target: Float, msIn: Int = 300): Float = ownAnimS(target, msIn).floatValue
+
+/** Mulai dari 0 lalu naik ke 1 tiap `key` berubah. Mengembalikan state untuk dibaca di draw phase. */
+@Composable
+fun popKeyS(key: Any, msIn: Int = 340): androidx.compose.runtime.FloatState {
     val ms = if (UiState.reduceAnim) 1 else msIn
     val s = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(key) {
@@ -147,8 +151,11 @@ fun popKey(key: Any, msIn: Int = 340): Float {
             if (k >= 1f) break
         }
     }
-    return s.floatValue
+    return s
 }
+
+@Composable
+fun popKey(key: Any, msIn: Int = 340): Float = popKeyS(key, msIn).floatValue
 
 private suspend fun withFrameNanosCompat(): Long = androidx.compose.runtime.withFrameNanos { it }
 
@@ -176,10 +183,10 @@ fun Modifier.rise(delayMs: Int = 0, key: Any = Unit): Modifier {
 @Composable
 fun Modifier.tap(onClick: () -> Unit): Modifier {
     var down by remember { mutableStateOf(false) }
-    val s = ownAnim(if (down) 0.95f else 1f, 110)
+    val s = ownAnimS(if (down) 0.95f else 1f, 110)
     val cb by rememberUpdatedState(onClick)
     return this
-        .graphicsLayer { scaleX = s; scaleY = s }
+        .graphicsLayer { val v = s.floatValue; scaleX = v; scaleY = v }
         .pointerInput(Unit) {
             detectTapGestures(
                 onPress = { down = true; tryAwaitRelease(); down = false },
@@ -226,8 +233,26 @@ object UiState {
     fun setReduce(p: Prefs, on: Boolean) { reduceAnim = on; p.reduceAnim = on; themeTick++ }
     /** Tema app aktif: 1 Apex, 2 Turbo, 3 Nitro. */
     var theme by mutableStateOf(1)
+    /** Hasil akhir: 1 animasi menyala, 0 mati (semua animasi instan, jam animasi berhenti). */
     var animLevel by mutableStateOf(1)
-    fun setAnim(p: Prefs, lvl: Int) { animLevel = lvl; p.animLevel = lvl; reduceAnim = lvl == 0; themeTick++ }
+    var animMode by mutableStateOf(0)
+    fun applyAnim(p: Prefs) {
+        animMode = p.animMode
+        val on = when (animMode) { 1 -> true; 2 -> false; else -> !p.animAutoOff }
+        animLevel = if (on) 1 else 0
+        reduceAnim = !on
+        p.reduceAnim = !on            // dibaca juga oleh floating
+        PerfGuard.reset()
+        PerfGuard.armed = animMode == 0 && on
+        themeTick++
+    }
+    fun setAnimMode(p: Prefs, m: Int) {
+        p.animMode = m
+        if (m == 0) p.animAutoOff = false   // memilih Otomatis lagi = ukur ulang
+        applyAnim(p)
+    }
+    /** Dipanggil PerfGuard saat frame terbukti tidak lancar. */
+    fun demote(p: Prefs) { p.animAutoOff = true; applyAnim(p) }
     var view: android.view.View? = null
     fun setHaptics(p: Prefs, on: Boolean) { haptics = on; p.haptics = on }
     /** Getar halus (bisa dimatikan di Pengaturan). */
@@ -250,8 +275,7 @@ object UiState {
         if (inited) return
         sndPrefs = p
         haptics = p.haptics
-        reduceAnim = p.reduceAnim
-        animLevel = p.animLevel
+        applyAnim(p)
         theme = p.appTheme
         bgDim = p.bgDim
         inited = true
@@ -357,14 +381,29 @@ fun SpaceRoot(vm: AppViewModel) {
                 NavBar()
             }
         }
+        ModeFx(vm)
         Splash(splashDone)
     }
 }
 
 @Composable
 private fun SpaceContent(vm: AppViewModel, land: Boolean, modifier: Modifier) {
-    val tk = popKey(UiState.tab, 320)
-    Box(modifier.graphicsLayer { alpha = 0.15f + 0.85f * tk; translationX = (1f - tk) * 28.dp.toPx() }) {
+    val tk = popKeyS(UiState.tab, if (UiState.theme == 3) 460 else 380)
+    val hold = remember { intArrayOf(UiState.tab, 1) }
+    if (UiState.tab != hold[0]) { hold[1] = if (UiState.tab > hold[0]) 1 else -1; hold[0] = UiState.tab }
+    val dir = hold[1]
+    val th = UiState.theme
+    Box(modifier.graphicsLayer {
+        val t = tk.floatValue
+        when (th) {
+            // Turbo: masuk dari atas/bawah
+            2 -> { alpha = t; translationY = -dir * (1f - t) * 40.dp.toPx(); val sc = 1.05f - 0.05f * t; scaleX = sc; scaleY = sc }
+            // Nitro: iris dari tengah
+            3 -> { alpha = 0.2f + 0.8f * t; val sc = 0.96f + 0.04f * t; scaleX = sc; scaleY = sc; if (t < 1f) { clip = true; shape = IrisShape(t) } }
+            // Apex: geser menyamping
+            else -> { alpha = 0.15f + 0.85f * t; translationX = dir * (1f - t) * 60.dp.toPx() }
+        }
+    }) {
         if (vm.loaded && !vm.rootOk) {
             NoticeCard(tx("Akses root belum diberikan", "Root access not granted"), tx("Buka manager root (KernelSU/Magisk/APatch) dan izinkan HSIN, lalu coba lagi.", "Open your root manager and allow HSIN, then retry."), vm)
         } else if (vm.loaded && vm.modPath.isEmpty()) {
@@ -633,8 +672,9 @@ private fun SettingsTab(vm: AppViewModel) {
         Glass(Modifier.fillMaxWidth().rise(55)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SText(tx("Gaya animasi", "Animation style"), 13.sp, SP.text, FontWeight.Medium)
-                Seg(listOf(tx("Minimal", "Minimal"), "Normal", tx("Mewah", "Fancy")), UiState.animLevel) { UiState.setAnim(vm.prefs, it); SoundFx.play(vm.prefs, "tab") }
-                SText(tx("Minimal: tanpa animasi, paling hemat. Normal: animasi ringan. Mewah: ditambah garis pindai dan cahaya warna mode.", "Minimal: no animation, lightest. Normal: light animation. Fancy: adds a scan line and mode-colour glow."), 11.sp, SP.faint)
+                Seg(listOf(tx("Otomatis", "Auto"), tx("Hidup", "On"), tx("Mati", "Off")), UiState.animMode) { UiState.setAnimMode(vm.prefs, it); SoundFx.play(vm.prefs, "tab") }
+                val st = if (UiState.animLevel == 1) tx("menyala", "on") else tx("mati", "off")
+                SText(tx("Otomatis: animasi menyala dan dimatikan sendiri kalau frame HP ini terukur tidak lancar. Pilih Otomatis lagi untuk mengukur ulang. Sekarang: $st.", "Auto: animation is on and turns itself off if this phone's frames measure as not smooth. Pick Auto again to re-measure. Now: $st."), 11.sp, SP.faint)
             }
         }
         SwitchRow(tx("Suara app", "App sounds"), tx("Suara saat klik, ganti mode, dan mulai game. Dibuat langsung oleh app. Bawaan mati.", "Sounds for clicks, mode changes and starting a game. Generated by the app. Off by default."), vm.prefs.soundOn, 56) { vm.prefs.soundOn = it; if (it) SoundFx.play(vm.prefs, "ignition") }

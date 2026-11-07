@@ -1097,7 +1097,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                     if (t >= 1f) sv.visibility = View.GONE else { sv.pos = t; sv.invalidate() }
                 }
             }
-            r.postOnAnimation(this)
+            // animasi mati: tidak minta frame tiap vsync kalau tidak ada yang bergerak
+            val moving = enterT0 != 0L || snapping || mode == MODE_MENU || scanView?.visibility == View.VISIBLE || kotlin.math.abs(dimA - wantDim) > 0.01f
+            if (prefs.reduceAnim && !moving) r.postDelayed(this, 200L) else r.postOnAnimation(this)
         }
     }
 
@@ -1125,7 +1127,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         applyMode()
         if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
         if (n == MODE_PANEL) anchorPanel()
-        if ((n == MODE_PANEL || n == MODE_THIN) && prefs.flStyle >= 3) { scanT0 = SystemClock.uptimeMillis(); scanView?.visibility = View.VISIBLE }
+        if ((n == MODE_PANEL || n == MODE_THIN) && prefs.flStyle >= 3 && !prefs.reduceAnim) { scanT0 = SystemClock.uptimeMillis(); scanView?.visibility = View.VISIBLE }
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
         root?.post { clamp() }

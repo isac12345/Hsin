@@ -141,10 +141,14 @@ class Prefs(ctx: Context) {
     var reduceAnim: Boolean
         get() = sp.getBoolean("reduce_anim", false)
         set(v) { sp.edit().putBoolean("reduce_anim", v).apply() }
-    /** Level animasi: 0 minimal, 1 normal, 2 mewah (efek gaming). */
-    var animLevel: Int
-        get() = sp.getInt("anim_level", if (sp.getBoolean("reduce_anim", false)) 0 else 1).coerceIn(0, 2)
-        set(v) { sp.edit().putInt("anim_level", v.coerceIn(0, 2)).putBoolean("reduce_anim", v == 0).apply() }
+    /** Mode animasi: 0 otomatis (ukur kelancaran), 1 selalu hidup, 2 mati. */
+    var animMode: Int
+        get() = if (sp.contains("anim_mode")) sp.getInt("anim_mode", 0).coerceIn(0, 2) else if (sp.getInt("anim_level", 1) == 0 || sp.getBoolean("reduce_anim", false)) 2 else 0
+        set(v) { sp.edit().putInt("anim_mode", v.coerceIn(0, 2)).apply() }
+    /** Hasil ukur: true kalau frame HP ini terbukti tidak lancar saat animasi menyala (hanya dipakai di mode otomatis). */
+    var animAutoOff: Boolean
+        get() = sp.getBoolean("anim_auto_off", false)
+        set(v) { sp.edit().putBoolean("anim_auto_off", v).apply() }
     /** Gelap latar custom: 0 ringan, 1 sedang, 2 pekat. */
     var bgDim: Int
         get() = sp.getInt("bg_dim", 1).coerceIn(0, 2)
