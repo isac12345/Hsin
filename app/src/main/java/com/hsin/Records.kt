@@ -90,6 +90,10 @@ private fun ScreenRecPane(vm: AppViewModel) {
     val touch = vm.conf["REC_TOUCH"] == "1"
     val cdOn = vm.prefs.recCountdown
     val withFps = vm.prefs.recWithFps
+    val playMissing = tx("File video tidak ditemukan", "Video file not found")
+    val playFail = tx("Tidak ada pemutar video yang bisa membukanya", "No video player could open it")
+    val delOk = tx("Video dihapus", "Video deleted")
+    val delFail = tx("Gagal menghapus video", "Could not delete the video")
     fun safe(f: String) = f.startsWith("/sdcard/Movies/HSIN/") && !f.contains("..") && f.none { it == '"' || it == '\'' || it == '$' || it == '`' || it == ';' }
     LaunchedEffect(vm.recOn) {
         if (vm.recOn) { t0 = android.os.SystemClock.elapsedRealtime(); while (true) { now = android.os.SystemClock.elapsedRealtime(); delay(500) } }
@@ -97,7 +101,7 @@ private fun ScreenRecPane(vm: AppViewModel) {
     LaunchedEffect(vm.recOn, vm.modPath, reload) {
         if (vm.modPath.isEmpty()) return@LaunchedEffect
         if (!vm.recOn) delay(1500)
-        val r = Root.exec("for f in \$(sh '${vm.modPath}/common/screenrec.sh' list 12); do echo \"\$f|\$(stat -c %s \"\$f\" 2>/dev/null)\"; done", 12_000L)
+        val r = Root.exec("D=/sdcard/Movies/HSIN; for f in \$(sh '${vm.modPath}/common/screenrec.sh' list 12); do case \"\$f\" in */*) ;; *) f=\"\$D/\$f\" ;; esac; echo \"\$f|\$(stat -c %s \"\$f\" 2>/dev/null)\"; done", 12_000L)
         files = r.out.lines().mapNotNull { l ->
             val p = l.trim().split('|')
             if (p.isNotEmpty() && p[0].endsWith(".mp4")) VidFile(p[0], (p.getOrNull(1)?.toLongOrNull() ?: 0L) / 1048576f) else null
@@ -180,9 +184,19 @@ private fun ScreenRecPane(vm: AppViewModel) {
                             SText(pretty, 13.sp, SP.text, FontWeight.Medium)
                             SText(String.format(Locale.US, "%.1f MB", f.sizeMb), 10.sp, SP.faint)
                         }
-                        Box(Modifier.tap { if (safe(f.path)) scope.launch { Root.exec("am start -a android.intent.action.VIEW -d 'file://${f.path}' -t video/mp4 >/dev/null 2>&1", 8_000L) } }.clip(CircleShape).border(1.dp, SP.gold, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) { SText(tx("Putar", "Play"), 11.sp, SP.gold) }
+                        Box(Modifier.tap { if (safe(f.path)) scope.launch {
+                            val cmd = "p='${f.path}'; [ -f \"\$p\" ] || exit 4; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d \"file://\$p\" >/dev/null 2>&1; sleep 1; " +
+                                "id=\$(content query --uri content://media/external/video/media --projection _id --where \"_data='\$p'\" 2>/dev/null | sed -n 's/.*_id=\\([0-9]*\\).*/\\1/p' | head -n 1); " +
+                                "if [ -n \"\$id\" ]; then am start -a android.intent.action.VIEW -d content://media/external/video/media/\$id -t video/mp4 --grant-read-uri-permission >/dev/null 2>&1; " +
+                                "else am start -a android.intent.action.VIEW -d \"file://\$p\" -t video/mp4 --grant-read-uri-permission >/dev/null 2>&1; fi"
+                            val r = Root.exec(cmd, 15_000L)
+                            if (r.code == 4) { vm.toast(playMissing); reload++ } else if (r.code != 0) vm.toast(playFail)
+                        } }.clip(CircleShape).border(1.dp, SP.gold, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) { SText(tx("Putar", "Play"), 11.sp, SP.gold) }
                         Spacer(Modifier.width(6.dp))
-                        Box(Modifier.tap { if (safe(f.path)) scope.launch { Root.exec("rm -f '${f.path}' && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d 'file://${f.path}' >/dev/null 2>&1", 8_000L); reload++ } }.clip(CircleShape).border(1.dp, SP.red, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) { SText(tx("Hapus", "Delete"), 11.sp, SP.red) }
+                        Box(Modifier.tap { if (safe(f.path)) scope.launch {
+                            val r = Root.exec("rm -f '${f.path}'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d 'file://${f.path}' >/dev/null 2>&1; [ ! -e '${f.path}' ]", 8_000L)
+                            vm.toast(if (r.code == 0) delOk else delFail); reload++
+                        } }.clip(CircleShape).border(1.dp, SP.red, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) { SText(tx("Hapus", "Delete"), 11.sp, SP.red) }
                     }
                 }
             }
