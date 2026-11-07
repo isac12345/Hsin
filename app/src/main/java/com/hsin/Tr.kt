@@ -158,6 +158,7 @@ private val EN2: Map<String, String> = mapOf(
     "Menjalankan hitungan berat 3 detik pada satu inti, lalu 3 detik pada semua inti. Biarkan HP tidak dipakai selama uji. Uji semua mode berjalan sendiri sekitar 1 menit (ada jeda dingin) lalu mengembalikan mode awalmu." to "Runs a heavy calculation for 3 seconds on one core, then 3 seconds on all cores. Leave the phone alone during the test. Test all modes runs by itself for about 1 minute (with cooling pauses) and then restores your original mode.",
     "STANDAR" to "STANDARD", "KACA" to "GLASS", "KAPSUL" to "CAPSULE",
     "UJI SEMUA MODE (otomatis)" to "TEST ALL MODES (automatic)", "Menguji..." to "Testing...", "Uji semua mode selesai" to "Test all modes finished",
+    "Jeda dingin " to "Cooldown ", "Mode " to "Mode ", "dtk" to "s", "Tweak kembali otomatis" to "Tweak will revert automatically", "Ringkasan disalin" to "Summary copied",
     "Mode Puncak aktif" to "Peak mode on", "Mode gagal diterapkan" to "Mode could not be applied", "game booster" to "game booster",
 )
 
@@ -169,6 +170,28 @@ fun trn(s: String): String {
     val frag = listOf(" disimpan" to " saved", " dihapus" to " removed", " game ditambahkan" to " games added", " game baru ditambahkan" to " new games added",
         " app ditutup" to " apps closed", "Batas suhu " to "Temperature limit ", "Dexopt selesai: " to "Dexopt finished: ", " berhasil, " to " ok, ", " gagal" to " failed")
     for ((a, b) in frag) r = r.replace(a, b)
+    for ((a, b) in MODFRAG) r = r.replace(a, b)
     return r
 }
 
+
+/** Potongan pesan dari modul (hsinctl) yang sering muncul. */
+private val MODFRAG = listOf(
+    " tidak didukung perangkat ini" to " is not supported on this device",
+    "HP ini tidak punya node kontrol pengisian" to "This phone has no charge control node",
+    "buka game terdaftar dulu" to "open a registered game first",
+    "belum jalan, buka gamenya dulu" to "is not running, open the game first",
+    "game sedang jalan, tutup dulu lalu luncurkan lagi dari sini" to "the game is running, close it and launch again from here",
+    "game sedang aktif, coba setelah selesai" to "a game is active, try again after it ends",
+    "app sistem/penting tidak boleh dibekukan" to "system/essential apps cannot be frozen",
+    "app tidak terpasang" to "app is not installed",
+    "layar ini tidak mendukung " to "this screen does not support ",
+    "kernel menolak" to "the kernel refused",
+    "gagal menyimpan" to "could not save", "gagal menulis" to "could not write", "gagal simpan" to "could not save", "gagal tulis" to "could not write",
+    "gagal membekukan" to "could not freeze", "gagal memulai rekaman" to "could not start recording", "gagal menyalin" to "could not copy",
+    "baterai " to "battery ", " terlalu rendah" to " is too low",
+    "angka derajat" to "a number in degrees", "angka 50-100" to "a number from 50 to 100",
+    "nilai tidak valid" to "invalid value", "nama tidak valid" to "invalid name", "package tidak valid" to "invalid package",
+    "tidak ditemukan" to "not found", "tidak ada" to "not available", "tidak dikenal" to "unknown",
+    "Overdrive hanya untuk game" to "Peak is for games only",
+)
