@@ -733,10 +733,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         )
         p.gravity = Gravity.TOP or Gravity.START
+        fullDisplay(p)
         p.x = savedX()
         p.y = savedY()
         if (prefs.flStyle == 2 && Build.VERSION.SDK_INT >= 31) {
@@ -802,10 +804,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         )
         p.gravity = Gravity.TOP or Gravity.START
+        fullDisplay(p)
         // Android 12+: overlay seluas layar dengan alpha jendela > 0,8 dianggap "menutupi" app di belakangnya,
         // dan app sensitif (Play Store: profil/pembayaran) lalu mengabaikan semua sentuhan = tampak beku.
         // Jendela probe isinya kosong, jadi alpha rendah tidak mengubah tampilan tapi membuat sentuhan lolos.
@@ -853,6 +857,15 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         } else {
             prefs.flXp = p.x + off
             prefs.flYp = p.y + off
+        }
+    }
+
+    /** Jendela memakai seluruh layar fisik (termasuk area poni/lubang kamera), supaya koordinat overlay dan probe sama. */
+    private fun fullDisplay(p: WindowManager.LayoutParams) {
+        if (Build.VERSION.SDK_INT >= 28) {
+            p.layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30)
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
     }
 
@@ -1744,10 +1757,21 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 val w = r.width; val h = r.height
                 if (w <= 0 || h <= 0) return
                 val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
-                p.x = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
-                p.y = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
-                p.x = p.x.coerceIn(0, max(0, sw - w)); p.y = p.y.coerceIn(0, max(0, sh - h))
+                var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
+                var ty = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
+                tx = tx.coerceIn(0, max(0, sw - w)); ty = ty.coerceIn(0, max(0, sh - h))
+                p.x = tx; p.y = ty
                 try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
+                // koreksi: kalau jendela ternyata tergeser (poni, bar sistem), selisih posisi nyata dan yang diminta ditutup
+                r.postDelayed({
+                    if (mode != MODE_PANEL || !attached) return@postDelayed
+                    val loc = IntArray(2); r.getLocationOnScreen(loc)
+                    val dx = loc[0] - tx; val dy = loc[1] - ty
+                    if (dx != 0 || dy != 0) {
+                        p.x = (p.x - dx).coerceIn(-sw, sw); p.y = (p.y - dy).coerceIn(-sh, sh)
+                        try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
+                    }
+                }, 150L)
             }
         })
         r.requestLayout()
