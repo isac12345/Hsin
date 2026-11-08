@@ -813,8 +813,15 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             try { wm.removeView(probe) } catch (_: Exception) { }
             probeOn = false
             screenW = 0; screenH = 0
-            if (attached) { lp?.let { q -> q.x = savedX(); q.y = savedY() }; clamp() }
+            if (attached) repos()
         }
+    }
+
+    /** Kembalikan posisi sesuai bentuk: panel gaming dipasang ulang ke titik tengah/tepinya, bentuk lain ke posisi tersimpan. */
+    private fun repos() {
+        if (mode == MODE_PANEL && prefs.flStyle >= 3) { anchorPanel(); return }
+        lp?.let { q -> q.x = savedX(); q.y = savedY() }
+        clamp()
     }
 
     private fun ensureProbe() {
@@ -849,11 +856,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 if (attached && landscape() != builtLand) {
                     rebuild()
                 } else if (attached) {
-                    lp?.let { q ->
-                        q.x = savedX()
-                        q.y = savedY()
-                    }
-                    clamp()
+                    repos()
                 }
             }
         }
@@ -901,6 +904,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private fun clamp() {
+        if (mode == MODE_PANEL && prefs.flStyle >= 3) return   // posisi panel diatur anchorPanel()
         val r = root ?: return
         val p = lp ?: return
         if (!attached) return
