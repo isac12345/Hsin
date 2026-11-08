@@ -1810,19 +1810,24 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         // pasang SATU pendengar tetap: tiap ukuran panel berubah (isi kartu, tombol rekam) posisi dihitung ulang
         anchorL?.let { try { r.viewTreeObserver.removeOnGlobalLayoutListener(it) } catch (_: Exception) { } }
-        var lw = -1; var lh = -1
+        var lw = -1; var lh = -1; var lx = -1; var ly = -1
         val l = object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 val p = lp ?: return
                 if (mode != MODE_PANEL || !attached) return
-                val w = r.width; val h = r.height
-                if (w <= 0 || h <= 0 || (w == lw && h == lh)) return
-                lw = w; lh = h
+                // yang diratakan adalah panel yang kelihatan, bukan jendela: jendela bisa lebih lebar dari panel
+                val pv = panel ?: r
+                var ox = 0; var oy = 0
+                var v: View? = pv
+                while (v != null && v !== r) { ox += v.left; oy += v.top; v = v.parent as? View }
+                val w = pv.width; val h = pv.height
+                if (w <= 0 || h <= 0 || (w == lw && h == lh && ox == lx && oy == ly)) return
+                lw = w; lh = h; lx = ox; ly = oy
                 val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
                 var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
                 val si = safeTopBottom()
                 var ty = when (pos) { 2 -> sh - h - si[1]; 3, 4 -> (sh - h) / 2; else -> si[0] }
-                tx = tx.coerceIn(0, max(0, sw - w)); ty = ty.coerceIn(0, max(0, sh - h))
+                tx = tx.coerceIn(0, max(0, sw - w)) - ox; ty = ty.coerceIn(0, max(0, sh - h)) - oy
                 if (p.x != tx || p.y != ty) { p.x = tx; p.y = ty; try { wm.updateViewLayout(r, p) } catch (_: Exception) { } }
                 if (enterPending) { enterPending = false; enterT0 = SystemClock.uptimeMillis() }
             }
