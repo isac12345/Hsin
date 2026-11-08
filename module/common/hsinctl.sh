@@ -158,6 +158,7 @@ cmd_memclean() {
 }
 
 cmd_status() {
+    command -v tw_idle_reassert >/dev/null 2>&1 && tw_idle_reassert
     _cur=$(rd "$STATE_DIR/current_state"); [ -n "$_cur" ] || _cur=none
     _act=$(rd "$STATE_DIR/active_profile"); [ -n "$_act" ] || _act=none
     printf 'profile=%s\nactive=%s\n' "$_cur" "$_act"

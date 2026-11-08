@@ -139,6 +139,13 @@ tw_idle_set() { # $1=0/1
     done
 }
 
+# Layanan performa vendor (turbopower, tran_perf, sched) bisa mengembalikan deep idle saat game/layar berganti:
+# tulis ulang pilihan user kalau nilainya berubah. Murah: dua pembacaan file.
+tw_idle_reassert() {
+    _ci=$(tw_conf_get CPUIDLE); [ -n "$_ci" ] || return 0
+    [ "$(tw_rd /sys/devices/system/cpu/cpu6/cpuidle/state1/disable)" = "$_ci" ] || tw_idle_set "$_ci"
+}
+
 tw_bypass_set() { settings put global game_bypass_charging "$1" >/dev/null 2>&1; }
 tw_night_set() { settings put secure night_display_activated "$1" >/dev/null 2>&1; }
 tw_turbo_set() { tw_wr /sys/kernel/turbo/common/turbo_enable "$1"; }
