@@ -891,6 +891,17 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             else { val m = android.util.DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m); android.graphics.Rect(0, 0, m.widthPixels, m.heightPixels) }
         } catch (_: Exception) { android.graphics.Rect(0, 0, ctx.resources.displayMetrics.widthPixels, ctx.resources.displayMetrics.heightPixels) }
     }
+    /** Tepi atas/bawah yang aman (poni, status bar) hanya untuk potret; lanskap tetap rapat ke tepi. */
+    private fun safeTopBottom(): IntArray {
+        val z = intArrayOf(0, 0)
+        if (realH() <= realW() || Build.VERSION.SDK_INT < 30) return z
+        return try {
+            val wi = wm.currentWindowMetrics.windowInsets
+            val a = wi.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout())
+            val n = wi.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.navigationBars())
+            intArrayOf(a.top, n.bottom)
+        } catch (_: Exception) { z }
+    }
     private fun realW(): Int = realBounds().width()
     private fun realH(): Int = realBounds().height()
 
@@ -1080,12 +1091,18 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private var enterT0 = 0L
     private var enterPending = false
+    private var lastOrient = 0L
     private val frame = object : Runnable {
         override fun run() {
             if (!loopOn) return
             val now = SystemClock.uptimeMillis()
             val r = root
             if (r == null || !attached) { loopOn = false; return }
+            // layar diputar saat floating sudah dibangun: bangun ulang sesuai ukuran/orientasi baru (dihitung dari layar fisik)
+            if (now - lastOrient > 400L) {
+                lastOrient = now
+                if (landscape() != builtLand) { loopOn = false; r.post { rebuild() }; return }
+            }
             // masuk panel/kapsul: membesar halus + memudar masuk (jam sendiri, tidak ikut skala animasi sistem)
             if (enterT0 != 0L) {
                 val v: View? = if (mode == MODE_PANEL) panel else if (mode == MODE_THIN) thin else null
@@ -1803,7 +1820,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 lw = w; lh = h
                 val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
                 var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
-                var ty = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
+                val si = safeTopBottom()
+                var ty = when (pos) { 2 -> sh - h - si[1]; 3, 4 -> (sh - h) / 2; else -> si[0] }
                 tx = tx.coerceIn(0, max(0, sw - w)); ty = ty.coerceIn(0, max(0, sh - h))
                 if (p.x != tx || p.y != ty) { p.x = tx; p.y = ty; try { wm.updateViewLayout(r, p) } catch (_: Exception) { } }
                 if (enterPending) { enterPending = false; enterT0 = SystemClock.uptimeMillis() }
