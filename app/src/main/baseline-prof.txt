@@ -1,0 +1,3 @@
+HSPLcom/hsin/**;->**(**)**
+HSPLcom/hsin/**;-><init>(**)V
+Lcom/hsin/**;

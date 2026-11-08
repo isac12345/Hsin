@@ -324,6 +324,7 @@ fun AppViewModel.chooseMode(key: String) {
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
     if (!prefs.soundOn) UiState.buzz() else { if (UiState.haptics) UiState.buzz2(); SoundFx.play(prefs, if (key == "puncak") "overdrive" else prof) }
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
+    pendMode(prof, key == "puncak")
     viewModelScope.launch {
         if (key != "puncak") Hsin.ovdStop()
         val r = Hsin.setProfile(prof)
@@ -333,6 +334,7 @@ fun AppViewModel.chooseMode(key: String) {
         } else {
             toast(if (r.ok) (if (UiState.en) "Mode applied" else "Mode diterapkan") else r.out.take(60))
         }
+        pendClear()
         refreshStatus()
     }
 }

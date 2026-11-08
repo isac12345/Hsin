@@ -344,6 +344,18 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
         loaded = true
         if ((prefs.bubbleOn || prefs.hudOn) && Settings.canDrawOverlays(app)) BubbleService.start(app)
+        if (rootOk) compileSelfOnce()
+    }
+
+    /** Sekali per versi: kompilasi penuh app ini jadi kode native (root), supaya UI tidak patah-patah di HP lemah. Jalan pelan di latar. */
+    private fun compileSelfOnce() {
+        if (prefs.sp.getInt("self_compiled", 0) >= appVer || appVer == 0) return
+        viewModelScope.launch {
+            delay(45_000L)
+            if (status.gamePkg.isNotEmpty()) return@launch   // jangan ganggu game
+            val r = Root.exec("nice -n 19 cmd package compile -f -m speed ${app.packageName}", 240_000L)
+            if (r.out.contains("Success")) prefs.sp.edit().putInt("self_compiled", appVer).apply()
+        }
     }
 
     suspend fun refreshAll() {
@@ -378,9 +390,17 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         loadRecentLog()
     }
 
+    /** Mode yang baru dipilih tampil seketika; polling tidak boleh menimpanya sebelum perintah selesai. */
+    @Volatile private var pendProf: String? = null
+    @Volatile private var pendOvd = false
+    @Volatile private var pendUntil = 0L
+    fun pendMode(prof: String, ovd: Boolean) { pendProf = prof; pendOvd = ovd; pendUntil = android.os.SystemClock.uptimeMillis() + 20_000L }
+    fun pendClear() { pendUntil = 0L }
+
     suspend fun refreshStatus() {
         val s = Hsin.status() ?: return
-        status = s
+        val pp = pendProf
+        status = if (pp != null && pendUntil > android.os.SystemClock.uptimeMillis()) s.copy(profile = pp, active = pp, ovd = pendOvd) else s
         statusOk = true
         if (!s.auto && !autoEnsured) {
             autoEnsured = true
@@ -395,7 +415,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setProfile(p: String) {
         viewModelScope.launch {
             status = status.copy(profile = p, active = p)
+            pendMode(p, status.ovd)
             val r = Hsin.setProfile(p)
+            pendClear()
             val locked = status.gamePkg.isNotEmpty()
             toast(
                 if (!r.ok) "Gagal ganti profil: ${r.out.take(60)}"

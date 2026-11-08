@@ -75,6 +75,8 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
+    // memasang baseline profile bawaan Compose dan app saat dipasang, supaya kode panas sudah terkompilasi
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
