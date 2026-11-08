@@ -860,8 +860,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private fun landscape(): Boolean {
-        val w = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
-        val h = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        val w = realW()
+        val h = realH()
         return w > h
     }
 
@@ -881,6 +881,16 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
+    /** Ukuran layar fisik saat ini (termasuk area poni/lubang kamera), searah rotasi. Jendela overlay memakai koordinat ini. */
+    private fun realBounds(): android.graphics.Rect {
+        return try {
+            if (Build.VERSION.SDK_INT >= 30) wm.maximumWindowMetrics.bounds
+            else { val m = android.util.DisplayMetrics(); @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m); android.graphics.Rect(0, 0, m.widthPixels, m.heightPixels) }
+        } catch (_: Exception) { android.graphics.Rect(0, 0, ctx.resources.displayMetrics.widthPixels, ctx.resources.displayMetrics.heightPixels) }
+    }
+    private fun realW(): Int = realBounds().width()
+    private fun realH(): Int = realBounds().height()
+
     /** Jendela memakai seluruh layar fisik (termasuk area poni/lubang kamera), supaya koordinat overlay dan probe sama. */
     private fun fullDisplay(p: WindowManager.LayoutParams) {
         if (Build.VERSION.SDK_INT >= 28) {
@@ -894,8 +904,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val r = root ?: return
         val p = lp ?: return
         if (!attached) return
-        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
-        val sh = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        val sw = realW()
+        val sh = realH()
         p.x = p.x.coerceIn(0, max(0, sw - r.width))
         p.y = p.y.coerceIn(0, max(0, sh - r.height))
         try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
@@ -1027,7 +1037,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun startSnap() {
         val r = root ?: return
         val p = lp ?: return
-        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val sw = realW()
         val margin = px(4)
         snapFrom = p.x
         snapTo = if (p.x + r.width / 2 < sw / 2) margin else sw - r.width - margin
@@ -1065,6 +1075,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     private var enterT0 = 0L
+    private var enterPending = false
     private val frame = object : Runnable {
         override fun run() {
             if (!loopOn) return
@@ -1159,8 +1170,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         mode = n
         if (n == MODE_MENU || n == MODE_PANEL) SoundFx.play(prefs, "open") else if (old == MODE_MENU || old == MODE_PANEL) SoundFx.play(prefs, "close")
         applyMode()
-        if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
-        if (n == MODE_PANEL) anchorPanel()
+        if (n == MODE_PANEL && prefs.flStyle >= 3) { panel?.alpha = 0f; enterT0 = 0L; enterPending = true; markActive() }
+        else if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
+        if (n == MODE_PANEL) {
+            anchorPanel()
+            // cadangan: kalau pendengar layout tidak sempat menyala, mulai animasi masuk juga
+            root?.postDelayed({ if (enterPending) { enterPending = false; enterT0 = SystemClock.uptimeMillis() } }, 300L)
+        }
         if ((n == MODE_PANEL || n == MODE_THIN) && prefs.flStyle >= 3 && !prefs.reduceAnim) { scanT0 = SystemClock.uptimeMillis(); scanView?.visibility = View.VISIBLE }
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
@@ -1202,13 +1218,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     /** Tombol melingkar di sisi yang lega (kiri/kanan layar). */
     private fun layoutMenu() {
         val m = menu ?: return
-        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val sw = realW()
         val cxScreen = (lp?.x ?: 0) + px(MENU_BOX) / 2
         val right = cxScreen < sw / 2
         val base = if (right) 0.0 else 180.0
         val angs = doubleArrayOf(-62.0, -21.0, 21.0, 62.0)
         val c = px(MENU_BOX) / 2f
-        val shH = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        val shH = realH()
         val cyScreen = (lp?.y ?: 0) + px(MENU_BOX) / 2
         // dekat tepi atas/bawah layar: putar sebaran tombol ke arah yang lega (hindari bar atas game)
         val vShift = when { cyScreen < px(MENU_R + 70) -> 38.0; cyScreen > shH - px(MENU_R + 70) -> -38.0; else -> 0.0 }
@@ -1764,8 +1780,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (st < 3) return
         val r = root ?: return
         if (!attached) return
-        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
-        val sh = if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels
+        val sw = realW()
+        val sh = realH()
         panel?.let { pv ->
             val l = pv.layoutParams
             val want = FrameLayout.LayoutParams.WRAP_CONTENT
@@ -1786,6 +1802,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 var ty = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
                 tx = tx.coerceIn(0, max(0, sw - w)); ty = ty.coerceIn(0, max(0, sh - h))
                 if (p.x != tx || p.y != ty) { p.x = tx; p.y = ty; try { wm.updateViewLayout(r, p) } catch (_: Exception) { } }
+                if (enterPending) { enterPending = false; enterT0 = SystemClock.uptimeMillis() }
             }
         }
         anchorL = l
@@ -1795,7 +1812,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun buildGamePanel(st: Int): View {
         val neon = themeNeon(st)
-        val sw = if (screenW > 0) screenW else ctx.resources.displayMetrics.widthPixels
+        val sw = realW()
         val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         panelBox = box
         box.background = panelBg(BORDER)
@@ -1841,7 +1858,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             for (t in listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
         }
 
-        val port = (if (screenH > 0) screenH else ctx.resources.displayMetrics.heightPixels) > sw
+        val port = (realH()) > sw
         val wf = prefs.flPanelW / 100f
         val all = listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)
         fun tileGrid(cols: Int): LinearLayout {
