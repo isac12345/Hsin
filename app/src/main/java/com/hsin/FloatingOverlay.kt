@@ -343,6 +343,20 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             probeOn = false
         }
         stopStream()
+        if (csvOn) {
+            // rekaman FPS jangan hilang kalau service mati: simpan di thread sendiri (scope akan dibatalkan)
+            val text = csvBuf.toString(); val rows = csvRows
+            csvOn = false; FpsLog.on = false; csvBuf.setLength(0); csvRows = 0
+            if (rows > 0) Thread {
+                try {
+                    val name = "HSIN_fps_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date()) + ".csv"
+                    val tmp = java.io.File(ctx.cacheDir, name); tmp.writeText(text)
+                    Root.execBlocking("mkdir -p /sdcard/Download && cp '${tmp.absolutePath}' /sdcard/Download/$name", 20_000L)
+                    tmp.delete(); FpsLog.saved++
+                } catch (_: Exception) { }
+            }.start()
+        }
+        FpsLog.on = false
         scope.cancel()
     }
 
@@ -439,6 +453,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var maxAcc = 0
 
     private suspend fun loop(pkg: String) {
+        var mine: Process? = null
         try {
             val mod = Root.modPath()
             if (mod.isEmpty()) return
@@ -446,6 +461,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 .redirectErrorStream(true)
                 .start()
             proc = p
+            mine = p
             val br = BufferedReader(InputStreamReader(p.inputStream))
             val block = ArrayList<String>(32)
             while (true) {
@@ -461,8 +477,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         } catch (e: Exception) {
             android.util.Log.e("FloatingOverlay", "stream gagal: ${e.message}")
         } finally {
-            try { proc?.destroyForcibly() } catch (_: Exception) { }
-            proc = null
+            try { mine?.destroyForcibly() } catch (_: Exception) { }
+            if (proc === mine) proc = null
         }
     }
 
@@ -1751,11 +1767,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val vto = r.viewTreeObserver
         vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
-                if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this)
                 val p = lp ?: return
-                if (mode != MODE_PANEL || !attached) return
+                if (mode != MODE_PANEL || !attached) { if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this); return }
                 val w = r.width; val h = r.height
                 if (w <= 0 || h <= 0) return
+                if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this)
                 val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
                 var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
                 var ty = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
@@ -2062,6 +2078,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         odStatusLine?.visibility = if (recOn) View.GONE else View.VISIBLE
         topRow?.visibility = if (recOn) View.VISIBLE else View.GONE
         footRow?.visibility = if (recOn) View.GONE else View.VISIBLE
+        if (mode == MODE_PANEL && attached) anchorPanel()
         hintRec?.visibility = if (recOn) View.VISIBLE else View.GONE
         panelBox?.background = panelBg(if (recOn) 0x8CE5484D.toInt() else if (odOn) OD_GLOW else BORDER)
         if (recOn && recStart == 0L) recStart = SystemClock.elapsedRealtime()

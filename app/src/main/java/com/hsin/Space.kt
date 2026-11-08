@@ -238,6 +238,7 @@ object UiState {
     var animMode by mutableStateOf(0)
     fun applyAnim(p: Prefs) {
         animMode = p.animMode
+        p.animMode = animMode   // simpan eksplisit supaya migrasi lama tidak membaca reduce_anim sebagai Mati
         val on = when (animMode) { 1 -> true; 2 -> false; else -> !p.animAutoOff }
         animLevel = if (on) 1 else 0
         reduceAnim = !on
