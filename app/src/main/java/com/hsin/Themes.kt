@@ -307,11 +307,20 @@ private fun SlantBar(frac: Float, col: Color, right: Boolean) {
     }
 }
 
+private val lastProg = floatArrayOf(1f)
+private fun lerpColorHold(a: Color, b: Color, t: Float) = lerpColor(a, b, t)
+
 @Composable
 internal fun ThemedHome(vm: AppViewModel, land: Boolean) {
     val live = rememberLive(vm, true)
     val cm = curMode(vm)
-    val col = if (cm.isEmpty()) SP.gold else info(cm).color
+    val target = if (cm.isEmpty()) SP.gold else info(cm).color
+    // warna aksen pindah halus ke mode baru (jam sendiri, tidak ikut skala animasi sistem)
+    val hold = remember { arrayOf(target, target) }   // [0] asal, [1] tujuan sebelumnya
+    if (hold[1] != target) { hold[0] = lerpColorHold(hold[0], hold[1], lastProg[0]); hold[1] = target }
+    val prog = popKey(target, 420)
+    lastProg[0] = prog
+    val col = lerpColor(hold[0], target, prog)
     Box(Modifier.fillMaxSize()) {
         ThemeDeco(vm.prefs.appTheme, col)
         when (vm.prefs.appTheme) {

@@ -336,6 +336,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         stopStream()
     }
 
+    /** Sembunyikan floating sebentar saat screenshot. */
+    fun setShotHidden(h: Boolean) {
+        root?.visibility = if (h) View.INVISIBLE else View.VISIBLE
+    }
+
     fun release() {
         removeWindow()
         if (probeOn) {
@@ -1752,6 +1757,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         return seg
     }
 
+    private var anchorL: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
+
     private fun anchorPanel() {
         val st = prefs.flStyle
         if (st < 3) return
@@ -1764,32 +1771,25 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             val want = FrameLayout.LayoutParams.WRAP_CONTENT
             if (l != null && l.height != want) { l.height = want; pv.layoutParams = l }
         }
-        val vto = r.viewTreeObserver
-        vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+        // pasang SATU pendengar tetap: tiap ukuran panel berubah (isi kartu, tombol rekam) posisi dihitung ulang
+        anchorL?.let { try { r.viewTreeObserver.removeOnGlobalLayoutListener(it) } catch (_: Exception) { } }
+        var lw = -1; var lh = -1
+        val l = object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 val p = lp ?: return
-                if (mode != MODE_PANEL || !attached) { if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this); return }
+                if (mode != MODE_PANEL || !attached) return
                 val w = r.width; val h = r.height
-                if (w <= 0 || h <= 0) return
-                if (r.viewTreeObserver.isAlive) r.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                if (w <= 0 || h <= 0 || (w == lw && h == lh)) return
+                lw = w; lh = h
                 val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
                 var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
                 var ty = when (pos) { 2 -> sh - h; 3, 4 -> (sh - h) / 2; else -> 0 }
                 tx = tx.coerceIn(0, max(0, sw - w)); ty = ty.coerceIn(0, max(0, sh - h))
-                p.x = tx; p.y = ty
-                try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
-                // koreksi: kalau jendela ternyata tergeser (poni, bar sistem), selisih posisi nyata dan yang diminta ditutup
-                r.postDelayed({
-                    if (mode != MODE_PANEL || !attached) return@postDelayed
-                    val loc = IntArray(2); r.getLocationOnScreen(loc)
-                    val dx = loc[0] - tx; val dy = loc[1] - ty
-                    if (dx != 0 || dy != 0) {
-                        p.x = (p.x - dx).coerceIn(-sw, sw); p.y = (p.y - dy).coerceIn(-sh, sh)
-                        try { wm.updateViewLayout(r, p) } catch (_: Exception) { }
-                    }
-                }, 150L)
+                if (p.x != tx || p.y != ty) { p.x = tx; p.y = ty; try { wm.updateViewLayout(r, p) } catch (_: Exception) { } }
             }
-        })
+        }
+        anchorL = l
+        r.viewTreeObserver.addOnGlobalLayoutListener(l)
         r.requestLayout()
     }
 

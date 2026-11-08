@@ -16,6 +16,26 @@ public class CaptureActivity extends Activity {
         String m = getIntent().getStringExtra("mode");
         if (m != null) mode = m;
         if (State.mode != State.IDLE) { finish(); return; }
+        // izin mikrofon harus ada sebelum rekam dengan audio, kalau tidak suara dibuang diam-diam
+        boolean needAudio = "rec".equals(mode) && (ZPrefs.b(this, ZPrefs.MIC, false) || ZPrefs.b(this, ZPrefs.INT, false));
+        if (needAudio && android.os.Build.VERSION.SDK_INT >= 23
+                && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 8);
+            return;
+        }
+        askProjection();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int rq, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(rq, perms, res);
+        if (rq != 8) return;
+        if (res.length == 0 || res[0] != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            Toast.makeText(this, "Izin mikrofon ditolak, rekam tanpa suara", Toast.LENGTH_SHORT).show();
+        askProjection();
+    }
+
+    private void askProjection() {
         try {
             MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
             startActivityForResult(mpm.createScreenCaptureIntent(), 7);

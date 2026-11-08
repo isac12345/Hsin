@@ -113,10 +113,13 @@ class BubbleService : Service() {
         f.onRec = { toggleRec() }
         f.onOvd = { on -> toggleOvd(on) }
         f.onShot = {
-            if (prefs.recEngine == 1) com.hsin.zrec.ZRec.shot(this)
-            else scope.launch {
+            // screencap lewat root: tanpa dialog izin, dan floating disembunyikan sebentar supaya tidak ikut terfoto
+            scope.launch {
+                floating?.setShotHidden(true)
+                kotlinx.coroutines.delay(260)
                 val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
                 val r = Root.exec("mkdir -p /sdcard/Pictures/HSIN && screencap -p /sdcard/Pictures/HSIN/HSIN_$ts.png", 10_000L)
+                floating?.setShotHidden(false)
                 Toast.makeText(this@BubbleService, if (r.code == 0) "✓ " + trn("Screenshot tersimpan di Pictures/HSIN") else "ℹ " + trn("Gagal mengambil screenshot"), Toast.LENGTH_SHORT).show()
             }
         }
