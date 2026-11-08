@@ -17,9 +17,9 @@ object PerfGuard {
     @Volatile var armed = false
     var onDemote: (() -> Unit)? = null
     private val ring = LongArray(90)
-    private var n = 0
-    private var t0 = 0L
-    private var strikes = 0
+    @Volatile private var n = 0
+    @Volatile private var t0 = 0L
+    @Volatile private var strikes = 0
     private var listener: Window.OnFrameMetricsAvailableListener? = null
     private var win: Window? = null
     private var thread: HandlerThread? = null
