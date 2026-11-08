@@ -60,6 +60,15 @@ class BubbleService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var floating: FloatingOverlay? = null
     private var profile = "none"
+    // Pilihan terakhir ditahan sampai perintah selesai, supaya polling status tidak menimpanya dengan nilai lama
+    @Volatile private var pendProf: String? = null
+    @Volatile private var pendOvd: Boolean? = null
+    @Volatile private var pendUntil = 0L
+    private fun pendOn() = pendUntil > android.os.SystemClock.uptimeMillis()
+    private fun effProfile(p: String) = if (pendOn()) pendProf ?: p else p
+    private fun effOvd(o: Boolean) = if (pendOn()) pendOvd ?: o else o
+    private fun pend(p: String?, o: Boolean?) { pendProf = p; pendOvd = o; pendUntil = android.os.SystemClock.uptimeMillis() + 20_000L }
+    private fun pendClear() { pendUntil = 0L }
     private var tempC = 0f
     private var batt = -1
     private var gamePkg = ""
@@ -196,11 +205,11 @@ class BubbleService : Service() {
                     if (orbAllowed()) floating?.setGame("auto")
                 }
                 if (s != null) {
-                    profile = s.profile
+                    profile = effProfile(s.profile)
                     tempC = s.tempC
                     batt = s.batt
                     gamePkg = s.gamePkg
-                    ovdOn = s.ovd
+                    ovdOn = effOvd(s.ovd)
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
                     // Lindungi proses ini dari pembunuh memori tiap kali game baru terdeteksi (satu panggilan su, bukan tiap siklus).
@@ -209,7 +218,7 @@ class BubbleService : Service() {
                         protectSelf()
                     }
                     recOn = s.rec || (prefs.recEngine == 1 && com.hsin.zrec.ZRec.mode() >= 2)
-                    floating?.setOvd(s.ovd, s.ovdLevel, s.gamePkg.isNotEmpty())
+                    floating?.setOvd(effOvd(s.ovd), s.ovdLevel, s.gamePkg.isNotEmpty())
                     floating?.setSession(s.gamePkg)
                     floating?.setProfileState(profile, recOn)
                     if (!orbAllowed()) {
@@ -304,11 +313,13 @@ class BubbleService : Service() {
     private fun setProfile(p: String) {
         if (p !in PROFILE_KEYS) return
         profile = p
+        pend(p, null)
         SoundFx.play(prefs, p)
         floating?.setProfileState(p, recOn)
         updateNotification()
         scope.launch {
             val r = Hsin.setProfile(p)
+            pendClear()
             Toast.makeText(
                 this@BubbleService,
                 if (r.ok) "Mode ${profileLabel(p)}" else "Gagal ganti mode",
@@ -328,8 +339,12 @@ class BubbleService : Service() {
     // ---------- rekam ----------
     private fun toggleOvd(on: Boolean) {
         SoundFx.play(prefs, if (on) "boost" else "boostoff")
+        pend(null, on)
+        ovdOn = on
+        floating?.setOvd(on, "", gamePkg.isNotEmpty())
         scope.launch {
             val r = if (on) Hsin.ovdStart() else Hsin.ovdStop()
+            pendClear()
             if (on && !r.ok) {
                 val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                 Toast.makeText(this@BubbleService, msg, Toast.LENGTH_LONG).show()
@@ -351,7 +366,7 @@ class BubbleService : Service() {
             if (!r.ok) Toast.makeText(this@BubbleService, trn("Gagal mengakses rekaman"), Toast.LENGTH_SHORT).show()
             Hsin.status()?.let {
                 recOn = it.rec
-                profile = it.profile
+                profile = effProfile(it.profile)
             }
             floating?.setProfileState(profile, recOn)
             updateNotification()

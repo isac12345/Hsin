@@ -216,7 +216,13 @@ tw_list() {
     printf 'perf_turbo=%s\n' "$(tw_rd /sys/kernel/turbo/common/turbo_enable)"
     printf 'perf_mali=%s:%s:%s\n' "$(tw_rd /sys/module/mali_kbase/parameters/gpu_boost_level2)" "$(tw_rd /sys/module/mali_kbase/parameters/gpu_pollingtime)" "$(tw_rd /sys/module/mali_kbase/parameters/gpu_upthreshold)"
     printf 'perf_trip=%s\n' "$(tw_rd /sys/class/thermal/thermal_zone0/trip_point_0_temp)"
-    printf 'perf_cpuidle=%s\n' "$(tw_rd /sys/devices/system/cpu/cpu6/cpuidle/state1/disable)"
+    # pilihan user dipertahankan: kalau kernel/ROM mengembalikan nilainya, tulis ulang lalu laporkan nilai sebenarnya
+    _ci=$(tw_conf_get CPUIDLE); _cl=$(tw_rd /sys/devices/system/cpu/cpu6/cpuidle/state1/disable)
+    if [ -n "$_ci" ] && [ -n "$_cl" ] && [ "$_ci" != "$_cl" ]; then
+        tw_idle_set "$_ci"; _cl=$(tw_rd /sys/devices/system/cpu/cpu6/cpuidle/state1/disable)
+        tw_log IDLE "dipulihkan ke $_ci, terbaca $_cl"
+    fi
+    printf 'perf_cpuidle=%s\n' "$_cl"
     printf 'tools_dac=%s\n' "$(tinymix -D 0 2>/dev/null | awk '/VBC DAC0 DG Set/{print $NF; exit}')"
     printf 'tools_bypass=%s\n' "$(settings get global game_bypass_charging 2>/dev/null | tr -d '\r\n')"
     sed -n 's/^\(HAS_[A-Z_]*\)=\(.*\)/\1=\2/p' "$TW_CAPS" 2>/dev/null
