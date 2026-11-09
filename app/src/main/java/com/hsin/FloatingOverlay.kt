@@ -1108,14 +1108,19 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 val v: View? = if (mode == MODE_PANEL) panel else if (mode == MODE_THIN) thin else null
                 if (v != null) {
                     val st = prefs.flStyle
-                    val t = if (prefs.reduceAnim) 1f else ((now - enterT0) / (if (st >= 3 && v === panel) 340f else 240f)).coerceIn(0f, 1f)
+                    val t = if (prefs.reduceAnim) 1f else ((now - enterT0) / (if (st >= 3 && v === panel) 180f else 160f)).coerceIn(0f, 1f)
                     val e = easeOut(t)
                     if (st >= 3 && v === panel) {
                         // tema gaming: panel meluncur masuk dari tepinya sendiri
                         v.alpha = 0.25f + 0.75f * e
                         v.scaleX = 1f; v.scaleY = 1f
-                        v.translationY = when (st) { 3 -> -(1f - e) * v.height; 4 -> (1f - e) * v.height; else -> 0f }
-                        v.translationX = if (st == 5) (1f - e) * v.width else 0f
+                        // masuk dari sisi tempat panel menempel (kiri/kanan/atas/bawah), jarak pendek
+                        val loc = IntArray(2); v.getLocationOnScreen(loc)
+                        val cx = (loc[0] + v.width / 2f) / realW().toFloat(); val cy = (loc[1] + v.height / 2f) / realH().toFloat()
+                        var dx = 0f; var dy = 0f
+                        if (cx < 0.3f) dx = -1f else if (cx > 0.7f) dx = 1f else if (cy < 0.5f) dy = -1f else dy = 1f
+                        v.translationX = dx * (1f - e) * v.width * 0.4f
+                        v.translationY = dy * (1f - e) * v.height * 0.4f
                         if (t >= 1f) { v.alpha = 1f; v.translationX = 0f; v.translationY = 0f; enterT0 = 0L }
                     } else {
                     v.alpha = e

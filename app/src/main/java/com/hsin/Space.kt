@@ -183,7 +183,7 @@ fun Modifier.rise(delayMs: Int = 0, key: Any = Unit): Modifier {
 @Composable
 fun Modifier.tap(onClick: () -> Unit): Modifier {
     var down by remember { mutableStateOf(false) }
-    val s = ownAnimS(if (down) 0.95f else 1f, 110)
+    val s = ownAnimS(if (down) 0.95f else 1f, 80)
     val cb by rememberUpdatedState(onClick)
     return this
         .graphicsLayer { val v = s.floatValue; scaleX = v; scaleY = v }
@@ -229,6 +229,8 @@ object UiState {
     var themeTick by mutableStateOf(0)
     var haptics by mutableStateOf(true)
     var reduceAnim = false
+    @Volatile var lastTouch = 0L
+    var touchTick by mutableStateOf(0)
     var bgDim by mutableStateOf(1)
     fun setReduce(p: Prefs, on: Boolean) { reduceAnim = on; p.reduceAnim = on; themeTick++ }
     /** Tema app aktif: 1 Apex, 2 Turbo, 3 Nitro. */
@@ -391,7 +393,7 @@ fun SpaceRoot(vm: AppViewModel) {
 
 @Composable
 private fun SpaceContent(vm: AppViewModel, land: Boolean, modifier: Modifier) {
-    val tk = popKeyS(UiState.tab, if (UiState.theme == 3) 460 else 380)
+    val tk = popKeyS(UiState.tab, if (UiState.theme == 3) 260 else 190)
     val hold = remember { intArrayOf(UiState.tab, 1) }
     if (UiState.tab != hold[0]) { hold[1] = if (UiState.tab > hold[0]) 1 else -1; hold[0] = UiState.tab }
     val dir = hold[1]
@@ -439,7 +441,7 @@ private fun NoticeCard(title: String, body: String, vm: AppViewModel) {
 @Composable
 private fun Splash(done: Boolean) {
     val clock = LocalClock.current
-    val off = ownAnim(if (done) 1f else 0f, 600)
+    val off = ownAnim(if (done) 1f else 0f, 250)
     if (off >= 1f) return
     Box(
         Modifier.fillMaxSize().graphicsLayer { alpha = 1f - off }.background(Color(0xFF0C0C0E)).pointerInput(Unit) { detectTapGestures { } },
