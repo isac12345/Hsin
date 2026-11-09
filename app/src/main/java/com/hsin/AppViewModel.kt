@@ -420,9 +420,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     // ---------- profil ----------
     fun setProfile(p: String) {
         viewModelScope.launch {
+            val old = status
             status = status.copy(profile = p, active = p)
             pendMode(p, status.ovd)
             val r = Hsin.setProfile(p)
+            if (!r.ok) status = status.copy(profile = old.profile, active = old.active)
             pendClear()
             val locked = status.gamePkg.isNotEmpty()
             toast(
@@ -1111,7 +1113,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     // ---------- gambar ----------
     fun setBackground(uri: Uri) {
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { Imaging.import(app, uri, Imaging.bgFile(app), 1600) }
+            val ok = withContext(Dispatchers.IO) { Imaging.import(app, uri, Imaging.bgFile(app), maxOf(app.resources.displayMetrics.widthPixels, app.resources.displayMetrics.heightPixels)) }
             if (ok) { prefs.bgVer = prefs.bgVer + 1; bgVer = prefs.bgVer; reloadImages(false, true); toast("Background diganti") } else toast("Gagal membaca gambar")
         }
     }
@@ -1125,7 +1127,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun setBanner(uri: Uri) {
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { Imaging.import(app, uri, Imaging.bannerFile(app), 1400) }
+            val ok = withContext(Dispatchers.IO) { Imaging.import(app, uri, Imaging.bannerFile(app), maxOf(app.resources.displayMetrics.widthPixels, app.resources.displayMetrics.heightPixels)) }
             if (ok) { prefs.bannerVer = prefs.bannerVer + 1; bannerVer = prefs.bannerVer; reloadImages(true, false); toast("Banner diganti") } else toast("Gagal membaca gambar")
         }
     }

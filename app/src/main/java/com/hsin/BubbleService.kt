@@ -312,6 +312,7 @@ class BubbleService : Service() {
     // ---------- profil ----------
     private fun setProfile(p: String) {
         if (p !in PROFILE_KEYS) return
+        val oldP = profile
         profile = p
         pend(p, null)
         SoundFx.play(prefs, p)
@@ -319,6 +320,7 @@ class BubbleService : Service() {
         updateNotification()
         scope.launch {
             val r = Hsin.setProfile(p)
+            if (!r.ok) { profile = oldP; floating?.setProfileState(oldP, recOn) }
             pendClear()
             Toast.makeText(
                 this@BubbleService,
