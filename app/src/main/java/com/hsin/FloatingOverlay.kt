@@ -1170,7 +1170,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             }
             // animasi mati: tidak minta frame tiap vsync kalau tidak ada yang bergerak
             val moving = enterT0 != 0L || snapping || mode == MODE_MENU || scanView?.visibility == View.VISIBLE || kotlin.math.abs(dimA - wantDim) > 0.01f
-            if (prefs.reduceAnim && !moving) r.postDelayed(this, 200L) else r.postOnAnimation(this)
+            if (!moving) r.postDelayed(this, if (prefs.reduceAnim) 200L else 33L) else r.postOnAnimation(this)
         }
     }
 

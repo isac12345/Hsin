@@ -325,11 +325,13 @@ internal fun profMode(profile: String, ovd: Boolean): String =
 fun AppViewModel.chooseMode(key: String) {
     val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
     if (!prefs.soundOn) UiState.buzz() else { if (UiState.haptics) UiState.buzz2(); SoundFx.play(prefs, if (key == "puncak") "overdrive" else prof) }
+    val old = status
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
     pendMode(prof, key == "puncak")
     viewModelScope.launch {
         if (key != "puncak") Hsin.ovdStop()
         val r = Hsin.setProfile(prof)
+        if (!r.ok) status = status.copy(profile = old.profile, active = old.active, ovd = old.ovd)
         if (key == "puncak") {
             val o = Hsin.ovdStart()
             toast(if (o.ok) (if (UiState.en) "Peak mode on" else "Mode Puncak aktif") else o.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
@@ -700,7 +702,7 @@ private fun SettingsTab(vm: AppViewModel) {
         Glass(Modifier.fillMaxWidth().rise(240)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SText(tx("Pembaruan", "Updates"), 12.sp, SP.dim)
-                SText("HSIN v${vm.appVer}", 14.sp, SP.text, FontWeight.Medium)
+                SText("HSIN v5.0", 14.sp, SP.text, FontWeight.Medium)
                 if (vm.updateText.isNotEmpty()) Text(vm.updateText, color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     HBtn(tx("Cek pembaruan", "Check for updates"), Modifier.weight(1f)) { vm.checkUpdate() }

@@ -22,7 +22,7 @@ object Imaging {
             val opts = BitmapFactory.Options().apply { inSampleSize = sample }
             val bmp = ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
                 ?: return false
-            FileOutputStream(dest).use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            FileOutputStream(dest).use { bmp.compress(if (android.os.Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else @Suppress("DEPRECATION") Bitmap.CompressFormat.WEBP, 85, it) }
             bmp.recycle()
             true
         } catch (_: Exception) {

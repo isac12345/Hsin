@@ -189,7 +189,7 @@ fun FullLogScreen(vm: AppViewModel) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             filters.forEach { (k, t) -> Chip(t, vm.logFilter == k) { vm.logFilter = k } }
         }
-        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(300).reversed()
+        val shown = vm.logs.filter { Hsin.logMatches(it, vm.logFilter) }.takeLast(200).reversed()
         if (shown.isEmpty()) txt("Tidak ada baris yang cocok.", 12.sp, muted())
         shown.forEach { l ->
             txt(l.raw, 11.sp, muted(), modifier = Modifier.padding(vertical = 2.dp))
