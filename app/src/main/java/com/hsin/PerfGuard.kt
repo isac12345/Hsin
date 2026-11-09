@@ -15,6 +15,9 @@ import android.view.Window
  */
 object PerfGuard {
     @Volatile var armed = false
+    /** Tingkat ringan: beban sedang, jam animasi turun ke 30/dtk sebelum animasi dimatikan total. */
+    @Volatile var soft = false
+    @Volatile private var calm = 0
     var onDemote: (() -> Unit)? = null
     private val ring = LongArray(90)
     @Volatile private var n = 0
@@ -44,7 +47,7 @@ object PerfGuard {
         thread?.quitSafely(); thread = null
     }
 
-    fun reset() { n = 0; strikes = 0 }
+    fun reset() { n = 0; strikes = 0; soft = false; calm = 0 }
 
     private fun feed(d: Long) {
         val now = SystemClock.elapsedRealtime()
@@ -56,7 +59,9 @@ object PerfGuard {
         if (now - t0 > 6000L) { strikes = 0; return }
         var slow = 0
         for (v in ring) if (v > 22_000_000L) slow++
-        if (slow * 100 / ring.size >= 30) {
+        val pct = slow * 100 / ring.size
+        if (pct >= 12) { soft = true; calm = 0 } else if (pct < 4 && soft) { if (++calm >= 3) { soft = false; calm = 0 } }
+        if (pct >= 30) {
             strikes++
             if (strikes >= 2) { strikes = 0; armed = false; Handler(Looper.getMainLooper()).post { onDemote?.invoke() } }
         } else strikes = 0

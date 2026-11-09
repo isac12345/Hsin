@@ -147,7 +147,8 @@ fun Backdrop(vm: AppViewModel) {
         }
         var m = Modifier.fillMaxSize()
         if (vm.blur > 0 && Build.VERSION.SDK_INT >= 31) m = m.blur((vm.blur * 0.24f).dp)
-        Image(bmp.asImageBitmap(), null, m, contentScale = scale)
+        val ib = remember(bmp) { bmp.asImageBitmap() }
+        Image(ib, null, m, contentScale = scale)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = when (UiState.bgDim) { 0 -> 0.3f; 2 -> 0.7f; else -> 0.5f })))
     } else {
         // tanpa background pilihan: pakai wallpaper bawaan HSIN supaya tidak ada layar kosong/hitam
@@ -161,7 +162,8 @@ fun Banner(vm: AppViewModel) {
     val custom = vm.bannerBmp
     Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 10.dp).height(124.dp).clip(RoundedCornerShape(22.dp))) {
         if (custom != null) {
-            Image(custom.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            val cb = remember(custom) { custom.asImageBitmap() }
+            Image(cb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else if (vm.bannerReady) {
             Image(painterResource(themeBanner(UiState.theme)), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
@@ -261,7 +263,7 @@ fun HsinApp(vm: AppViewModel) {
         var last = 0L
         while (true) {
             val n = withFrameNanos { it }
-            if (n - last >= 14_000_000L) { last = n; clock.floatValue = (n - t0) / 1_000_000_000f }   // maksimal ~60 pembaruan/detik, hemat di layar 120 Hz
+            if (n - last >= (if (PerfGuard.soft) 30_000_000L else 14_000_000L)) { last = n; clock.floatValue = (n - t0) / 1_000_000_000f }   // maksimal ~60 pembaruan/detik, hemat di layar 120 Hz
         }
     }
     LaunchedEffect(UiState.portrait) {
