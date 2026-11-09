@@ -404,7 +404,7 @@ internal fun ModeFx(vm: AppViewModel) {
     LaunchedEffect(cm) { if (first[0]) first[0] = false else tick.intValue++ }
     val key = tick.intValue
     if (key == 0 || UiState.reduceAnim) return
-    val p = popKeyS(key, 640)
+    val p = popKeyS(key, 350)
     val th = UiState.theme
     Canvas(Modifier.fillMaxSize()) {
         val t = p.floatValue
@@ -412,7 +412,7 @@ internal fun ModeFx(vm: AppViewModel) {
         val fade = 1f - t
         val big = maxOf(size.width, size.height)
         when (th) {
-            2 -> drawCircle(col.copy(alpha = fade * 0.8f), radius = t * big * 0.6f, center = center, style = Stroke(6f))
+            2 -> drawCircle(col.copy(alpha = fade * 0.8f), radius = t * big * 0.6f, center = center, style = Stroke(3f))
             3 -> {
                 val r = t * big * 0.6f
                 val hex = Path()
@@ -422,7 +422,7 @@ internal fun ModeFx(vm: AppViewModel) {
                     if (i == 0) hex.moveTo(x, y) else hex.lineTo(x, y)
                 }
                 hex.close()
-                drawPath(hex, col.copy(alpha = fade * 0.7f), style = Stroke(6f))
+                drawPath(hex, col.copy(alpha = fade * 0.7f), style = Stroke(3f))
             }
             else -> {
                 val w = size.width * 0.3f; val skew = size.height * 0.2f

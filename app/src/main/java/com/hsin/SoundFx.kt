@@ -160,23 +160,35 @@ object SoundFx {
         return ShortArray(b.d.size) { i -> (tanh(drive * b.d[i] * g * 0.9f) / nrm * 32000f).toInt().coerceIn(-32767, 32767).toShort() }
     }
 
+    private val exec = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "hsin-sfx").apply { isDaemon = true } }
+    @Volatile private var track: AudioTrack? = null
+
+    private fun ensureTrack(): AudioTrack? {
+        track?.let { return it }
+        return try {
+            AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(SR).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes(maxOf(AudioTrack.getMinBufferSize(SR, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT), 8192))
+                .setTransferMode(AudioTrack.MODE_STREAM).build().also { track = it }
+        } catch (_: Throwable) { null }
+    }
+
+    /** Satu pemutar bersama, satu thread; PCM dibuat sekali lalu disimpan di memori. */
     fun play(p: Prefs, kind: String) {
         if (!p.soundOn) return
         val k = alias(kind)
-        val vol = p.soundVol / 100f
-        Thread {
+        val vol = (p.soundVol / 100f).coerceIn(0.1f, 1f)
+        try { track?.let { it.pause(); it.flush() } } catch (_: Throwable) { }
+        exec.execute {
             try {
-                val pcm = synchronized(cache) { cache[k] } ?: (render(k) ?: return@Thread).also { synchronized(cache) { cache[k] = it } }
-                val t = AudioTrack.Builder()
-                    .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-                    .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(SR).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                    .setBufferSizeInBytes(pcm.size * 2).setTransferMode(AudioTrack.MODE_STATIC).build()
-                t.write(pcm, 0, pcm.size)
-                t.setVolume(vol.coerceIn(0.1f, 1f))
+                val pcm = synchronized(cache) { cache[k] } ?: (render(k) ?: return@execute).also { synchronized(cache) { cache[k] = it } }
+                val t = ensureTrack() ?: return@execute
+                t.pause(); t.flush()
+                t.setVolume(vol)
                 t.play()
-                Thread.sleep(pcm.size * 1000L / SR + 200)
-                t.release()
+                t.write(pcm, 0, pcm.size)
             } catch (_: Throwable) { }
-        }.start()
+        }
     }
 }

@@ -308,7 +308,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         msg = trn(s.removePrefix("ERROR:").removePrefix("OK:").trim())
         SoundFx.play(prefs, if (s.startsWith("ERROR") || s.startsWith("Gagal")) "bad" else "good")
         toastJob?.cancel()
-        toastJob = viewModelScope.launch { delay(2600); msg = null }
+        val bad = s.startsWith("ERROR") || s.startsWith("Gagal")
+        toastJob = viewModelScope.launch { delay(if (bad) 3500 else 2500); msg = null }
     }
 
     fun label(pkg: String): String = try {
@@ -324,7 +325,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             bootstrap()
             while (true) {
-                delay(3000)
+                delay(2000)
                 if (!visible || !rootOk) continue
                 tick++
                 refreshStatus()
@@ -353,6 +354,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             delay(45_000L)
             if (status.gamePkg.isNotEmpty()) return@launch   // jangan ganggu game
+            // hanya saat layar mati atau sedang dicas
+            val pw = app.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+            val chg = app.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                ?.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+            if (pw.isInteractive && chg == 0) return@launch
             val r = Root.exec("nice -n 19 cmd package compile -f -m speed ${app.packageName}", 240_000L)
             if (r.out.contains("Success")) prefs.sp.edit().putInt("self_compiled", appVer).apply()
         }

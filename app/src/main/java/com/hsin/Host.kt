@@ -44,6 +44,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -77,6 +79,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        try { window.attributes = window.attributes.also { it.preferredRefreshRate = 60f } } catch (_: Throwable) { }
         setContent { HsinApp(vm) }
         handleLaunchIntent(intent)
         if (!vm.prefs.permAsked) {
@@ -87,6 +90,12 @@ class MainActivity : ComponentActivity() {
                 okLabel = "BERIKAN",
             ) { requestPerms() }
         }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        UiState.lastTouch = android.os.SystemClock.uptimeMillis()
+        UiState.touchTick = (UiState.lastTouch and 0x3fffffff).toInt()
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -146,7 +155,6 @@ fun Backdrop(vm: AppViewModel) {
             else -> ContentScale.FillBounds
         }
         var m = Modifier.fillMaxSize()
-        if (vm.blur > 0 && Build.VERSION.SDK_INT >= 31) m = m.blur((vm.blur * 0.24f).dp)
         val ib = remember(bmp) { bmp.asImageBitmap() }
         Image(ib, null, m, contentScale = scale)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = when (UiState.bgDim) { 0 -> 0.3f; 2 -> 0.7f; else -> 0.5f })))
@@ -262,6 +270,13 @@ fun HsinApp(vm: AppViewModel) {
         val t0 = withFrameNanos { it }
         var last = 0L
         while (true) {
+            // diam total (nol GPU) bila 3 dtk tanpa sentuhan; bangun seketika saat disentuh
+            if (vm.loaded && UiState.ritual.isEmpty() && vm.msg == null &&
+                android.os.SystemClock.uptimeMillis() - UiState.lastTouch > 3000L) {
+                val seen = UiState.touchTick
+                kotlinx.coroutines.withTimeoutOrNull(150L) { snapshotFlow { UiState.touchTick }.first { it != seen } }
+                if (UiState.touchTick == seen) continue
+            }
             val n = withFrameNanos { it }
             if (n - last >= (if (PerfGuard.soft) 30_000_000L else 14_000_000L)) { last = n; clock.floatValue = (n - t0) / 1_000_000_000f }   // maksimal ~60 pembaruan/detik, hemat di layar 120 Hz
         }
