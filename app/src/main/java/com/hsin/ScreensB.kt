@@ -348,7 +348,7 @@ fun RamKeepScreen(vm: AppViewModel) {
     key(vm.ramKeepVer) {
         HsinCard {
             Label("Selalu dilindungi")
-            txt("Termux, Magisk, KernelSU, APatch, HSIN, launcher, keyboard, dialer, dan layanan sistem tidak pernah ditutup. Pilih app lain yang juga ingin dilindungi dari Bersihkan RAM:", 12.sp, muted())
+            txt("App sistem dan root tidak pernah ditutup. Pilih app lain yang ingin dilindungi:", 12.sp, muted())
         }
         HsinCard {
             val list = vm.thirdParty
@@ -383,7 +383,7 @@ fun FreezeScreen(vm: AppViewModel) {
     BackBtn { vm.back() }
     HsinCard {
         Label("Bekukan app")
-        txt("App yang dibekukan tidak jalan sama sekali di latar belakang dan ikonnya hilang, tapi datanya aman. Cairkan kapan saja dari sini. App sistem, launcher, keyboard, dan HSIN tidak bisa dibekukan.", 12.sp, muted())
+        txt("App beku tidak jalan di latar, datanya aman. Cairkan kapan saja dari sini.", 12.sp, muted())
         if (vm.frozen.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             Label("Sedang dibekukan · ${vm.frozen.size}")
@@ -487,7 +487,7 @@ fun BenchScreen(vm: AppViewModel) {
     key(vm.benchVer) {
         HsinCard {
             Label("Uji performa CPU")
-            txt("Menjalankan hitungan berat 3 detik pada satu inti, lalu 3 detik pada semua inti. Biarkan HP tidak dipakai selama uji. Uji semua mode berjalan sendiri sekitar 1 menit (ada jeda dingin) lalu mengembalikan mode awalmu.", 12.sp, muted())
+            txt("Uji kecepatan 1 inti lalu semua inti. Jangan pakai HP saat uji. Uji semua mode sekitar 1 menit.", 12.sp, muted())
             if (vm.benchBusy && vm.benchStep.isNotEmpty()) txt(vm.benchStep, 13.sp, Mint, FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
             Pill(if (vm.benchBusy) "Menguji..." else "UJI SEMUA MODE (otomatis)", { vm.runBenchAll() }, solid = !vm.benchBusy, enabled = !vm.benchBusy)
             Pill(if (vm.benchBusy) "Menguji..." else "UJI MODE SAAT INI (${profileLabel(vm.status.profile)})", { vm.runBench() }, enabled = !vm.benchBusy)
@@ -523,7 +523,7 @@ fun ChargeScreen(vm: AppViewModel) {
     val steps = listOf(100, 95, 90, 85, 80, 70)
     HsinCard {
         Label("Batas pengisian")
-        txt("Menghentikan pengisian di persen tertentu supaya baterai lebih awet. Berhasil atau tidaknya tergantung kernel HP: HSIN mencari node pengisian yang bisa dipakai.", 12.sp, muted())
+        txt("Berhenti mengisi di persen tertentu supaya baterai awet. Hasilnya tergantung HP.", 12.sp, muted())
         Spacer(Modifier.height(10.dp))
         when (kind) {
             "", "none" -> txt(if (ci.isEmpty()) "Memeriksa HP..." else "HP ini tidak punya kontrol pengisian yang bisa diatur. Fitur ini tidak tersedia di perangkatmu.", 13.sp)

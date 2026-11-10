@@ -4,6 +4,10 @@ import androidx.compose.runtime.Composable
 
 /** Kamus Indo -> Inggris untuk layar turunan (teks yang ditulis langsung). Teks tanpa padanan tampil apa adanya. */
 private val EN: Map<String, String> = mapOf(
+    "App sistem dan root tidak pernah ditutup. Pilih app lain yang ingin dilindungi:" to "System and root apps are never closed. Pick other apps to protect:",
+    "App beku tidak jalan di latar, datanya aman. Cairkan kapan saja dari sini." to "Frozen apps do not run in the background; data is safe. Unfreeze anytime here.",
+    "Uji kecepatan 1 inti lalu semua inti. Jangan pakai HP saat uji. Uji semua mode sekitar 1 menit." to "Tests 1 core then all cores. Do not use the phone during the test. The all-modes test takes about 1 minute.",
+    "Berhenti mengisi di persen tertentu supaya baterai awet. Hasilnya tergantung HP." to "Stops charging at a set percent to keep the battery healthy. Result depends on the phone.",
     "BATALKAN" to "CANCEL", "KEMBALIKAN" to "RESET", "KOSONGKAN" to "CLEAR", "SEGARKAN" to "REFRESH", "KAPSUL" to "CAPSULE", "ORB" to "ORB",
     "Kapsul tembus sentuh" to "Click-through capsule",
     "Kapsul hanya tampil, sentuhan diteruskan ke game. Matikan di sini untuk menggesernya lagi." to "The capsule is display-only; touches pass through to the game. Turn this off to drag it again.",

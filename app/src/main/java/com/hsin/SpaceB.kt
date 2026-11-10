@@ -673,7 +673,7 @@ private fun AlatLayar(vm: AppViewModel) {
                 if (i == 0) vm.setTweak("display_refresh", null) else vm.setTweak("display_refresh", rates[i - 1].toString())
             }
         }
-        Text(tx("Otomatis: Hemat 60, Seimbang 90, Performa 120, Puncak setinggi layar. Pilihan manual berlaku di semua mode. Batas FPS tiap game diatur di tab Game.", "Auto: Battery 60, Balanced 90, Performance 120, Peak as high as the panel. A manual pick applies in every mode. Each game's FPS cap is set in the Games tab."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+        Text(tx("Otomatis: Hemat 60, Seimbang 90, Performa 120, Puncak maksimal layar.", "Auto: Battery 60, Balanced 90, Performance 120, Peak = max panel."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
     }
     Section(tx("TAMPILAN", "APPEARANCE"), 40) {
         Gate(twCap(vm, "HAS_NIGHT")) { HSwitch(tx("Mode malam", "Night light"), tx("Warna layar lebih hangat, nyaman di mata.", "Warmer screen colours, easier on the eyes."), vm.tw["display_night"] == "1") { vm.setTweak("display_night", if (it) "1" else "0") } }
