@@ -282,7 +282,7 @@ object UiState {
         theme = p.appTheme
         bgDim = p.bgDim
         inited = true
-        en = p.sp.getBoolean("hsin_en", false)
+        en = p.sp.getBoolean("hsin_en", java.util.Locale.getDefault().language != "in" && java.util.Locale.getDefault().language != "id")
         portrait = false
     }
     fun setEn(p: Prefs, v: Boolean) { en = v; p.sp.edit().putBoolean("hsin_en", v).apply() }
