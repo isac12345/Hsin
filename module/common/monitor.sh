@@ -45,7 +45,7 @@ LAST_EVENT_PKG_FILE="$STATE_DIR/.foreground_last_pkg"
 HUD_FOREGROUND_FILE="$STATE_DIR/.hud_foreground_pkg"
 
 # GameBoost integration
-GB_GRACE="${HSIN_GB_GRACE:-12}"
+GB_GRACE="${HSIN_GB_GRACE:-1}"
 GB_PENDING_FILE="$STATE_DIR/.gb_pending"
 GB_ACTIVE_FILE="$STATE_DIR/.gb_active"
 GB_SAFETY_INTERVAL=15
@@ -567,7 +567,7 @@ handle_foreground_event() {
     if command -v gh_foreground >/dev/null 2>&1; then
         gh_foreground "$handle_pkg" "$_mapped_prof"
     fi
-    if [ -n "$_mapped_prof" ] && [ "$_mapped_prof" != "performance" ] && [ "$handle_current" = "battery" ]; then
+    if [ -f "$STATE_DIR/GAME_PROMOTE" ] && [ -n "$_mapped_prof" ] && [ "$_mapped_prof" != "performance" ] && [ "$handle_current" = "battery" ]; then
         game_promote=1
         handle_target="balanced"
         monitor_log "GAMEBOOST" "DAILY GAME PROMOTE: $handle_pkg detected in Daily mode, promoting to balanced"
@@ -654,7 +654,7 @@ handle_foreground_event() {
                         # _gb_level tidak jatuh ke fail-safe balanced).
                         local orig_level
                         orig_level=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null)
-                        local _target_level="${GB_FORCED_LEVEL:-${GB_BATT_LEVEL:-extreme}}"
+                        local _target_level="${GB_FORCED_LEVEL:-${GB_BATT_LEVEL:-$( [ -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GB_EXTREME" ] && echo extreme || echo performance )}}"
                         printf '%s\n' "$_target_level" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
                         gb_apply
                         if [ -n "$orig_level" ]; then
