@@ -142,6 +142,7 @@ tw_idle_set() { # $1=0/1
 # Layanan performa vendor (turbopower, tran_perf, sched) bisa mengembalikan deep idle saat game/layar berganti:
 # tulis ulang pilihan user kalau nilainya berubah. Murah: dua pembacaan file.
 tw_idle_reassert() {
+    [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.gh_idle_prev" ] && return 0
     _ci=$(tw_conf_get CPUIDLE); [ -n "$_ci" ] || return 0
     [ "$(tw_rd /sys/devices/system/cpu/cpu6/cpuidle/state1/disable)" = "$_ci" ] || tw_idle_set "$_ci"
 }

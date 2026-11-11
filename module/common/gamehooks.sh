@@ -748,8 +748,27 @@ _gh_ovd() {   # $1=start|stop|recover  $2=pkg/alasan
 }
 
 # ---------------------------------------------------------------- siklus hidup
+# Performa stabil: inti besar tanpa deep idle selama game (nilai asli dikembalikan saat game selesai).
+GH_IDLE_PREV="$GH_STATE/.gh_idle_prev"
+_gh_idle_on() {
+    [ -f "$GH_IDLE_PREV" ] && return 0
+    [ -w /sys/devices/system/cpu/cpu6/cpuidle/state1/disable ] || return 0
+    _ghi=$(tr -d '[:space:]' < /sys/devices/system/cpu/cpu6/cpuidle/state1/disable 2>/dev/null)
+    printf '%s\n' "${_ghi:-0}" > "$GH_IDLE_PREV" 2>/dev/null
+    for _ghc in 6 7; do printf '1' > "/sys/devices/system/cpu/cpu$_ghc/cpuidle/state1/disable" 2>/dev/null; done
+    _gh_log APPLIED "deep idle inti besar dimatikan selama game"
+}
+_gh_idle_off() {
+    [ -f "$GH_IDLE_PREV" ] || return 0
+    _ghi=$(tr -d '[:space:]' < "$GH_IDLE_PREV" 2>/dev/null); rm -f "$GH_IDLE_PREV"
+    case "$_ghi" in 0|1) ;; *) _ghi=0 ;; esac
+    for _ghc in 6 7; do printf '%s' "$_ghi" > "/sys/devices/system/cpu/cpu$_ghc/cpuidle/state1/disable" 2>/dev/null; done
+}
+
 gh_start() {
     printf '%s\n' "$1" > "$GH_MARK" 2>/dev/null
+    if [ ! -f "$GH_STATE/.perf_stable_v1" ]; then : > "$GH_STATE/GAME_DND_ON" 2>/dev/null; : > "$GH_STATE/.perf_stable_v1" 2>/dev/null; fi
+    _gh_idle_on
     rm -f "$GH_PEND"
     _gh_log INFO "game aktif: $1"
     _gh_prio_apply "$1"
@@ -770,6 +789,7 @@ gh_stop() {
     rm -f "$GH_MARK" "$GH_PEND" "$GH_PRIO_T"
     _gh_ovd_exists && _gh_ovd stop "game selesai"
     _gh_dnd_off
+    _gh_idle_off
     _gh_refresh_off
     _gh_render_restore
     _gh_angle_restore

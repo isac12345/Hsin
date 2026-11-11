@@ -457,13 +457,13 @@ check_battery_status() {
     case "$capacity" in ''|*[!0-9]*) echo "OK"; return 0 ;; esac
     
     # Battery critical (<15%) without charging — reject boost
-    if [ "$capacity" -lt 15 ] 2>/dev/null && [ "$status" != "Charging" ]; then
+    if [ "$capacity" -lt 10 ] 2>/dev/null && [ "$status" != "Charging" ]; then
         echo "LOW"
         return 0
     fi
     
     # Battery low (<30%) without charging — force performance-level boost
-    if [ "$capacity" -lt 30 ] 2>/dev/null && [ "$status" != "Charging" ]; then
+    if [ "$capacity" -lt 0 ] 2>/dev/null && [ "$status" != "Charging" ]; then
         echo "WARNING"
         return 0
     fi
