@@ -1708,17 +1708,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun panelBg(edge: Int): GradientDrawable {
         val st = prefs.flStyle
         if (st < 3) return roundBg(panelColor(), pf(20), edge)
-        val r = pf(28)
-        val radii = when (st) {
-            3 -> floatArrayOf(0f, 0f, 0f, 0f, r, r, r, r)          // turun dari atas
-            4 -> floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)          // naik dari bawah
-            else -> floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)       // laci kanan
-        }
-        val neon = if (edge == BORDER) themeNeon(st) else edge
+        val edgeCol = if (edge == BORDER) 0x33FFFFFF else edge
         return GradientDrawable().apply {
             setColor(panelColor())
-            cornerRadii = radii
-            setStroke(px(2), neon)
+            cornerRadius = pf(16)
+            setStroke(px(1), edgeCol)
         }
     }
 
@@ -2016,7 +2010,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         val edge = if (odOn) OD_GLOW else BORDER
         panelBox?.background = panelBg(if (recOn) 0x8CE5484D.toInt() else edge)
-        pill?.background = roundBg(panelColor(), pf(24), edge)
+        pill?.background = if (prefs.flStyle >= 3) null else roundBg(panelColor(), pf(24), edge)
         thin?.background = roundBg(panelColor(), pf(26), edge)
     }
 
