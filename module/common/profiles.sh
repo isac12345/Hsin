@@ -5,12 +5,15 @@
 # memory, safe for all-day use. Internal name remains "battery" for
 # backward compat with apply_now / current_state / active_profile files.
 BATTERY_GOVERNOR_PREFERENCE="schedutil walt interactive performance"
-BATTERY_CPU_FREQ_MAX_PERCENT=82
+# Adapt = harian: tanpa patok buatan. Governor GPU/CPU sudah menurunkan
+# frekuensi sendiri saat idle, jadi patok atas hanya menahan saat butuh
+# (penyebab "daily ngelag" di modul lain).
+BATTERY_CPU_FREQ_MAX_PERCENT=100
 BATTERY_CPU_FREQ_MIN_PERCENT=0
 BATTERY_BOOST_CPU_INPUT=1
 BATTERY_BOOST_WALT_INPUT=1
 BATTERY_BOOST_MTK_PERFMGR=1
-BATTERY_DEVFREQ_MAX_PERCENT=78
+BATTERY_DEVFREQ_MAX_PERCENT=100
 BATTERY_IO_ADD_RANDOM=0
 BATTERY_IO_IOSTATS=0
 BATTERY_IO_NOMERGES=2
@@ -38,7 +41,7 @@ BATTERY_CPU_FREQ_MIN_SKIP=1
 BATTERY_GPU_ADRENO_SKIP=0
 BATTERY_GPU_ADRENO_MODE="cap"
 BATTERY_GPU_ADRENO_POWERLEVEL=0
-BATTERY_GPU_FREQ_MAX_PERCENT=62
+BATTERY_GPU_FREQ_MAX_PERCENT=100
 # GPU floor: 0 = terendah/default (full idle diizinkan). Hanya performance
 # yang mengangkat floor (50%), dijaga thermal gate di engine.
 BATTERY_GPU_FREQ_MIN_PERCENT=0
@@ -173,7 +176,11 @@ profile_warn() {
 
 load_profile() {
     local profile_name="$1"
+    # Dua mode yang dipakai user: adapt (harian, ikut beban nyata) dan puncak.
+    # Nama lama tetap diterima supaya APK versi sekarang tidak rusak.
     case "$profile_name" in
+        adapt)               profile_name="battery" ;;
+        puncak|overdrive|max) profile_name="performance" ;;
         battery|balanced|performance)
             ;;
         *)

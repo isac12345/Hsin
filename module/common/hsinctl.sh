@@ -206,7 +206,7 @@ cmd_status() {
 }
 
 cmd_profile() {
-    valid_profile "$1" || { echo "ERROR: profil tidak valid (battery|balanced|performance)"; return 1; }
+    valid_profile "$1" || { echo "ERROR: profil tidak valid (adapt|puncak)"; return 1; }
     sh "$COMMON/apply_now.sh" "$1" manual >/dev/null 2>&1
     _rc=$?
     # apply_now bisa SKIPPED (sudah current) -> tetap exit 0
@@ -622,7 +622,7 @@ cmd_adapt() {
     _ad="$STATE_DIR/adapt"
     case "$1" in
         ''|list)
-            if [ ! -d "$_ad" ]; then
+            if [ -z "$(ls "$_ad"/*.conf 2>/dev/null)" ]; then
                 echo "adapt=belum ada data (jalankan game sekali)"
                 return 0
             fi
