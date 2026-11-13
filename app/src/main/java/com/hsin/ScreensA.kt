@@ -67,12 +67,12 @@ fun AutoScreen(vm: AppViewModel) {
         Label("Baterai rendah")
         ToggleRow("Aktif", null, battOn) { battOn = it }
         SliderRow("Batas baterai", pct, 5f..50f, "${pct.toInt()}%", { pct = it })
-        Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(battProf), { battProf = PROFILE_KEYS[it] })
+        Seg(listOf("Adapt"), 0, { battProf = "adapt" })
     }
     HsinCard {
         Label("Lagi charging")
         ToggleRow("Aktif", null, chgOn) { chgOn = it }
-        Seg(PROFILE_LABELS, PROFILE_KEYS.indexOf(chgProf), { chgProf = PROFILE_KEYS[it] })
+        Seg(listOf("Adapt"), 0, { chgProf = "adapt" })
     }
     // profil otomatis per jenis app (dijalankan modul tiap ±10 dtk, tidak mengganggu game)
     val catOn = vm.confStr("CAT_ON", "0") == "1"
@@ -80,8 +80,8 @@ fun AutoScreen(vm: AppViewModel) {
         Label("Per jenis app")
         ToggleRow("Aktif", "Video, sosmed, musik, dan browser di depan memakai profil pilihanmu; kembali normal saat keluar.", catOn) { vm.setConfKey("CAT_ON", if (it) "1" else "0") }
         if (catOn) {
-            val opts = listOf("none") + PROFILE_KEYS
-            val optLabels = listOf("OFF") + PROFILE_LABELS
+            val opts = listOf("none", "adapt")
+            val optLabels = listOf("OFF", "Adapt")
             listOf("VIDEO" to "Video", "SOCIAL" to "Sosmed", "MUSIC" to "Musik", "BROWSER" to "Browser").forEach { (k, name) ->
                 val cur = vm.confStr("CAT_$k", "none")
                 Label(name, Modifier.padding(top = 6.dp))
@@ -190,7 +190,7 @@ fun DetectScreen(vm: AppViewModel) {
     val reg = vm.games.map { it.pkg }.toSet()
     val found = vm.apps.filter { it.isGame && it.pkg !in reg }
     var sel by remember { mutableStateOf<Set<String>?>(null) }
-    var prof by remember { mutableStateOf(2) }
+    var prof by remember { mutableStateOf(0) }
     val chosen = (sel ?: found.map { it.pkg }.toSet()).filter { p -> found.any { it.pkg == p } }
     HsinCard {
         Label("Game ditemukan · ${found.size}")
@@ -218,9 +218,9 @@ fun DetectScreen(vm: AppViewModel) {
     if (found.isNotEmpty()) {
         HsinCard {
             Label("Profil awal")
-            Seg(PROFILE_LABELS, prof, { prof = it })
+            Seg(GAME_LABELS, prof, { prof = it })
             Pill("TAMBAH ${chosen.size} GAME", {
-                if (chosen.isNotEmpty()) vm.addGames(chosen.toList(), PROFILE_KEYS[prof]) { vm.back() }
+                if (chosen.isNotEmpty()) vm.addGames(chosen.toList(), GAME_KEYS[prof]) { vm.back() }
             }, solid = true, enabled = chosen.isNotEmpty())
         }
     }
@@ -231,7 +231,7 @@ fun DetectScreen(vm: AppViewModel) {
 fun AddGameScreen(vm: AppViewModel) {
     var q by remember { mutableStateOf("") }
     var pick by remember { mutableStateOf("") }
-    var prof by remember { mutableStateOf(2) }
+    var prof by remember { mutableStateOf(0) }
     var fps by remember { mutableStateOf("") }
     val reg = vm.games.map { it.pkg }.toSet()
     val list = vm.apps.filter { it.pkg !in reg && (q.isBlank() || it.label.contains(q, true) || it.pkg.contains(q, true)) }
@@ -264,8 +264,8 @@ fun AddGameScreen(vm: AppViewModel) {
             }
         }
         txt(if (pick.isEmpty()) "Pilih aplikasi di atas" else "Dipilih: ${vm.label(pick)}", 12.sp, muted(), modifier = Modifier.padding(top = 8.dp))
-        Seg(PROFILE_LABELS, prof, { prof = it })
+        Seg(GAME_LABELS, prof, { prof = it })
         Field(fps, { fps = it.filter { c -> c.isDigit() || c == ',' } }, "FPS target (opsional, mis. 30,60,90)")
-        Pill("ADD", { if (pick.isNotEmpty()) vm.addGame(pick, fps, PROFILE_KEYS[prof]) { vm.back() } }, solid = true, enabled = pick.isNotEmpty())
+        Pill("ADD", { if (pick.isNotEmpty()) vm.addGame(pick, fps, GAME_KEYS[prof]) { vm.back() } }, solid = true, enabled = pick.isNotEmpty())
     }
 }

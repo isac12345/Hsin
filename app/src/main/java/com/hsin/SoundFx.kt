@@ -142,6 +142,10 @@ object SoundFx {
         "fps" -> 1.0f to { b -> osc(b, "sawtooth", 140f, 60f, 0.5f, 0.35f, 0f, 8f); crackle(b, 0.1f, 5); glitch(b, 0f, 10, 0.1f) }
         "err" -> 1.2f to { b -> osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0f, 12f); osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0.38f, 12f); glitch(b, 0.7f, 6, 0.12f) }
         "ok" -> 1.0f to { b -> listOf(262f, 330f, 392f).forEach { f -> osc(b, "sawtooth", f, f, 0.5f, 0.15f, 0f, 3f) }; hit(b, 0f, 0.45f); digi(b, listOf(1320f, 1760f, 2640f), 0.07f, 0.1f, 0.1f, 0.1f); chime(b, 0.3f) }
+        "adapt0" -> 0.3f to { b -> click(b, 0f, 0.35f); osc(b, "triangle", 330f, 500f, 0.12f, 0.3f * DG, 0.01f) }
+        "adapt1" -> 0.45f to { b -> click(b, 0f, 0.4f); osc(b, "triangle", 440f, 660f, 0.14f, 0.3f * DG, 0.01f); osc(b, "sine", 880f, 880f, 0.2f, 0.12f * DG, 0.1f) }
+        "adapt2" -> 0.6f to { b -> hit(b, 0f, 0.35f); osc(b, "triangle", 587f, 880f, 0.16f, 0.3f * DG, 0.01f); chime(b, 0.12f) }
+        "adapt3" -> 0.9f to { b -> hit(b, 0f, 0.5f); sweep(b, 500f, 2400f, 0.35f, 0.12f); osc(b, "sawtooth", 784f, 1180f, 0.2f, 0.18f, 0.1f, 3f); crackle(b, 0.25f, 3); chime(b, 0.45f) }
         else -> null
     }
 

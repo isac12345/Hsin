@@ -1,5 +1,6 @@
 package com.hsin
 
+import android.animation.ValueAnimator
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Canvas
@@ -126,6 +127,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private var menuInfo: TextView? = null
     private val menuBtns = ArrayList<TextView>()
     private val orbs = ArrayList<OrbView>()
+    private var adaptLoad = -1
+    private var panelWheel: AdaptWheelView? = null
+    private var modeSw: ModeSwitch? = null
     private var fpsBig: TextView? = null
     private var fpsThin: TextView? = null
     private var fpsPillLbl: TextView? = null
@@ -384,6 +388,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         thinGroups.fill(null)
         rings.clear()
         orbs.clear()
+        panelWheel = null; modeSw = null
         menuBtns.clear()
         menu = null
         menuInfo = null
@@ -1429,7 +1434,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val orb = OrbView()
         orbs.add(orb)
         f.addView(orb, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())))
-        val b = textView("--", 18f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.02f }
+        val b = textView("--", 15f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.04f }
         if (forMenu) fpsMenu = b else fpsPill = b
         f.addView(b, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())))
         f.layoutParams = FrameLayout.LayoutParams(px(orbDp()), px(orbDp()))
@@ -1819,7 +1824,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 val w = pv.width; val h = pv.height
                 if (w <= 0 || h <= 0 || (w == lw && h == lh && ox == lx && oy == ly)) return
                 lw = w; lh = h; lx = ox; ly = oy
-                val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; 5 -> 4; else -> 1 }
+                val pos = if (prefs.flPanelPos != 0) prefs.flPanelPos else when (st) { 4 -> 2; else -> 4 }
                 var tx = when (pos) { 3 -> 0; 4 -> sw - w; else -> (sw - w) / 2 }
                 val si = safeTopBottom()
                 var ty = when (pos) { 2 -> sh - h - si[1]; 3, 4 -> (sh - h) / 2; else -> si[0] }
@@ -1833,152 +1838,86 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         r.requestLayout()
     }
 
+    /** Panel ringkas: roda + angka FPS, empat angka sistem, empat tombol ikon, saklar Adapt/Puncak. */
     private fun buildGamePanel(st: Int): View {
-        val neon = themeNeon(st)
         val sw = realW()
+        val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
+        val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
         val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         panelBox = box
         box.background = panelBg(BORDER)
-        val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
-        val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
+        box.setPadding(px(12), px(10), px(12), px(10))
 
-        val title = textView("", 15f, accentColor(), true).apply { letterSpacing = 0.12f; gravity = Gravity.CENTER }
-        themeTitle = title
-        val nb = textView("--", if (st == 5) 34f else 38f, TEXT, true).apply { letterSpacing = -0.02f }
+        themeTitle = textView("", 10f, accentColor(), true)
+        val nb = textView("--", 16f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.04f }
         fpsBig = nb
-        val l3 = fpsLabel(12f, 0.1f); fpsBigLbl = l3
-        val (tRec, cRec) = roundTile("Rekam", RED, "●", { onRec?.invoke() })
-        val (tFps, cFps) = roundTile("Rekam FPS", neon, "≈", { toggleFpsLog() })
-        val (tRam, _) = roundTile("Bersih RAM", 0xFF4FE3C1.toInt(), "◎", { onRam?.invoke() }, false)
-        val (tDnd, cDnd) = roundTile("Jangan ganggu", 0xFFE8B95A.toInt(), "☾", { onDnd?.invoke() }, false)
-        tileDnd = cDnd
-        val (tShot, _) = roundTile("Screenshot", 0xFF60A5FA.toInt(), "▣", { onShot?.invoke() }, false)
-        val (tPause, _) = roundTile("Jeda", 0xFFF5A524.toInt(), "‖", { onPause?.invoke() }, false)
-        val (tClose, _) = roundTile("Ringkas", 0xFFCFD2DD.toInt(), "–", { setMode(MODE_PILL) })
-        val (tHide, _) = roundTile("Sembunyikan", 0xFF8A93A6.toInt(), "×", { hide() })
-        tileRec = cRec; tileFps = cFps
+        fpsBigLbl = fpsLabel(10f, 0.1f)
+        val wheel = AdaptWheelView(ctx) { prefs.reduceAnim }
+        wheel.setPuncak(odOn); wheel.setLoad(adaptLoad, false)
+        panelWheel = wheel
+        val wheelBox = FrameLayout(ctx)
+        wheelBox.addView(wheel, FrameLayout.LayoutParams(px(70), px(70)))
+        wheelBox.addView(nb, FrameLayout.LayoutParams(px(70), px(70)))
 
-        // baris rekam (muncul hanya saat merekam)
+        val names = listOf("CPU", "GPU", "RAM", "SUHU")
+        val stats = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        for (r in 0 until 2) {
+            val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+            for (c in 0 until 2) {
+                val i = r * 2 + c
+                val cell = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(px(4), px(1), px(4), px(1)) }
+                cell.addView(textView(names[i], 9f, LABEL, true).apply { letterSpacing = 0.08f })
+                val v = textView("--", 13f, TEXT, true)
+                valViews[i] = v
+                cell.addView(v)
+                cards[i] = cell
+                line.addView(cell, lpw(0, WRAP, 1f))
+            }
+            stats.addView(line, lpw(MATCH, WRAP, mt = if (r == 0) 0 else px(4)))
+        }
+        gridRow = stats
+        val head = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(wheelBox, lpw(px(70), px(70)))
+        head.addView(stats, lpw(0, WRAP, 1f, px(8)))
+        box.addView(head, lpw(MATCH, WRAP))
+
+        // tombol ikon
+        val (_, cRec) = roundTile("Rekam", RED, "\u25CF", { onRec?.invoke() })
+        val (_, cFps) = roundTile("Rekam FPS", themeNeon(st), "\u2248", { toggleFpsLog() })
+        val (_, cShot) = roundTile("Screenshot", 0xFF60A5FA.toInt(), "\u25A3", { onShot?.invoke() })
+        val (_, cPause) = roundTile("Jeda", 0xFFF5A524.toInt(), "\u2016", { onPause?.invoke() })
+        tileRec = cRec; tileFps = cFps; tileDnd = null
+        val foot = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        for (c in listOf(cRec, cFps, cShot, cPause)) {
+            (c.parent as? ViewGroup)?.removeView(c)
+            foot.addView(c, lpw(px(36), px(36), 0f, px(6)).apply { marginEnd = px(6) })
+        }
+        footRow = foot
+        box.addView(foot, lpw(MATCH, WRAP, mt = px(8)))
+
+        // baris rekam (hanya saat merekam)
         val top = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        top.addView(View(ctx).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(RED) } }, LinearLayout.LayoutParams(px(12), px(12)))
-        top.addView(textView("00:00", 18f, TEXT, true).apply { tag = "timer" }, lpw(WRAP, WRAP, ms = px(8)))
-        top.addView(textView("REC", 11f, REC_TAG, true).apply { letterSpacing = 0.12f }, lpw(WRAP, WRAP, ms = px(8)))
+        top.addView(View(ctx).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(RED) } }, LinearLayout.LayoutParams(px(10), px(10)))
+        top.addView(textView("00:00", 15f, TEXT, true).apply { tag = "timer" }, lpw(WRAP, WRAP, ms = px(6)))
+        top.addView(textView("REC", 10f, REC_TAG, true).apply { letterSpacing = 0.12f }, lpw(WRAP, WRAP, ms = px(6)))
         top.addView(View(ctx), LinearLayout.LayoutParams(0, 1, 1f))
-        top.addView(recButton(true), LinearLayout.LayoutParams(WRAP, px(40)))
+        top.addView(recButton(true), LinearLayout.LayoutParams(WRAP, px(34)))
         topRow = top
-        val recHint = textView("Profil terkunci selama merekam. Satu sesi = satu file video.", 10f, HINT, false)
+        box.addView(top, lpw(MATCH, WRAP, mt = px(8)))
+        val recHint = textView("Profil terkunci selama merekam.", 10f, HINT, false)
         hintRec = recHint
+        box.addView(recHint, lpw(MATCH, WRAP, mt = px(4)))
 
-        fun hdr(): View = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            addView(textView("HSIN", 12f, neon, true).apply { letterSpacing = 0.25f }, lpw(0, WRAP, 1f))
-            addView(title, lpw(WRAP, WRAP))
-            addView(View(ctx), lpw(0, 1, 1f))
-            addView(nb); addView(l3, lpw(WRAP, WRAP, ms = px(4)))
-        }
-        fun tilesRow(): LinearLayout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-            for (t in listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)) addView(t, lpw(0, WRAP, 1f))
-        }
+        // saklar mode
+        buildOdRow()
+        val msw = ModeSwitch()
+        modeSw = msw
+        segRow = msw
+        box.addView(msw, lpw(MATCH, px(32), mt = px(8)))
+        odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 9f; box.addView(o, lpw(MATCH, WRAP, mt = px(4))); odStatusLine = o }
 
-        val port = (realH()) > sw
         val wf = prefs.flPanelW / 100f
-        val all = listOf(tRec, tFps, tShot, tPause, tRam, tDnd, tClose, tHide)
-        fun tileGrid(cols: Int): LinearLayout {
-            val g = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-            val rows = (all.size + cols - 1) / cols
-            for (r in 0 until rows) {
-                val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-                for (c in 0 until cols) { val ix = r * cols + c; line.addView(if (ix < all.size) all[ix] else View(ctx), lpw(0, WRAP, 1f)) }
-                g.addView(line, lpw(MATCH, WRAP, mt = px(if (r == 0) 0 else 4)))
-            }
-            return g
-        }
-        fun odLine(parent: LinearLayout) {
-            odSmall?.let { o -> (o.parent as? ViewGroup)?.removeView(o); o.textSize = 10f; parent.addView(o, lpw(MATCH, WRAP, mt = px(4))); odStatusLine = o }
-        }
-        val names4 = listOf("CPU PAKAI", "GPU PAKAI", "RAM PAKAI", "SUHU HP")
-        if (port) {   // potret: satu kolom, kartu 2x2, tombol 4 per baris
-            box.setPadding(px(14), px(12), px(14), px(14))
-            box.addView(hdr(), lpw(MATCH, WRAP))
-            val cb = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-            for (r in 0 until 2) {
-                val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-                for (c in 0 until 2) line.addView(card(names4[r * 2 + c], r * 2 + c), lpw(0, WRAP, 1f, if (c == 0) 0 else px(8)))
-                cb.addView(line, lpw(MATCH, WRAP, mt = if (r == 0) 0 else px(8)))
-            }
-            gridRow = cb
-            box.addView(cb, lpw(MATCH, WRAP, mt = px(10)))
-            box.addView(top, lpw(MATCH, WRAP, mt = px(10)))
-            val foot = tileGrid(4); footRow = foot
-            box.addView(foot, lpw(MATCH, WRAP, mt = px(10)))
-            box.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
-            box.addView(buildSegRow(false, true), lpw(MATCH, WRAP, mt = px(10)))
-            odLine(box)
-            box.layoutParams = FrameLayout.LayoutParams(minOf((sw * 0.94f).toInt(), (px(420) * wf).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
-        } else when (st) {
-            3 -> {   // Kartu Miring: panel lebar
-                box.setPadding(px(18), px(12), px(18), px(16))
-                box.addView(hdr(), lpw(MATCH, WRAP))
-                val grid = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-                for (i in 0 until 4) grid.addView(card(names4[i], i), lpw(0, WRAP, 1f, if (i == 0) 0 else px(8)))
-                gridRow = grid
-                box.addView(grid, lpw(MATCH, WRAP, mt = px(12)))
-                box.addView(top, lpw(MATCH, WRAP, mt = px(10)))
-                val foot = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-                for (t in all) foot.addView(t, lpw(0, WRAP, 1f))
-                footRow = foot
-                box.addView(foot, lpw(MATCH, WRAP, mt = px(12)))
-                box.addView(recHint, lpw(MATCH, WRAP, mt = px(8)))
-                box.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(12)))
-                odLine(box)
-                box.layoutParams = FrameLayout.LayoutParams((minOf(px(560), (sw * 0.78f).toInt()) * wf).toInt().coerceAtMost((sw * 0.96f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
-            }
-            4 -> {   // Dasbor Bundar: sayap CPU kiri, GPU kanan
-                box.setPadding(px(14), px(12), px(14), px(12))
-                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-                val left = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                left.addView(card("CPU PAKAI", 0), lpw(MATCH, WRAP))
-                left.addView(card("RAM PAKAI", 2), lpw(MATCH, WRAP, mt = px(8)))
-                val right = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                right.addView(card("GPU PAKAI", 1), lpw(MATCH, WRAP))
-                right.addView(card("SUHU HP", 3), lpw(MATCH, WRAP, mt = px(8)))
-                val mid = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
-                mid.addView(hdr(), lpw(MATCH, WRAP))
-                mid.addView(top, lpw(MATCH, WRAP, mt = px(8)))
-                val foot = tileGrid(4); footRow = foot
-                mid.addView(foot, lpw(MATCH, WRAP, mt = px(8)))
-                mid.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
-                mid.addView(buildSegRow(false), lpw(MATCH, WRAP, mt = px(8)))
-                odLine(mid)
-                row.addView(left, lpw(px(96), WRAP))
-                row.addView(mid, lpw(0, WRAP, 1f, px(10)))
-                row.addView(right, lpw(px(96), WRAP, ms = px(10)))
-                gridRow = row
-                box.addView(row, lpw(MATCH, WRAP))
-                box.layoutParams = FrameLayout.LayoutParams((minOf(px(640), (sw * 0.86f).toInt()) * wf).toInt().coerceAtMost((sw * 0.96f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
-            }
-            else -> { // Kubus Energi: laci dengan strip angka kiri
-                box.setPadding(px(10), px(12), px(12), px(12))
-                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-                val strip = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                val names = listOf("CPU", "GPU", "RAM", "SUHU")
-                for (i in 0 until 4) strip.addView(card(names[i], i), lpw(MATCH, WRAP, mt = if (i == 0) 0 else px(6)))
-                gridRow = strip
-                val main = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-                main.addView(hdr(), lpw(MATCH, WRAP))
-                main.addView(top, lpw(MATCH, WRAP, mt = px(8)))
-                val foot = tileGrid(4); footRow = foot
-                main.addView(foot, lpw(MATCH, WRAP, mt = px(10)))
-                main.addView(recHint, lpw(MATCH, WRAP, mt = px(6)))
-                main.addView(buildSegRow(false, true), lpw(MATCH, WRAP, mt = px(8)))
-                odLine(main)
-                row.addView(strip, lpw(px(88), WRAP))
-                row.addView(main, lpw(0, WRAP, 1f, px(10)))
-                box.addView(row, lpw(MATCH, WRAP))
-                box.layoutParams = FrameLayout.LayoutParams((minOf(px(420), (sw * 0.62f).toInt()) * wf).toInt().coerceAtMost((sw * 0.96f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
-            }
-        }
+        box.layoutParams = FrameLayout.LayoutParams((minOf(px(250), (sw * 0.5f).toInt()) * wf).toInt().coerceAtMost((sw * 0.94f).toInt()), FrameLayout.LayoutParams.WRAP_CONTENT)
         paintTiles()
         return box
     }
@@ -2033,11 +1972,20 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     }
 
     /** Status Overdrive dari modul. avail = ada game terdaftar yang aktif (syarat untuk menyalakan). */
+    /** Beban Adapt dari modul (-1 = tidak beradaptasi). Roda orb dan panel berputar bila berubah. */
+    fun setAdaptLoad(l: Int) {
+        if (l == adaptLoad) return
+        adaptLoad = l
+        for (o in orbs) o.setLoad(l)
+        panelWheel?.setLoad(l)
+    }
+
     fun setOvd(on: Boolean, level: String, avail: Boolean) {
         syncProbe(avail)
         if (on == odOn && level == odLevel && avail == odAvail) return
         val modeChanged = on != odOn
         odOn = on; odLevel = level; odAvail = avail
+        if (modeChanged) { for (o in orbs) o.setPuncak(on); panelWheel?.setPuncak(on) }
         applyOvd()
         if (modeChanged) {
             val acc = accentColor()
@@ -2048,6 +1996,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun applyOvd() {
         paintThinBtns()
+        modeSw?.sync()
         val row = odRow
         if (row != null) {
             if (odOn) {
@@ -2114,6 +2063,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun applyRec() {
         paintMenu()
         segRow?.visibility = if (recOn) View.GONE else View.VISIBLE
+        modeSw?.sync()
         odRow?.visibility = if (recOn) View.GONE else View.VISIBLE
         odStatusLine?.visibility = if (recOn) View.GONE else View.VISIBLE
         topRow?.visibility = if (recOn) View.VISIBLE else View.GONE
@@ -2191,112 +2141,62 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    private inner class OrbView : View(ctx) {
+    private inner class OrbView : AdaptWheelView(ctx, { prefs.reduceAnim }) {
         var accent = accentColor()
-        private var frac = 0f
-        private var low = false
-        private var phase = 0f
-        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val rect = android.graphics.RectF()
 
-        fun setFps(v: Float) {
-            val f = (v / 90f).coerceIn(0f, 1f)
-            val nl = v in 1f..29.5f
-            var ch = false
-            if (kotlin.math.abs(f - frac) > 0.01f) { frac = f; ch = true }
-            if (nl != low) { low = nl; ch = true }
-            if (ch) invalidate()
+        init {
+            setPuncak(odOn)
+            setLoad(adaptLoad, false)
         }
 
-        /** Napas pelan sesuai mode (Hemat lambat, Puncak cepat); FPS rendah = berdenyut cepat. */
+        fun setFps(v: Float) = setLow(v in 1f..29.5f)
+
+        /** Hanya kedip skala saat mode berganti; roda sendiri diputar GPU, tidak digambar ulang per frame. */
         fun tick(now: Long) {
-            val period = if (low) 700f else if (odOn) 1200f else when (profile) {
-                else -> 2400f
-            }
-            phase = ((now % period.toLong()) / period)
-            invalidate()
             val fl = now - flashT0
             val sc = if (fl in 0L..320L) 1f + 0.16f * kotlin.math.sin(Math.PI.toFloat() * fl / 320f) else 1f
             if (scaleX != sc) { scaleX = sc; scaleY = sc }
         }
+    }
 
-        private fun shapePath(sty: Int, w: Float): Path {
-            val pth = Path(); val m = pf(2f); val c = w / 2f
-            if (sty == 3) {
-                val k = w * 0.24f
-                pth.moveTo(m + k, m); pth.lineTo(w - m, m); pth.lineTo(w - m, w - m - k); pth.lineTo(w - m - k, w - m); pth.lineTo(m, w - m); pth.lineTo(m, m + k); pth.close()
-            } else {
-                val r = c - m
-                for (i in 0 until 6) {
-                    val a = Math.toRadians(-90.0 + 60.0 * i)
-                    val x = c + (r * Math.cos(a)).toFloat(); val y = c + (r * Math.sin(a)).toFloat()
-                    if (i == 0) pth.moveTo(x, y) else pth.lineTo(x, y)
-                }
-                pth.close()
-            }
-            return pth
+    /** Pilihan mode berbentuk saklar geser: Adapt di kiri, Puncak (merah) di kanan. */
+    private inner class ModeSwitch : View(ctx) {
+        private var pos = if (odOn) 1f else 0f
+        private var anim: ValueAnimator? = null
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rr = android.graphics.RectF()
+        init { isClickable = true; setOnClickListener { markActive(); onToggle() } }
+        private fun onToggle() {
+            if (recOn) return
+            if (!odOn && !odAvail) { Toast.makeText(ctx, "\u2139 " + trn("Buka game terdaftar dulu, Puncak hanya untuk game"), Toast.LENGTH_SHORT).show(); return }
+            cycleMode()
         }
-
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat()
-            val c = w / 2f
-            val st = pf(4f)
-            val ringCol = if (low) 0xFFE5484D.toInt() else accent
-            val breath = (0.5f + 0.5f * kotlin.math.sin(phase * 2f * Math.PI.toFloat()))
-            p.style = Paint.Style.FILL
-            p.color = when (prefs.flStyle) {
-                1 -> Color.argb(250, 11, 13, 16)
-                2 -> Color.argb(95, 255, 255, 255)
-                3 -> Color.argb(250, 12, 15, 26)
-                4 -> Color.argb(250, 12, 12, 18)
-                5 -> Color.argb(250, 7, 9, 15)
-                else -> Color.argb(235, 20, 20, 22)
-            }
-            val sty = prefs.flStyle
-            if (sty == 3 || sty == 5) {
-                // bentuk sendiri per tema: 3 = kotak sudut terpotong, 5 = heksagon; isi gelap + garis neon dengan sorot berjalan
-                val sp = shapePath(sty, w)
-                canvas.drawPath(sp, p)
-                val nc = themeNeon(sty)
-                p.style = Paint.Style.STROKE; p.strokeWidth = pf(2f); p.color = (nc and 0x00FFFFFF) or 0x66000000
-                canvas.drawPath(sp, p)
-                val pm = android.graphics.PathMeasure(sp, true)
-                val len = pm.length
-                val start = (System.currentTimeMillis() % 2400L) / 2400f * len
-                val seg = Path()
-                p.strokeWidth = pf(3.2f); p.color = nc; p.strokeCap = Paint.Cap.ROUND
-                pm.getSegment(start, minOf(start + len * 0.22f, len), seg, true)
-                canvas.drawPath(seg, p)
-                if (start + len * 0.22f > len) { val s2 = Path(); pm.getSegment(0f, start + len * 0.22f - len, s2, true); canvas.drawPath(s2, p) }
-                p.style = Paint.Style.FILL
-            } else canvas.drawCircle(c, c, c - pf(1), p)
-            if (sty == 4) {                         // Dasbor Bundar: cincin merah berputar + tanda skala
-                val nc = themeNeon(4)
-                p.style = Paint.Style.STROKE; p.strokeWidth = pf(2.5f); p.color = nc; p.strokeCap = Paint.Cap.ROUND
-                rect.set(pf(2f), pf(2f), w - pf(2f), w - pf(2f))
-                val rot = (System.currentTimeMillis() % 3000L) / 3000f * 360f
-                canvas.drawArc(rect, rot, 80f, false, p)
-                canvas.drawArc(rect, rot + 180f, 80f, false, p)
-                p.strokeWidth = pf(1.2f); p.color = 0x66FFFFFF
-                for (k in 0 until 24) {
-                    val a = Math.toRadians(k * 15.0)
-                    val r1 = c - pf(3.5f); val r2 = c - pf(if (k % 6 == 0) 8f else 5.5f)
-                    canvas.drawLine(c + (r1 * Math.cos(a)).toFloat(), c + (r1 * Math.sin(a)).toFloat(), c + (r2 * Math.cos(a)).toFloat(), c + (r2 * Math.sin(a)).toFloat(), p)
-                }
-                p.style = Paint.Style.FILL
-            }
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = pf(1.5f) + pf(1.5f) * breath
-            p.color = Color.argb((50 + 110 * breath).toInt(), Color.red(ringCol), Color.green(ringCol), Color.blue(ringCol))
-            canvas.drawCircle(c, c, c - pf(1.5f), p)
-            p.strokeWidth = st
-            p.color = 0x24FFFFFF
-            val pad = pf(6f) + st / 2f
-            rect.set(pad, pad, w - pad, w - pad)
-            canvas.drawArc(rect, 0f, 360f, false, p)
-            p.color = ringCol
-            p.strokeCap = Paint.Cap.ROUND
-            canvas.drawArc(rect, -90f, 360f * frac, false, p)
+        fun sync() {
+            alpha = if (recOn) 0.45f else if (!odOn && !odAvail) 0.75f else 1f
+            val to = if (odOn) 1f else 0f
+            if (to == pos) { invalidate(); return }
+            anim?.cancel()
+            if (prefs.reduceAnim) { pos = to; invalidate(); return }
+            val a = ValueAnimator.ofFloat(pos, to)
+            a.duration = 280L
+            a.interpolator = android.view.animation.OvershootInterpolator(1.1f)
+            a.addUpdateListener { pos = (it.animatedValue as Float).coerceIn(0f, 1f); invalidate() }
+            anim = a; a.start()
+        }
+        override fun onDraw(c: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat()
+            p.style = Paint.Style.FILL; p.color = 0xFF10161E.toInt()
+            rr.set(0f, 0f, w, h); c.drawRoundRect(rr, h / 2f, h / 2f, p)
+            val tw = w / 2f - pf(3f)
+            val x = pf(3f) + (w - 2f * pf(3f) - tw) * pos
+            p.color = if (pos > 0.5f) OD else P_ADAPT
+            rr.set(x, pf(3f), x + tw, h - pf(3f)); c.drawRoundRect(rr, h / 2f, h / 2f, p)
+            p.textAlign = Paint.Align.CENTER; p.isFakeBoldText = true; p.textSize = pf(11f); p.letterSpacing = 0.08f
+            val ty = h / 2f + pf(4f)
+            p.color = if (pos < 0.5f) DARK else SEG_TEXT
+            c.drawText("ADAPT", w * 0.25f, ty, p)
+            p.color = if (pos > 0.5f) Color.WHITE else OD_TEXT
+            c.drawText("PUNCAK", w * 0.75f, ty, p)
         }
     }
 

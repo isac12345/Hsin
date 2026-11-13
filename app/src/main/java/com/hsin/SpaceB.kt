@@ -925,12 +925,12 @@ internal fun RitualOverlay(vm: AppViewModel) {
         delay(350)
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
         step = 1
-        val gProf = g?.profile ?: "balanced"
+        val gProf = g?.profile ?: "adapt"
         vm.prefs.lastGame = pkg
         // Puncak: game belum jalan di langkah ini, jadi tidak boleh dianggap sukses. Dibuktikan sesudah game dibuka (ovd start).
         val ovdWanted = opts["OVD"] == "on"
         ovdPend = ovdWanted
-        val modeOk = if (ovdWanted) true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
+        val modeOk = if (ovdWanted) true else if (gProf in PROFILE_KEYS || gProf == "adapt") Hsin.setProfile(gProf).ok else true
         setRes(1, (if (en) mode.nameEn else mode.nameId) + if (!modeOk) " ✗" else if (ovdWanted) " …" else "")
         delay(350)
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")

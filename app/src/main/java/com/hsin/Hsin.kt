@@ -94,7 +94,7 @@ object Hsin {
         if (!PKG_RE.matches(pkg)) return Root.Res(1, "ERROR: package tidak valid")
         val f = fps.replace(" ", "").ifEmpty { "30,60" }
         if (!FPS_RE.matches(f)) return Root.Res(1, "ERROR: FPS tidak valid (contoh 30,60)")
-        if (profile !in PROFILE_KEYS) return Root.Res(1, "ERROR: profil tidak valid")
+        if (profile !in PROFILE_KEYS && profile != "adapt") return Root.Res(1, "ERROR: profil tidak valid")
         return ctl("game add $pkg $f $profile", 60_000L)
     }
 

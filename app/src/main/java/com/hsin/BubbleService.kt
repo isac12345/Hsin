@@ -210,6 +210,13 @@ class BubbleService : Service() {
                     batt = s.batt
                     gamePkg = s.gamePkg
                     adaptNow = s.adaptNow
+                    val aLoad = if (effOvd(s.ovd)) -1 else adaptNow.split("|").getOrNull(1)?.toIntOrNull() ?: -1
+                    if (aLoad != lastAdaptLoad) {
+                        val first = lastAdaptLoad == -2
+                        lastAdaptLoad = aLoad
+                        floating?.setAdaptLoad(aLoad)
+                        if (!first && aLoad >= 0) SoundFx.play(prefs, "adapt$aLoad")
+                    }
                     ovdOn = effOvd(s.ovd)
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
@@ -399,6 +406,7 @@ class BubbleService : Service() {
     }
 
     @Volatile private var adaptNow = ""
+    private var lastAdaptLoad = -2
 
     private fun modeNow(): String = if (ovdOn) "Puncak" else profileLabel(profile)
 
