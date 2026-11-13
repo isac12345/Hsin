@@ -22,7 +22,7 @@ is_valid_package() {
 
 is_valid_profile() {
     case "$1" in
-        battery|balanced|performance) return 0 ;;
+        adapt|puncak|battery|balanced|performance) return 0 ;;
         *) return 1 ;;
     esac
 }

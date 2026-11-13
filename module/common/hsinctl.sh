@@ -102,7 +102,7 @@ batt_temp_mc() {
     printf '%s' $((_bt * 100))
 }
 
-valid_profile() { case "$1" in battery|balanced|performance) return 0 ;; *) return 1 ;; esac; }
+valid_profile() { case "$1" in adapt|puncak|battery|balanced|performance) return 0 ;; *) return 1 ;; esac; }
 valid_pkg() {
     case "$1" in ''|*[!A-Za-z0-9._]*) return 1 ;; esac
     case "$1" in *.*) return 0 ;; *) return 1 ;; esac
