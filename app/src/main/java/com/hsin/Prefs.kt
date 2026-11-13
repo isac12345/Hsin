@@ -18,6 +18,10 @@ class Prefs(ctx: Context) {
     var rescueEpoch: Long
         get() = sp.getLong("rescue_epoch", 0L)
         set(v) { sp.edit().putLong("rescue_epoch", v).apply() }
+    /** Toast "FPS di bawah 20" saat game; bawaan mati (mengganggu). */
+    var rescueToast: Boolean
+        get() = sp.getBoolean("rescue_toast", false)
+        set(v) { sp.edit().putBoolean("rescue_toast", v).apply() }
     var bubbleHidden: Boolean
         get() = sp.getBoolean("bubble_hidden", false)
         set(v) { sp.edit().putBoolean("bubble_hidden", v).apply() }

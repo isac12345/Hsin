@@ -236,7 +236,7 @@ class BubbleService : Service() {
                         prefs.rescueEpoch = ep
                         val why = rp.getOrNull(3)?.trim().orEmpty().ifEmpty { "tak jelas" }
                         val act = rp.getOrNull(2)?.trim().orEmpty().ifEmpty { "-" }
-                        Toast.makeText(this@BubbleService, "FPS sempat di bawah 20 (penyebab: $why). Aksi: $act", Toast.LENGTH_LONG).show()
+                        if (prefs.rescueToast) Toast.makeText(this@BubbleService, "FPS sempat di bawah 20 (penyebab: $why). Aksi: $act", Toast.LENGTH_LONG).show()
                     }
                 }
                 // baterai/suhu selalu dari sistem (tanpa su) supaya notifikasi tidak basi walau status gagal/lambat

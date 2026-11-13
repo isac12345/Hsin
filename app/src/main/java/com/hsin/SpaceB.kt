@@ -798,6 +798,8 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
             HealthRow(tx("Penjaga", "Watchdog"), h.watchdog); HealthRow(tx("Mode otomatis", "Auto mode"), h.auto)
             HSwitch("Boot guard", if (h.bootFail > 0) tx("gagal: ${h.bootFail}x", "failed: ${h.bootFail}x") else null, h.bootGuard) { vm.setBootGuard(it) }
             HBtn(tx("Cek ulang", "Recheck"), Modifier.fillMaxWidth()) { vm.checkHealth() }
+            var rescueOn by remember { mutableStateOf(vm.prefs.rescueToast) }
+            HSwitch(tx("Toast FPS di bawah 20", "Toast when FPS under 20"), tx("Pemberitahuan kecil saat game patah", "Small notice when the game stutters"), rescueOn) { rescueOn = it; vm.prefs.rescueToast = it }
             HBtn(tx("Restart monitor modul", "Restart module monitor"), Modifier.fillMaxWidth()) { vm.restartMonitor() }
             Text(tx("Setelah update modul, monitor perlu dimulai ulang agar kode barunya dimuat.", "After a module update the monitor must restart to load the new code."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
         }
