@@ -17,6 +17,14 @@ LOG_FILE="$WORK_DIR/hsin.log"
 export HSIN_LOG_FILE="$LOG_FILE"
 export HSIN_CONF_DIR="$WORK_DIR"
 
+# Rotasi log: satu berkas lama disimpan, hsin.log tidak tumbuh tanpa batas.
+# (keputusan #97; dijalankan sekali per boot, murah dan tidak mengganggu game)
+if [ -f "$LOG_FILE" ]; then
+    _log_sz=$(stat -c %s "$LOG_FILE" 2>/dev/null)
+    case "$_log_sz" in ''|*[!0-9]*) _log_sz=0 ;; esac
+    [ "$_log_sz" -gt 2097152 ] && mv -f "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null
+fi
+
 echo "=== HSIN Starting Boot Service: $(date) ===" >> "$LOG_FILE"
 echo "[BOOT] boot service dimulai (MODDIR=$MODDIR WORK_DIR=$WORK_DIR)" >> "$LOG_FILE"
 
@@ -184,6 +192,16 @@ tune_input
 
 command -v tw_apply_profile >/dev/null 2>&1 && tw_apply_profile "$ACTIVE_PROFILE"
 
+# Frame pacing/prediction: system.prop mematikan default. Kalau user sudah
+# menyalakan lewat `hsinctl framepacing on` (uji A/B, keputusan #57), pasang
+# ulang tiap boot karena resetprop tidak persisten untuk properti vendor.
+_fp_boot=$(sed -n 's/^FRAMEPACING=//p' "$WORK_DIR/app.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+if [ "$_fp_boot" = "1" ] && command -v resetprop >/dev/null 2>&1; then
+    resetprop vendor.perf.framepacing.enable true 2>/dev/null
+    resetprop persist.sys.framepredict.enable true 2>/dev/null
+    echo "[BOOT] framepacing/prediction aktif (FRAMEPACING=1)" >> "$LOG_FILE"
+fi
+
 # M2: CPU Ownership — deteksi fas-rs vs HSIN fallback
 # Bila fas-rs hidup → powercfg.sh; bila mati → tune_cpu_freq fallback
 # dengan minimum 50% hardware_max, Performance = maksimum.
@@ -197,7 +215,7 @@ fi
 
 # 5. Tulis Ringkasan Eksekusi
 echo "=== HSIN Optimization Complete ===" >> "$LOG_FILE"
-echo "Applied: $APPLIED_COUNT | Skipped: $SKIPPED_COUNT | Failed: $FAILED_COUNT" >> "$LOG_FILE"
+echo "Applied: $APPLIED_COUNT | Skipped: $SKIPPED_COUNT (tidak ada/dilewati) | Failed: $FAILED_COUNT (ditolak kernel)" >> "$LOG_FILE"
 echo "======================================" >> "$LOG_FILE"
 echo "[BOOT] tahap tuning selesai (applied=$APPLIED_COUNT skipped=$SKIPPED_COUNT failed=$FAILED_COUNT)" >> "$LOG_FILE"
 
@@ -217,7 +235,7 @@ fi
 rm -f "$WORK_DIR/.rec_pid" "$WORK_DIR/.rec_stop" "$WORK_DIR/.rec_file" "$WORK_DIR/.hud_layer" 2>/dev/null
 
 # 9.5 Auto-scan game (opsional): SCAN_AUTO=1 di app.conf. Mendaftarkan game terpasang yang ada di
-#     gamelist.seed / gamelist.user dengan profil SCAN_PROFILE (default balanced). fas-rs di-merge sekali.
+#     gamelist.seed / gamelist.user dengan profil SCAN_PROFILE (default performance). fas-rs di-merge sekali.
 if [ -f "$MODDIR/common/gamescan.sh" ] && grep -qx 'SCAN_AUTO=1' "$WORK_DIR/app.conf" 2>/dev/null; then
     (
         sleep 25

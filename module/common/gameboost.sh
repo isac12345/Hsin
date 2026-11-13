@@ -107,6 +107,13 @@ _gb_cpuset_eq() {
 _gb_write() {
     local _node="$1" _val="$2" _cat="$3"
     [ -e "$_node" ] || { _gb_log "SKIPPED" "$_cat node=$_node (not found)"; return 0; }
+    # Overdrive aktif = dia yang memegang freq; GameBoost jangan menimpa.
+    case "$_node" in
+        */cpufreq/*/scaling_min_freq|*/cpufreq/*/scaling_max_freq|*/devfreq/*/min_freq|*/devfreq/*/max_freq)
+            [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.ovd_active" ] && {
+                _gb_log "SKIPPED" "$_cat node=$_node (Overdrive aktif)"; return 0
+            } ;;
+    esac
     if [ ! -w "$_node" ]; then
         chmod 0644 "$_node" 2>/dev/null
     fi
@@ -597,7 +604,12 @@ _gb_apply_cpu() {
         _gb_log "SKIPPED" "NO_CPUSET exists, skip cpuset"
     fi
 
-    # --- uclamp (extreme 60, performance 30) ---
+    # uclamp extreme: 60 normal, 40 di HP lemah (keputusan #36) supaya task
+    # ringan tidak dipaksa ke core besar dan panas naik percuma.
+    local _gb_uclamp=60
+    [ "${DEVICE_TIER:-mid}" = "low" ] && _gb_uclamp=40
+
+    # --- uclamp (extreme 60/40, performance 30) ---
     # Di bawah GB_FASRS_OWNS_CPU: HSIN tidak menulis boost CPU apa pun (lantai,
     # uclamp, stune); fas-rs satu-satunya pemilik performa CPU. cpuset (penempatan
     # thread, bukan frekuensi) tetap diatur NO_CPUSET.
@@ -605,7 +617,7 @@ _gb_apply_cpu() {
         _gb_log "SKIPPED" "UCLAMP dilewati: fas-rs pemilik CPU (GB_FASRS_OWNS_CPU)"
     elif [ -d "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}" ]; then
         case "$_level" in
-            extreme)     _gb_write "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}/foreground/cpu.uclamp.min" "60" "UCLAMP"
+            extreme)     _gb_write "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}/foreground/cpu.uclamp.min" "${_gb_uclamp}" "UCLAMP"
                          _gb_write "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}/foreground/cpu.uclamp.max" "100" "UCLAMP" ;;
             performance) _gb_write "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}/foreground/cpu.uclamp.min" "30" "UCLAMP"
                          _gb_write "${DEV_CPUCTL_PREFIX:-/dev/cpuctl}/foreground/cpu.uclamp.max" "100" "UCLAMP" ;;
@@ -858,8 +870,7 @@ _gb_apply_io() {
 
         # read_ahead_kb (modul33 stabil: extreme 2048, performance 2048)
         case "$_level" in
-            extreme)     _gb_write "$_dev/queue/read_ahead_kb" "2048" "IO" ;;
-            performance) _gb_write "$_dev/queue/read_ahead_kb" "2048" "IO" ;;
+            extreme|performance) _gb_write "$_dev/queue/read_ahead_kb" "${GAME_IO_READ_AHEAD_KB:-2048}" "IO" ;;
         esac
     done
 }

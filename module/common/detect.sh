@@ -5,7 +5,7 @@
 # Naikkan DETECT_VERSION setiap logic deteksi berubah supaya cache lama
 # otomatis di-refresh (tanpa detect ulang tiap boot).
 
-DETECT_VERSION=3
+DETECT_VERSION=4
 
 CONF_DIR="${HSIN_CONF_DIR:-/data/adb/hsin}"
 CACHE_FILE="$CONF_DIR/detected.conf"
@@ -448,9 +448,30 @@ if [ -f "$CACHE_FILE" ] && [ -s "$CACHE_FILE" ] && [ "${HSIN_FORCE_DETECT:-0}" !
     DETECT_VERSION="$HSIN_SCRIPT_DETECT_VERSION"
 fi
 
+# Keputusan #92: HP lemah ditentukan RAM + ro.config.low_ram + jumlah core.
+# Tanpa gate RAM (#91): angka RAM hanya salah satu sinyal, bukan syarat tunggal.
+detect_device_tier() {
+    local ram_mb=0 cores=0 lowram=0
+    ram_mb=$(awk '/^MemTotal:/{print int($2/1024); exit}' /proc/meminfo 2>/dev/null)
+    case "$ram_mb" in ''|*[!0-9]*) ram_mb=0 ;; esac
+    cores=$(ls -d "${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}"/cpu[0-9]* 2>/dev/null | wc -l | tr -d '[:space:]')
+    case "$cores" in ''|*[!0-9]*) cores=0 ;; esac
+    [ "$(getprop ro.config.low_ram 2>/dev/null)" = "true" ] && lowram=1
+    DEVICE_RAM_MB="$ram_mb"
+    CPU_CORES="$cores"
+    if [ "$lowram" = "1" ] || [ "$cores" -le 4 ] 2>/dev/null || { [ "$ram_mb" -gt 0 ] && [ "$ram_mb" -le 3072 ]; }; then
+        DEVICE_TIER="low"
+    elif [ "$ram_mb" -ge 6144 ] 2>/dev/null && [ "$cores" -ge 8 ] 2>/dev/null; then
+        DEVICE_TIER="high"
+    else
+        DEVICE_TIER="mid"
+    fi
+}
+
 mkdir -p "$CONF_DIR"
 
 CHIPSET_FAMILY=$(detect_chipset_family)
+detect_device_tier
 SOC_VENDOR=$(detect_soc)
 CPU_POLICIES=$(detect_cpu_policies_sorted)
 STORAGE_DEVICES=$(detect_storage)
@@ -482,6 +503,11 @@ GPU_DEVFREQ_PATH="$GPU_DEVFREQ_PATH"
 THERMAL_SUPPORTED="$THERMAL_SUPPORTED"
 THERMAL_PATH="$THERMAL_PATH"
 THERMAL_TYPE="$THERMAL_TYPE"
+DEVICE_TIER="$DEVICE_TIER"
+DEVICE_RAM_MB="$DEVICE_RAM_MB"
+CPU_CORES="$CPU_CORES"
+# DEVICE_TIER: low | mid | high (keputusan #92). low = uclamp 40, target 30 FPS,
+# preload game mati, tweak yang dilewati dicatat (keputusan #95).
 # Arti nilai eksplisit:
 # CHIPSET_FAMILY=unisoc -> device Unisoc (folder asopt terdeteksi).
 # CHIPSET_FAMILY=mtk -> device MediaTek modern (fpsgo ada, tanpa /proc/ppm).

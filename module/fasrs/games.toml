@@ -12,18 +12,21 @@ scene_game_list = true
 # Tambah/hapus baris di bawah untuk game baru, format:
 #   "nama.package" = [fps1, fps2, ...]   atau   "nama.package" = fps_tunggal
 
+# Otoritas termal saat game = HSIN (monitor.sh), bukan fas-rs. Ambang fas-rs
+# dinaikkan supaya tidak memotong lebih dulu: HSIN step-down di 75/85/95C
+# (atau 95% trip kernel), Puncak berhenti di 105C. fas-rs hanya jaring terakhir.
 [powersave]
 margin_fps = 3.0
-core_temp_thresh = 80000
+core_temp_thresh = 90000
 
 [balance]
 margin_fps = 1.0
-core_temp_thresh = 90000
+core_temp_thresh = 95000
 
 [performance]
 margin_fps = 0.3
-core_temp_thresh = 95000
+core_temp_thresh = 100000
 
 [fast]
 margin_fps = 0
-core_temp_thresh = 95000
+core_temp_thresh = 105000

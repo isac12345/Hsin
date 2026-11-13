@@ -80,6 +80,17 @@ apply_tweak() {
         return 0
     fi
     
+    # Overdrive memegang freq CPU/GPU selama aktif; apply profil di tengah sesi
+    # game tidak boleh mengembalikannya. Overdrive menulis lewat jalurnya sendiri.
+    case "$path" in
+        */cpufreq/*/scaling_min_freq|*/cpufreq/*/scaling_max_freq|*/devfreq/*/min_freq|*/devfreq/*/max_freq)
+            if [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.ovd_active" ]; then
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                log_msg "SKIPPED" "$category" "path=$path (Overdrive aktif)"
+                return 0
+            fi ;;
+    esac
+
     # Mode dry-run untuk testing/simulasi tanpa menyentuh kernel
     if [ "${HSIN_DRYRUN:-0}" = "1" ]; then
         APPLIED_COUNT=$((APPLIED_COUNT + 1))
@@ -120,8 +131,8 @@ apply_tweak() {
                 return 0
             fi
             if [ "$before_rc" -eq 0 ] && [ "$after_val" = "$before_val" ]; then
-                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-                log_msg "SKIPPED" "$category" "path=$path value=$value (kernel menolak nilai, dibiarkan)"
+                FAILED_COUNT=$((FAILED_COUNT + 1))
+                log_msg "FAILED" "$category" "path=$path value=$value (kernel menolak nilai, nilai tidak berubah)"
                 return 0
             fi
             APPLIED_COUNT=$((APPLIED_COUNT + 1))
@@ -129,13 +140,13 @@ apply_tweak() {
             log_msg "WARN" "$category" "verifikasi mismatch: current=$after_val target=$value ($path)"
             return 0
         else
-            SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-            log_msg "SKIPPED" "$category" "path=$path value=$value (kernel menolak tulis, dibiarkan)"
+            FAILED_COUNT=$((FAILED_COUNT + 1))
+            log_msg "FAILED" "$category" "path=$path value=$value (kernel menolak tulis)"
             return 0
         fi
     else
-        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-        log_msg "SKIPPED" "$category" "path=$path (tidak bisa ditulis di kernel ini, dibiarkan)"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        log_msg "FAILED" "$category" "path=$path (tidak bisa ditulis di kernel ini)"
         return 0
     fi
 }
@@ -935,7 +946,11 @@ tune_io() {
         apply_tweak "$category" "$q_dir/add_random" "$IO_ADD_RANDOM"
         apply_tweak "$category" "$q_dir/iostats" "$IO_IOSTATS"
         apply_tweak "$category" "$q_dir/nomerges" "$IO_NOMERGES"
-        apply_tweak "$category" "$q_dir/read_ahead_kb" "$IO_READ_AHEAD_KB"
+        _io_ra="$IO_READ_AHEAD_KB"
+        # Saat game aktif, read_ahead milik sesi game (2048). Tanpa ini apply profil di
+        # tengah game menimpa 2048 balik ke 32 dan membuat loading tekstur tersendat.
+        [ -f "${HSIN_STATE_DIR:-${LOG_FILE%/*}}/.gh_active" ] && _io_ra="${GAME_IO_READ_AHEAD_KB:-2048}"
+        apply_tweak "$category" "$q_dir/read_ahead_kb" "$_io_ra"
         # Elevator: pilih preferensi profil pertama yang ADA di kernel.
         # (sio pra-4.x tidak dicantumkan di profiles: selalu SKIP di kernel
         # modern.) gameboost menimpa mq-deadline saat boost + restore native;

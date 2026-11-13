@@ -666,6 +666,8 @@ _gh_preload() {
     _gpl_pkg="$1"
     [ "$(gh_opt_get "$_gpl_pkg" preload off)" = on ] || return 0
     gh_feat_ok preload || return 0
+    # Keputusan #75: di HP lemah page cache preload memakan RAM yang dibutuhkan game.
+    [ "${DEVICE_TIER:-mid}" = "low" ] && { _gh_log SKIPPED "preload $_gpl_pkg dilewati: DEVICE_TIER=low"; return 0; }
     command -v pm >/dev/null 2>&1 || return 0
     _gpl_now=$(_gh_now); _gh_num "$_gpl_now" || return 0
     _gpl_cd=$(_gh_conf PRELOAD_COOLDOWN 600); _gh_num "$_gpl_cd" || _gpl_cd=600

@@ -114,6 +114,9 @@ PERFORMANCE_IO_NOMERGES=2
 # Read-ahead kecil ala GTurbo: data game_NON-sequential (zip/asset texture
 # acak). 256 KB = prefetch sia-sia yang menabrak fragmentasi saat write dirty.
 PERFORMANCE_IO_READ_AHEAD_KB=32
+# Nilai read_ahead saat game aktif (keputusan #14). Dipakai engine dan gameboost
+# supaya keduanya menulis angka yang sama; 32 hanya untuk idle.
+GAME_IO_READ_AHEAD_KB=2048
 PERFORMANCE_IO_SCHED_PREFERENCE="kyber mq-deadline"
 PERFORMANCE_VM_SWAPPINESS=40
 PERFORMANCE_VM_VFS_CACHE_PRESSURE=50

@@ -28,17 +28,38 @@ if [ -z "$pkg_list" ]; then
 else
     regex_val=""
     for pkg in $pkg_list; do
-        # escape titik supaya jadi literal match, bukan wildcard regex
-        esc_pkg=$(printf '%s' "$pkg" | sed 's/[.]/\\./g')
+        # Titik dibiarkan: sed sudah tidak bisa menulis backslash lewat
+        # replacement, dan pola "com.a.b" tetap cocok dengan nama paket asli.
         if [ -z "$regex_val" ]; then
-            regex_val="$esc_pkg"
+            regex_val="$pkg"
         else
-            regex_val="$regex_val|$esc_pkg"
+            regex_val="$regex_val|$pkg"
         fi
     done
 fi
 
-# Timpa nilai "regex" milik rule "Alpha-FasrsManaged" saja (idempotent,
-# aman dijalankan berkali-kali tiap boot walau games.toml berubah-ubah).
-sed -i '/"name": "Alpha-FasrsManaged"/{n;s#"regex": *".*"#"regex": "'"$regex_val"'"#
+LOG="${HSIN_LOG_FILE:-/data/adb/hsin/hsin.log}"
+
+# Tulis lalu BACA BALIK. Tanpa ini, sed yang gagal senyap membuat uperf dan
+# fas-rs sama-sama menangani game yang sama (temuan T22).
+set_regex() {
+    sed -i '/"name": "Alpha-FasrsManaged"/{n;s#"regex": *".*"#"regex": "'"$regex_val"'"#
 }' "$UPERF_JSON"
+}
+
+read_regex() {
+    sed -n '/"name": "Alpha-FasrsManaged"/{n;s/.*"regex": *"\([^"]*\)".*/\1/p;}' "$UPERF_JSON" 2>/dev/null | head -n 1
+}
+
+set_regex
+_ur=$(read_regex)
+[ "$_ur" = "$regex_val" ] || set_regex
+_ur=$(read_regex)
+if [ "$_ur" != "$regex_val" ]; then
+    printf '[%s] [UPERF] [FAILED] regex exclusion uperf tidak sesuai (dapat=%s harap=%s)\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${_ur:-kosong}" "${regex_val:-kosong}" >> "$LOG" 2>/dev/null
+    exit 1
+fi
+printf '[%s] [UPERF] [APPLIED] regex exclusion=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${regex_val:-kosong}" >> "$LOG" 2>/dev/null
+exit 0

@@ -40,6 +40,7 @@
 #   tweak caps|list|get <KEY>|set <KEY> <VAL>|reset|profile <mode>   tweak global (display/perf/tools), BUKAN per game
 #   gamefps get <pkg> | set <pkg> <10-240|off>   satu nilai FPS: batas FPS game + refresh layar (digabung)
 #   modinfo                   module.prop
+#   diagnose                  ringkasan satu kali baca: mode, pemilik CPU, suhu, FPS/1% low, gagal apply terakhir
 
 COMMON="$(dirname "$(readlink -f "$0")")"
 MODDIR="$(dirname "$COMMON")"
@@ -292,7 +293,7 @@ cmd_game() {
     case "$1" in
         add)
             valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
-            _fps="${3:-30,60}"; _pr="${4:-balanced}"
+            _fps="${3:-30,60}"; _pr="${4:-performance}"
             sh "$COMMON/game_add.sh" add "$2" "$_fps" "$_pr"
             ;;
         remove)
@@ -522,6 +523,98 @@ cmd_health() {
     printf 'ver=%s\n' "$(sed -n 's/^versionCode=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
 }
 
+# Statistik frame dari fpsd.out: rata-rata FPS, 1% low, dan jeda terpanjang.
+# Hanya baca berkas, tidak menjalankan apa pun ke perangkat.
+diag_fps_stats() {
+    [ -r "$1" ] || return 1
+    _dfs_lat=$(sed -n 's/^lat=//p' "$1" 2>/dev/null | head -n 1)
+    [ -n "$_dfs_lat" ] || return 1
+    printf '%s\n' "$_dfs_lat" | awk '
+        {
+            n = 0
+            for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
+            if (n < 3) exit 1
+            m = 0
+            for (i = 2; i <= n; i++) { d = t[i] - t[i - 1]; if (d > 0) { m++; dt[m] = d } }
+            if (m < 3) exit 1
+            tot = 0
+            for (i = 1; i <= m; i++) { tot += dt[i]; a[i] = dt[i] }
+            for (i = 2; i <= m; i++) { k = a[i]; j = i - 1; while (j > 0 && a[j] > k) { a[j + 1] = a[j]; j-- } a[j + 1] = k }
+            idx = int(m * 0.99); if (idx < 1) idx = 1; if (idx > m) idx = m
+            printf "fps_avg=%d\nfps_p1=%d\nstall_ms=%d\nframes=%d\n", int(1000000000 * m / tot), int(1000000000 / a[idx]), int(a[m] / 1000000), m
+        }'
+}
+
+cmd_diagnose() {
+    _dg_cur=$(rd "$STATE_DIR/current_state"); [ -n "$_dg_cur" ] || _dg_cur=none
+    _dg_act=$(rd "$STATE_DIR/active_profile"); [ -n "$_dg_act" ] || _dg_act=none
+    echo "diag=1"
+    printf 'ver=%s\n' "$(sed -n 's/^versionCode=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
+    printf 'profile=%s\nactive=%s\n' "$_dg_cur" "$_dg_act"
+
+    if [ -r "$FASRS_NODE" ] || pidof fas-rs >/dev/null 2>&1; then
+        echo cpu_owner=fas-rs
+    else
+        echo cpu_owner=hsin
+    fi
+
+    if [ -f "$STATE_DIR/.ovd_active" ]; then _dg_ovd=1; else _dg_ovd=0; fi
+    printf 'ovd=%s\n' "$_dg_ovd"
+
+    _dg_pkg=$(rd "$STATE_DIR/.gh_active")
+    _dg_secs=0
+    if [ -f "$STATE_DIR/.game_t0" ]; then
+        read -r _dg_t0 _dg_gp < "$STATE_DIR/.game_t0" 2>/dev/null
+        [ -n "$_dg_gp" ] && _dg_pkg=$_dg_gp
+        _dg_now=$(uptime_secs)
+        case "$_dg_t0" in
+            ''|*[!0-9]*) ;;
+            *) [ -n "$_dg_now" ] && _dg_secs=$((_dg_now - _dg_t0)) ;;
+        esac
+        [ "$_dg_secs" -ge 0 ] 2>/dev/null || _dg_secs=0
+    fi
+    printf 'game_pkg=%s\ngame_secs=%s\n' "${_dg_pkg:-none}" "$_dg_secs"
+
+    _dg_soc=$(max_temp_mc); case "$_dg_soc" in ''|*[!0-9]*) _dg_soc=0 ;; esac
+    _dg_bat=$(batt_temp_mc); case "$_dg_bat" in ''|*[!0-9]*) _dg_bat=0 ;; esac
+    printf 'soc_temp_c=%s\n' "$((_dg_soc / 1000))"
+    printf 'batt_temp_c=%s\n' "$((_dg_bat / 1000))"
+    printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
+
+    _dg_fs=$(rd "$STATE_DIR/fpsd.status")
+    printf 'fps_src=%s\n' "${_dg_fs:-na}"
+    diag_fps_stats "$STATE_DIR/fpsd.out" || printf 'fps_avg=na\nfps_p1=na\nstall_ms=na\nframes=0\n'
+
+    if [ -r "$LOG_FILE" ]; then
+        _dg_tail=$(tail -n 500 "$LOG_FILE" 2>/dev/null)
+        printf 'apply_applied=%s\n' "$(printf '%s\n' "$_dg_tail" | grep -c '\[APPLIED\]')"
+        printf 'apply_skipped=%s\n' "$(printf '%s\n' "$_dg_tail" | grep -c '\[SKIPPED\]')"
+        printf 'apply_failed=%s\n' "$(printf '%s\n' "$_dg_tail" | grep -c '\[FAILED\]')"
+    else
+        printf 'apply_applied=na\napply_skipped=na\napply_failed=na\n'
+    fi
+
+    _dg_sl=$(tail -n 1 "$STATE_DIR/sessions.log" 2>/dev/null)
+    printf 'sessions_last=%s\n' "${_dg_sl:-na}"
+
+    _dg_warn=""
+    # Lantai 20 FPS hanya untuk sesi game (keputusan #4). Aplikasi biasa yang sedang
+    # di depan memang boleh lambat; jangan bikin peringatan palsu.
+    _dg_p1=$(diag_fps_stats "$STATE_DIR/fpsd.out" 2>/dev/null | sed -n 's/^fps_p1=//p')
+    if [ "${_dg_pkg:-none}" != none ]; then
+        case "$_dg_p1" in
+            ''|na) ;;
+            *) [ "$_dg_p1" -lt 20 ] 2>/dev/null && _dg_warn="below_20_fps" ;;
+        esac
+    fi
+    [ "$_dg_soc" -ge 100000 ] 2>/dev/null && _dg_warn="${_dg_warn:+$_dg_warn,}soc_hot"
+    if [ "$_dg_ovd" = 1 ] && [ "$_dg_cur" != performance ]; then
+        _dg_warn="${_dg_warn:+$_dg_warn,}ovd_profile_mismatch"
+    fi
+    printf 'warn=%s\n' "${_dg_warn:-none}"
+    return 0
+}
+
 cmd_device() { [ -f "$STATE_DIR/detected.conf" ] && cat "$STATE_DIR/detected.conf"; return 0; }
 
 cmd_redetect() {
@@ -556,6 +649,37 @@ cmd_log() {
     [ "$_n" -le 3000 ] || _n=3000
     [ -f "$LOG_FILE" ] && tail -n "$_n" "$LOG_FILE"
     return 0
+}
+
+# Frame pacing/prediction: default mati di system.prop. Keputusan #57 minta uji
+# A/B dulu, jadi ada sakelar runtime (bukan ubah system.prop + reboot).
+cmd_framepacing() {
+    _fp_cfg="$STATE_DIR/app.conf"
+    _fp_cur=$(getprop vendor.perf.framepacing.enable 2>/dev/null)
+    case "$1" in
+        on|off)
+            [ "$1" = "on" ] && _fp=1 || _fp=0
+            touch "$_fp_cfg" 2>/dev/null
+            grep -v '^FRAMEPACING=' "$_fp_cfg" > "$_fp_cfg.tmp.$$" 2>/dev/null
+            printf 'FRAMEPACING=%s\n' "$_fp" >> "$_fp_cfg.tmp.$$"
+            mv -f "$_fp_cfg.tmp.$$" "$_fp_cfg" 2>/dev/null
+            if [ "$_fp" = "1" ]; then _fp_v=true; else _fp_v=false; fi
+            if command -v resetprop >/dev/null 2>&1; then
+                resetprop vendor.perf.framepacing.enable "$_fp_v" 2>/dev/null
+                resetprop persist.sys.framepredict.enable "$_fp_v" 2>/dev/null
+            else
+                setprop vendor.perf.framepacing.enable "$_fp_v" 2>/dev/null
+                setprop persist.sys.framepredict.enable "$_fp_v" 2>/dev/null
+            fi
+            echo "OK: framepacing=$1 (aktif=$(getprop vendor.perf.framepacing.enable 2>/dev/null), bertahan setelah reboot)"
+            ;;
+        status|'')
+            _fp_saved=$(sed -n 's/^FRAMEPACING=//p' "$_fp_cfg" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+            printf 'framepacing=%s\nframepredict=%s\ntersimpan=%s\n' \
+                "${_fp_cur:-na}" "$(getprop persist.sys.framepredict.enable 2>/dev/null || echo na)" "${_fp_saved:-0}"
+            ;;
+        *) echo "Usage: hsinctl framepacing on|off|status"; return 1 ;;
+    esac
 }
 
 cmd_tweak() {
@@ -612,6 +736,7 @@ case "$1" in
     game) cmd_game "$2" "$3" "$4" "$5" ;;
     sessions) cmd_sessions "$2" ;;
     health) cmd_health ;;
+    diagnose) cmd_diagnose ;;
     device) cmd_device ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
@@ -635,6 +760,7 @@ case "$1" in
     gamefx) cmd_gamefx "$2" "$3" "$4" "$5" ;;
     gamefps) cmd_gamefps "$2" "$3" "$4" ;;
     tweak) cmd_tweak "$2" "$3" "$4" ;;
+    framepacing) cmd_framepacing "$2" ;;
     mitigation) cmd_mitigation "$2" "$3" "$4" ;;
     shield) shift; sh "$COMMON/shield.sh" "$@" ;;
     bugreport) sh "$COMMON/bugreport.sh" ;;

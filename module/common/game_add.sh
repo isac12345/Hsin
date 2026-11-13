@@ -6,7 +6,7 @@
 #
 # add: tambah/ubah game ke REPO fasrs/games.toml, sentuh merge flag
 #      untuk service.sh, sync uperf exclusion, tulis game_profile_map.conf.
-#      Default fps="30,60", default profile="balanced".
+#      Default fps="30,60", default profile="performance" (game baru langsung dapat boost).
 # list: tampilkan gabungan games.toml + uperf regex + status asoulopt.
 #
 # CATATAN:
@@ -26,7 +26,7 @@ UPERF_JSON="/sdcard/Android/yc/uperf/uperf.json"
 SYNC_SCRIPT="$MODDIR/sync_uperf_exclusion.sh"
 
 DEFAULT_FPS="30,60"
-DEFAULT_PROFILE="balanced"
+DEFAULT_PROFILE="performance"
 
 # ---------- helpers ----------
 
@@ -360,7 +360,7 @@ case "$1" in
         echo ""
         echo "  add <pkg> [fps_csv] [profile]"
         echo "    Tambah game ke fas-rs games.toml + uperf exclusion + profile map."
-        echo "    Default fps=30,60  Default profile=balanced"
+        echo "    Default fps=30,60  Default profile=performance"
         echo "    Contoh: game_add.sh add com.example.game"
         echo "            game_add.sh add com.example.game 60"
         echo "            game_add.sh add com.example.game 30,60,90 performance"
