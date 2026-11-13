@@ -25,7 +25,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#define MAXTS 70
+#define MAXTS 150              /* frame terakhir per dump (cukup untuk 120 Hz) */
+#define HIST 1200              /* riwayat frame untuk 1% low: ~10 dtk @120 Hz */
+#define WINDOW_NS 10000000000LL
 #define OUTBUF (256 * 1024)
 
 /* Header binder_manager.h tidak ada di semua NDK, jadi libbinder_ndk.so dimuat saat jalan (dlopen) dan
@@ -51,6 +53,22 @@ static volatile sig_atomic_t g_stop = 0;
 static void on_sig(int s) { (void)s; g_stop = 1; }
 
 static AIBinder *g_sf = NULL;
+
+/* Riwayat frame lintas dump. Tanpa ini fpsd.out hanya berisi ~1 dtk terakhir,
+ * sehingga "1% low" cuma frame terburuk dalam 1 dtk, bukan angka yang jujur. */
+static long long hist[HIST];
+static int hist_n = 0, hist_pos = 0;
+static long long hist_last = 0;
+
+static void hist_reset(void) { hist_n = 0; hist_pos = 0; hist_last = 0; }
+
+static void hist_add(long long t) {
+    if (t <= hist_last) return;            /* dump berikutnya mengulang frame yang sudah ada */
+    hist_last = t;
+    hist[hist_pos] = t;
+    hist_pos = (hist_pos + 1) % HIST;
+    if (hist_n < HIST) hist_n++;
+}
 
 static int sf_connect(void) {
     if (g_sf) return 0;
@@ -220,6 +238,7 @@ int main(int argc, char **argv) {
         if (strcmp(pkg, cur_pkg) != 0) {
             snprintf(cur_pkg, sizeof cur_pkg, "%s", pkg);
             layer[0] = 0; stale = 0; prevlast = 0;
+            hist_reset();
         }
         if (sf_connect() != 0) {
             write_file(dir, "fpsd.status", "binder-fail\n");
@@ -244,8 +263,14 @@ int main(int argc, char **argv) {
         if (n >= 3) {
             fail_run = 0;
             prevlast = last;
+            for (int i = 0; i < n; i++) hist_add(ts[i]);
+            int start = (hist_pos - hist_n + HIST) % HIST;
+            int cnt = hist_n;
+            long long oldest = hist_last - WINDOW_NS;
+            while (cnt > 3 && hist[start] < oldest) { start = (start + 1) % HIST; cnt--; }
             int o = snprintf(out, 128, "pkg=%s\nstatus=ok\nlat=", cur_pkg);
-            for (int i = 0; i < n; i++) o += snprintf(out + o, 32, " %lld", ts[i]);
+            for (int i = 0; i < cnt; i++)
+                o += snprintf(out + o, 32, " %lld", hist[(start + i) % HIST]);
             out[o++] = '\n'; out[o] = 0;
             write_file(dir, "fpsd.out", out);
             write_file(dir, "fpsd.status", "ok\n");
