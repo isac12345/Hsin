@@ -59,6 +59,10 @@ GB_COOLDOWN_SECS=60
 # GAME-SNAPSHOT: 1x per sesi game, GAME_SNAP_AFTER_SECS detik sejak game
 # jadi foreground. Murni baca + log (nol perubahan perilaku).
 GAME_T0_FILE="$STATE_DIR/.game_t0"
+# Hasil pengukuran terakhir dari check_fps_floor, dipakai adapt.sh tanpa
+# menghitung ulang (hemat satu awk tiap tick).
+FPS_LAST_P1=""
+FPS_LAST_STALL=""
 GAME_SNAP_DONE_FILE="$STATE_DIR/.game_snap_done"
 GAME_SNAP_AFTER_SECS=60
 # Snapshot berulang tiap N dtk selama game foreground (visibilitas sesi panjang:
@@ -108,6 +112,9 @@ if [ -f "$MODDIR/gamehooks.sh" ]; then
 else
     monitor_log "GAMEHOOK" "WARN: gamehooks.sh tidak ada, ekstra game dilewati"
 fi
+# adapt.sh: beban adaptif per game (ide "adaptasi tanpa batas"). Butuh
+# FPS_LAST_* dari check_fps_floor; aman kalau berkasnya tidak ada.
+[ -f "$MODDIR/adapt.sh" ] && . "$MODDIR/adapt.sh" 2>/dev/null
 # CPU_POLICIES untuk gb_apply: service.sh tidak mengekspornya ke proses
 # ini; tanpa ini lantai CPU diam-diam skip (for kosong, tanpa log).
 # detected.conf murni assignment (dari detect.sh sendiri) jadi aman.
@@ -586,6 +593,8 @@ handle_foreground_event() {
             monitor_uptime
             printf '%s %s\n' "${MONITOR_UP:-0}" "$handle_pkg" > "$GAME_T0_FILE" 2>/dev/null
             rm -f "$GAME_SNAP_DONE_FILE" 2>/dev/null
+            # Beban adaptif: pilih dari hasil sesi sebelumnya lalu pasang.
+            command -v ad_begin >/dev/null 2>&1 && ad_begin "$handle_pkg"
         fi
         if [ "$gb_active" != "1" ]; then
             # Check DISABLE_GAMEBOOST gate
@@ -999,6 +1008,7 @@ check_gb_grace_period() {
             _gb_unforce_level
             sh "$MODDIR/apply_now.sh" "$manual_prof" monitor >> "$LOG_FILE" 2>&1
             monitor_log "GAMEBOOST" "RESTORED after ${GB_GRACE}s grace, profile=$manual_prof dipasang ulang"
+            command -v ad_end >/dev/null 2>&1 && ad_end
             rm -f "$GB_PENDING_FILE"
         fi
     fi
@@ -1228,6 +1238,8 @@ check_fps_floor() {
     _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out") || return 0
     _ff_p1=${_ff_stat%% *}
     _ff_stall=${_ff_stat##* }
+    FPS_LAST_P1=$_ff_p1
+    FPS_LAST_STALL=$_ff_stall
     case "$_ff_p1" in ''|*[!0-9]*) return 0 ;; esac
 
     _ff_cnt=0
@@ -1343,6 +1355,7 @@ run_event_supervised_loop() {
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
         check_fps_floor "$monitor_foreground_package"
+        command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard
@@ -1390,6 +1403,7 @@ run_polling_loop() {
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
         check_fps_floor "$monitor_foreground_package"
+        command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard

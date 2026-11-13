@@ -758,14 +758,20 @@ _gb_apply_gpu() {
     fi
 
     # --- kbase ---
+    # Nilai bisa dititipkan adapt.sh (beban adaptif per game). Penulis tetap
+    # satu: gameboost. Default 1/1/30 = agresif seperti sebelumnya.
     local _kbase="$SYSFS_MODULE_PREFIX/mali_kbase/parameters"
+    local _kb_boost="${GB_KBASE_BOOST:-1}" _kb_poll="${GB_KBASE_POLL:-1}" _kb_up="${GB_KBASE_UP:-30}"
+    case "$_kb_boost" in ''|*[!0-9]*) _kb_boost=1 ;; esac
+    case "$_kb_poll"  in ''|*[!0-9]*) _kb_poll=1 ;; esac
+    case "$_kb_up"    in ''|*[!0-9]*) _kb_up=30 ;; esac
     if [ -d "$_kbase" ]; then
         [ -w "$_kbase/gpu_boost_level2" ] && \
-            _gb_write "$_kbase/gpu_boost_level2" "1" "GPU_KBASE"
+            _gb_write "$_kbase/gpu_boost_level2" "$_kb_boost" "GPU_KBASE"
         [ -w "$_kbase/gpu_pollingtime" ] && \
-            _gb_write "$_kbase/gpu_pollingtime" "1" "GPU_KBASE"
+            _gb_write "$_kbase/gpu_pollingtime" "$_kb_poll" "GPU_KBASE"
         [ -w "$_kbase/gpu_upthreshold" ] && \
-            _gb_write "$_kbase/gpu_upthreshold" "30" "GPU_KBASE"
+            _gb_write "$_kbase/gpu_upthreshold" "$_kb_up" "GPU_KBASE"
     fi
 
     # --- MTK ged_dvfs_boost ---

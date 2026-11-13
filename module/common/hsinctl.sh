@@ -617,6 +617,35 @@ cmd_diagnose() {
 
 cmd_device() { [ -f "$STATE_DIR/detected.conf" ] && cat "$STATE_DIR/detected.conf"; return 0; }
 
+# Beban adaptif per game (adapt.sh): lihat apa yang modul pelajari.
+cmd_adapt() {
+    _ad="$STATE_DIR/adapt"
+    case "$1" in
+        ''|list)
+            if [ ! -d "$_ad" ]; then
+                echo "adapt=belum ada data (jalankan game sekali)"
+                return 0
+            fi
+            for _f in "$_ad"/*.conf; do
+                [ -f "$_f" ] || continue
+                _p=${_f##*/}; _p=${_p%.conf}
+                printf '%s beban=%s sesi=%s p1_min=%s rata=%s jank=%s%% stall=%sms terakhir=%s\n' \
+                    "$_p" \
+                    "$(sed -n 's/^beban=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^sesi=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^p1_min=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^p1_avg=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^jank_pct=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^stall_max=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^terakhir=//p' "$_f" | tail -n 1)"
+            done
+            ;;
+        get) [ -n "$2" ] && cat "$_ad/$2.conf" 2>/dev/null ;;
+        reset) rm -rf "$_ad" 2>/dev/null; echo "OK: data adaptasi dihapus, beban awal dari DEVICE_TIER" ;;
+        *) echo "Usage: hsinctl adapt [list|get <paket>|reset]"; return 1 ;;
+    esac
+}
+
 cmd_redetect() {
     rm -f "$STATE_DIR/detected.conf" 2>/dev/null
     HSIN_FORCE_DETECT=1 sh "$COMMON/detect.sh" >/dev/null 2>&1
@@ -738,6 +767,7 @@ case "$1" in
     health) cmd_health ;;
     diagnose) cmd_diagnose ;;
     device) cmd_device ;;
+    adapt) cmd_adapt "$2" "$3" ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
     gamerender) cmd_gamerender "$2" "$3" "$4" ;;
