@@ -270,9 +270,11 @@ data class FpsFile(
                 ov * 2 >= n -> "OVERDRIVE"
                 else -> profileLabel(prof.maxByOrNull { it.value }?.key ?: "").uppercase()
             }
+            // ambang relatif ke target sesi (persentil 95, minimal 20): mulus >= 90% target, patah < 60% target
+            val ref = maxOf(20.0, sorted[((sorted.size - 1) * 0.95).toInt()])
             return FpsFile(
                 name, pkg, last.toInt(), fps.average(), low,
-                fps.count { it >= 27.0 } * 100 / fps.size, fps.count { it < 15.0 } * 100 / fps.size,
+                fps.count { it >= ref * 0.9 } * 100 / fps.size, fps.count { it < ref * 0.6 } * 100 / fps.size,
                 temps.minOrNull() ?: 0, temps.maxOrNull() ?: 0, mode,
                 fps.map { it.toFloat() }.toFloatArray(), cpuL.toFloatArray(), gpuL.toFloatArray(), tL.toFloatArray(),
             )
