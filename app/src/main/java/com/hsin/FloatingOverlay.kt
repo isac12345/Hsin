@@ -1153,12 +1153,12 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 dimA += (wantDim - dimA) * 0.12f
                 r.alpha = dimA
             }
-            if (now - lastTick >= 33L) {
+            if (now - lastTick >= 90L) {
                 lastTick = now
                 for (o in orbs) o.tick(now)
                 if (prefs.flStyle >= 3 && fpsTextOn) {
                     val d = fpsTarget - fpsDisp
-                    fpsDisp = if (kotlin.math.abs(d) > 0.4f) fpsDisp + d * 0.3f else fpsTarget
+                    fpsDisp = if (kotlin.math.abs(d) > 0.4f) fpsDisp + d * 0.6f else fpsTarget
                     val txt = fpsDisp.toInt().toString()
                     val fl = now < flashUntil
                     setText(fpsPill, txt); setText(fpsMenu, txt); setText(fpsThin, txt)
@@ -1177,7 +1177,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             }
             // animasi mati: tidak minta frame tiap vsync kalau tidak ada yang bergerak
             val moving = enterT0 != 0L || snapping || mode == MODE_MENU || scanView?.visibility == View.VISIBLE || kotlin.math.abs(dimA - wantDim) > 0.01f
-            if (!moving) r.postDelayed(this, if (prefs.reduceAnim) 200L else 33L) else r.postOnAnimation(this)
+            if (!moving) r.postDelayed(this, if (prefs.reduceAnim) 250L else 100L) else r.postOnAnimation(this)
         }
     }
 
@@ -1846,7 +1846,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val nb = textView("--", 16f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.04f }
         fpsBig = nb
         fpsBigLbl = fpsLabel(10f, 0.1f)
-        val wheel = AdaptWheelView(ctx) { prefs.reduceAnim }
+        val wheel = AdaptWheelView(ctx) { prefs.animMode == 2 }
         wheel.setPuncak(odOn); wheel.setLoad(adaptLoad, false)
         panelWheel = wheel
         val wheelBox = FrameLayout(ctx)
@@ -2135,7 +2135,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    private inner class OrbView : AdaptWheelView(ctx, { prefs.reduceAnim }) {
+    private inner class OrbView : AdaptWheelView(ctx, { prefs.animMode == 2 }) {
         var accent = accentColor()
 
         init {
@@ -2167,7 +2167,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             val to = if (odOn) 1f else 0f
             if (to == pos) { invalidate(); return }
             anim?.cancel()
-            if (prefs.reduceAnim) { pos = to; invalidate(); return }
+            if (prefs.animMode == 2) { pos = to; invalidate(); return }
             val a = ValueAnimator.ofFloat(pos, to)
             a.duration = 280L
             a.interpolator = android.view.animation.OvershootInterpolator(1.1f)
