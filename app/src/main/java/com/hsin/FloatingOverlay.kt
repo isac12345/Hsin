@@ -777,6 +777,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         try {
             wm.addView(r, p)
             attached = true
+            if (!shownOnce) {
+                shownOnce = true
+                for (o in orbs) o.appear()
+                SoundFx.play(prefs, "wheelin")
+            }
             if (mode == MODE_PANEL) { applyMode(); anchorPanel() }
             addedAt = SystemClock.uptimeMillis()
             markActive()
@@ -790,7 +795,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         r.post { clamp() }
     }
 
+    private var shownOnce = false
+
     private fun removeWindow() {
+        shownOnce = false
         stopLoop()
         root?.let { v -> if (attached) try { wm.removeView(v) } catch (_: Exception) { } }
         attached = false
@@ -1118,16 +1126,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                     val e = easeOut(t)
                     if (st >= 3 && v === panel) {
                         // tema gaming: panel meluncur masuk dari tepinya sendiri
-                        v.alpha = 0.25f + 0.75f * e
-                        v.scaleX = 1f; v.scaleY = 1f
-                        // masuk dari sisi tempat panel menempel (kiri/kanan/atas/bawah), jarak pendek
-                        val loc = IntArray(2); v.getLocationOnScreen(loc)
-                        val cx = (loc[0] + v.width / 2f) / realW().toFloat(); val cy = (loc[1] + v.height / 2f) / realH().toFloat()
-                        var dx = 0f; var dy = 0f
-                        if (cx < 0.3f) dx = -1f else if (cx > 0.7f) dx = 1f else if (cy < 0.5f) dy = -1f else dy = 1f
-                        v.translationX = dx * (1f - e) * v.width * 0.4f
-                        v.translationY = dy * (1f - e) * v.height * 0.4f
-                        if (t >= 1f) { v.alpha = 1f; v.translationX = 0f; v.translationY = 0f; enterT0 = 0L }
+                        v.alpha = e
+                        v.scaleX = 1f; v.scaleY = 1f; v.translationX = 0f; v.translationY = 0f
+                        if (t >= 1f) { v.alpha = 1f; enterT0 = 0L }
                     } else {
                     v.alpha = e
                     val sc = 0.92f + 0.08f * e
@@ -1200,7 +1201,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (n == MODE_MENU) { p.x -= menuPad(); p.y -= menuPad() }
         }
         mode = n
-        if (n == MODE_MENU || n == MODE_PANEL) SoundFx.play(prefs, "open") else if (old == MODE_MENU || old == MODE_PANEL) SoundFx.play(prefs, "close")
+        if (n == MODE_PANEL) { SoundFx.play(prefs, "wheelin"); panelWheel?.appear() } else if (n == MODE_MENU) SoundFx.play(prefs, "tap") else if (old == MODE_MENU || old == MODE_PANEL) SoundFx.play(prefs, "tap")
         applyMode()
         if (n == MODE_PANEL && prefs.flStyle >= 3) { panel?.alpha = 0f; enterT0 = 0L; enterPending = true; markActive() }
         else if (n == MODE_PANEL || n == MODE_THIN) { enterT0 = SystemClock.uptimeMillis(); markActive() }
@@ -1209,7 +1210,6 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             // cadangan: kalau pendengar layout tidak sempat menyala, mulai animasi masuk juga
             root?.postDelayed({ if (enterPending) { enterPending = false; enterT0 = SystemClock.uptimeMillis() } }, 300L)
         }
-        if ((n == MODE_PANEL || n == MODE_THIN) && prefs.flStyle >= 3 && !prefs.reduceAnim) { scanT0 = SystemClock.uptimeMillis(); scanView?.visibility = View.VISIBLE }
         if (n == MODE_MENU) { layoutMenu(); markActive(); startMenuPop() }
         else for (b in menuBtns) { b.scaleX = 1f; b.scaleY = 1f; b.alpha = 1f; b.translationX = 0f; b.translationY = 0f }
         root?.post { clamp() }
@@ -2147,9 +2147,6 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
         /** Hanya kedip skala saat mode berganti; roda sendiri diputar GPU, tidak digambar ulang per frame. */
         fun tick(now: Long) {
-            val fl = now - flashT0
-            val sc = if (fl in 0L..320L) 1f + 0.16f * kotlin.math.sin(Math.PI.toFloat() * fl / 320f) else 1f
-            if (scaleX != sc) { scaleX = sc; scaleY = sc }
         }
     }
 

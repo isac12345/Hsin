@@ -118,6 +118,16 @@ object SoundFx {
     private fun chime(b: Buf, t0: Float = 0f) { osc(b, "sine", 1319f, 1319f, 0.2f, 0.22f * DG, t0); osc(b, "sine", 1760f, 1760f, 0.35f, 0.22f * DG, t0 + 0.12f); osc(b, "sine", 3520f, 3520f, 0.3f, 0.06f * DG, t0 + 0.12f) }
     private fun click(b: Buf, t0: Float, v: Float = 0.4f) { noise(b, 0.03f, v, "highpass", 2500f, 2500f, 1f, t0); osc(b, "sine", 180f, 70f, 0.07f, v + 0.1f, t0) }
 
+    private fun tick2(b: Buf, t0: Float, v: Float) { noise(b, 0.03f, v, "bandpass", 1500f, 1200f, 3f, t0); osc(b, "square", 900f, 700f, 0.02f, v * 0.3f * DG, t0) }
+    private fun clang(b: Buf, t0: Float, v: Float, k: Float) {
+        osc(b, "sine", 520f * k, 515f * k, 0.9f, v, t0); osc(b, "sine", 1180f * k, 1170f * k, 0.7f, v * 0.7f, t0)
+        osc(b, "sine", 1740f * k, 1730f * k, 0.5f, v * 0.5f, t0); osc(b, "sine", 2350f * k, 2340f * k, 0.4f, v * 0.35f, t0)
+        noise(b, 0.06f, v * 0.5f, "bandpass", 3000f, 2000f, 1.5f, t0)
+    }
+    /** Klik ratchet: waktu tiap klik sama dengan putaran roda (AdaptWheelView.Ratchet). */
+    private fun ratchet(b: Buf, n: Int, dur: Float, v: Float) { for (i in 1..n) { val t = dur * (1f - (1f - i.toFloat() / n).pow(1f / 2.2f)); tick2(b, t - 0.01f, v) } }
+    private fun wheelSnd(n: Int, dur: Float, k: Float): Pair<Float, (Buf) -> Unit> = (dur + 1f) to { b -> ratchet(b, n, dur, 0.35f); clang(b, dur, 0.5f, k) }
+
     private fun build(kind: String): Pair<Float, (Buf) -> Unit>? = when (kind) {
         "ignition" -> 2.4f to { b -> for (i in 0 until 4) osc(b, "square", 95f, 70f, 0.1f, 0.22f, i * 0.16f, 5f); engine(b, 70f, 110f, 0.4f, 0.5f, 0.7f); engine(b, 110f, 270f, 0.4f, 0.5f, 1.1f); engine(b, 270f, 90f, 0.5f, 0.45f, 1.5f); digi(b, listOf(880f, 1320f, 1760f, 2640f), 0.07f, 0.1f, 0.1f, 1.2f); hit(b, 1.1f, 0.5f) }
         "loading" -> 3.4f to { b -> engine(b, 60f, 330f, 3f, 0.35f); for (i in 0 until 14) osc(b, "square", 1800f + i * 60f, 1800f + i * 60f, 0.02f, 0.07f * DG, i * 0.21f); sweep(b, 1200f, 4200f, 0.5f, 0.1f, 2.5f); glitch(b, 2.9f, 4, 0.08f) }
@@ -142,10 +152,11 @@ object SoundFx {
         "fps" -> 1.0f to { b -> osc(b, "sawtooth", 140f, 60f, 0.5f, 0.35f, 0f, 8f); crackle(b, 0.1f, 5); glitch(b, 0f, 10, 0.1f) }
         "err" -> 1.2f to { b -> osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0f, 12f); osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0.38f, 12f); glitch(b, 0.7f, 6, 0.12f) }
         "ok" -> 1.0f to { b -> listOf(262f, 330f, 392f).forEach { f -> osc(b, "sawtooth", f, f, 0.5f, 0.15f, 0f, 3f) }; hit(b, 0f, 0.45f); digi(b, listOf(1320f, 1760f, 2640f), 0.07f, 0.1f, 0.1f, 0.1f); chime(b, 0.3f) }
-        "adapt0" -> 0.3f to { b -> click(b, 0f, 0.35f); osc(b, "triangle", 330f, 500f, 0.12f, 0.3f * DG, 0.01f) }
-        "adapt1" -> 0.45f to { b -> click(b, 0f, 0.4f); osc(b, "triangle", 440f, 660f, 0.14f, 0.3f * DG, 0.01f); osc(b, "sine", 880f, 880f, 0.2f, 0.12f * DG, 0.1f) }
-        "adapt2" -> 0.6f to { b -> hit(b, 0f, 0.35f); osc(b, "triangle", 587f, 880f, 0.16f, 0.3f * DG, 0.01f); chime(b, 0.12f) }
-        "adapt3" -> 0.9f to { b -> hit(b, 0f, 0.5f); sweep(b, 500f, 2400f, 0.35f, 0.12f); osc(b, "sawtooth", 784f, 1180f, 0.2f, 0.18f, 0.1f, 3f); crackle(b, 0.25f, 3); chime(b, 0.45f) }
+        "adapt0" -> wheelSnd(4, 0.7f, 0.9f)
+        "adapt1" -> wheelSnd(6, 0.9f, 1.0f)
+        "adapt2" -> wheelSnd(8, 1.1f, 1.12f)
+        "adapt3" -> wheelSnd(12, 1.5f, 1.3f)
+        "wheelin" -> wheelSnd(6, 0.6f, 1.0f)
         else -> null
     }
 

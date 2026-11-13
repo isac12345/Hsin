@@ -9,7 +9,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.Interpolator
+import android.view.animation.OvershootInterpolator
 import android.view.animation.LinearInterpolator
 
 /**
@@ -26,6 +27,19 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
         private val SILVER = intArrayOf(215, 222, 230)
         private val GOLDC = intArrayOf(232, 184, 74)
         private const val PUN = 0xFFFF4D5E.toInt()
+        /** Langkah ratchet per beban: sama dengan jumlah klik di SoundFx (tiap 45 derajat satu klik). */
+        val STEPS = intArrayOf(4, 6, 8, 12)
+    }
+
+    /** Putaran bergerak per langkah 45 derajat (klik demi klik), makin lambat di akhir. Waktu klik sama dengan SoundFx. */
+    class Ratchet(private val n: Int) : Interpolator {
+        override fun getInterpolation(t: Float): Float {
+            val outer = 1f - Math.pow((1f - t).toDouble(), 2.2).toFloat()
+            val x = outer * n
+            val i = Math.floor(x.toDouble()).toInt().coerceAtMost(n - 1)
+            val f = x - i
+            return (i + f * f * (3f - 2f * f)) / n
+        }
     }
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -36,6 +50,7 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
     private var spin: Animator? = null
     private var cont: ObjectAnimator? = null
     private var flashAnim: ValueAnimator? = null
+    private var appearAnim: Animator? = null
 
     init { setLayerType(LAYER_TYPE_HARDWARE, null) }
 
@@ -61,7 +76,7 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
         val delta = (if (l >= old) 1f else -1f) * DEG[l]
         val a = ObjectAnimator.ofFloat(this, ROTATION, rotation, rotation + delta)
         a.duration = DUR[l]
-        a.interpolator = DecelerateInterpolator(1.6f)
+        a.interpolator = Ratchet(STEPS[l])
         a.addListener(object : AnimatorListenerAdapter() {
             private var cancelled = false
             override fun onAnimationCancel(an: Animator) { cancelled = true }
@@ -98,7 +113,29 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
         spin?.cancel(); spin = null
         cont?.cancel(); cont = null
         flashAnim?.cancel(); flashAnim = null
+        appearAnim?.cancel(); appearAnim = null
         flash = 0f
+    }
+
+    /** Muncul: roda membesar sambil berputar ratchet satu putaran 270 derajat (hanya bila tidak berputar terus). */
+    fun appear() {
+        if (reduce()) return
+        appearAnim?.cancel()
+        val set = android.animation.AnimatorSet()
+        val sc = ValueAnimator.ofFloat(0.4f, 1f)
+        sc.interpolator = OvershootInterpolator(1.2f)
+        sc.addUpdateListener { val v = it.animatedValue as Float; scaleX = v; scaleY = v; alpha = (v / 0.7f).coerceIn(0f, 1f) }
+        val list = ArrayList<Animator>()
+        list.add(sc)
+        if (cont == null) list.add(ObjectAnimator.ofFloat(this, ROTATION, rotation - 270f, rotation).apply { interpolator = Ratchet(6) })
+        set.playTogether(list)
+        set.duration = 600L
+        set.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(an: Animator) { scaleX = 1f; scaleY = 1f; alpha = 1f }
+            override fun onAnimationCancel(an: Animator) { scaleX = 1f; scaleY = 1f; alpha = 1f }
+        })
+        appearAnim = set
+        set.start()
     }
 
     override fun onDetachedFromWindow() { cont?.pause(); super.onDetachedFromWindow() }
