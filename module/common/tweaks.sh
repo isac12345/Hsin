@@ -92,6 +92,24 @@ tw_refresh_set() {
     [ "$_hz" -ge 30 ] && [ "$_hz" -le 240 ] || return 0
     _mx=$(sed -n 's/^REFRESH_MAX=//p' "$TW_CAPS" 2>/dev/null | tail -n 1)
     tw_num "$_mx" && [ "$_hz" -gt "$_mx" ] && _hz="$_mx"
+    # Jangan menulis Hz yang tidak ada di panel: turunkan ke nilai panel tertinggi yang tidak melebihi permintaan.
+    if command -v gh_refresh_list >/dev/null 2>&1; then
+        _rl=$(gh_refresh_list 2>/dev/null | tr '\n' ' ')
+        if [ -n "$_rl" ]; then
+            case " $_rl " in
+                *" $_hz "*) ;;
+                *)
+                    _pick=""
+                    for _x in $_rl; do
+                        tw_num "$_x" || continue
+                        [ "$_x" -le "$_hz" ] && _pick="$_x"
+                    done
+                    [ -n "$_pick" ] || _pick=$(printf '%s\n' $_rl | sort -n | head -n 1)
+                    [ -n "$_pick" ] && _hz="$_pick"
+                    ;;
+            esac
+        fi
+    fi
     settings put system peak_refresh_rate "$_hz" >/dev/null 2>&1
     settings put system min_refresh_rate "$_hz" >/dev/null 2>&1
     settings put system tran_refresh_mode "$_hz" >/dev/null 2>&1
@@ -109,13 +127,6 @@ tw_dac_set() {
     _id=$(tinymix -D 0 2>/dev/null | awk '/VBC DAC0 DG Set/{print $1; exit}')
     tw_num "$_id" || return 0
     tinymix -D 0 "$_id" "$_v" "$_v" >/dev/null 2>&1
-}
-
-tw_mali_set() { # $1=boost $2=poll $3=upthreshold
-    _mm=/sys/module/mali_kbase/parameters
-    tw_num "$1" && tw_wr "$_mm/gpu_boost_level2" "$1"
-    tw_num "$2" && tw_wr "$_mm/gpu_pollingtime" "$2"
-    tw_num "$3" && tw_wr "$_mm/gpu_upthreshold" "$3"
 }
 
 tw_trip_set() { # $1=offset derajat (0 atau 10000)
@@ -163,13 +174,6 @@ tw_led_set() { # $1=off|red|green|blue
     esac
 }
 
-tw_mali_set_str() { # $1=boost:poll:up (satu string, divalidasi lalu dipecah)
-    case "$1" in ''|*[!0-9:]*|*:*:*:*) return 1 ;; esac
-    _a=${1%%:*}; _rest=${1#*:}; _b=${_rest%%:*}; _c=${_rest#*:}
-    [ -n "$_a" ] && [ -n "$_b" ] && [ -n "$_c" ] || return 1
-    tw_mali_set "$_a" "$_b" "$_c"
-}
-
 tw_conf_get() { sed -n "s/^TW_$1=//p" "$TW_CONF" 2>/dev/null | tail -n 1; }
 
 # ---------------------------------------------------------------- profil
@@ -182,23 +186,22 @@ tw_apply_profile() {
     tw_caps_ensure
 
     case "$_p" in
-        battery)     _r=60;  _d=28; _t=0; _m="0:8:88" ;;
-        balanced)    _r=90;  _d=28; _t=0; _m="0:8:88" ;;
-        performance) _r=120; _d=32; _t=0; _m="50:4:90" ;;
-        peak)        _r=144; _d=36; _t=1; _m="100:1:100" ;;
+        battery)     _r=60;  _d=28; _t=0 ;;
+        balanced)    _r=90;  _d=28; _t=0 ;;
+        performance) _r=60;  _d=32; _t=0 ;;
+        peak)        _r=144; _d=36; _t=1 ;;
     esac
 
     # Baca override tanpa source file (tidak ada variabel bocor / eksekusi shell).
     _v=$(tw_conf_get REFRESH_HZ); [ -n "$_v" ] && _r="$_v"
     _v=$(tw_conf_get DAC_GAIN);  [ -n "$_v" ] && _d="$_v"
     _v=$(tw_conf_get TURBO);     [ -n "$_v" ] && _t="$_v"
-    _v=$(tw_conf_get MALI);      [ -n "$_v" ] && _m="$_v"
 
     # Refresh per mode; saat game aktif refresh dipegang gamehooks.
     if command -v settings >/dev/null 2>&1 && { [ "$_force" = force ] || [ ! -f "$TW_STATE/.gh_active" ]; }; then tw_refresh_set "$_r"; fi
     tw_has HAS_AUDIO_MIXER && tw_dac_set "$_d"
     tw_has HAS_TURBO && tw_turbo_set "$_t"
-    tw_has HAS_MALI && tw_mali_set_str "$_m"
+    # kbase Mali TIDAK ditulis di sini: satu penulis = engine.sh (profil) dan gameboost (saat game).
 
     _v=$(tw_conf_get NIGHT);      [ -n "$_v" ] && tw_night_set "$_v"
     _v=$(tw_conf_get FONT_SCALE); [ -n "$_v" ] && tw_font_set "$_v"
@@ -211,7 +214,7 @@ tw_apply_profile() {
     _tr=$(tw_conf_get TRIP)
     tw_num "$_tr" && [ "$_tr" -gt 0 ] && [ "$_tr" -le 20000 ] && tw_has HAS_TRIP && tw_trip_set "$_tr"
 
-    tw_log APPLIED "profile=$_p refresh=$_r dac=$_d turbo=$_t mali=$_m"
+    tw_log APPLIED "profile=$_p refresh=$_r dac=$_d turbo=$_t"
 }
 
 # ---------------------------------------------------------------- status
@@ -261,7 +264,8 @@ tw_set_global() { # $1=KEY $2=VALUE
         perf_trip)
             tw_num "$_v" && [ "$_v" -ge 0 ] && [ "$_v" -le 20000 ] || { echo "ERROR: trip 0-20000"; return 1; } ;;
         perf_mali)
-            case "$_v" in *:*:*) ;; *) echo "ERROR: mali=boost:poll:up"; return 1 ;; esac ;;
+            # Keputusan #15: satu penulis kbase (engine per profil, gameboost saat game).
+            echo "ERROR: perf_mali read-only (performance=1/1/30)"; return 1 ;;
         tools_dac)
             tw_num "$_v" && [ "$_v" -ge 0 ] && [ "$_v" -le 127 ] || { echo "ERROR: dac 0-127"; return 1; } ;;
         tools_led)
@@ -276,7 +280,6 @@ tw_set_global() { # $1=KEY $2=VALUE
         display_font_scale) _sk=FONT_SCALE ;;
         display_density) _sk=DENSITY ;;
         perf_turbo) _sk=TURBO ;;
-        perf_mali) _sk=MALI ;;
         perf_trip) _sk=TRIP ;;
         perf_cpuidle) _sk=CPUIDLE ;;
         tools_dac) _sk=DAC_GAIN ;;
@@ -298,7 +301,6 @@ tw_set_global() { # $1=KEY $2=VALUE
         display_density)
             case "$_v" in reset) wm density reset >/dev/null 2>&1 ;; *) tw_density_set "$_v" ;; esac ;;
         perf_turbo) tw_turbo_set "$_v" ;;
-        perf_mali) tw_mali_set_str "$_v" ;;
         perf_trip) if [ "$_v" = 0 ]; then tw_trip_restore; else tw_trip_set "$_v"; fi ;;
         perf_cpuidle) tw_idle_set "$_v" ;;
         tools_dac) tw_dac_set "$_v" ;;

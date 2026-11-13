@@ -217,6 +217,59 @@ apply_floors() {
     return $_any
 }
 
+# freq_ge <daftar> <lantai> <nilai>: 0 bila <nilai> ada di daftar pada posisi >= <lantai>.
+# Sengaja membandingkan string (bukan aritmetika): /system/bin/sh 32-bit tidak aman untuk frekuensi > 2^31.
+freq_ge() {
+    _fg_on=0
+    for _fg_f in $(printf '%s\n' $1 | sort -n); do
+        [ "$_fg_f" = "$2" ] && _fg_on=1
+        [ "$_fg_on" = 1 ] && [ "$_fg_f" = "$3" ] && return 0
+    done
+    return 1
+}
+
+# verify_floors <persen_cpu> <persen_gpu>: baca balik hasil apply_floors.
+# Return 1 bila ada lantai yang tidak benar-benar terpasang. Lantai dianggap benar bila min hasil baca
+# ada di daftar pada posisi >= yang diminta (kernel boleh menaikkan); max harus = frekuensi tertinggi.
+verify_floors() {
+    _vf_bad=0
+    for _p in "$CPUFREQ"/policy*; do
+        [ -f "$_p/scaling_min_freq" ] || continue
+        _av=$(rd "$_p/scaling_available_frequencies")
+        [ -n "$_av" ] || continue
+        _fl=$(pick_freq "$_av" "$1") || continue
+        _mx=$(top_freq "$_av")
+        _rmax=$(rd "$_p/scaling_max_freq")
+        _rmin=$(rd "$_p/scaling_min_freq")
+        if [ "$_rmax" != "$_mx" ]; then
+            _vf_bad=$((_vf_bad + 1))
+            ovd_log VERIFY "$_p max_freq=[$_rmax] harap=[$_mx]"
+        fi
+        if ! freq_ge "$_av" "$_fl" "$_rmin"; then
+            _vf_bad=$((_vf_bad + 1))
+            ovd_log VERIFY "$_p min_freq=[$_rmin] harap>=$_fl"
+        fi
+    done
+    if _g=$(gpu_dir); then
+        _av=$(rd "$_g/available_frequencies")
+        if [ -n "$_av" ]; then
+            _fl=$(pick_freq "$_av" "$2"); _mx=$(top_freq "$_av")
+            if [ -n "$_fl" ] && [ -n "$_mx" ]; then
+                _rmax=$(rd "$_g/max_freq"); _rmin=$(rd "$_g/min_freq")
+                if [ "$_rmax" != "$_mx" ]; then
+                    _vf_bad=$((_vf_bad + 1))
+                    ovd_log VERIFY "$_g max_freq=[$_rmax] harap=[$_mx]"
+                fi
+                if ! freq_ge "$_av" "$_fl" "$_rmin"; then
+                    _vf_bad=$((_vf_bad + 1))
+                    ovd_log VERIFY "$_g min_freq=[$_rmin] harap>=$_fl"
+                fi
+            fi
+        fi
+    fi
+    [ "$_vf_bad" -eq 0 ]
+}
+
 restore_prev() {
     [ -f "$OVD_PREV" ] || return 0
     while IFS='|' read -r _t _d _mn _mx; do
@@ -319,13 +372,25 @@ do_start() {
     temp_state; _ts=$?
     [ "$_ts" -ge 2 ] && { echo "ERROR: suhu terlalu tinggi untuk Overdrive"; return 1; }
     save_prev || { echo "ERROR: gagal menyimpan nilai asli"; return 1; }
+    # Tanda aktif dipasang sebelum menulis: engine/gameboost melewati node frekuensi
+    # selama tanda ini ada, jadi apply profil di tengah verifikasi tidak membatalkannya.
+    printf '%s\nfull\n' "$_pkg" > "$OVD_ACTIVE"
     if ! apply_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"; then
+        rm -f "$OVD_ACTIVE"
         restore_prev; echo "ERROR: node frekuensi tidak bisa ditulis"; return 1
     fi
     apply_extras
     ovd_tw peak
     freeze_engines
-    printf '%s\nfull\n' "$_pkg" > "$OVD_ACTIVE"
+    # Baca balik: jangan pernah lapor aktif kalau kernel diam-diam mengembalikan nilai.
+    # Dicek lalu diulang setelah 2 dtk (sebagian driver menimpa beberapa saat kemudian).
+    verify_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"
+    sleep 2
+    if ! verify_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"; then
+        do_stop "lantai frekuensi ditolak kernel"
+        echo "ERROR: lantai frekuensi tidak bertahan (ditolak kernel), Overdrive dibatalkan"
+        return 1
+    fi
     rm -f "$OVD_LAST" "$OVD_PID"
     if command -v setsid >/dev/null 2>&1; then
         setsid sh "$0" _loop "$_pkg" </dev/null >/dev/null 2>&1 &

@@ -52,7 +52,7 @@ gs_user_add() {
 }
 
 gs_add_all() {
-    _gs_prof="${1:-balanced}"
+    _gs_prof="${1:-performance}"
     _gs_fps="${2:-30,60}"
     case "$_gs_prof" in battery|balanced|performance) ;; *) echo "ERROR: profil = battery|balanced|performance"; return 1 ;; esac
     _gs_n=0

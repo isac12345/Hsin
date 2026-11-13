@@ -951,6 +951,21 @@ log_game_snapshot() {
     return 0
 }
 
+# 95% trip passive terendah dari zona SoC/CPU. Kosong = sensor tidak terbaca.
+thermal_kernel_cap() {
+    _tk_min=0
+    for _tk_z in "${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"/thermal_zone*; do
+        [ -d "$_tk_z" ] || continue
+        _tk_ty=$(cat "$_tk_z/type" 2>/dev/null)
+        case "$_tk_ty" in *soc*|*cpu*|*gpu*) ;; *) continue ;; esac
+        _tk_t=$(cat "$_tk_z/trip_point_1_temp" 2>/dev/null | tr -d '[:space:]')
+        case "$_tk_t" in ''|*[!0-9]*|0) continue ;; esac
+        if [ "$_tk_min" -eq 0 ] || [ "$_tk_t" -lt "$_tk_min" ]; then _tk_min=$_tk_t; fi
+    done
+    [ "$_tk_min" -gt 0 ] 2>/dev/null && printf '%s' $((_tk_min * 95 / 100))
+    return 0
+}
+
 # Check GameBoost grace period and safety
 check_gb_grace_period() {
     local now
@@ -969,30 +984,21 @@ check_gb_grace_period() {
         
         local elapsed=$((now - pending_time))
         if [ "$elapsed" -ge "$GB_GRACE" ] 2>/dev/null; then
-            # Grace period expired: restore original profile
+            # Grace period expired: kembalikan nilai native dulu, lalu PASANG LAGI profil pilihan user
+            # (keputusan #13: profil tidak boleh hilang sampai reboot gara-gara game selesai).
             local manual_prof
             manual_prof=$(get_manual_profile)
-            if [ "$manual_prof" = "battery" ]; then
-                # DAILY restore: kembalikan boost dulu (bila aktif), lalu ke Daily
-                if [ -f "$GB_ACTIVE_FILE" ] && [ "$(cat "$GB_ACTIVE_FILE" 2>/dev/null)" = "1" ] \
-                    && command -v gb_restore >/dev/null 2>&1; then
+            if [ -f "$GB_ACTIVE_FILE" ] && [ "$(cat "$GB_ACTIVE_FILE" 2>/dev/null)" = "1" ]; then
+                if command -v gb_restore >/dev/null 2>&1; then
                     gb_restore
                     printf '%s\n' "0" > "$GB_ACTIVE_FILE" 2>/dev/null
-                elif [ -f "$GB_ACTIVE_FILE" ] && [ "$(cat "$GB_ACTIVE_FILE" 2>/dev/null)" = "1" ] \
-                    && ! command -v gb_restore >/dev/null 2>&1; then
-                    monitor_log "GAMEBOOST" "WARN: gb_restore unavailable, cannot restore Daily boost"
+                else
+                    monitor_log "GAMEBOOST" "WARN: gb_restore unavailable, cannot restore native values"
                 fi
-                _gb_unforce_level
-                sh "$MODDIR/apply_now.sh" battery monitor >> "$LOG_FILE" 2>&1
-                monitor_log "GAMEBOOST" "DAILY RESTORED after ${GB_GRACE}s grace, returning to Daily"
-            elif command -v gb_restore >/dev/null 2>&1; then
-                gb_restore
-                printf '%s\n' "0" > "$GB_ACTIVE_FILE" 2>/dev/null
-                _gb_unforce_level
-                monitor_log "GAMEBOOST" "RESTORED after ${GB_GRACE}s grace"
-            else
-                monitor_log "GAMEBOOST" "WARN: gb_restore unavailable, cannot restore after grace"
             fi
+            _gb_unforce_level
+            sh "$MODDIR/apply_now.sh" "$manual_prof" monitor >> "$LOG_FILE" 2>&1
+            monitor_log "GAMEBOOST" "RESTORED after ${GB_GRACE}s grace, profile=$manual_prof dipasang ulang"
             rm -f "$GB_PENDING_FILE"
         fi
     fi
@@ -1023,6 +1029,15 @@ check_gb_grace_period() {
                 gb_warm_thr=200000
                 gb_high_thr=200000
             fi
+            # Keputusan #21: jangan menunggu di atas 95% trip passive kernel.
+            # Driver di HP uji menolak penulisan trip (tulis 83000 dibaca 0),
+            # jadi headroom dipakai dengan MENURUNKAN ambang HSIN, bukan menggeser trip.
+            _tk_cap=$(thermal_kernel_cap)
+            if [ -n "$_tk_cap" ] && [ ! -f "$STATE_DIR/.ovd_active" ]; then
+                [ "$gb_warm_thr" -gt "$_tk_cap" ] 2>/dev/null && gb_warm_thr=$_tk_cap
+                [ "$gb_high_thr" -gt "$_tk_cap" ] 2>/dev/null && gb_high_thr=$_tk_cap
+            fi
+
             # Overdrive aktif (mode gacor, OVD_STEPDOWN bukan 1): tangga warm/high dimatikan,
             # batas kritis digeser ke 105C. Rem darurat dipegang overdrive.sh.
             local gb_crit_thr=95000
@@ -1151,6 +1166,112 @@ check_gb_grace_period() {
     return 0
 }
 
+# ---------------------------------------------------------------- lantai FPS
+# Keputusan #1/#4/#30/#66: hanya untuk sesi game, 1% low < 20 FPS selama
+# ~3 detik (2 sampel tick game) = naikkan prioritas sekali, catat penyebabnya,
+# dan tulis penanda untuk notifikasi kecil di APK (#67).
+FPS_LOW_FILE="$STATE_DIR/.fps_low"
+FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
+
+# shortcut: rumus 1% low sama dengan diag_fps_stats di hsinctl.sh; disalin di
+# sini supaya monitor tidak memanggil hsinctl (banyak fork) tiap tick game.
+monitor_fps_stat() {   # $1=fpsd.out -> "p1 stall_ms"
+    sed -n 's/^lat=//p' "$1" 2>/dev/null | head -n 1 | awk '{
+        n = 0
+        for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
+        if (n < 3) exit 1
+        m = 0
+        for (i = 2; i <= n; i++) { d = t[i] - t[i - 1]; if (d > 0) { m++; dt[m] = d } }
+        if (m < 3) exit 1
+        for (i = 1; i <= m; i++) a[i] = dt[i]
+        for (i = 2; i <= m; i++) { k = a[i]; j = i - 1; while (j > 0 && a[j] > k) { a[j + 1] = a[j]; j-- } a[j + 1] = k }
+        idx = int(m * 0.99); if (idx < 1) idx = 1; if (idx > m) idx = m
+        printf "%d %d", int(1000000000 / a[idx]), int(a[m] / 1000000)
+    }'
+}
+
+fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"
+    _fdc=""
+    for _fdc_p in ${CPU_POLICIES:-}; do
+        _fdc_d="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}/cpufreq/$_fdc_p"
+        _fdc_c=$(cat "$_fdc_d/scaling_cur_freq" 2>/dev/null | tr -d '[:space:]')
+        _fdc_m=$(cat "$_fdc_d/cpuinfo_max_freq" 2>/dev/null | tr -d '[:space:]')
+        case "$_fdc_c" in ''|*[!0-9]*) continue ;; esac
+        case "$_fdc_m" in ''|*[!0-9]*|0) continue ;; esac
+        [ $((_fdc_c * 100 / _fdc_m)) -ge 90 ] && { _fdc="cpu"; break; }
+    done
+    _fdc_g="${GPU_DEVFREQ_PATH:-}"
+    if [ -n "$_fdc_g" ] && [ -r "$_fdc_g/cur_freq" ] && [ -r "$_fdc_g/max_freq" ]; then
+        _fdc_gc=$(cat "$_fdc_g/cur_freq" 2>/dev/null | tr -d '[:space:]')
+        _fdc_gm=$(cat "$_fdc_g/max_freq" 2>/dev/null | tr -d '[:space:]')
+        case "$_fdc_gc$_fdc_gm" in ''|*[!0-9]*) ;; *)
+            if [ "$_fdc_gm" -gt 0 ] 2>/dev/null && [ $((_fdc_gc * 100 / _fdc_gm)) -ge 90 ]; then
+                _fdc="${_fdc:+$_fdc+}gpu"
+            fi ;;
+        esac
+    fi
+    _fdc_io=$(awk '/^some/{print int($2); exit}' /proc/pressure/io 2>/dev/null)
+    case "$_fdc_io" in ''|*[!0-9]*) _fdc_io=0 ;; esac
+    [ "$_fdc_io" -ge 10 ] 2>/dev/null && _fdc="${_fdc:+$_fdc+}io"
+    printf '%s' "${_fdc:-tak jelas}"
+}
+
+check_fps_floor() {
+    _ff_pkg="$1"
+    [ -f "$STATE_DIR/.game_t0" ] || return 0
+    [ -r "$STATE_DIR/fpsd.out" ] || return 0
+    _ff_now=$(date +%s 2>/dev/null)
+    _ff_mt=$(stat -c %Y "$STATE_DIR/fpsd.out" 2>/dev/null)
+    case "$_ff_now$_ff_mt" in ''|*[!0-9]*) return 0 ;; esac
+    # Data lebih tua dari 5 dtk = daemon sedang mati/tidak melaporkan game ini.
+    [ $((_ff_now - _ff_mt)) -le 5 ] || return 0
+    _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out") || return 0
+    _ff_p1=${_ff_stat%% *}
+    _ff_stall=${_ff_stat##* }
+    case "$_ff_p1" in ''|*[!0-9]*) return 0 ;; esac
+
+    _ff_cnt=0
+    [ -f "$FPS_LOW_FILE" ] && _ff_cnt=$(cat "$FPS_LOW_FILE" 2>/dev/null)
+    case "$_ff_cnt" in ''|*[!0-9]*) _ff_cnt=0 ;; esac
+
+    if [ "$_ff_p1" -lt 20 ] 2>/dev/null; then
+        _ff_cnt=$((_ff_cnt + 1))
+    else
+        _ff_cnt=0
+        if [ -f "$FPS_RESCUE_FILE" ]; then
+            rm -f "$FPS_RESCUE_FILE" 2>/dev/null
+            monitor_log "FPS-LOOP" "pulih: 1% low=${_ff_p1} FPS"
+        fi
+    fi
+    printf '%s\n' "$_ff_cnt" > "$FPS_LOW_FILE" 2>/dev/null
+    [ "$_ff_cnt" -ge 2 ] 2>/dev/null || return 0
+
+    _ff_cause=$(fps_drop_cause)
+    if [ -f "$STATE_DIR/.ovd_active" ]; then
+        # Puncak sudah di frekuensi maksimum: aksi tambahan hanya menambah panas.
+        if [ ! -f "$FPS_RESCUE_FILE" ]; then
+            printf '%s|%s|ovd|%s\n' "$_ff_now" "$_ff_pkg" "$_ff_cause" > "$FPS_RESCUE_FILE" 2>/dev/null
+            monitor_log "FPS-LOOP" "1% low=${_ff_p1} FPS <20 (${_ff_stall}ms, ${_ff_cause}): Puncak sudah maksimum, tanpa aksi"
+        fi
+        return 0
+    fi
+    [ -f "$FPS_RESCUE_FILE" ] && return 0
+    _ff_act="tidak ada aksi"
+    if command -v gb_apply >/dev/null 2>&1; then
+        _ff_orig=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null)
+        printf '%s\n' "extreme" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
+        gb_apply >/dev/null 2>&1
+        if [ -n "$_ff_orig" ]; then
+            printf '%s\n' "$_ff_orig" > "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
+        else
+            rm -f "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null
+        fi
+        _ff_act="boost=extreme"
+    fi
+    printf '%s|%s|%s|%s\n' "$_ff_now" "$_ff_pkg" "$_ff_act" "$_ff_cause" > "$FPS_RESCUE_FILE" 2>/dev/null
+    monitor_log "FPS-LOOP" "1% low=${_ff_p1} FPS <20 (${_ff_stall}ms, ${_ff_cause}) -> ${_ff_act}"
+}
+
 start_event_stream() {
     stop_event_stream
     rm -f "$LAST_EVENT_PKG_FILE" 2>/dev/null
@@ -1221,6 +1342,7 @@ run_event_supervised_loop() {
         fi
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
+        check_fps_floor "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard
@@ -1267,6 +1389,7 @@ run_polling_loop() {
 
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
+        check_fps_floor "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard
