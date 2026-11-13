@@ -228,10 +228,21 @@ class BubbleService : Service() {
                         floating?.setGame("auto")
                     }
                 }
+                // Lantai FPS dari modul (.fps_rescue): hanya saat game, satu toast per kejadian (epoch sama tidak diulang).
+                if (gamePkg.isNotEmpty()) {
+                    val rp = Hsin.fpsRescue().split("|")
+                    val ep = rp.getOrNull(0)?.trim()?.toLongOrNull() ?: 0L
+                    if (ep > 0L && ep != prefs.rescueEpoch) {
+                        prefs.rescueEpoch = ep
+                        val why = rp.getOrNull(3)?.trim().orEmpty().ifEmpty { "tak jelas" }
+                        val act = rp.getOrNull(2)?.trim().orEmpty().ifEmpty { "-" }
+                        Toast.makeText(this@BubbleService, "FPS sempat di bawah 20 (penyebab: $why). Aksi: $act", Toast.LENGTH_LONG).show()
+                    }
+                }
                 // baterai/suhu selalu dari sistem (tanpa su) supaya notifikasi tidak basi walau status gagal/lambat
                 readBattery()
                 updateNotification()
-                delay(if (gamePkg.isNotEmpty()) 4000L else 6000L)
+                delay(if (gamePkg.isNotEmpty()) 8000L else 6000L)
             }
         }
     }

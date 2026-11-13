@@ -568,6 +568,7 @@ internal fun AlatTab(vm: AppViewModel, land: Boolean) {
         vm.go("tools")
         vm.refreshRates = Hsin.refreshList(); vm.refreshHz = Hsin.refreshGet()
         vm.loadTweaks()
+        vm.loadFramepacing()
         // refresh rate sekarang satu pengaturan (tab Layar); buang kunci lama "refresh saat game"
         if (vm.refreshHz != "off") vm.updateRefreshHz("off")
     }
@@ -646,9 +647,17 @@ private fun AlatMesin(vm: AppViewModel, land: Boolean) {
         Section(tx("GPU DAN DAYA", "GPU AND POWER"), 90) {
             Text(tx("Otomatis mengikuti mode (Hemat sampai Puncak). Pilih manual hanya kalau perlu.", "Automatic follows the mode (Battery to Peak). Pick manually only if needed."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
             Gate(twCap(vm, "HAS_MALI")) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SText(tx("Dorongan GPU", "GPU boost"), 11.sp, SP.dim)
-                    TwChips(vm, "perf_mali", "MALI", listOf(tx("Rendah", "Low"), tx("Sedang", "Medium"), tx("Tinggi", "High")), listOf("0:8:88", "50:4:90", "100:1:100"))
+                // perf_mali dikunci modul (baca saja): hanya tampilkan nilai sekarang, tanpa kontrol
+                Column(Modifier.alpha(0.5f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SText(tx("Dorongan GPU (baca saja)", "GPU boost (read only)"), 11.sp, SP.dim)
+                    val pm = vm.tw["perf_mali"]?.trim().orEmpty()
+                    val pp = pm.split(':')
+                    SText(
+                        if (pm.isEmpty() || pm == "na" || pp.size != 3) "N/A"
+                        else tx("boost ${pp[0]} · polling ${pp[1]} · ambang ${pp[2]}", "boost ${pp[0]} · polling ${pp[1]} · threshold ${pp[2]}"),
+                        12.sp, SP.text
+                    )
+                    Text(tx("Diatur otomatis oleh mode; tidak bisa diubah dari app.", "Set automatically by the mode; cannot be changed from the app."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
                 }
             }
             Gate(twCap(vm, "HAS_TURBO")) { HSwitch(tx("Turbo CPU", "CPU turbo"), tx("Membuka batas turbo bawaan kernel. Otomatis menyala di Puncak.", "Unlocks the kernel turbo limit. On automatically in Peak."), vm.tw["perf_turbo"] == "1") { vm.setTweak("perf_turbo", if (it) "1" else "0") } }
@@ -779,12 +788,18 @@ private fun AlatLog(vm: AppViewModel) {
 @Composable
 private fun AlatSistem(vm: AppViewModel, land: Boolean) {
     TwoCol(land, {
-        Section(tx("KESEHATAN MODUL", "MODULE HEALTH")) {
+        Section(tx("DIAGNOSE", "DIAGNOSE")) {
+            Text(tx("Lihat bukti mode aktif, suhu, FPS 1% terendah, dan tweak yang gagal.", "See proof of the active mode, temperature, 1% low FPS and failed tweaks."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            HBtn(tx("Diagnose", "Diagnose"), Modifier.fillMaxWidth(), solid = true) { vm.go("diagnose") }
+        }
+        Section(tx("KESEHATAN MODUL", "MODULE HEALTH"), 20) {
             val h = vm.health
             HealthRow("Uperf", h.uperf); HealthRow("fas-rs", h.fasrs); HealthRow(tx("Pemantau", "Monitor"), h.monitor)
             HealthRow(tx("Penjaga", "Watchdog"), h.watchdog); HealthRow(tx("Mode otomatis", "Auto mode"), h.auto)
             HSwitch("Boot guard", if (h.bootFail > 0) tx("gagal: ${h.bootFail}x", "failed: ${h.bootFail}x") else null, h.bootGuard) { vm.setBootGuard(it) }
             HBtn(tx("Cek ulang", "Recheck"), Modifier.fillMaxWidth()) { vm.checkHealth() }
+            HBtn(tx("Restart monitor modul", "Restart module monitor"), Modifier.fillMaxWidth()) { vm.restartMonitor() }
+            Text(tx("Setelah update modul, monitor perlu dimulai ulang agar kode barunya dimuat.", "After a module update the monitor must restart to load the new code."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
         }
         Section(tx("CEK FITUR", "FEATURE CHECK"), 40) {
             Text(tx("Menguji sungguhan apakah tweak jalan di HP ini (± 10 detik). Buka game dulu bila ingin ikut cek sumber FPS.", "Really tests whether the tweaks work on this phone (~10 s). Open a game first to include the FPS source."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
@@ -827,7 +842,15 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
             KVRow("GPU", d["GPU_VENDOR"].orEmpty().ifEmpty { "—" })
             KVRow("CPU", d["CPU_POLICIES"].orEmpty().ifEmpty { "—" })
             KVRow(tx("Penyimpanan", "Storage"), d["STORAGE_DEVICES"].orEmpty().ifEmpty { "—" })
+            KVRow(tx("Kelas HP", "Phone class"), tierLine(d)?.substringAfter(": ") ?: "—")
             HBtn(tx("Deteksi ulang", "Redetect"), Modifier.fillMaxWidth()) { vm.redetect() }
+        }
+        Section(tx("FRAME PACING (UJI A/B)", "FRAME PACING (A/B TEST)"), 40) {
+            val on = vm.fp["framepacing"] == "true"
+            Text(tx("Bandingkan main dengan dan tanpa. Bawaan mati.", "Compare gameplay with and without. Off by default."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            if (vm.fp.isEmpty()) SText(tx("Status tidak terbaca (modul lama?)", "Status unreadable (old module?)"), 11.sp, SP.faint)
+            else SText(tx("Status: ", "State: ") + (if (on) tx("nyala", "on") else tx("mati", "off")) + " · " + tx("tersimpan: ", "saved: ") + (if (vm.fp["tersimpan"] == "1") tx("nyala", "on") else tx("mati", "off")), 11.sp, SP.faint)
+            HChips(listOf(tx("MATI", "OFF"), tx("NYALA", "ON")), if (on) 1 else 0) { vm.setFramepacing(it == 1) }
         }
         Section(tx("MODUL", "MODULE"), 60) {
             HSwitch(tx("Jalan otomatis saat boot", "Start on boot"), null, vm.autostart) { vm.updateAutostart(it) }
@@ -882,6 +905,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
     var step by remember(pkg) { mutableIntStateOf(-1) }
     var cancelled by remember(pkg) { mutableStateOf(false) }
     var done by remember(pkg) { mutableStateOf(false) }
+    var ovdPend by remember(pkg) { mutableStateOf(false) }
     var mode by remember(pkg) { mutableStateOf(info("seimbang")) }
     fun setRes(i: Int, v: String) { results.value = results.value.toMutableList().also { it[i] = v } }
 
@@ -900,8 +924,11 @@ internal fun RitualOverlay(vm: AppViewModel) {
         step = 1
         val gProf = g?.profile ?: "balanced"
         vm.prefs.lastGame = pkg
-        val modeOk = if (opts["OVD"] == "on") true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
-        setRes(1, (if (en) mode.nameEn else mode.nameId) + if (modeOk) "" else " ✗")
+        // Puncak: game belum jalan di langkah ini, jadi tidak boleh dianggap sukses. Dibuktikan sesudah game dibuka (ovd start).
+        val ovdWanted = opts["OVD"] == "on"
+        ovdPend = ovdWanted
+        val modeOk = if (ovdWanted) true else if (gProf in PROFILE_KEYS) Hsin.setProfile(gProf).ok else true
+        setRes(1, (if (en) mode.nameEn else mode.nameId) + if (!modeOk) " ✗" else if (ovdWanted) " …" else "")
         delay(350)
         if (!modeOk) vm.toast(if (en) "Mode could not be applied" else "Mode gagal diterapkan")
         if (cancelled) { UiState.ritual = ""; return@LaunchedEffect }
@@ -923,7 +950,20 @@ internal fun RitualOverlay(vm: AppViewModel) {
             var seen = false
             for (k in 0 until 6) { delay(700); if (Hsin.status()?.gamePkg == pkg) { seen = true; break } }
             if (!seen) setRes(5, if (en) "Starting…" else "Memuat…")
+            if (ovdWanted) {
+                // sukses hanya bila modul menjawab "OK:"; selain itu tampilkan pesan error modul apa adanya
+                val o = Hsin.ovdStart()
+                val first = o.out.lines().firstOrNull { it.isNotBlank() }.orEmpty().trim()
+                val ovdOk = o.ok && first.startsWith("OK:")
+                ovdPend = false
+                setRes(1, (if (en) mode.nameEn else mode.nameId) + if (ovdOk) "" else " ✗")
+                if (!ovdOk) vm.toast("Gagal: Puncak " + (first.removePrefix("ERROR:").trim().ifEmpty { "tidak aktif" }))
+            }
+        } else if (ovdWanted) {
+            ovdPend = false
+            setRes(1, (if (en) mode.nameEn else mode.nameId) + " ✗")
         }
+        ovdPend = false
         if (!r.ok) vm.toast(r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
         step = 6
         done = r.ok
@@ -973,7 +1013,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
                 Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0x22FFFFFF))) { Box(Modifier.fillMaxWidth(prog).fillMaxHeight().background(col)) }
                 Spacer(Modifier.height(2.dp))
                 for (i in 0 until 6) {
-                    val finished = i < step || done
+                    val finished = (i < step || done) && !(i == 1 && ovdPend)
                     val cur = i == step && !done
                     val a = ownAnim(if (finished || cur) 1f else 0f, 250)
                     Glass(Modifier.fillMaxWidth(), radius = 10, alt = true) {
@@ -982,7 +1022,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
                                 Modifier.size(22.dp).clip(CircleShape).background(if (finished) col else Color.Transparent)
                                     .border(1.5.dp, if (finished) col else if (cur) col.copy(alpha = 0.5f + 0.5f * sin(clock.floatValue * 8f)) else Color(0x44FFFFFF), CircleShape),
                                 contentAlignment = Alignment.Center
-                            ) { SText(if (finished) "✓" else "${i + 1}", 11.sp, if (finished) SP.ink else SP.dim, FontWeight.Bold) }
+                            ) { SText(if (finished) (if (results.value[i].endsWith("✗")) "✗" else "✓") else "${i + 1}", 11.sp, if (finished) SP.ink else SP.dim, FontWeight.Bold) }
                             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                 SText(names[i], 13.sp, lerpColor(SP.dim, SP.text, a), FontWeight.SemiBold)
                                 SText(subs[i], 10.sp, SP.faint)

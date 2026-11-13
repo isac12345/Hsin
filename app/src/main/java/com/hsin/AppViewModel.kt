@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -41,7 +42,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         "auto" to "tools", "therm" to "tools",
         "stats" to "custom", "detect" to "games", "edit" to "games", "addgame" to "games",
         "bgbanner" to "custom", "bubble" to "custom", "theme" to "custom",
-        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "sessions" to "records", "bench" to "tools", "memfx" to "tools", "perf" to "records",
+        "dexopt" to "tools", "batlab" to "tools", "fulllog" to "tools", "ramkeep" to "tools", "freeze" to "tools", "charge" to "tools", "sessions" to "records", "bench" to "tools", "memfx" to "tools", "perf" to "records", "diagnose" to "tools",
     )
     val tab: String get() = parents[route] ?: route
 
@@ -67,6 +68,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             "perf" -> loadFpsFiles()
             "dash", "therm" -> viewModelScope.launch { flags = Hsin.flags() }
             "auto" -> viewModelScope.launch { conf = Hsin.conf() }
+            "diagnose" -> { diag = null; runDiagnose() }
         }
     }
 
@@ -82,6 +84,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var loaded by mutableStateOf(false)
     var status by mutableStateOf(Status())
     var statusOk by mutableStateOf(false)
+    /** True bila pembacaan status terakhir gagal: nilai di [status] bisa basi. */
+    var statusStale by mutableStateOf(false)
+    var statusLastOkMs by mutableLongStateOf(0L)
     var conf by mutableStateOf<Map<String, String>>(emptyMap())
     var flags by mutableStateOf<Map<String, Boolean>>(emptyMap())
     var games by mutableStateOf<List<GameEntry>>(emptyList())
@@ -404,7 +409,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun pendClear() { pendUntil = 0L }
 
     suspend fun refreshStatus() {
-        val s = Hsin.status() ?: return
+        val s = Hsin.status()
+        if (s == null) {
+            statusOk = false
+            statusStale = true
+            return
+        }
+        statusStale = false
+        statusLastOkMs = System.currentTimeMillis()
         val pp = pendProf
         status = if (pp != null && pendUntil > android.os.SystemClock.uptimeMillis()) s.copy(profile = pp, active = pp, ovd = pendOvd) else s
         statusOk = true
@@ -1066,6 +1078,76 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     fun dexCancel() { dexJob?.cancel() }
 
     // ---------- device / modul ----------
+    // ---------- diagnose, frame pacing, restart monitor ----------
+    var diag by mutableStateOf<DiagOutcome?>(null)
+    var diagBusy by mutableStateOf(false)
+    var fp by mutableStateOf<Map<String, String>>(emptyMap())
+
+    /** Satu kali baca `hsinctl diagnose`; hanya dipanggil dari tombol (tanpa polling). */
+    fun runDiagnose() {
+        if (diagBusy) return
+        viewModelScope.launch {
+            diagBusy = true
+            try {
+                val r = Hsin.diagnose()
+                diag = classifyDiagnose(r.code, r.out)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                diag = DiagOutcome(null, "invalid")
+            } finally {
+                diagBusy = false
+            }
+        }
+    }
+
+    private fun diagStamp(): String = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+
+    fun copyDiagnose() {
+        val m = diag?.kv ?: return
+        val cm = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("hsin.diagnose", diagReportText(m, diagStamp())))
+        toast("Laporan disalin")
+    }
+
+    fun saveDiagnose() {
+        val m = diag?.kv ?: return
+        viewModelScope.launch {
+            val day = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(java.util.Date())
+            val name = "HSIN-diagnose-$day.txt"
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    val tmp = java.io.File(app.cacheDir, name)
+                    tmp.writeText(diagReportText(m, diagStamp()))
+                    val r = Root.execBlocking("mkdir -p /sdcard/Download && cp '${tmp.absolutePath}' '/sdcard/Download/$name' && chmod 666 '/sdcard/Download/$name'", 10_000L)
+                    tmp.delete()
+                    r.ok
+                } catch (_: Exception) { false }
+            }
+            toast(if (ok) "Laporan disimpan: Download/$name" else "Gagal menyimpan laporan")
+        }
+    }
+
+    fun loadFramepacing() {
+        viewModelScope.launch { fp = Hsin.framepacing() }
+    }
+
+    fun setFramepacing(on: Boolean) {
+        viewModelScope.launch {
+            val r = Hsin.setFramepacing(on)
+            val okMsg = r.out.trimStart().startsWith("OK")
+            toast(if (okMsg) (if (on) "Frame pacing dinyalakan" else "Frame pacing dimatikan") else "Gagal: " + r.out.lines().firstOrNull { it.isNotBlank() }.orEmpty().removePrefix("ERROR:").trim().take(60))
+            fp = Hsin.framepacing()
+        }
+    }
+
+    fun restartMonitor() {
+        viewModelScope.launch {
+            val r = Hsin.restartMonitor()
+            toast(if (r.ok && r.out.contains("started")) "Monitor dimulai ulang. Reboot bila ragu." else "Gagal memulai ulang monitor")
+        }
+    }
+
     fun redetect() {
         viewModelScope.launch {
             busy = "Mendeteksi ulang..."

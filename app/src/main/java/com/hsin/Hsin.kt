@@ -216,6 +216,25 @@ object Hsin {
 
     suspend fun ovdStart(): Root.Res = ctl("ovd start", 20_000L)
 
+    /** Satu panggilan `hsinctl diagnose`; keluaran diparse di Diagnose.kt. */
+    suspend fun diagnose(): Root.Res = ctl("diagnose", 25_000L)
+
+    /** `hsinctl framepacing status`: framepacing=, framepredict=, tersimpan=. Kosong bila modul lama. */
+    suspend fun framepacing(): Map<String, String> = kv(ctl("framepacing status").out)
+
+    suspend fun setFramepacing(on: Boolean): Root.Res = ctl("framepacing ${if (on) "on" else "off"}", 20_000L)
+
+    /** Jalankan ulang monitor modul lewat watchdog.sh (latar belakang; skrip itu berupa loop). */
+    suspend fun restartMonitor(): Root.Res {
+        val m = Root.modPath()
+        if (m.isEmpty()) return Root.Res(-3, "modul tidak ditemukan")
+        return Root.exec("nohup sh $m/common/watchdog.sh >/dev/null 2>&1 & echo started", 10_000L)
+    }
+
+    /** Isi $STATE/.fps_rescue (satu baris epoch|paket|aksi|penyebab), kosong bila tidak ada. */
+    suspend fun fpsRescue(): String =
+        Root.exec("cat $STATE/.fps_rescue 2>/dev/null", 6_000L).out.lines().firstOrNull { it.isNotBlank() }.orEmpty().trim()
+
     suspend fun ovdStop(): Root.Res = ctl("ovd stop", 20_000L)
 
     suspend fun launchGame(pkg: String): Root.Res {
@@ -237,7 +256,7 @@ object Hsin {
     }
 
     // ---- tweak global (display / performa / alat), bukan per game ----
-    private val TW_KEYS = setOf("display_refresh", "display_night", "display_font_scale", "perf_turbo", "perf_mali",
+    private val TW_KEYS = setOf("display_refresh", "display_night", "display_font_scale", "perf_turbo",
         "perf_trip", "perf_cpuidle", "tools_dac", "tools_bypass", "tools_led")
     private val TW_VAL = Regex("^[A-Za-z0-9._:-]+$")
 

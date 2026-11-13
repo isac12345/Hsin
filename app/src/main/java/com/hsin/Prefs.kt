@@ -14,6 +14,10 @@ class Prefs(ctx: Context) {
     var lastGame: String
         get() = sp.getString("last_game", "") ?: ""
         set(v) { sp.edit().putString("last_game", v).apply() }
+    /** Epoch .fps_rescue yang terakhir sudah ditampilkan (supaya toast tidak berulang). */
+    var rescueEpoch: Long
+        get() = sp.getLong("rescue_epoch", 0L)
+        set(v) { sp.edit().putLong("rescue_epoch", v).apply() }
     var bubbleHidden: Boolean
         get() = sp.getBoolean("bubble_hidden", false)
         set(v) { sp.edit().putBoolean("bubble_hidden", v).apply() }
