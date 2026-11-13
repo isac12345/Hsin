@@ -57,7 +57,7 @@ conf_get() {
     [ -n "$_v" ] && printf '%s' "$_v" || printf '%s' "$2"
 }
 
-valid_profile() { case "$1" in battery|balanced|performance) return 0 ;; *) return 1 ;; esac; }
+valid_profile() { case "$1" in adapt|puncak|battery|balanced|performance) return 0 ;; *) return 1 ;; esac; }
 
 # suhu baterai (mC), dipakai untuk puncak sesi. Fallback ke sensor terpanas bila node tidak ada.
 batt_temp_mc() {

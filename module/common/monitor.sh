@@ -108,6 +108,9 @@ if [ -f "$MODDIR/gamehooks.sh" ]; then
 else
     monitor_log "GAMEHOOK" "WARN: gamehooks.sh tidak ada, ekstra game dilewati"
 fi
+# adapt.sh: beban adaptif per game (ide "adaptasi tanpa batas"). Butuh
+# FPS_LAST_* dari check_fps_floor; aman kalau berkasnya tidak ada.
+[ -f "$MODDIR/adapt.sh" ] && . "$MODDIR/adapt.sh" 2>/dev/null
 # CPU_POLICIES untuk gb_apply: service.sh tidak mengekspornya ke proses
 # ini; tanpa ini lantai CPU diam-diam skip (for kosong, tanpa log).
 # detected.conf murni assignment (dari detect.sh sendiri) jadi aman.
@@ -586,6 +589,8 @@ handle_foreground_event() {
             monitor_uptime
             printf '%s %s\n' "${MONITOR_UP:-0}" "$handle_pkg" > "$GAME_T0_FILE" 2>/dev/null
             rm -f "$GAME_SNAP_DONE_FILE" 2>/dev/null
+            # Beban adaptif: pilih dari hasil sesi sebelumnya lalu pasang.
+            command -v ad_begin >/dev/null 2>&1 && ad_begin "$handle_pkg"
         fi
         if [ "$gb_active" != "1" ]; then
             # Check DISABLE_GAMEBOOST gate
@@ -999,6 +1004,7 @@ check_gb_grace_period() {
             _gb_unforce_level
             sh "$MODDIR/apply_now.sh" "$manual_prof" monitor >> "$LOG_FILE" 2>&1
             monitor_log "GAMEBOOST" "RESTORED after ${GB_GRACE}s grace, profile=$manual_prof dipasang ulang"
+            command -v ad_end >/dev/null 2>&1 && ad_end
             rm -f "$GB_PENDING_FILE"
         fi
     fi
@@ -1175,7 +1181,9 @@ FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
 
 # shortcut: rumus 1% low sama dengan diag_fps_stats di hsinctl.sh; disalin di
 # sini supaya monitor tidak memanggil hsinctl (banyak fork) tiap tick game.
-monitor_fps_stat() {   # $1=fpsd.out -> "p1 stall_ms"
+# Hasil: "p1 avg stall_ms". avg dipakai adapt.sh untuk membedakan aplikasi
+# yang benar-benar bergerak (game, sosmed) dari yang diam (layar baca).
+monitor_fps_stat() {   # $1=fpsd.out -> "p1 avg stall_ms"
     sed -n 's/^lat=//p' "$1" 2>/dev/null | head -n 1 | awk '{
         n = 0
         for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
@@ -1186,7 +1194,9 @@ monitor_fps_stat() {   # $1=fpsd.out -> "p1 stall_ms"
         for (i = 1; i <= m; i++) a[i] = dt[i]
         for (i = 2; i <= m; i++) { k = a[i]; j = i - 1; while (j > 0 && a[j] > k) { a[j + 1] = a[j]; j-- } a[j + 1] = k }
         idx = int(m * 0.99); if (idx < 1) idx = 1; if (idx > m) idx = m
-        printf "%d %d", int(1000000000 / a[idx]), int(a[m] / 1000000)
+        span = t[n] - t[1]
+        avg = (span > 0) ? int((n - 1) * 1000000000 / span) : 0
+        printf "%d %d %d", int(1000000000 / a[idx]), avg, int(a[m] / 1000000)
     }'
 }
 
@@ -1227,7 +1237,8 @@ check_fps_floor() {
     [ $((_ff_now - _ff_mt)) -le 5 ] || return 0
     _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out") || return 0
     _ff_p1=${_ff_stat%% *}
-    _ff_stall=${_ff_stat##* }
+    _ff_rest=${_ff_stat#* }
+    _ff_stall=${_ff_rest##* }
     case "$_ff_p1" in ''|*[!0-9]*) return 0 ;; esac
 
     _ff_cnt=0
@@ -1300,6 +1311,7 @@ run_event_supervised_loop() {
             continue
         fi
         if [ "$monitor_screen_state" != "ON" ]; then
+            command -v ad_release >/dev/null 2>&1 && ad_release
             stop_event_stream
             sleep "$SCREEN_OFF_INTERVAL"
             continue
@@ -1340,9 +1352,17 @@ run_event_supervised_loop() {
                 monitor_log "EVENT" "event stream healthy (${event_parsed} parsed in ${EVENT_ON_SECS}s)"
             fi
         fi
+        # Di mode event-driven, handler event berjalan di proses anak (reader
+        # fifo), jadi variabel paket di loop ini tidak pernah diperbarui. Baca
+        # berkas HUD yang ditulis handler tiap tick supaya tick selalu tahu
+        # aplikasi yang sedang di depan, bukan paket basi dari tick pertama.
+        if [ -f "$HUD_FOREGROUND_FILE" ]; then
+            monitor_foreground_package=$(tr -d '[:space:]' < "$HUD_FOREGROUND_FILE" 2>/dev/null)
+        fi
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
         check_fps_floor "$monitor_foreground_package"
+        command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard
@@ -1368,6 +1388,7 @@ run_polling_loop() {
         fi
 
         if [ "$monitor_screen_state" != "ON" ]; then
+            command -v ad_release >/dev/null 2>&1 && ad_release
             sleep "$SCREEN_OFF_INTERVAL"
             continue
         fi
@@ -1390,6 +1411,7 @@ run_polling_loop() {
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
         check_fps_floor "$monitor_foreground_package"
+        command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
         # DAILY: anti-lag guard (loadavg)
         check_daily_loadavg_guard
@@ -1424,5 +1446,6 @@ else
     run_polling_loop
 fi
 
+command -v ad_release >/dev/null 2>&1 && ad_release
 monitor_log "STOP" "monitor stopped"
 exit 0

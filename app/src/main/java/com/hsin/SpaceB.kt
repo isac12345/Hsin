@@ -134,11 +134,12 @@ internal fun CoreDial(vm: AppViewModel, sizeDp: Dp) {
     val clock = LocalClock.current
     val cm = curMode(vm)
     val idx = MODES.indexOfFirst { it.key == cm }
-    val pos = ownAnim(if (idx < 0) 1f else idx.toFloat(), 520)
-    val i0 = pos.toInt().coerceIn(0, 3)
-    val i1 = (i0 + 1).coerceAtMost(3)
+    val pos = ownAnim(if (idx < 0) 0f else idx.toFloat(), 520)
+    val last = MODES.size - 1
+    val i0 = pos.toInt().coerceIn(0, last)
+    val i1 = (i0 + 1).coerceAtMost(last)
     val col = lerpColor(MODES[i0].color, MODES[i1].color, (pos - i0).coerceIn(0f, 1f))
-    val m = if (idx < 0) MODES[1] else MODES[idx]
+    val m = if (idx < 0) MODES[0] else MODES[idx]
     val pop = popKey(cm)
     val speed = 1f + pos * 0.9f
     Box(Modifier.size(sizeDp), contentAlignment = Alignment.Center) {
@@ -156,9 +157,9 @@ internal fun CoreDial(vm: AppViewModel, sizeDp: Dp) {
                 drawCircle(col.copy(alpha = 0.4f), r - 16.dp.toPx(), c, style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 9.dp.toPx()))))
             }
             drawArc(Color(0x1FFFFFFF), 135f, 270f, false, tl, sz, style = Stroke(9.dp.toPx(), cap = StrokeCap.Round))
-            drawArc(col, 135f, 270f * (pos / 3f).coerceIn(0f, 1f), false, tl, sz, style = Stroke(9.dp.toPx(), cap = StrokeCap.Round))
-            for (i in 0..3) {
-                val a = Math.toRadians(135.0 + 270.0 * i / 3.0)
+            drawArc(col, 135f, 270f * (pos / last.toFloat()).coerceIn(0f, 1f), false, tl, sz, style = Stroke(9.dp.toPx(), cap = StrokeCap.Round))
+            for (i in 0..last) {
+                val a = Math.toRadians(135.0 + 270.0 * i / last.toDouble())
                 val p = Offset(c.x + r * cos(a).toFloat(), c.y + r * sin(a).toFloat())
                 val on = i.toFloat() <= pos + 0.01f
                 drawCircle(Color(0xFF141416), 11.dp.toPx(), p)
@@ -167,8 +168,8 @@ internal fun CoreDial(vm: AppViewModel, sizeDp: Dp) {
             }
         }
         val rDp = sizeDp / 2 - 20.dp
-        for (i in 0..3) {
-            val a = Math.toRadians(135.0 + 270.0 * i / 3.0)
+        for (i in 0..last) {
+            val a = Math.toRadians(135.0 + 270.0 * i / last.toDouble())
             val x = sizeDp / 2 + rDp * cos(a).toFloat() - 20.dp
             val y = sizeDp / 2 + rDp * sin(a).toFloat() - 20.dp
             Box(Modifier.offset(x, y).size(40.dp).tap { vm.chooseMode(MODES[i].key) })
@@ -491,7 +492,7 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                     val sh = RoundedCornerShape(10.dp)
                     Box(
                         Modifier.weight(1f).tap {
-                            val prof = when (m.key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
+                            val prof = if (m.key == "puncak") "performance" else "balanced"
                             vm.addGame(g.pkg, g.fps, prof) { ver++ }
                             vm.setGameOpt(g.pkg, "OVD", if (m.key == "puncak") "on" else "off")
                             ver++
@@ -908,7 +909,7 @@ internal fun RitualOverlay(vm: AppViewModel) {
     var cancelled by remember(pkg) { mutableStateOf(false) }
     var done by remember(pkg) { mutableStateOf(false) }
     var ovdPend by remember(pkg) { mutableStateOf(false) }
-    var mode by remember(pkg) { mutableStateOf(info("seimbang")) }
+    var mode by remember(pkg) { mutableStateOf(info("adapt")) }
     fun setRes(i: Int, v: String) { results.value = results.value.toMutableList().also { it[i] = v } }
 
     LaunchedEffect(pkg) {

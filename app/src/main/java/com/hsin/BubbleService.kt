@@ -209,6 +209,7 @@ class BubbleService : Service() {
                     tempC = s.tempC
                     batt = s.batt
                     gamePkg = s.gamePkg
+                    adaptNow = s.adaptNow
                     ovdOn = effOvd(s.ovd)
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
@@ -322,7 +323,7 @@ class BubbleService : Service() {
 
     // ---------- profil ----------
     private fun setProfile(p: String) {
-        if (p !in PROFILE_KEYS) return
+        if (p !in PROFILE_KEYS && p != "adapt") return
         val oldP = profile
         profile = p
         pend(p, null)
@@ -397,6 +398,8 @@ class BubbleService : Service() {
         nm.createNotificationChannel(ch)
     }
 
+    @Volatile private var adaptNow = ""
+
     private fun modeNow(): String = if (ovdOn) "Puncak" else profileLabel(profile)
 
     private fun buildNotification(): Notification {
@@ -416,7 +419,12 @@ class BubbleService : Service() {
         } else ""
         lastFps = floating?.lastFps ?: 0
         val text = buildString {
-            if (gameName.isNotEmpty()) append(gameName) else append("Siaga")
+            val ap = adaptNow.split("|")
+            val adPkg = ap.getOrNull(0).orEmpty()
+            if (!ovdOn && adPkg.isNotEmpty()) {
+                val an = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(adPkg, 0)).toString() } catch (_: Exception) { adPkg }
+                append("Beradaptasi: ").append(an).append(" · beban ").append(ap.getOrNull(1).orEmpty())
+            } else if (gameName.isNotEmpty()) append(gameName) else append("Siaga")
             if (gameName.isNotEmpty() && lastFps > 0) append(" · ").append(lastFps).append(" FPS")
             if (tempC > 0f) append(" · %.0f°C".format(tempC))
             if (batt >= 0) append(" · ").append(batt).append("%")
@@ -432,10 +440,10 @@ class BubbleService : Service() {
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-        val keys = PROFILE_KEYS + "puncak"
-        val labels = PROFILE_LABELS + "Puncak"
+        val keys = listOf("adapt", "puncak")
+        val labels = listOf("Adapt", "Puncak")
         keys.forEachIndexed { i, k ->
-            val active = if (k == "puncak") ovdOn else (!ovdOn && k == profile)
+            val active = if (k == "puncak") ovdOn else !ovdOn
             val pi = PendingIntent.getService(
                 this, 100 + i,
                 Intent(this, BubbleService::class.java).setAction(ACT_SET).putExtra(EXTRA_P, k),

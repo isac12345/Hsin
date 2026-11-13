@@ -60,6 +60,7 @@ object Hsin {
             ovdLast = m["ovd_last"].orEmpty(),
             thermalWarmC = m["thermal_warm_c"]?.toIntOrNull() ?: 75,
             ver = m["ver"]?.toIntOrNull() ?: 0,
+            adaptNow = m["adapt_now"].orEmpty(),
         )
     }
 

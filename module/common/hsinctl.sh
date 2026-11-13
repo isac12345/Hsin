@@ -189,6 +189,7 @@ cmd_status() {
         [ "$_gs" -ge 0 ] 2>/dev/null || _gs=0
     fi
     printf 'game_pkg=%s\ngame_secs=%s\n' "$_gp" "$_gs"
+    printf 'adapt_now=%s\n' "$(rd "$STATE_DIR/.adapt_now")"
     printf 'hud_pkg=%s\n' "$(rd "$STATE_DIR/.gh_active")"
     pid_alive "$STATE_DIR/.rec_pid" screenrec.sh && echo rec=1 || echo rec=0
     printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
@@ -206,7 +207,7 @@ cmd_status() {
 }
 
 cmd_profile() {
-    valid_profile "$1" || { echo "ERROR: profil tidak valid (battery|balanced|performance)"; return 1; }
+    valid_profile "$1" || { echo "ERROR: profil tidak valid (adapt|puncak)"; return 1; }
     sh "$COMMON/apply_now.sh" "$1" manual >/dev/null 2>&1
     _rc=$?
     # apply_now bisa SKIPPED (sudah current) -> tetap exit 0
@@ -617,6 +618,35 @@ cmd_diagnose() {
 
 cmd_device() { [ -f "$STATE_DIR/detected.conf" ] && cat "$STATE_DIR/detected.conf"; return 0; }
 
+# Beban adaptif semua aplikasi (adapt.sh): lihat apa yang modul pelajari.
+cmd_adapt() {
+    _ad="$STATE_DIR/adapt"
+    case "$1" in
+        ''|list)
+            if [ -z "$(ls "$_ad"/*.conf 2>/dev/null)" ]; then
+                echo "adapt=belum ada data (buka aplikasi sekali)"
+                return 0
+            fi
+            for _f in "$_ad"/*.conf; do
+                [ -f "$_f" ] || continue
+                _p=${_f##*/}; _p=${_p%.conf}
+                printf '%s beban=%s sesi=%s p1_min=%s rata=%s jank=%s%% stall=%sms terakhir=%s\n' \
+                    "$_p" \
+                    "$(sed -n 's/^beban=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^sesi=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^p1_min=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^p1_avg=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^jank_pct=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^stall_max=//p' "$_f" | tail -n 1)" \
+                    "$(sed -n 's/^terakhir=//p' "$_f" | tail -n 1)"
+            done
+            ;;
+        get) [ -n "$2" ] && cat "$_ad/$2.conf" 2>/dev/null ;;
+        reset) rm -rf "$_ad" 2>/dev/null; echo "OK: data adaptasi dihapus, beban awal dari DEVICE_TIER" ;;
+        *) echo "Usage: hsinctl adapt [list|get <paket>|reset]"; return 1 ;;
+    esac
+}
+
 cmd_redetect() {
     rm -f "$STATE_DIR/detected.conf" 2>/dev/null
     HSIN_FORCE_DETECT=1 sh "$COMMON/detect.sh" >/dev/null 2>&1
@@ -738,6 +768,7 @@ case "$1" in
     health) cmd_health ;;
     diagnose) cmd_diagnose ;;
     device) cmd_device ;;
+    adapt) cmd_adapt "$2" "$3" ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
     gamerender) cmd_gamerender "$2" "$3" "$4" ;;

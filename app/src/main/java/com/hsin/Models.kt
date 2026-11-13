@@ -26,6 +26,8 @@ data class Status(
     val ovdLast: String = "",
     val thermalWarmC: Int = 75,
     val ver: Int = 0,
+    /** paket|beban|game|epoch dari modul saat adapt aktif; kosong bila tidak. */
+    val adaptNow: String = "",
 )
 
 data class GameEntry(val pkg: String, val profile: String, val fps: String)
@@ -97,10 +99,9 @@ sealed class Dlg {
 }
 
 fun profileLabel(p: String): String = when (p) {
-    "battery" -> "Hemat"
-    "balanced" -> "Seimbang"
-    "performance" -> "Performa"
+    "battery", "balanced", "performance" -> "Adapt"
     "overdrive" -> "Puncak"
+    "adapt" -> "Adapt"
     else -> "—"
 }
 

@@ -89,8 +89,8 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putInt("fl_alpha", v.coerceIn(40, 100)).apply() }
     /** Gaya floating: 0 standar, 1 HUD gelap tegas, 2 kaca lembut. */
     var flStyle: Int
-        get() = sp.getInt("fl_style", 3).coerceIn(3, 5)
-        set(v) { sp.edit().putInt("fl_style", v.coerceIn(3, 5)).apply() }
+        get() = 3
+        set(_) { }
     /** Posisi panel: 0 otomatis (ikut tema), 1 atas, 2 bawah, 3 kiri, 4 kanan. */
     var flPanelPos: Int
         get() = sp.getInt("fl_panel_pos", 0).coerceIn(0, 4)
@@ -101,8 +101,8 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putInt("fl_panel_w", v.coerceIn(70, 130)).apply() }
     /** Tema app: 1 Apex, 2 Turbo, 3 Nitro. */
     var appTheme: Int
-        get() = sp.getInt("app_theme", 1).coerceIn(1, 3)
-        set(v) { sp.edit().putInt("app_theme", v.coerceIn(1, 3)).apply() }
+        get() = 1
+        set(_) { }
     /** Pembersihan sekali: sisa opsi per game lama (Mode ringan, Hz tanpa batas FPS). */
     var gameOptsClean613: Boolean
         get() = sp.getBoolean("game_opts_clean_613", false)

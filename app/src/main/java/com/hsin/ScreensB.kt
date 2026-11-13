@@ -110,8 +110,6 @@ private fun FloatingSettings(vm: AppViewModel) {
         SliderRow("Transparansi", al, 40f..100f, "${al.toInt()}%",
             { al = it; val n = SystemClock.uptimeMillis(); if (n - alT > 150) { alT = n; p.flAlpha = it.toInt() } },
             { p.flAlpha = al.toInt(); vm.flChanged() })
-        Label("Gaya floating", Modifier.padding(top = 10.dp))
-        Seg(listOf("APEX", "TURBO", "NITRO"), p.flStyle - 3, { p.flStyle = it + 3; p.appTheme = it + 1; UiState.theme = it + 1; UiState.themeTick++; vm.flChanged() })
         Label("Posisi panel", Modifier.padding(top = 10.dp))
         Seg(listOf("OTOMATIS", "ATAS", "BAWAH", "KIRI", "KANAN"), p.flPanelPos, { p.flPanelPos = it; vm.flChanged() })
         var pw by remember { mutableStateOf(p.flPanelW.toFloat()) }

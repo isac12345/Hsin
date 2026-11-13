@@ -61,6 +61,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         private const val P_BATTERY = 0xFF4FE3C1.toInt()
         private const val P_BALANCED = 0xFFE8B95A.toInt()
         private const val P_PERF = 0xFFFF9A3C.toInt()
+        private const val P_ADAPT = 0xFFD7DEE6.toInt()
         private const val OD = 0xFFFF4D5E.toInt()
         private const val OD_TEXT = 0xFFFF9AA0.toInt()
         private const val OD_END = 0xFFB82E3C.toInt()
@@ -1219,22 +1220,16 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     /** Putar mode: Hemat > Seimbang > Performa > Puncak > Hemat. */
     private fun cycleMode() {
+        // Dua mode saja: Adapt <-> Puncak
         if (odOn) {
             onOvd?.invoke(false)
-            onProfile?.invoke("battery")
+            onProfile?.invoke("adapt")
             return
         }
-        when (profile) {
-            "battery" -> onProfile?.invoke("balanced")
-            "balanced" -> onProfile?.invoke("performance")
-            "performance" -> if (odAvail) onOvd?.invoke(true) else onProfile?.invoke("battery")
-            else -> onProfile?.invoke("balanced")
-        }
+        if (odAvail) onOvd?.invoke(true) else onProfile?.invoke("adapt")
     }
 
-    private fun modeName(): String = if (odOn) "Puncak" else when (profile) {
-        "battery" -> "Hemat"; "balanced" -> "Seimbang"; "performance" -> "Performa"; else -> "—"
-    }
+    private fun modeName(): String = if (odOn) "Puncak" else "Adapt"
 
     private fun updateMenuInfo(tempC: Float?) {
         val t = if (tempC != null) " \u00B7 " + tempC.toInt() + "\u00B0" else ""
@@ -1278,7 +1273,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (menuBtns.size < 4) return
         val acc = accentColor()
         menuBtns[0].apply {
-            text = when { odOn -> "PUN"; profile == "battery" -> "HEM"; profile == "balanced" -> "SEI"; profile == "performance" -> "PRF"; else -> "..." }
+            text = if (odOn) "PUN" else "ADP"
             setTextColor(Color.BLACK)
             background = roundBg(acc, pf(26), 0)
         }
@@ -1380,12 +1375,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private fun accentColor(): Int {
         if (odOn) return OD
         if (prefs.flAccentFixed) return prefs.flAccentColor
-        return when (profile) {
-            "battery" -> P_BATTERY
-            "balanced" -> P_BALANCED
-            "performance" -> P_PERF
-            else -> P_PERF
-        }
+        return P_ADAPT
     }
 
     private fun roundBg(colorIn: Int, radiusIn: Float, strokeIn: Int): GradientDrawable {
@@ -1500,8 +1490,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         row.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
         // tombol cepat: profil (ketuk = ganti), Overdrive, rekam data FPS
         val bp = thinBtn { 
-            val next = when (profile) { "battery" -> "balanced"; "balanced" -> "performance"; else -> "battery" }
-            onProfile?.invoke(next)
+            onProfile?.invoke("adapt")
         }
         thinProf = bp
         row.addView(bp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, px(40)).apply { marginStart = px(12) })
@@ -1531,8 +1520,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     private fun paintThinBtns() {
         thinProf?.apply {
-            text = when (profile) { "battery" -> "HEMAT"; "balanced" -> "SEIMBANG"; "performance" -> "PERFORMA"; else -> "..." }
-            val mc = when (profile) { "battery" -> P_BATTERY; "balanced" -> P_BALANCED; else -> P_PERF }
+            text = "ADAPT"
+            val mc = P_ADAPT
             setTextColor(mc)
             background = roundBg((mc and 0x00FFFFFF) or 0x26000000, pf(20), (mc and 0x00FFFFFF) or 0x80000000.toInt())
         }
@@ -1627,10 +1616,11 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
         segButtons = ArrayList()
         for ((i, k) in PROFILE_KEYS.withIndex()) {
-            val b = textView(PROFILE_TEXT[i], 13f, SEG_TEXT, true).apply {
+            val b = textView(if (i == 0) "ADAPT" else "", 13f, SEG_TEXT, true).apply {
                 gravity = Gravity.CENTER
                 isClickable = true
-                setOnClickListener { if (!odOn) onProfile?.invoke(k) }
+                setOnClickListener { if (!odOn) onProfile?.invoke("adapt") }
+                if (i > 0) visibility = View.GONE
             }
             seg.addView(b, LinearLayout.LayoutParams(0, px(44), 1f).apply { marginStart = if (i == 0) 0 else px(6) })
             segButtons.add(b)
@@ -1782,9 +1772,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             lines.add(l)
         }
         for ((i, k) in PROFILE_KEYS.withIndex()) {
-            val b = textView(PROFILE_TEXT[i], 12f, SEG_TEXT, true).apply {
+            val b = textView(if (i == 0) "ADAPT" else "", 12f, SEG_TEXT, true).apply {
                 gravity = Gravity.CENTER; isClickable = true; maxLines = 1
-                setOnClickListener { if (!odOn) onProfile?.invoke(k) }
+                setOnClickListener { if (!odOn) onProfile?.invoke("adapt") }
+                if (i > 0) visibility = View.GONE
             }
             if (grid) lines[i / 2].addView(b, lpw(0, px(38), 1f, if (i % 2 == 0) 0 else px(4)))
             else if (vertical) seg.addView(b, lpw(LinearLayout.LayoutParams.MATCH_PARENT, px(36), mt = if (i == 0) 0 else px(4)))
@@ -2110,9 +2101,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         paintTiles()
         if (segButtons.size < 3) return
         val acc = accentColor()
-        val chipCol = intArrayOf(P_BATTERY, P_BALANCED, P_PERF)
+        val chipCol = intArrayOf(P_ADAPT, P_ADAPT, P_ADAPT)
         for (i in 0 until 3) {
-            val on = PROFILE_KEYS[i] == profile && !odOn
+            val on = i == 0 && !odOn
             val b = segButtons[i]
             b.background = roundBg(if (on) chipCol[i] else Color.TRANSPARENT, pf(10), if (on) 0 else (chipCol[i] and 0x00FFFFFF) or 0x55000000)
             b.setTextColor(if (on) DARK else SEG_TEXT)
@@ -2220,7 +2211,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         /** Napas pelan sesuai mode (Hemat lambat, Puncak cepat); FPS rendah = berdenyut cepat. */
         fun tick(now: Long) {
             val period = if (low) 700f else if (odOn) 1200f else when (profile) {
-                "battery" -> 3200f; "balanced" -> 2400f; else -> 1800f
+                else -> 2400f
             }
             phase = ((now % period.toLong()) / period)
             invalidate()

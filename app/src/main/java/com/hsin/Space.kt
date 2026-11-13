@@ -293,21 +293,15 @@ object UiState {
 internal class MInfo(val key: String, val nameId: String, val nameEn: String, val stars: Int, val color: Color, val tagId: String, val tagEn: String, val detId: String, val detEn: String)
 
 internal val MODES = listOf(
-    MInfo("hemat", "Hemat", "Saver", 1, Color(0xFF4FE3C1), "Irit baterai, tetap lancar", "Saves battery, stays smooth",
-        "Hemat daya tanpa ngelag. Cocok untuk game ringan dan pemakaian harian.",
-        "Efficient without lag. Good for light games and everyday use."),
-    MInfo("seimbang", "Seimbang", "Balanced", 2, Color(0xFFE8B95A), "Lancar dan adem untuk sesi panjang", "Smooth and cool for long sessions",
-        "Cukup kencang untuk kebanyakan game, suhu dan baterai tetap terjaga.",
-        "Fast enough for most games while keeping heat and battery in check."),
-    MInfo("performa", "Performa", "Performance", 3, Color(0xFFFF9A3C), "Tenaga tinggi untuk game berat", "High power for heavy games",
-        "CPU dan GPU agresif, tetap dijaga pengaman panas.",
-        "Aggressive CPU and GPU, still protected by the thermal guard."),
+    MInfo("adapt", "Adapt", "Adapt", 2, Color(0xFFD7DEE6), "Belajar dari pemakaianmu, makin pas", "Learns from your use, fits better each time",
+        "Modul mengatur tenaga sendiri untuk tiap aplikasi: naik saat tersendat, turun saat lancar, lalu mengingatnya.",
+        "The module tunes power per app by itself: up when it stutters, down when smooth, and remembers it."),
     MInfo("puncak", "Puncak", "Peak", 4, Color(0xFFFF4D5E), "Tenaga penuh, CPU dan GPU dikunci tertinggi", "Full power, CPU and GPU locked at top speed",
         "CPU dan GPU dikunci frekuensi tertinggi, batas panas dilonggarkan. Paling kencang, HP lebih hangat.",
         "CPU and GPU locked at top frequency, thermal limit relaxed. Fastest, phone runs warmer.")
 )
 
-internal fun info(k: String): MInfo = MODES.firstOrNull { it.key == k } ?: MODES[1]
+internal fun info(k: String): MInfo = MODES.firstOrNull { it.key == k } ?: MODES[0]
 
 @Composable
 internal fun mname(m: MInfo): String = if (LocalEn.current) m.nameEn else m.nameId
@@ -316,14 +310,14 @@ internal fun starText(n: Int): String = "★".repeat(n) + "☆".repeat(4 - n)
 
 internal fun curMode(vm: AppViewModel): String {
     if (vm.status.ovd) return "puncak"
-    return when (vm.status.profile) { "battery" -> "hemat"; "performance" -> "performa"; "balanced" -> "seimbang"; else -> "" }
+    return if (vm.status.profile == "none") "" else "adapt"
 }
 
 internal fun profMode(profile: String, ovd: Boolean): String =
-    if (ovd) "puncak" else when (profile) { "battery" -> "hemat"; "performance" -> "performa"; else -> "seimbang" }
+    if (ovd) "puncak" else "adapt"
 
 fun AppViewModel.chooseMode(key: String) {
-    val prof = when (key) { "hemat" -> "battery"; "seimbang" -> "balanced"; else -> "performance" }
+    val prof = if (key == "puncak") "performance" else "adapt"
     if (!prefs.soundOn) UiState.buzz() else { if (UiState.haptics) UiState.buzz2(); SoundFx.play(prefs, if (key == "puncak") "overdrive" else prof) }
     val old = status
     status = status.copy(profile = prof, active = prof, ovd = key == "puncak")
@@ -666,12 +660,6 @@ private fun SettingsTab(vm: AppViewModel) {
                 Seg(listOf("Indonesia", "English"), if (UiState.en) 1 else 0) { UiState.setEn(vm.prefs, it == 1) }
                 SText(tx("Warna aksen", "Accent color"), 12.sp, SP.dim)
                 Seg(listOf(tx("Emas", "Gold"), tx("Ikut mode", "Follow mode"), "Mint", tx("Merah", "Red")), vm.prefs.accentTheme) { vm.prefs.accentTheme = it; UiState.themeTick++ }
-                SText(tx("Tema (tampilan app dan floating di game)", "Theme (app and in-game floating)"), 12.sp, SP.dim)
-                Seg(listOf("Apex", "Turbo", "Nitro"), vm.prefs.appTheme - 1) {
-                    vm.prefs.appTheme = it + 1; UiState.theme = it + 1; vm.prefs.flStyle = 3 + it
-                    vm.flChanged(); UiState.themeTick++; SoundFx.play(vm.prefs, "tab")
-                }
-                SText(tx("Apex: tajam, Turbo: bulat, Nitro: segi enam.", "Apex: sharp, Turbo: round, Nitro: hexagon."), 11.sp, SP.faint)
                 SText(tx("Gelap latar (kalau pakai gambar sendiri)", "Background dimming (custom image)"), 12.sp, SP.dim)
                 Seg(listOf(tx("Ringan", "Light"), tx("Sedang", "Medium"), tx("Pekat", "Dark")), UiState.bgDim) { UiState.bgDim = it; vm.prefs.bgDim = it }
             }

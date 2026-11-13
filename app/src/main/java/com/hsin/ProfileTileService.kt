@@ -20,8 +20,7 @@ class ProfileTileService : TileService() {
     override fun onClick() {
         super.onClick()
         scope.launch {
-            val cur = Hsin.status()?.profile ?: "none"
-            val next = PROFILE_KEYS[(PROFILE_KEYS.indexOf(cur) + 1) % PROFILE_KEYS.size]
+            val next = "adapt"
             render(next)
             Hsin.setProfile(next)
             render(Hsin.status()?.profile ?: next)

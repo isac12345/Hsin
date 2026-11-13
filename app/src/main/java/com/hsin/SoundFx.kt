@@ -146,7 +146,7 @@ object SoundFx {
     }
 
     private fun alias(kind: String) = when (kind) {
-        "tab" -> "tap2"; "click" -> "tap"; "battery" -> "cool"; "balanced" -> "on"; "performance" -> "perf"
+        "tab" -> "tap2"; "click" -> "tap"; "battery" -> "cool"; "balanced" -> "on"; "adapt" -> "on"; "performance" -> "perf"
         "overdrive" -> "boost"; "ritual" -> "ignition"; "good" -> "ok"; "bad" -> "err"; else -> kind
     }
 

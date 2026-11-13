@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.text.font.FontWeight
@@ -257,7 +260,7 @@ private fun HomeRound(vm: AppViewModel, live: Live, col: Color, land: Boolean) {
 private fun HomeCube(vm: AppViewModel, live: Live, col: Color, land: Boolean) {
     val clock = LocalClock.current
     val cm = curMode(vm)
-    val m = if (cm.isEmpty()) MODES[1] else info(cm)
+    val m = if (cm.isEmpty()) MODES[0] else info(cm)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val d = if (land) minOf(maxHeight - 120.dp, 180.dp).coerceAtLeast(110.dp) else 190.dp
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -321,8 +324,15 @@ internal fun ThemedHome(vm: AppViewModel, land: Boolean) {
     val prog = popKey(target, 420)
     lastProg[0] = prog
     val col = lerpColor(hold[0], target, prog)
+    // Roda adaptasi: maju satu takik (45 derajat) tiap kali modul mengubah beban; berputar pelan selagi adapt aktif.
+    val ad = vm.status.adaptNow.split("|")
+    val adKey = ad.getOrNull(0).orEmpty() + "/" + ad.getOrNull(1).orEmpty()
+    var steps by remember { mutableIntStateOf(0) }
+    LaunchedEffect(adKey) { if (adKey.length > 1) steps++ }
+    val stepDeg = ownAnim(steps * 45f, 700)
+    val spin = if (adKey.length > 1) LocalClock.current.floatValue * 8f else 0f
     Box(Modifier.fillMaxSize()) {
-        ThemeDeco(vm.prefs.appTheme, col)
+        ThemeDeco(1, col, stepDeg + spin)
         when (vm.prefs.appTheme) {
             1 -> HomeSlant(vm, live, col, land)
             2 -> HomeRound(vm, live, col, land)
@@ -333,21 +343,14 @@ internal fun ThemedHome(vm: AppViewModel, land: Boolean) {
 
 /** Dekorasi latar tiap tema (di belakang konten, tidak menangkap sentuhan). */
 @Composable
-private fun ThemeDeco(theme: Int, col: Color) {
+private fun ThemeDeco(theme: Int, col: Color, wheelDeg: Float = 0f) {
     val clock = LocalClock.current
     Canvas(Modifier.fillMaxSize()) {
         val t = clock.floatValue
         val w = size.width; val h = size.height
         when (theme) {
-            1 -> {   // batang miring bercahaya di kiri dan kanan
-                val bh = 16.dp.toPx(); val gap = 8.dp.toPx(); val sk = bh * 0.9f
-                for (side in 0..1) for (i in 0 until 6) {
-                    val y = h * 0.12f + i * (bh + gap)
-                    val len = (60 + (i * 17 + (t * 20f).toInt() * (if (side == 0) 1 else 2)) % 70).dp.toPx()
-                    val x0 = if (side == 0) 6.dp.toPx() else w - 6.dp.toPx() - len
-                    val path = Path().apply { moveTo(x0 + sk, y); lineTo(x0 + len, y); lineTo(x0 + len - sk, y + bh); lineTo(x0, y + bh); close() }
-                    drawPath(path, col.copy(alpha = 0.05f + 0.025f * ((i + (t * 2f).toInt()) % 4)))
-                }
+            1 -> {   // roda adaptasi besar di belakang, dua garis aksen di tepi
+                drawAdaptWheel(Offset(w * 0.72f, h * 0.52f), minOf(w, h) * 0.62f, wheelDeg, col, 0.10f)
                 drawLine(col.copy(alpha = 0.5f), Offset(0f, 1.dp.toPx()), Offset(w * 0.35f, 1.dp.toPx()), 2.dp.toPx())
                 drawLine(col.copy(alpha = 0.5f), Offset(w, h - 1.dp.toPx()), Offset(w * 0.65f, h - 1.dp.toPx()), 2.dp.toPx())
             }
@@ -430,6 +433,33 @@ internal fun ModeFx(vm: AppViewModel) {
                 val band = Path().apply { moveTo(x, 0f); lineTo(x + w, 0f); lineTo(x + w - skew, size.height); lineTo(x - skew, size.height); close() }
                 drawPath(band, Brush.horizontalGradient(listOf(Color.Transparent, col.copy(alpha = 0.38f), Color.Transparent), startX = x - skew, endX = x + w))
             }
+        }
+    }
+}
+
+
+/** Roda adaptasi buatan sendiri: cincin, 8 jari, 8 titik berbentuk belah ketupat. */
+internal fun DrawScope.drawAdaptWheel(c: Offset, r: Float, deg: Float, col: Color, alpha: Float) {
+    rotate(deg, c) {
+        val sw = (r * 0.04f).coerceAtLeast(1.5f)
+        drawCircle(col.copy(alpha = alpha), r * 0.62f, c, style = Stroke(sw))
+        drawCircle(col.copy(alpha = alpha * 0.55f), r * 0.50f, c, style = Stroke(sw * 0.5f))
+        drawCircle(col.copy(alpha = alpha), r * 0.11f, c)
+        for (k in 0 until 8) {
+            val a = Math.toRadians(k * 45.0)
+            val ca = cos(a).toFloat(); val sa = sin(a).toFloat()
+            drawLine(col.copy(alpha = alpha), Offset(c.x + ca * r * 0.11f, c.y + sa * r * 0.11f), Offset(c.x + ca * r * 0.62f, c.y + sa * r * 0.62f), sw)
+            drawLine(col.copy(alpha = alpha * 0.8f), Offset(c.x + ca * r * 0.62f, c.y + sa * r * 0.62f), Offset(c.x + ca * r * 0.80f, c.y + sa * r * 0.80f), sw * 0.7f)
+            val nc = Offset(c.x + ca * r * 0.90f, c.y + sa * r * 0.90f)
+            val d = r * 0.085f
+            val p = Path().apply {
+                moveTo(nc.x + ca * d, nc.y + sa * d)
+                lineTo(nc.x - sa * d * 0.7f, nc.y + ca * d * 0.7f)
+                lineTo(nc.x - ca * d, nc.y - sa * d)
+                lineTo(nc.x + sa * d * 0.7f, nc.y - ca * d * 0.7f)
+                close()
+            }
+            drawPath(p, col.copy(alpha = alpha))
         }
     }
 }
