@@ -1228,6 +1228,10 @@ fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"
 
 check_fps_floor() {
     _ff_pkg="$1"
+    # Kosongkan dulu: angka sesi lama tidak boleh terbaca sebagai kondisi app
+    # yang sekarang (adapt.sh memakai FPS_LAST_*).
+    FPS_LAST_P1=""
+    FPS_LAST_STALL=""
     [ -f "$STATE_DIR/.game_t0" ] || return 0
     [ -r "$STATE_DIR/fpsd.out" ] || return 0
     _ff_now=$(date +%s 2>/dev/null)

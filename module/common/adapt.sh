@@ -33,6 +33,10 @@ AD_KBASE_2="1 2 55"    # sedang
 AD_KBASE_3="1 1 30"    # agresif (sama dengan game boost ekstrem)
 
 AD_PKG=""
+AD_KBASE_OWN=0
+AD_KB_SAVE1=""
+AD_KB_SAVE2=""
+AD_KB_SAVE3=""
 AD_BEBAN=""
 AD_N=0
 AD_SUM=0
@@ -77,6 +81,40 @@ ad_kbase_set() {   # $1=beban -> titip nilai ke gameboost (satu penulis)
     GB_KBASE_UP=${_rest##* }
 }
 
+# Sesi game sedang dipegang gameboost? Kalau ya, kbase jangan disentuh di
+# sini: gameboost yang menulis dan memulihkan.
+ad_gb_active() {
+    [ -n "${GB_ACTIVE_FILE:-}" ] && [ -f "$GB_ACTIVE_FILE" ] && \
+        [ "$(cat "$GB_ACTIVE_FILE" 2>/dev/null)" = "1" ]
+}
+
+# Aplikasi non-game (daily) yang jank: modul menaikkan kbase sebentar, lalu
+# mengembalikan nilai lamanya sendiri. Tidak lewat gameboost karena di luar
+# game tidak ada sesi gb_apply yang memulihkannya.
+ad_kbase_own_apply() {
+    command -v gb_kbase_apply >/dev/null 2>&1 || return 0
+    _kb="${SYSFS_MODULE_PREFIX:-/sys/module}/mali_kbase/parameters"
+    [ -d "$_kb" ] || return 0
+    ad_gb_active && return 0
+    AD_KB_SAVE1=$(cat "$_kb/gpu_boost_level2" 2>/dev/null | tr -d '[:space:]')
+    AD_KB_SAVE2=$(cat "$_kb/gpu_pollingtime" 2>/dev/null | tr -d '[:space:]')
+    AD_KB_SAVE3=$(cat "$_kb/gpu_upthreshold" 2>/dev/null | tr -d '[:space:]')
+    gb_kbase_apply
+    AD_KBASE_OWN=1
+}
+
+ad_kbase_own_restore() {
+    [ "$AD_KBASE_OWN" = "1" ] || return 0
+    _kb="${SYSFS_MODULE_PREFIX:-/sys/module}/mali_kbase/parameters"
+    case "$AD_KB_SAVE1$_AD_KB_SAVE2$_AD_KB_SAVE3" in
+        ''|*[!0-9]*) AD_KBASE_OWN=0; return 0 ;;
+    esac
+    printf '%s\n' "$AD_KB_SAVE1" > "$_kb/gpu_boost_level2" 2>/dev/null
+    printf '%s\n' "$AD_KB_SAVE2" > "$_kb/gpu_pollingtime" 2>/dev/null
+    printf '%s\n' "$AD_KB_SAVE3" > "$_kb/gpu_upthreshold" 2>/dev/null
+    AD_KBASE_OWN=0
+}
+
 ad_tier_beban() {   # awal untuk game yang belum punya riwayat
     case "${DEVICE_TIER:-mid}" in
         low)  printf '3' ;;
@@ -108,17 +146,44 @@ ad_begin() {   # $1=pkg
     case "$AD_BEBAN" in ''|*[!0-9]*) AD_BEBAN=$(ad_tier_beban) ;; esac
     [ "$AD_BEBAN" -gt 3 ] 2>/dev/null && AD_BEBAN=3
     ad_kbase_set "$AD_BEBAN"
+    ad_kbase_own_apply
     ad_cset "$1" sesi $((_sesi + 1))
     ad_log "mulai $1 beban=$AD_BEBAN sesi=$((_sesi + 1)) kbase=${GB_KBASE_BOOST:-?}/${GB_KBASE_POLL:-?}/${GB_KBASE_UP:-?}"
 }
 
 ad_tick() {   # $1=pkg; baca FPS_LAST_P1/FPS_LAST_STALL dari monitor.sh
     [ -n "$1" ] || return 0
-    if [ "$AD_OPEN" != "1" ] || [ "$1" != "$AD_PKG" ]; then
-        ad_begin "$1" || return 0
+    # Hanya game terdaftar. Aplikasi biasa tidak diadaptasi: ukurannya beda
+    # (Termux 4 FPS bukan masalah) dan daily harus tetap tanpa campur tangan.
+    if command -v get_game_profile >/dev/null 2>&1; then
+        [ -n "$(get_game_profile "$1")" ] || return 0
     fi
     _p1="${FPS_LAST_P1:-}"
+    if [ -z "$_p1" ]; then
+        # Aplikasi non-game: check_fps_floor tidak mengukur (khusus game),
+        # jadi ukur di sini. Hanya saat fpsd masih segar, supaya angka mati
+        # tidak dipakai.
+        _sd="${STATE_DIR:-${HSIN_CONF_DIR:-/data/adb/hsin}}"
+        _now=$(date +%s 2>/dev/null)
+        _mt=$(stat -c %Y "$_sd/fpsd.out" 2>/dev/null)
+        case "$_now$_mt" in
+            ''|*[!0-9]*) : ;;
+            *) if [ $((_now - _mt)) -le 5 ] && command -v monitor_fps_stat >/dev/null 2>&1; then
+                   _p1=$(monitor_fps_stat "$_sd/fpsd.out" 2>/dev/null | cut -d' ' -f1)
+               fi ;;
+        esac
+    fi
     case "$_p1" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$_p1" -gt 240 ] 2>/dev/null && return 0
+    if [ "$AD_OPEN" != "1" ] || [ "$1" != "$AD_PKG" ]; then
+        # Aplikasi sehat (1% low di atas target) dan belum punya riwayat:
+        # jangan dicatat sama sekali. Ini yang bikin daily tetap ringan:
+        # modul hanya turun tangan saat ada yang benar-benar tersendat.
+        if [ -z "$(ad_cget "$1" beban)" ] && [ "$_p1" -ge "$AD_TARGET_P1" ] 2>/dev/null; then
+            return 0
+        fi
+        ad_begin "$1" || return 0
+    fi
     AD_N=$((AD_N + 1))
     AD_SUM=$((AD_SUM + _p1))
     if [ -z "$AD_MIN" ] || [ "$_p1" -lt "$AD_MIN" ]; then AD_MIN=$_p1; fi
@@ -132,6 +197,7 @@ ad_tick() {   # $1=pkg; baca FPS_LAST_P1/FPS_LAST_STALL dari monitor.sh
 
 ad_end() {
     [ "$AD_OPEN" = "1" ] || return 0
+    ad_kbase_own_restore
     AD_OPEN=0
     [ "$AD_N" -gt 0 ] 2>/dev/null || { AD_PKG=""; return 0; }
     _avg=$((AD_SUM / AD_N))

@@ -758,21 +758,9 @@ _gb_apply_gpu() {
     fi
 
     # --- kbase ---
-    # Nilai bisa dititipkan adapt.sh (beban adaptif per game). Penulis tetap
-    # satu: gameboost. Default 1/1/30 = agresif seperti sebelumnya.
-    local _kbase="$SYSFS_MODULE_PREFIX/mali_kbase/parameters"
-    local _kb_boost="${GB_KBASE_BOOST:-1}" _kb_poll="${GB_KBASE_POLL:-1}" _kb_up="${GB_KBASE_UP:-30}"
-    case "$_kb_boost" in ''|*[!0-9]*) _kb_boost=1 ;; esac
-    case "$_kb_poll"  in ''|*[!0-9]*) _kb_poll=1 ;; esac
-    case "$_kb_up"    in ''|*[!0-9]*) _kb_up=30 ;; esac
-    if [ -d "$_kbase" ]; then
-        [ -w "$_kbase/gpu_boost_level2" ] && \
-            _gb_write "$_kbase/gpu_boost_level2" "$_kb_boost" "GPU_KBASE"
-        [ -w "$_kbase/gpu_pollingtime" ] && \
-            _gb_write "$_kbase/gpu_pollingtime" "$_kb_poll" "GPU_KBASE"
-        [ -w "$_kbase/gpu_upthreshold" ] && \
-            _gb_write "$_kbase/gpu_upthreshold" "$_kb_up" "GPU_KBASE"
-    fi
+    # Satu-satunya tempat menulis kbase. Nilai bisa dititipkan adapt.sh
+    # (beban adaptif), default 1/1/30 = agresif seperti sebelumnya.
+    gb_kbase_apply
 
     # --- MTK ged_dvfs_boost ---
     if [ "${SOC_VENDOR:-}" = "mtk" ]; then
@@ -1178,6 +1166,24 @@ _gb_restore_fasrs_mode() {
     [ -n "$_pcfg" ] || return 0
     sh "$_pcfg" "$_want" 2>/dev/null
     _gb_log "INFO" "fas-rs mode=$_want (restore, state=$_st)"
+}
+
+# Tulis kbase Mali. Dipanggil gb_apply (nilai dari adapt.sh bila ada titipan)
+# dan oleh adapt.sh untuk aplikasi non-game. Tetap satu implementasi.
+gb_kbase_apply() {
+    local _kbase="${SYSFS_MODULE_PREFIX:-/sys/module}/mali_kbase/parameters"
+    [ -d "$_kbase" ] || return 0
+    local _kb_boost="${GB_KBASE_BOOST:-1}" _kb_poll="${GB_KBASE_POLL:-1}" _kb_up="${GB_KBASE_UP:-30}"
+    case "$_kb_boost" in ''|*[!0-9]*) _kb_boost=1 ;; esac
+    case "$_kb_poll"  in ''|*[!0-9]*) _kb_poll=1 ;; esac
+    case "$_kb_up"    in ''|*[!0-9]*) _kb_up=30 ;; esac
+    [ -w "$_kbase/gpu_boost_level2" ] && \
+        _gb_write "$_kbase/gpu_boost_level2" "$_kb_boost" "GPU_KBASE"
+    [ -w "$_kbase/gpu_pollingtime" ] && \
+        _gb_write "$_kbase/gpu_pollingtime" "$_kb_poll" "GPU_KBASE"
+    [ -w "$_kbase/gpu_upthreshold" ] && \
+        _gb_write "$_kbase/gpu_upthreshold" "$_kb_up" "GPU_KBASE"
+    return 0
 }
 
 return 0 2>/dev/null || true
