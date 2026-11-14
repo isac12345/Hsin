@@ -24,7 +24,7 @@ export SYSFS_MODULE_PREFIX="$T/mod" SYSFS_POWER_PREFIX="$T/power"
 export AD_STATE="$T/state"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
-AD_NONGAME_MAX=2
+AD_NONGAME_MAX=2; AD_RAISE_SECS=15; AD_TEMP_MAX=50000
 
 # ganti pembacaan PSI/RAM dengan nilai uji
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
