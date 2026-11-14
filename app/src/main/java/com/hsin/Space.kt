@@ -480,10 +480,10 @@ private fun Embers() {
 }
 
 // ===================== navigasi =====================
-@Composable
 /** Urutan tombol navigasi: Beranda, Game, Adapt, Rekaman, Alat, Pengaturan. */
 internal val NAV_ORDER = listOf(0, 1, 5, 2, 3, 4)
 
+@Composable
 internal fun navName(i: Int): String = when (i) {
     0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); 3 -> tx("Alat", "Tools"); 5 -> "Adapt"; else -> tx("Pengaturan", "Settings")
 }
