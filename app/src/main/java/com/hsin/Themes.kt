@@ -338,6 +338,12 @@ internal fun ThemedHome(vm: AppViewModel, land: Boolean) {
             2 -> HomeRound(vm, live, col, land)
             else -> HomeCube(vm, live, col, land)
         }
+        if (adKey.length > 1) {
+            val pk = ad[0]
+            val pm = androidx.compose.ui.platform.LocalContext.current.packageManager
+            val nm = try { pm.getApplicationLabel(pm.getApplicationInfo(pk, 0)).toString() } catch (_: Exception) { pk }
+            SText("Adapt · " + nm + " · " + tx("beban", "load") + " " + ad.getOrNull(1).orEmpty(), 11.sp, SP.dim, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+        }
     }
 }
 

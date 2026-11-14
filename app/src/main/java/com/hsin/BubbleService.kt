@@ -78,7 +78,6 @@ class BubbleService : Service() {
     private var ovdOn = false
     private var fpsRetryFor = ""
     private var lastFps = 0
-    private var protectedFor = ""
     private var flJob: Job? = null
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -223,11 +222,6 @@ class BubbleService : Service() {
                     ovdOn = effOvd(s.ovd)
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
-                    // Lindungi proses ini dari pembunuh memori tiap kali game baru terdeteksi (satu panggilan su, bukan tiap siklus).
-                    if (hudPkg.isNotEmpty() && hudPkg != protectedFor) {
-                        protectedFor = hudPkg
-                        protectSelf()
-                    }
                     recOn = s.rec || (prefs.recEngine == 1 && com.hsin.zrec.ZRec.mode() >= 2)
                     floating?.setOvd(effOvd(s.ovd), s.ovdLevel, s.gamePkg.isNotEmpty())
                     floating?.setSession(s.gamePkg)
@@ -268,24 +262,14 @@ class BubbleService : Service() {
     /** Minta sistem jangan membekukan/membunuh service ini: whitelist hemat daya, bucket aktif, oom. Butuh root, gagal diam-diam. */
     private fun harden() {
         val pkg = packageName
-        val pid = android.os.Process.myPid()
         scope.launch {
             Root.exec(
                 "dumpsys deviceidle whitelist +$pkg >/dev/null 2>&1; " +
                     "cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow >/dev/null 2>&1; " +
                     "cmd appops set $pkg RUN_IN_BACKGROUND allow >/dev/null 2>&1; " +
-                    "am set-standby-bucket $pkg active >/dev/null 2>&1; " +
-                    "[ -w /proc/$pid/oom_score_adj ] && echo -500 > /proc/$pid/oom_score_adj; true",
+                    "am set-standby-bucket $pkg active >/dev/null 2>&1; true",
                 10_000L,
             )
-        }
-    }
-
-    /** Turunkan oom_score_adj proses ini (butuh root). Gagal diam-diam: hanya tambahan, bukan syarat jalan. */
-    private fun protectSelf() {
-        val pid = android.os.Process.myPid()
-        scope.launch {
-            Root.exec("[ -w /proc/$pid/oom_score_adj ] && echo -300 > /proc/$pid/oom_score_adj", 5_000L)
         }
     }
 

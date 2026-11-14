@@ -87,6 +87,9 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     var onShot: (() -> Unit)? = null
     var onPause: (() -> Unit)? = null
     private var fpsTarget = 0f
+    private var panelBat: TextView? = null
+    private var panelLow: TextView? = null
+    private val fpsWin = ArrayDeque<Float>()
     private var fpsDisp = 0f
     private var fpsTextOn = false
     private var flashUntil = 0L
@@ -637,6 +640,16 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         setText(fpsPillLbl, lbl)
         setText(fpsThinLbl, lbl)
         setText(fpsBigLbl, lbl)
+        fpsText?.toFloatOrNull()?.let { fpsWin.addLast(it); if (fpsWin.size > 120) fpsWin.removeFirst() }
+        if (mode == MODE_PANEL) {
+            panelLow?.let { v -> val st = FpsSession.stats(fpsWin.toList()); setText(v, st?.second?.toString() ?: "--") }
+            panelBat?.let { v ->
+                val bi = ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                val lv = bi?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val sc = bi?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+                setText(v, if (lv >= 0 && sc > 0) "${lv * 100 / sc}%" else "--")
+            }
+        }
         noFpsTicks = if (s.fps == null) noFpsTicks + 1 else 0
         if (prefs.flStyle >= 3) {
             // tema gaming: angka FPS menghitung naik halus (diatur di loop frame) dan berkedip merah saat patah
@@ -1872,6 +1885,18 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 line.addView(cell, lpw(0, WRAP, 1f))
             }
             stats.addView(line, lpw(MATCH, WRAP, mt = if (r == 0) 0 else px(4)))
+        }
+        run {
+            val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+            for ((k, nm) in listOf("BATERAI", "1% LOW").withIndex()) {
+                val cell = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(px(4), px(1), px(4), px(1)) }
+                cell.addView(textView(nm, 9f, LABEL, true).apply { letterSpacing = 0.08f })
+                val v = textView("--", 13f, TEXT, true)
+                if (k == 0) panelBat = v else panelLow = v
+                cell.addView(v)
+                line.addView(cell, lpw(0, WRAP, 1f))
+            }
+            stats.addView(line, lpw(MATCH, WRAP, mt = px(4)))
         }
         gridRow = stats
         val head = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
