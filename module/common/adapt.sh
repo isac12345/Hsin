@@ -28,10 +28,16 @@ AD_PSI_IO="${AD_PSI_IO:-20}"
 AD_MEM_MIN_KB="${AD_MEM_MIN_KB:-400000}"
 AD_TEMP_MAX="${AD_TEMP_MAX:-48000}"   # 48 C: berhenti menaikkan beban
 AD_TEMP_CRIT="${AD_TEMP_CRIT:-50000}" # 50 C: langsung turunkan beban
+# Suhu otak HP (thermal zone) dipakai sebagai pengaman tambahan: sensor baterai
+# jarang naik di atas 42 C walau SoC sudah 69 C, jadi tanpa ini penahan panas
+# tidak pernah bekerja saat main lama.
+AD_SOC_MAX="${AD_SOC_MAX:-70000}"     # 70 C: berhenti menaikkan beban
+AD_SOC_CRIT="${AD_SOC_CRIT:-75000}"   # 75 C: langsung turunkan beban
 AD_BATT_MIN="${AD_BATT_MIN:-15}"
 AD_RAISE_SECS="${AD_RAISE_SECS:-15}"
 AD_LOWER_SECS="${AD_LOWER_SECS:-60}"
 AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
+AD_RAISE_RESET="${AD_RAISE_RESET:-300}"  # lancar 5 menit: jatah naik diisi ulang (sesi panjang)
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
 AD_GAME_LOWER="${AD_GAME_LOWER:-1}"   # 1: beban game boleh turun saat sudah lancar
@@ -162,6 +168,20 @@ ad_temp_mc() {
     _t=$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp" 2>/dev/null | tr -d '[:space:]')
     case "$_t" in ''|*[!0-9]*) printf '0'; return ;; esac
     printf '%s' $((_t * 100))
+}
+
+# Suhu terpanas dari semua thermal zone (mili-C). 0 bila tidak terbaca.
+ad_soc_temp_mc() {
+    _zt="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
+    _mx=0
+    for _z in "$_zt"/thermal_zone*/temp; do
+        [ -r "$_z" ] || continue
+        _v=$(cat "$_z" 2>/dev/null | tr -d '[:space:]')
+        case "$_v" in ''|*[!0-9]*) continue ;; esac
+        [ "$_v" -lt 1000 ] 2>/dev/null && _v=$((_v * 1000))   # sebagian kernel pakai 0,1 C
+        [ "$_v" -gt "$_mx" ] && _mx=$_v
+    done
+    printf '%s' "$_mx"
 }
 
 ad_batt_pct() {
@@ -389,6 +409,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     _pi=$(ad_psi io);  case "$_pi" in ''|*[!0-9]*) _pi=0 ;; esac
     _mem=$(ad_memavail_kb); case "$_mem" in ''|*[!0-9]*) _mem=99999999 ;; esac
     _tmp=$(ad_temp_mc); case "$_tmp" in ''|*[!0-9]*) _tmp=0 ;; esac
+    _soc=$(ad_soc_temp_mc); case "$_soc" in ''|*[!0-9]*) _soc=0 ;; esac
     _bat=$(ad_batt_pct); case "$_bat" in ''|*[!0-9]*) _bat=100 ;; esac
 
     # --- nilai: tersendat atau lancar ---
@@ -431,6 +452,15 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         AD_CALM_SECS=$((AD_CALM_SECS + _dt)); AD_JANK_SECS=0
     fi
 
+    # Sesi panjang (main 1-2 jam): setelah lancar lama, jatah naik diisi ulang.
+    # Tanpa ini jatah habis di menit-menit awal, lalu area berat yang datang
+    # belakangan tidak pernah ditolong.
+    if [ "$AD_RAISE_N" -gt 0 ] && [ "$AD_CALM_SECS" -ge "$AD_RAISE_RESET" ]; then
+        AD_RAISE_N=0
+        AD_CALM_SECS=0
+        ad_log "jatah naik diisi ulang setelah lancar $((AD_RAISE_RESET / 60)) menit ($AD_PKG)"
+    fi
+
     # --- catat sampel (gabungan) ---
     if [ -n "$_p1" ]; then
         AD_SN=$((AD_SN + 1))
@@ -445,18 +475,26 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     _gap_ok=0
     [ $((_now - AD_LAST_CHG)) -ge "$AD_CHG_GAP" ] 2>/dev/null && _gap_ok=1
 
-    # Suhu kritis (50 C): menang atas segalanya, langsung turunkan satu tingkat.
+    # Suhu kritis: menang atas segalanya, langsung turunkan satu tingkat.
     if [ "$_tmp" -ge "$AD_TEMP_CRIT" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ]; then
         AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_CALM_SECS=0; AD_JANK_SECS=0
         ad_apply; ad_flush
-        ad_log "turun: suhu $((_tmp / 1000))C kritis, beban=$AD_BEBAN ($AD_PKG)"
+        ad_log "turun: suhu baterai $((_tmp / 1000))C kritis, beban=$AD_BEBAN ($AD_PKG)"
+        return 0
+    fi
+    if [ "$_soc" -ge "$AD_SOC_CRIT" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ]; then
+        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_CALM_SECS=0; AD_JANK_SECS=0
+        ad_apply; ad_flush
+        ad_log "turun: suhu otak HP $((_soc / 1000))C kritis, beban=$AD_BEBAN ($AD_PKG)"
         return 0
     fi
 
     if [ "$AD_JANK_SECS" -ge "$AD_RAISE_SECS" ] && [ "$_gap_ok" = "1" ]; then
         AD_JANK_SECS=0
         if [ "$_tmp" -ge "$AD_TEMP_MAX" ]; then
-            ad_log "tahan: suhu $((_tmp / 1000))C, tidak menaikkan beban ($AD_PKG)"
+            ad_log "tahan: suhu baterai $((_tmp / 1000))C, tidak menaikkan beban ($AD_PKG)"
+        elif [ "$_soc" -ge "$AD_SOC_MAX" ]; then
+            ad_log "tahan: suhu otak HP $((_soc / 1000))C, tidak menaikkan beban ($AD_PKG)"
         elif [ "$_bat" -le "$AD_BATT_MIN" ]; then
             ad_log "tahan: baterai ${_bat}%, tidak menaikkan beban ($AD_PKG)"
         elif ad_in_call; then

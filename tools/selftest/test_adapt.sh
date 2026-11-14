@@ -12,14 +12,16 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/adapt.XXXXXX"); trap 'rm -rf "$T"' EXIT
 PASS=0; FAIL=0
 chk() { if [ "$2" = "$3" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; else FAIL=$((FAIL+1)); printf '  FAIL %s (dapat=[%s] harap=[%s])\n' "$1" "$2" "$3"; fi; }
 
-mkdir -p "$T/state" "$T/mod/mali_kbase/parameters" "$T/psi" "$T/power/battery"
+mkdir -p "$T/state" "$T/mod/mali_kbase/parameters" "$T/psi" "$T/power/battery" "$T/thermal/thermal_zone0"
 P="$T/mod/mali_kbase/parameters"
 printf '0\n' > "$P/gpu_boost_level2"; printf '8\n' > "$P/gpu_pollingtime"; printf '88\n' > "$P/gpu_upthreshold"
 printf '361\n' > "$T/power/battery/temp"; printf '80\n' > "$T/power/battery/capacity"
+printf '45000\n' > "$T/thermal/thermal_zone0/temp"
 printf 'pkg=x\n' > "$T/fpsd.out"
 
 export HSIN_CONF_DIR="$T/state" HSIN_LOG_FILE="$T/log" AD_DIR="$T/state/adapt"
 export SYSFS_MODULE_PREFIX="$T/mod" SYSFS_POWER_PREFIX="$T/power"
+export SYSFS_THERMAL_PREFIX="$T/thermal"
 export AD_STATE="$T/state"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
@@ -71,6 +73,23 @@ AD_OPEN=0; T_NOW=3000
 tick com.sosmed.a 8; tick com.sosmed.a 8; tick com.sosmed.a 8
 chk "tetap 1 karena baterai" "$(conf com.sosmed.a beban)" "1"
 printf '80\n' > "$T/power/battery/capacity"
+
+echo "== suhu otak HP 71 C menahan kenaikan"
+AD_CHG_GAP=0
+printf '71000\n' > "$T/thermal/thermal_zone0/temp"
+rm -f "$AD_DIR/com.sosmed.h.conf"; printf 'beban=1\n' > "$AD_DIR/com.sosmed.h.conf"
+T_FPS="6 60 900"; T_PSI=70
+AD_OPEN=0; T_NOW=3500
+tick com.sosmed.h 8; tick com.sosmed.h 8; tick com.sosmed.h 8
+chk "tetap 1 karena panas otak" "$(conf com.sosmed.h beban)" "1"
+
+echo "== suhu otak HP 76 C memaksa turun"
+printf '76000\n' > "$T/thermal/thermal_zone0/temp"
+AD_OPEN=0; T_NOW=3800
+tick com.sosmed.h 8
+chk "turun ke 0 karena panas otak" "$(conf com.sosmed.h beban)" "0"
+printf '45000\n' > "$T/thermal/thermal_zone0/temp"
+AD_CHG_GAP=30
 
 echo "== lancar 60 detik: turun satu tingkat"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000
@@ -168,6 +187,24 @@ chk "naik ke 2" "$(conf com.game.w beban)" "2"
 T_FPS="6 60 900"; T_PSI=70
 tick com.game.w 10; tick com.game.w 10
 chk "belum naik lagi (jeda)" "$(conf com.game.w beban)" "2"
+
+echo "== sesi panjang: jatah naik diisi ulang setelah lancar 5 menit"
+AD_CHG_GAP=0
+rm -f "$AD_DIR/com.game.long.conf"
+T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
+AD_OPEN=0; T_NOW=200000
+ad_tick com.game.long
+tick com.game.long 20; tick com.game.long 20
+chk "naik sampai puncak 3" "$(conf com.game.long beban)" "3"
+chk "jatah naik habis" "$AD_RAISE_N" "2"
+T_FPS="60 60 16"; T_PSI=5
+for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do tick com.game.long 30; done
+chk "jatah naik diisi ulang" "$AD_RAISE_N" "0"
+chk "beban sudah turun karena lancar" "$(conf com.game.long beban)" "0"
+T_FPS="6 60 900"; T_PSI=70
+tick com.game.long 20
+chk "bisa naik lagi setelah diisi ulang" "$(conf com.game.long beban)" "1"
+AD_CHG_GAP=30
 
 echo "== game boleh turun saat sudah lancar lama"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000
