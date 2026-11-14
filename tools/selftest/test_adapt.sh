@@ -25,6 +25,7 @@ export SYSFS_THERMAL_PREFIX="$T/thermal"
 export AD_STATE="$T/state"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
+AD_WARM_SECS=0   # uji lain tidak perlu menunggu pemanasan; diuji khusus di bawah
 
 # ganti pembacaan PSI/RAM dengan nilai uji
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
@@ -176,6 +177,10 @@ tick com.game.x 10; tick com.game.x 20
 chk "naik ke 3" "$(conf com.game.x beban)" "3"
 tick com.game.x 10; tick com.game.x 20
 chk "jatah habis lalu turun" "$(conf com.game.x beban)" "2"
+tick com.game.x 10; tick com.game.x 20
+chk "turun lagi ke 1" "$(conf com.game.x beban)" "1"
+tick com.game.x 10; tick com.game.x 20
+chk "berhenti di 1, tidak ke 0" "$(conf com.game.x beban)" "1"
 
 echo "== jeda minimal 30 detik antar perubahan"
 AD_CHG_GAP=30
@@ -188,7 +193,22 @@ T_FPS="6 60 900"; T_PSI=70
 tick com.game.w 10; tick com.game.w 10
 chk "belum naik lagi (jeda)" "$(conf com.game.w beban)" "2"
 
-echo "== sesi panjang: jatah naik diisi ulang setelah lancar 5 menit"
+echo "== awal sesi game: 90 detik pemanasan tidak memakai jatah"
+AD_WARM_SECS=90
+AD_CHG_GAP=0
+rm -f "$AD_DIR/com.game.warm.conf"
+T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
+AD_OPEN=0; T_NOW=250000
+ad_tick com.game.warm
+tick com.game.warm 15; tick com.game.warm 15; tick com.game.warm 15
+chk "belum naik saat pemanasan" "$AD_BEBAN" "1"
+chk "jatah belum terpakai" "$AD_RAISE_N" "0"
+tick com.game.warm 15; tick com.game.warm 15; tick com.game.warm 15
+chk "naik setelah pemanasan" "$(conf com.game.warm beban)" "2"
+AD_WARM_SECS=0
+AD_CHG_GAP=30
+
+echo "== sesi panjang: jatah naik diisi ulang tiap 10 menit main"
 AD_CHG_GAP=0
 rm -f "$AD_DIR/com.game.long.conf"
 T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
@@ -198,12 +218,11 @@ tick com.game.long 20; tick com.game.long 20
 chk "naik sampai puncak 3" "$(conf com.game.long beban)" "3"
 chk "jatah naik habis" "$AD_RAISE_N" "2"
 T_FPS="60 60 16"; T_PSI=5
-for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do tick com.game.long 30; done
+for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22; do tick com.game.long 30; done
 chk "jatah naik diisi ulang" "$AD_RAISE_N" "0"
-chk "beban sudah turun karena lancar" "$(conf com.game.long beban)" "0"
 T_FPS="6 60 900"; T_PSI=70
 tick com.game.long 20
-chk "bisa naik lagi setelah diisi ulang" "$(conf com.game.long beban)" "1"
+chk "bisa naik lagi setelah 10 menit" "$(conf com.game.long beban)" "1"
 AD_CHG_GAP=30
 
 echo "== game boleh turun saat sudah lancar lama"

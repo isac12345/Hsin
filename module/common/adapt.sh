@@ -37,7 +37,8 @@ AD_BATT_MIN="${AD_BATT_MIN:-15}"
 AD_RAISE_SECS="${AD_RAISE_SECS:-15}"
 AD_LOWER_SECS="${AD_LOWER_SECS:-60}"
 AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
-AD_RAISE_RESET="${AD_RAISE_RESET:-300}"  # lancar 5 menit: jatah naik diisi ulang (sesi panjang)
+AD_RAISE_RESET="${AD_RAISE_RESET:-600}"  # tiap 10 menit main: jatah naik diisi ulang
+AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai jatah naik
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
 AD_GAME_LOWER="${AD_GAME_LOWER:-1}"   # 1: beban game boleh turun saat sudah lancar
@@ -60,6 +61,8 @@ AD_KB_SAVE1=""
 AD_KB_SAVE2=""
 AD_KB_SAVE3=""
 AD_LAST_TS=0
+AD_OPEN_TS=0
+AD_LAST_RESET=0
 AD_LAST_CHG=0
 AD_RAISE_N=0
 AD_JANK_SECS=0
@@ -319,6 +322,8 @@ ad_open() {   # $1=pkg
     AD_RAISE_N=0
     AD_LAST_CHG=0
     AD_LAST_TS=$(date +%s 2>/dev/null)
+    AD_OPEN_TS=$AD_LAST_TS
+    AD_LAST_RESET=$AD_LAST_TS
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
     AD_BEBAN=$(ad_cget "$1" "$AD_BKEY")
@@ -446,19 +451,27 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     [ "$_dt" -gt 30 ] && _dt=30
     [ "$_dt" -lt 0 ] && _dt=0
     AD_LAST_TS=$_now
+
+    # Awal sesi game = loading dan pemanasan. Jangan pakai jatah naik di sini,
+    # karena dulu dua kenaikan habis sebelum game benar-benar mulai.
+    if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_SECS" ] 2>/dev/null; then
+        _jank=0; _calm=0
+    fi
     if [ "$_jank" -eq 1 ]; then
         AD_JANK_SECS=$((AD_JANK_SECS + _dt)); AD_CALM_SECS=0
     elif [ "$_calm" -eq 1 ]; then
         AD_CALM_SECS=$((AD_CALM_SECS + _dt)); AD_JANK_SECS=0
     fi
 
-    # Sesi panjang (main 1-2 jam): setelah lancar lama, jatah naik diisi ulang.
-    # Tanpa ini jatah habis di menit-menit awal, lalu area berat yang datang
-    # belakangan tidak pernah ditolong.
-    if [ "$AD_RAISE_N" -gt 0 ] && [ "$AD_CALM_SECS" -ge "$AD_RAISE_RESET" ]; then
-        AD_RAISE_N=0
-        AD_CALM_SECS=0
-        ad_log "jatah naik diisi ulang setelah lancar $((AD_RAISE_RESET / 60)) menit ($AD_PKG)"
+    # Sesi panjang (main 1-2 jam): jatah naik diisi ulang tiap 10 menit main,
+    # tidak perlu menunggu lancar. Tanpa ini jatah habis di menit awal lalu area
+    # berat yang datang belakangan tidak pernah ditolong.
+    if [ $((_now - AD_LAST_RESET)) -ge "$AD_RAISE_RESET" ] 2>/dev/null; then
+        AD_LAST_RESET=$_now
+        if [ "$AD_RAISE_N" -gt 0 ]; then
+            AD_RAISE_N=0
+            ad_log "jatah naik diisi ulang ($(($AD_RAISE_RESET / 60)) menit main, $AD_PKG)"
+        fi
     fi
 
     # --- catat sampel (gabungan) ---
@@ -511,9 +524,10 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             ad_apply
             ad_flush
             ad_log "naik: $AD_PKG beban=$AD_BEBAN (ke-$AD_RAISE_N/$AD_MAX_RAISE) ($_why) suhu=$((_tmp / 1000))C ram=$((_mem / 1024))MB"
-        elif [ "$AD_BEBAN" -gt 0 ]; then
-            # Sudah mentok atau jatah naik habis dan masih tersendat: naik tidak
-            # menolong, jadi mundur supaya tidak menambah panas tanpa manfaat.
+        elif [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
+            # Naik tidak menolong: mundur supaya tidak menambah panas. Game
+            # berhenti di beban 1, tidak sampai 0, supaya tetap ada bantuan
+            # minimal selama main (dulu jatuh ke 0 lalu terkunci di sana).
             AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
             ad_apply
             ad_flush
