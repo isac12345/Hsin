@@ -1,17 +1,11 @@
 package com.hsin
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
 import android.view.animation.Interpolator
-import android.view.animation.OvershootInterpolator
-import android.view.animation.LinearInterpolator
 
 /**
  * Roda Adapt HSIN (desain asli): cincin tipis dengan 8 bulatan di luar, bagian tengah kosong untuk angka FPS.
@@ -47,17 +41,64 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
     private var puncak = false
     private var low = false
     private var flash = 0f
-    private var spin: Animator? = null
-    private var cont: ObjectAnimator? = null
-    private var flashAnim: ValueAnimator? = null
-    private var appearAnim: Animator? = null
+
+    // Animasi pakai jam sendiri (uptimeMillis), bukan Animator: Animator mengikuti skala animasi sistem (0 di banyak HP) dan jadi instan.
+    private var spinning = false
+    private var sFrom = 0f; private var sDelta = 0f; private var sT0 = 0L; private var sDur = 1L; private var sSteps = 4
+    private var contOn = false
+    private var cBase = 0f; private var cT0 = 0L
+    private var flashing = false; private var fT0 = 0L
+    private var appearing = false; private var aT0 = 0L; private var aBase = 0f
+    private var running = false
+    private var lastCont = 0L
+
+    private val driver = object : Runnable {
+        override fun run() {
+            running = false
+            if (!isAttachedToWindow) return
+            val now = android.os.SystemClock.uptimeMillis()
+            var keep = false
+            var angle = rotation
+            if (spinning) {
+                val q = ((now - sT0).toFloat() / sDur).coerceIn(0f, 1f)
+                angle = sFrom + sDelta * Ratchet(sSteps).getInterpolation(q)
+                if (q >= 1f) {
+                    spinning = false
+                    flashing = true; fT0 = now
+                    if (load == 3 && !puncak && !reduce()) { contOn = true; cT0 = now; cBase = angle }
+                } else keep = true
+            }
+            if (contOn && !spinning) {
+                if (now - lastCont >= 30L) { lastCont = now; angle = cBase + 360f * (((now - cT0) % 7000L) / 7000f) } else angle = rotation
+                keep = true
+            }
+            if (appearing) {
+                val q = ((now - aT0).toFloat() / 600f).coerceIn(0f, 1f)
+                val t = q - 1f
+                val sc = 0.4f + 0.6f * (t * t * (2.2f * t + 1.2f) + 1f)
+                scaleX = sc; scaleY = sc; alpha = (sc / 0.7f).coerceIn(0f, 1f)
+                if (!spinning && !contOn) angle = aBase - 270f * (1f - Ratchet(6).getInterpolation(q))
+                if (q >= 1f) { appearing = false; scaleX = 1f; scaleY = 1f; alpha = 1f; if (!contOn && !spinning) angle = aBase } else keep = true
+            }
+            if (flashing) {
+                val q = ((now - fT0) / 450f).coerceIn(0f, 1f)
+                flash = Math.sin(Math.PI * q).toFloat()
+                invalidate()
+                if (q >= 1f) { flashing = false; flash = 0f; invalidate() } else keep = true
+            }
+            if (angle != rotation) rotation = angle
+            if (keep) kick()
+        }
+    }
+
+    private fun kick() { if (!running && isAttachedToWindow) { running = true; postOnAnimation(driver) } }
 
     init { setLayerType(LAYER_TYPE_HARDWARE, null) }
 
     fun setPuncak(on: Boolean) {
         if (on == puncak) return
         puncak = on
-        if (on) { stopAnims() }
+        if (on) stopAnims()
         invalidate()
     }
 
@@ -69,77 +110,41 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
         if (l == load) return
         val old = load
         load = l
+        val cur = rotation
         stopAnims()
         invalidate()
         if (l < 0 || puncak) return
-        if (!animate || reduce()) { if (l == 3 && !reduce()) startCont(); return }
-        val delta = (if (l >= old) 1f else -1f) * DEG[l]
-        val a = ObjectAnimator.ofFloat(this, ROTATION, rotation, rotation + delta)
-        a.duration = DUR[l]
-        a.interpolator = Ratchet(STEPS[l])
-        a.addListener(object : AnimatorListenerAdapter() {
-            private var cancelled = false
-            override fun onAnimationCancel(an: Animator) { cancelled = true }
-            override fun onAnimationEnd(an: Animator) {
-                if (cancelled) return
-                lock()
-                if (load == 3) startCont()
-            }
-        })
-        spin = a
-        a.start()
-    }
-
-    private fun lock() {
-        val f = ValueAnimator.ofFloat(0f, 1f, 0f)
-        f.duration = 450L
-        f.addUpdateListener { flash = it.animatedValue as Float; invalidate() }
-        f.addListener(object : AnimatorListenerAdapter() { override fun onAnimationEnd(an: Animator) { flash = 0f; invalidate() } })
-        flashAnim = f
-        f.start()
-    }
-
-    private fun startCont() {
-        cont?.cancel()
-        val a = ObjectAnimator.ofFloat(this, ROTATION, rotation, rotation + 360f)
-        a.duration = 7000L
-        a.interpolator = LinearInterpolator()
-        a.repeatCount = ValueAnimator.INFINITE
-        cont = a
-        if (isAttachedToWindow) a.start()
+        if (!animate) {
+            if (l == 3 && !reduce()) { contOn = true; cT0 = android.os.SystemClock.uptimeMillis(); cBase = cur; kick() }
+            return
+        }
+        if (reduce()) return
+        sFrom = cur
+        sDelta = (if (l >= old) 1f else -1f) * DEG[l]
+        sDur = DUR[l]; sSteps = STEPS[l]
+        sT0 = android.os.SystemClock.uptimeMillis()
+        spinning = true
+        kick()
     }
 
     private fun stopAnims() {
-        spin?.cancel(); spin = null
-        cont?.cancel(); cont = null
-        flashAnim?.cancel(); flashAnim = null
-        appearAnim?.cancel(); appearAnim = null
+        spinning = false; contOn = false; flashing = false; appearing = false
         flash = 0f
+        scaleX = 1f; scaleY = 1f; alpha = 1f
     }
 
-    /** Muncul: roda membesar sambil berputar ratchet satu putaran 270 derajat (hanya bila tidak berputar terus). */
+    /** Muncul: roda membesar sambil berputar ratchet 270 derajat. */
     fun appear() {
         if (reduce()) return
-        appearAnim?.cancel()
-        val set = android.animation.AnimatorSet()
-        val sc = ValueAnimator.ofFloat(0.4f, 1f)
-        sc.interpolator = OvershootInterpolator(1.2f)
-        sc.addUpdateListener { val v = it.animatedValue as Float; scaleX = v; scaleY = v; alpha = (v / 0.7f).coerceIn(0f, 1f) }
-        val list = ArrayList<Animator>()
-        list.add(sc)
-        if (cont == null) list.add(ObjectAnimator.ofFloat(this, ROTATION, rotation - 270f, rotation).apply { interpolator = Ratchet(6) })
-        set.playTogether(list)
-        set.duration = 600L
-        set.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(an: Animator) { scaleX = 1f; scaleY = 1f; alpha = 1f }
-            override fun onAnimationCancel(an: Animator) { scaleX = 1f; scaleY = 1f; alpha = 1f }
-        })
-        appearAnim = set
-        set.start()
+        appearing = true
+        aT0 = android.os.SystemClock.uptimeMillis()
+        aBase = if (contOn) rotation else rotation
+        scaleX = 0.4f; scaleY = 0.4f; alpha = 0f
+        kick()
     }
 
-    override fun onDetachedFromWindow() { cont?.pause(); super.onDetachedFromWindow() }
-    override fun onAttachedToWindow() { super.onAttachedToWindow(); cont?.let { if (it.isPaused) it.resume() else if (!it.isStarted) it.start() } }
+    override fun onDetachedFromWindow() { running = false; super.onDetachedFromWindow() }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); if (spinning || contOn || appearing || flashing) kick() }
 
     private fun base(): Int {
         if (puncak) return PUN

@@ -1,6 +1,5 @@
 package com.hsin
 
-import android.animation.ValueAnimator
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Canvas
@@ -1157,8 +1156,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                 lastTick = now
                 for (o in orbs) o.tick(now)
                 if (prefs.flStyle >= 3 && fpsTextOn) {
-                    val d = fpsTarget - fpsDisp
-                    fpsDisp = if (kotlin.math.abs(d) > 0.4f) fpsDisp + d * 0.6f else fpsTarget
+                    fpsDisp = fpsTarget   // angka FPS langsung, tanpa animasi
                     val txt = fpsDisp.toInt().toString()
                     val fl = now < flashUntil
                     setText(fpsPill, txt); setText(fpsMenu, txt); setText(fpsThin, txt)
@@ -1846,7 +1844,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val nb = textView("--", 16f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.04f }
         fpsBig = nb
         fpsBigLbl = fpsLabel(10f, 0.1f)
-        val wheel = AdaptWheelView(ctx) { prefs.animMode == 2 }
+        val wheel = AdaptWheelView(ctx) { false }
         wheel.setPuncak(odOn); wheel.setLoad(adaptLoad, false)
         panelWheel = wheel
         val wheelBox = FrameLayout(ctx)
@@ -1967,6 +1965,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
 
     /** Status Overdrive dari modul. avail = ada game terdaftar yang aktif (syarat untuk menyalakan). */
     /** Beban Adapt dari modul (-1 = tidak beradaptasi). Roda orb dan panel berputar bila berubah. */
+    /** Uji dari Alat: roda berputar seolah beban berubah (tanpa menunggu modul). */
+    fun testLoad(l: Int) {
+        adaptLoad = l
+        for (o in orbs) o.setLoad(l)
+        panelWheel?.setLoad(l)
+    }
+
     fun setAdaptLoad(l: Int) {
         if (l == adaptLoad) return
         adaptLoad = l
@@ -2135,7 +2140,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    private inner class OrbView : AdaptWheelView(ctx, { prefs.animMode == 2 }) {
+    private inner class OrbView : AdaptWheelView(ctx, { false }) {
         var accent = accentColor()
 
         init {
@@ -2153,7 +2158,6 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     /** Pilihan mode berbentuk saklar geser: Adapt di kiri, Puncak (merah) di kanan. */
     private inner class ModeSwitch : View(ctx) {
         private var pos = if (odOn) 1f else 0f
-        private var anim: ValueAnimator? = null
         private val p = Paint(Paint.ANTI_ALIAS_FLAG)
         private val rr = android.graphics.RectF()
         init { isClickable = true; setOnClickListener { markActive(); onToggle() } }
@@ -2162,17 +2166,22 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             if (!odOn && !odAvail) { Toast.makeText(ctx, "\u2139 " + trn("Buka game terdaftar dulu, Puncak hanya untuk game"), Toast.LENGTH_SHORT).show(); return }
             cycleMode()
         }
+        private var fromPos = 0f; private var toPos = 0f; private var t0 = 0L; private var moving = false
+        private val stepper = object : Runnable {
+            override fun run() {
+                val q = ((SystemClock.uptimeMillis() - t0) / 280f).coerceIn(0f, 1f)
+                val t = q - 1f
+                pos = (fromPos + (toPos - fromPos) * (t * t * (2.1f * t + 1.1f) + 1f)).coerceIn(0f, 1f)
+                invalidate()
+                if (q < 1f) postOnAnimation(this) else { pos = toPos; moving = false; invalidate() }
+            }
+        }
         fun sync() {
             alpha = if (recOn) 0.45f else if (!odOn && !odAvail) 0.75f else 1f
             val to = if (odOn) 1f else 0f
-            if (to == pos) { invalidate(); return }
-            anim?.cancel()
-            if (prefs.animMode == 2) { pos = to; invalidate(); return }
-            val a = ValueAnimator.ofFloat(pos, to)
-            a.duration = 280L
-            a.interpolator = android.view.animation.OvershootInterpolator(1.1f)
-            a.addUpdateListener { pos = (it.animatedValue as Float).coerceIn(0f, 1f); invalidate() }
-            anim = a; a.start()
+            if (to == toPos && (moving || to == pos)) { invalidate(); return }
+            toPos = to; fromPos = pos; t0 = SystemClock.uptimeMillis()
+            if (!moving) { moving = true; postOnAnimation(stepper) }
         }
         override fun onDraw(c: Canvas) {
             val w = width.toFloat(); val h = height.toFloat()

@@ -801,6 +801,9 @@ private fun AlatSistem(vm: AppViewModel, land: Boolean) {
             HBtn(tx("Cek ulang", "Recheck"), Modifier.fillMaxWidth()) { vm.checkHealth() }
             var rescueOn by remember { mutableStateOf(vm.prefs.rescueToast) }
             HSwitch(tx("Toast FPS di bawah 20", "Toast when FPS under 20"), tx("Pemberitahuan kecil saat game patah", "Small notice when the game stutters"), rescueOn) { rescueOn = it; vm.prefs.rescueToast = it }
+            Text(tx("Uji roda Adapt di floating (tanpa game). Buka floating dulu.", "Test the Adapt wheel on the floating orb (no game needed). Show the floating first."), color = SP.dim, fontSize = 11.sp, lineHeight = 14.sp)
+            val ctxW = androidx.compose.ui.platform.LocalContext.current
+            HChips(listOf("0", "1", "2", "3"), -1) { n -> ctxW.startService(android.content.Intent(ctxW, BubbleService::class.java).setAction(BubbleService.ACT_WHEEL).putExtra("load", n)) }
             HBtn(tx("Restart monitor modul", "Restart module monitor"), Modifier.fillMaxWidth()) { vm.restartMonitor() }
             Text(tx("Setelah update modul, monitor perlu dimulai ulang agar kode barunya dimuat.", "After a module update the monitor must restart to load the new code."), color = SP.faint, fontSize = 10.sp, lineHeight = 13.sp)
         }

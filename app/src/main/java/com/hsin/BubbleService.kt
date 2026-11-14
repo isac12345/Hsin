@@ -34,6 +34,7 @@ class BubbleService : Service() {
         const val ACT_SET = "com.hsin.SET_PROFILE"
         const val ACT_SHOW = "com.hsin.SHOW_BUBBLE"
         const val ACT_FPSLOG = "com.hsin.FPS_LOG"
+        const val ACT_WHEEL = "com.hsin.TEST_WHEEL"
         const val EXTRA_P = "profile"
 
         private const val WANT = "/data/adb/hsin/.bubble_want"
@@ -211,7 +212,8 @@ class BubbleService : Service() {
                     gamePkg = s.gamePkg
                     adaptNow = s.adaptNow
                     val aLoad = if (effOvd(s.ovd)) -1 else adaptNow.split("|").getOrNull(1)?.toIntOrNull() ?: -1
-                    if (aLoad != lastAdaptLoad) {
+                    if (android.os.SystemClock.uptimeMillis() < testUntil) { /* uji roda dari Alat: jangan ditimpa modul */ }
+                    else if (aLoad != lastAdaptLoad) {
                         val first = lastAdaptLoad == -2
                         lastAdaptLoad = aLoad
                         floating?.setAdaptLoad(aLoad)
@@ -293,6 +295,12 @@ class BubbleService : Service() {
                     if (gamePkg.isEmpty()) Toast.makeText(this, trn("Buka game dulu untuk mode Puncak"), Toast.LENGTH_SHORT).show()
                     else toggleOvd(!ovdOn)
                 } else setProfile(it)
+            }
+            ACT_WHEEL -> {
+                val n = intent.getIntExtra("load", 0)
+                testUntil = android.os.SystemClock.uptimeMillis() + 15000L
+                floating?.testLoad(n)
+                if (n >= 0) SoundFx.play(prefs, "adapt$n")
             }
             ACT_FPSLOG -> {
                 // layar Performa di app: mulai/berhenti rekam data FPS; pastikan floating terpasang (aliran HUD)
@@ -407,6 +415,7 @@ class BubbleService : Service() {
 
     @Volatile private var adaptNow = ""
     private var lastAdaptLoad = -2
+    @Volatile private var testUntil = 0L
 
     private fun modeNow(): String = if (ovdOn) "Puncak" else profileLabel(profile)
 
