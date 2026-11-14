@@ -71,10 +71,11 @@ internal fun AdaptTab(vm: AppViewModel) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             HBtn(tx("Segarkan", "Refresh")) { reload++ }
+            val copiedMsg = tx("Laporan disalin", "Report copied")
             HBtn(tx("Salin laporan", "Copy report")) {
                 val txt = (rows ?: emptyList()).joinToString("\n") { r -> "${r.pkg} beban=${r.beban ?: "-"} sesi=${r.sesi ?: "-"} fps=${r.rata ?: "-"} 1%low=${r.p1Min ?: "-"} jank=${r.jank ?: "-"}% stall=${r.stallMs ?: "-"}ms terakhir=${r.terakhir}" }
                 (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("adapt", txt))
-                android.widget.Toast.makeText(ctx, tx("Laporan disalin", "Report copied"), android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(ctx, copiedMsg, android.widget.Toast.LENGTH_SHORT).show()
             }
             if (!confirm) HBtn(tx("Hapus semua catatan", "Clear all records"), color = SP.dim) { confirm = true }
             else {
