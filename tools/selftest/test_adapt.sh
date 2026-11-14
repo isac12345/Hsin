@@ -139,12 +139,12 @@ tick com.buruk
 chk "jank_pct dihapus" "$(conf com.buruk jank_pct)" ""
 chk "n dihapus" "$(conf com.buruk n)" ""
 
-echo "== game: mulai beban 1, batas 3, kbase langsung ditulis"
+echo "== game: mulai beban 1, batas 3, kbase ditulis gameboost"
 T_FPS="6 60 900"; T_PSI=70; DEVICE_TIER=low
 AD_OPEN=0; T_NOW=40000
 ad_tick com.game.x
 chk "beban awal game 1" "$AD_BEBAN" "1"
-chk "kbase beban 1 langsung terpasang" "$(kb)" "0/4/75"
+chk "game tidak menulis kbase sendiri" "$(kb)" "0/8/88"
 
 echo "== game: maksimal 2 kenaikan per sesi, lalu turun karena tidak menolong"
 AD_CHG_GAP=0
@@ -157,8 +157,6 @@ tick com.game.x 10; tick com.game.x 20
 chk "naik ke 3" "$(conf com.game.x beban)" "3"
 tick com.game.x 10; tick com.game.x 20
 chk "jatah habis lalu turun" "$(conf com.game.x beban)" "2"
-tick com.game.x 10; tick com.game.x 20
-chk "tidak turun terus (cukup satu tingkat)" "$(conf com.game.x beban)" "2"
 
 echo "== jeda minimal 30 detik antar perubahan"
 AD_CHG_GAP=30
@@ -170,16 +168,6 @@ chk "naik ke 2" "$(conf com.game.w beban)" "2"
 T_FPS="6 60 900"; T_PSI=70
 tick com.game.w 10; tick com.game.w 10
 chk "belum naik lagi (jeda)" "$(conf com.game.w beban)" "2"
-
-echo "== game: turun saat lancar juga langsung menulis kbase"
-AD_CHG_GAP=0
-rm -f "$AD_DIR/com.game.y.conf"; printf 'beban=1\n' > "$AD_DIR/com.game.y.conf"
-T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000
-AD_OPEN=0; T_NOW=55000
-tick com.game.y 30; tick com.game.y 30; tick com.game.y 30
-chk "beban game turun ke 0" "$(conf com.game.y beban)" "0"
-chk "kbase game kembali bawaan" "$(kb)" "0/8/88"
-AD_CHG_GAP=30
 
 echo "== game boleh turun saat sudah lancar lama"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000

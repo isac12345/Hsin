@@ -56,7 +56,6 @@ AD_KB_SAVE3=""
 AD_LAST_TS=0
 AD_LAST_CHG=0
 AD_RAISE_N=0
-AD_LAST_ACT=0   # 1 = perubahan terakhir menaikkan beban (dasar aturan "naik tidak menolong")
 AD_JANK_SECS=0
 AD_CALM_SECS=0
 AD_SN=0
@@ -298,7 +297,6 @@ ad_open() {   # $1=pkg
     AD_JANK_SECS=0
     AD_CALM_SECS=0
     AD_RAISE_N=0
-    AD_LAST_ACT=0
     AD_LAST_CHG=0
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
@@ -330,14 +328,7 @@ ad_apply() {   # pasang beban sekarang
     ad_kbase_set "$AD_BEBAN"
     # Penanda untuk APK (notifikasi/orb): paket|beban|game|epoch
     printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" > "$AD_STATE/.adapt_now" 2>/dev/null
-    if [ "$AD_IS_GAME" = "1" ]; then
-        # gameboost memegang level profil, tetapi nilai kbase yang dititipkan
-        # adapt harus ditulis SEKARANG. Dulu hanya ditulis saat gameboost
-        # kebetulan menerapkan ulang, jadi kenaikan beban saat main tidak
-        # terasa (baru 18 detik kemudian, dan penurunan tidak pernah).
-        command -v gb_kbase_apply >/dev/null 2>&1 && gb_kbase_apply
-        return 0
-    fi
+    if [ "$AD_IS_GAME" = "1" ]; then return 0; fi   # game: gameboost yang menulis
     if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; ad_kbase_fix_leftover; return 0; fi
     ad_kbase_own_apply
 }
@@ -355,7 +346,6 @@ ad_end() {
     AD_BEBAN=""
     AD_JANK_SECS=0
     AD_CALM_SECS=0
-    AD_LAST_ACT=0
 }
 
 ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
@@ -457,7 +447,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # Suhu kritis (50 C): menang atas segalanya, langsung turunkan satu tingkat.
     if [ "$_tmp" -ge "$AD_TEMP_CRIT" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ]; then
-        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_CALM_SECS=0; AD_JANK_SECS=0; AD_LAST_ACT=0
+        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_CALM_SECS=0; AD_JANK_SECS=0
         ad_apply; ad_flush
         ad_log "turun: suhu $((_tmp / 1000))C kritis, beban=$AD_BEBAN ($AD_PKG)"
         return 0
@@ -479,15 +469,14 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
                 ad_log "tahan: ram sempit ($_why), tidak menaikkan beban ($AD_PKG)"
             fi
         elif [ "$AD_BEBAN" -lt "$_max" ] && [ "$AD_RAISE_N" -lt "$AD_MAX_RAISE" ]; then
-            AD_BEBAN=$((AD_BEBAN + 1)); AD_RAISE_N=$((AD_RAISE_N + 1)); AD_LAST_CHG=$_now; AD_LAST_ACT=1
+            AD_BEBAN=$((AD_BEBAN + 1)); AD_RAISE_N=$((AD_RAISE_N + 1)); AD_LAST_CHG=$_now
             ad_apply
             ad_flush
             ad_log "naik: $AD_PKG beban=$AD_BEBAN (ke-$AD_RAISE_N/$AD_MAX_RAISE) ($_why) suhu=$((_tmp / 1000))C ram=$((_mem / 1024))MB"
-        elif [ "$AD_BEBAN" -gt 0 ] && [ "$AD_LAST_ACT" = "1" ]; then
-            # Kenaikan terakhir tidak menolong: mundur SATU tingkat saja. Dulu
-            # aturan ini jalan tiap 15 detik, jadi beban turun terus sampai 0,
-            # jatah naik habis, lalu game tersendat tanpa bantuan.
-            AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_LAST_ACT=0
+        elif [ "$AD_BEBAN" -gt 0 ]; then
+            # Sudah mentok atau jatah naik habis dan masih tersendat: naik tidak
+            # menolong, jadi mundur supaya tidak menambah panas tanpa manfaat.
+            AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
             ad_apply
             ad_flush
             ad_log "turun: naik tidak menolong, beban=$AD_BEBAN ($AD_PKG) ($_why)"
@@ -498,7 +487,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ] \
         && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_GAME_LOWER" = "1" ]; }; then
         AD_CALM_SECS=0
-        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_LAST_ACT=0
+        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
         ad_apply
         ad_flush
         ad_log "turun: $AD_PKG beban=$AD_BEBAN (lancar $AD_LOWER_SECS s)"
