@@ -22,15 +22,19 @@ AD_STATE="${HSIN_CONF_DIR:-/data/adb/hsin}"
 AD_TARGET_P1="${AD_TARGET_P1:-20}"
 AD_AVG_MIN="${AD_AVG_MIN:-15}"
 AD_STALL_JANK="${AD_STALL_JANK:-300}"
+AD_P1_RATIO="${AD_P1_RATIO:-65}"     # 1% low < 65% rata-rata = frame pacing patah
 AD_PSI_CPU="${AD_PSI_CPU:-60}"
 AD_PSI_IO="${AD_PSI_IO:-20}"
 AD_MEM_MIN_KB="${AD_MEM_MIN_KB:-400000}"
-AD_TEMP_MAX="${AD_TEMP_MAX:-200000}"   # tanpa batas suhu (pilihan pengguna)
-AD_BATT_MIN="${AD_BATT_MIN:-10}"
-AD_RAISE_SECS="${AD_RAISE_SECS:-5}"
-AD_LOWER_SECS="${AD_LOWER_SECS:-40}"
+AD_TEMP_MAX="${AD_TEMP_MAX:-48000}"   # 48 C: berhenti menaikkan beban
+AD_TEMP_CRIT="${AD_TEMP_CRIT:-50000}" # 50 C: langsung turunkan beban
+AD_BATT_MIN="${AD_BATT_MIN:-15}"
+AD_RAISE_SECS="${AD_RAISE_SECS:-15}"
+AD_LOWER_SECS="${AD_LOWER_SECS:-60}"
+AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
+AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
-AD_GAME_LOWER="${AD_GAME_LOWER:-0}"   # 0: beban game tidak diturunkan selama game berjalan
+AD_GAME_LOWER="${AD_GAME_LOWER:-1}"   # 1: beban game boleh turun saat sudah lancar
 AD_CHG_MAX="${AD_CHG_MAX:-2}"       # batas beban saat mengisi daya
 
 # Nilai kbase per beban: "boost poll upthreshold". Beban 0 = nilai bawaan
@@ -45,11 +49,14 @@ AD_BEBAN=""
 AD_BKEY=beban
 AD_IS_GAME=0
 AD_OPEN=0
+AD_FPS_OWN=0
 AD_KBASE_OWN=0
 AD_KB_SAVE1=""
 AD_KB_SAVE2=""
 AD_KB_SAVE3=""
 AD_LAST_TS=0
+AD_LAST_CHG=0
+AD_RAISE_N=0
 AD_JANK_SECS=0
 AD_CALM_SECS=0
 AD_SN=0
@@ -195,7 +202,7 @@ ad_kbase_own_restore() {
 }
 
 ad_charging() {
-    case "$(cat /sys/class/power_supply/battery/status 2>/dev/null)" in Charging|Full) return 0 ;; esac
+    case "$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status" 2>/dev/null)" in Charging|Full) return 0 ;; esac
     return 1
 }
 ad_max_beban() {
@@ -206,10 +213,24 @@ ad_max_beban() {
 
 ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     if [ "$AD_IS_GAME" = "1" ]; then
-        printf '2'    # game baru mulai di beban 2 (pilihan pengguna)
+        printf '1'    # game baru mulai di beban 1, naik hanya bila perlu
     else
         printf '0'    # aplikasi biasa: mulai tanpa bantuan
     fi
+}
+
+# Batas FPS per game (opsional). Berkas: $AD_STATE/fps_cap.conf, baris
+# "paket=30|45|60|90|120". ROM ini menolak "--fps disable", jadi pelepasannya
+# memakai 120 (sama dengan refresh panel maksimum = tanpa batas nyata).
+ad_fps_get() {
+    [ -f "$AD_STATE/fps_cap.conf" ] || return 1
+    sed -n "s/^$1=//p" "$AD_STATE/fps_cap.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]'
+}
+
+ad_fps_set() {   # $1=pkg $2=angka
+    case "$2" in 30|45|60|90|120) ;; *) return 1 ;; esac
+    command -v cmd >/dev/null 2>&1 || return 1
+    cmd game set --fps "$2" "$1" >/dev/null 2>&1
 }
 
 ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
@@ -255,13 +276,24 @@ ad_open() {   # $1=pkg
     AD_OPEN=1
     AD_JANK_SECS=0
     AD_CALM_SECS=0
+    AD_RAISE_N=0
+    AD_LAST_CHG=0
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
     AD_BEBAN=$(ad_cget "$1" "$AD_BKEY")
-    # catatan lama yang tetap patah parah (>=60%) dibuang: mulai lagi dari awal
+    # catatan lama yang tetap patah parah (>=60%) dibuang seluruhnya: beban dan
+    # statistiknya. Kalau hanya beban yang dihapus, jank_pct tetap >=60 dan
+    # setiap sesi berikutnya membuang beban lagi (ingatan tidak pernah dipakai).
     _jp=$(ad_cget "$1" jank_pct); case "$_jp" in ''|*[!0-9]*) _jp=0 ;; esac
-    [ "$_jp" -ge 60 ] 2>/dev/null && AD_BEBAN=""
+    if [ "$_jp" -ge 60 ] 2>/dev/null; then
+        AD_BEBAN=""
+        _f="$AD_DIR/$1.conf"
+        if [ -f "$_f" ]; then
+            grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
+                && mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
+        fi
+    fi
     case "$AD_BEBAN" in ''|*[!0-9]*) AD_BEBAN=$(ad_tier_beban) ;; esac
     _max=$(ad_max_beban)
     [ "$AD_BEBAN" -gt "$_max" ] 2>/dev/null && AD_BEBAN=$_max
@@ -269,6 +301,14 @@ ad_open() {   # $1=pkg
     case "$_sesi" in ''|*[!0-9]*) _sesi=0 ;; esac
     ad_cset "$1" sesi $((_sesi + 1))
     ad_apply
+    # Batas FPS per game: dipasang sekali di awal, tidak diubah saat main.
+    if [ "$AD_IS_GAME" = "1" ]; then
+        _fps=$(ad_fps_get "$1")
+        if [ -n "$_fps" ] && ad_fps_set "$1" "$_fps"; then
+            AD_FPS_OWN=1
+            ad_log "batas fps $1 = $_fps"
+        fi
+    fi
     ad_log "mulai $1 game=$AD_IS_GAME beban=$AD_BEBAN sesi=$((_sesi + 1))"
 }
 
@@ -287,6 +327,11 @@ ad_end() {
     ad_flush
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
     ad_kbase_own_restore
+    # Lepas batas FPS game yang tadi dipasang (bukan milik pengguna).
+    if [ "$AD_FPS_OWN" = "1" ]; then
+        ad_fps_set "$AD_PKG" 120
+        AD_FPS_OWN=0
+    fi
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
     ad_log "selesai $AD_PKG beban=$AD_BEBAN $_tail"
     AD_PKG=""
@@ -304,10 +349,20 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         [ "$AD_OPEN" = "1" ] && ad_end
         return 0
     fi
+    # Mode Puncak (profil performance) mematikan Adapt: pengguna minta tenaga penuh.
+    case "$(tr -d '[:space:]' < "$AD_STATE/active_profile" 2>/dev/null)" in
+        performance|puncak|overdrive)
+            [ "$AD_OPEN" = "1" ] && ad_end
+            return 0
+            ;;
+    esac
     if [ "$AD_OPEN" = "1" ] && [ "$AD_PKG" != "$_pkg" ]; then
         ad_end    # pindah aplikasi: semua kembali normal
     fi
     [ "$AD_OPEN" = "1" ] || ad_open "$_pkg"
+
+    # Pembersih RAM otomatis saat sempit (memfx: PSI + ambang + jeda sendiri).
+    command -v mf_relief_tick >/dev/null 2>&1 && mf_relief_tick "$_pkg"
 
     # --- ukur ---
     _st=""
@@ -333,6 +388,11 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     _jank=0; _calm=0; _why=""
     if [ -n "$_avg" ] && [ "$_avg" -ge "$AD_AVG_MIN" ]; then
         if [ "$_p1" -lt "$AD_TARGET_P1" ]; then _jank=1; _why="1%low=$_p1"; fi
+        # Frame pacing: 1% low jauh di bawah rata-rata = ada drop besar walau
+        # FPS rata-rata masih kelihatan bagus (mis. 30 turun ke 15 sebentar).
+        if [ $((_p1 * 100)) -lt $((_avg * AD_P1_RATIO)) ]; then
+            _jank=1; _why=${_why:-"p1=$_p1 rata=$_avg"}
+        fi
         if [ "$_stall" -gt "$AD_STALL_JANK" ]; then _jank=1; _why=${_why:-"jeda=${_stall}ms"}; fi
     fi
     if [ "$_jank" -eq 0 ]; then
@@ -344,6 +404,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         _calm=1
         if [ -n "$_avg" ] && [ "$_avg" -ge "$AD_AVG_MIN" ]; then
             if [ -n "$_p1" ] && [ "$_p1" -lt "$AD_TARGET_P1" ]; then _calm=0; fi
+            if [ -n "$_p1" ] && [ $((_p1 * 100)) -lt $((_avg * AD_P1_RATIO)) ]; then _calm=0; fi
         fi
         [ "$_pc" -ge 30 ] && _calm=0
         [ "$_pi" -ge 10 ] && _calm=0
@@ -374,7 +435,18 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # --- putuskan ---
     _max=$(ad_max_beban)
-    if [ "$AD_JANK_SECS" -ge "$AD_RAISE_SECS" ]; then
+    _gap_ok=0
+    [ $((_now - AD_LAST_CHG)) -ge "$AD_CHG_GAP" ] 2>/dev/null && _gap_ok=1
+
+    # Suhu kritis (50 C): menang atas segalanya, langsung turunkan satu tingkat.
+    if [ "$_tmp" -ge "$AD_TEMP_CRIT" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ]; then
+        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now; AD_CALM_SECS=0; AD_JANK_SECS=0
+        ad_apply; ad_flush
+        ad_log "turun: suhu $((_tmp / 1000))C kritis, beban=$AD_BEBAN ($AD_PKG)"
+        return 0
+    fi
+
+    if [ "$AD_JANK_SECS" -ge "$AD_RAISE_SECS" ] && [ "$_gap_ok" = "1" ]; then
         AD_JANK_SECS=0
         if [ "$_tmp" -ge "$AD_TEMP_MAX" ]; then
             ad_log "tahan: suhu $((_tmp / 1000))C, tidak menaikkan beban ($AD_PKG)"
@@ -384,23 +456,31 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             ad_log "tahan: ada panggilan aktif ($AD_PKG)"
         elif [ "${_why#ram=}" != "$_why" ]; then
             # RAM sempit bukan masalah GPU: menaikkan kbase tidak menolong.
-            # Pembersihan RAM dilakukan tombol di APK (ROM ini tanpa am kill-all).
+            # Pembersihan RAM otomatis lewat mf_relief_tick di atas.
             if [ $((_now - AD_LAST_MENTOK)) -ge 120 ] 2>/dev/null; then
                 AD_LAST_MENTOK=$_now
                 ad_log "tahan: ram sempit ($_why), tidak menaikkan beban ($AD_PKG)"
             fi
-        elif [ "$AD_BEBAN" -lt "$_max" ]; then
-            AD_BEBAN=$((AD_BEBAN + 1))
+        elif [ "$AD_BEBAN" -lt "$_max" ] && [ "$AD_RAISE_N" -lt "$AD_MAX_RAISE" ]; then
+            AD_BEBAN=$((AD_BEBAN + 1)); AD_RAISE_N=$((AD_RAISE_N + 1)); AD_LAST_CHG=$_now
             ad_apply
             ad_flush
-            ad_log "naik: $AD_PKG beban=$AD_BEBAN ($_why) suhu=$((_tmp / 1000))C ram=$((_mem / 1024))MB"
+            ad_log "naik: $AD_PKG beban=$AD_BEBAN (ke-$AD_RAISE_N/$AD_MAX_RAISE) ($_why) suhu=$((_tmp / 1000))C ram=$((_mem / 1024))MB"
+        elif [ "$AD_BEBAN" -gt 0 ]; then
+            # Sudah mentok atau jatah naik habis dan masih tersendat: naik tidak
+            # menolong, jadi mundur supaya tidak menambah panas tanpa manfaat.
+            AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
+            ad_apply
+            ad_flush
+            ad_log "turun: naik tidak menolong, beban=$AD_BEBAN ($AD_PKG) ($_why)"
         elif [ $((_now - AD_LAST_MENTOK)) -ge 120 ] 2>/dev/null; then
             AD_LAST_MENTOK=$_now
             ad_log "mentok: $AD_PKG beban=$AD_BEBAN ($_why) suhu=$((_tmp / 1000))C"
         fi
-    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_GAME_LOWER" = "1" ]; }; then
+    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ] \
+        && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_GAME_LOWER" = "1" ]; }; then
         AD_CALM_SECS=0
-        AD_BEBAN=$((AD_BEBAN - 1))
+        AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
         ad_apply
         ad_flush
         ad_log "turun: $AD_PKG beban=$AD_BEBAN (lancar $AD_LOWER_SECS s)"

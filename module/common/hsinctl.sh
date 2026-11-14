@@ -647,6 +647,34 @@ cmd_adapt() {
     esac
 }
 
+# Batas FPS per game (opsional). Dipasang sekali saat game dibuka, dilepas saat
+# game ditutup. ROM ini menolak "--fps disable", jadi pelepasannya memakai 120.
+cmd_fps() {
+    _f="$STATE_DIR/fps_cap.conf"
+    case "$1" in
+        list)
+            if [ -s "$_f" ]; then cat "$_f"; else echo "belum ada batas fps per game"; fi
+            ;;
+        set)
+            valid_pkg "$2" || { echo "ERROR: paket tidak valid"; return 1; }
+            case "$3" in
+                30|45|60|90|120) ;;
+                *) echo "ERROR: fps harus 30|45|60|90|120"; return 1 ;;
+            esac
+            mkdir -p "$STATE_DIR" 2>/dev/null
+            { grep -v "^$2=" "$_f" 2>/dev/null; printf '%s=%s\n' "$2" "$3"; } > "$_f.tmp.$$" \
+                && mv -f "$_f.tmp.$$" "$_f" || { rm -f "$_f.tmp.$$"; return 1; }
+            echo "OK: $2 fps=$3 (dipasang saat game dibuka berikutnya)"
+            ;;
+        clear)
+            valid_pkg "$2" || { echo "ERROR: paket tidak valid"; return 1; }
+            [ -f "$_f" ] && { grep -v "^$2=" "$_f" > "$_f.tmp.$$" && mv -f "$_f.tmp.$$" "$_f"; }
+            echo "OK: batas fps $2 dihapus"
+            ;;
+        *) echo "Usage: hsinctl fps list | fps set <paket> <30|45|60|90|120> | fps clear <paket>"; return 1 ;;
+    esac
+}
+
 cmd_redetect() {
     rm -f "$STATE_DIR/detected.conf" 2>/dev/null
     HSIN_FORCE_DETECT=1 sh "$COMMON/detect.sh" >/dev/null 2>&1
@@ -769,6 +797,7 @@ case "$1" in
     diagnose) cmd_diagnose ;;
     device) cmd_device ;;
     adapt) cmd_adapt "$2" "$3" ;;
+    fps) cmd_fps "$2" "$3" "$4" ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
     gamerender) cmd_gamerender "$2" "$3" "$4" ;;
