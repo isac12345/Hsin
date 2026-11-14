@@ -197,8 +197,11 @@ ad_kbase_fix_leftover() {
     [ -d "$_kb" ] || return 0
     ad_gb_active && return 0
     _cur="$(cat "$_kb/gpu_boost_level2" 2>/dev/null | tr -d '[:space:]') $(cat "$_kb/gpu_pollingtime" 2>/dev/null | tr -d '[:space:]') $(cat "$_kb/gpu_upthreshold" 2>/dev/null | tr -d '[:space:]')"
+    # Cocokkan juga pasangan poll+up saja: pernah kejadian node tertinggal
+    # campuran (0/2/55) karena penulisan terputus saat monitor dimatikan.
     case "$_cur" in
         "$AD_KBASE_1"|"$AD_KBASE_2"|"$AD_KBASE_3") ;;
+        *" ${AD_KBASE_1#* }"|*" ${AD_KBASE_2#* }"|*" ${AD_KBASE_3#* }") ;;
         *) return 0 ;;
     esac
     GB_KBASE_BOOST=${AD_KBASE_0%% *}

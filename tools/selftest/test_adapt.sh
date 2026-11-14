@@ -230,6 +230,15 @@ tick com.sisa
 chk "kbase kembali bawaan" "$(kb)" "0/8/88"
 ad_end
 
+echo "== sisa campuran (0/2/55) juga dibersihkan"
+printf '0\n' > "$P/gpu_boost_level2"; printf '2\n' > "$P/gpu_pollingtime"; printf '55\n' > "$P/gpu_upthreshold"
+AD_OPEN=0; AD_KBASE_OWN=0; T_NOW=125000
+printf 'beban=0\n' > "$AD_DIR/com.sisa2.conf"
+tick com.sisa2
+chk "campuran kembali bawaan" "$(kb)" "0/8/88"
+ad_end
+AD_KBASE_OWN=0
+
 echo "== jank_pct tidak lebih dari 100 (data lama korup)"
 mkdir -p "$AD_DIR"
 printf 'n=2
