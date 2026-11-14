@@ -215,9 +215,10 @@ class BubbleService : Service() {
                     if (android.os.SystemClock.uptimeMillis() < testUntil) { /* uji roda dari Alat: jangan ditimpa modul */ }
                     else if (aLoad != lastAdaptLoad) {
                         val first = lastAdaptLoad == -2
+                        val prevLoad = lastAdaptLoad
                         lastAdaptLoad = aLoad
                         floating?.setAdaptLoad(aLoad)
-                        if (!first && aLoad >= 0) SoundFx.play(prefs, "adapt$aLoad")
+                        if (!first && aLoad >= 0) SoundFx.play(prefs, (if (aLoad < prevLoad) "adaptdn" else "adapt") + aLoad)
                     }
                     ovdOn = effOvd(s.ovd)
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
@@ -442,12 +443,9 @@ class BubbleService : Service() {
                 val an = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(adPkg, 0)).toString() } catch (_: Exception) { adPkg }
                 append("Beradaptasi: ").append(an).append(" · beban ").append(ap.getOrNull(1).orEmpty())
             } else if (gameName.isNotEmpty()) append(gameName) else append("Siaga")
-            if (gameName.isNotEmpty() && lastFps > 0) append(" · ").append(lastFps).append(" FPS")
-            if (tempC > 0f) append(" · %.0f°C".format(tempC))
-            if (batt >= 0) append(" · ").append(batt).append("%")
         }
         val b = NotificationCompat.Builder(this, CH)
-            .setSmallIcon(R.drawable.ic_stat_hsin)
+            .setSmallIcon(R.drawable.ic_stat_wheel)
             .setContentTitle("HSIN · Mode ${modeNow()}")
             .setContentText(if (hidden) "Orb disembunyikan · ketuk untuk memunculkan" else text)
             .setContentIntent(content)

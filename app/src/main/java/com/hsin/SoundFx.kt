@@ -152,10 +152,14 @@ object SoundFx {
         "fps" -> 1.0f to { b -> osc(b, "sawtooth", 140f, 60f, 0.5f, 0.35f, 0f, 8f); crackle(b, 0.1f, 5); glitch(b, 0f, 10, 0.1f) }
         "err" -> 1.2f to { b -> osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0f, 12f); osc(b, "sawtooth", 110f, 100f, 0.3f, 0.3f, 0.38f, 12f); glitch(b, 0.7f, 6, 0.12f) }
         "ok" -> 1.0f to { b -> listOf(262f, 330f, 392f).forEach { f -> osc(b, "sawtooth", f, f, 0.5f, 0.15f, 0f, 3f) }; hit(b, 0f, 0.45f); digi(b, listOf(1320f, 1760f, 2640f), 0.07f, 0.1f, 0.1f, 0.1f); chime(b, 0.3f) }
-        "adapt0" -> wheelSnd(4, 0.7f, 0.9f)
-        "adapt1" -> wheelSnd(6, 0.9f, 1.0f)
-        "adapt2" -> wheelSnd(8, 1.1f, 1.12f)
-        "adapt3" -> wheelSnd(12, 1.5f, 1.3f)
+        "adapt0" -> wheelSnd(4, 0.5f, 0.9f)
+        "adapt1" -> wheelSnd(6, 0.65f, 1.0f)
+        "adapt2" -> wheelSnd(8, 0.8f, 1.12f)
+        "adapt3" -> wheelSnd(12, 1.05f, 1.3f)
+        "adaptdn0" -> wheelSnd(4, 0.5f, 0.68f)
+        "adaptdn1" -> wheelSnd(6, 0.65f, 0.75f)
+        "adaptdn2" -> wheelSnd(8, 0.8f, 0.84f)
+        "adaptdn3" -> wheelSnd(12, 1.05f, 0.95f)
         "wheelin" -> wheelSnd(6, 0.6f, 1.0f)
         else -> null
     }

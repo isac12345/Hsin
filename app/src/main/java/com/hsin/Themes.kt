@@ -109,7 +109,7 @@ internal fun NavApex(compact: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp)
     ) {
         LogoThemed(if (compact) 34 else 46)
-        for (i in 0 until 5) ThemedNavBtn(i, SlantShape, 56.dp, if (compact) 36.dp else 42.dp, !compact)
+        for (i in NAV_ORDER) ThemedNavBtn(i, SlantShape, 56.dp, if (compact) 36.dp else 42.dp, !compact)
     }
 }
 
@@ -122,7 +122,7 @@ internal fun NavTurbo(compact: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically
         ) {
             LogoThemed(34)
-            for (i in 0 until 5) ThemedNavBtn(i, CircleShape, 42.dp, 42.dp, false)
+            for (i in NAV_ORDER) ThemedNavBtn(i, CircleShape, 42.dp, 42.dp, false)
         }
     }
 }
@@ -135,7 +135,7 @@ internal fun NavNitro(compact: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp)
     ) {
         LogoThemed(if (compact) 34 else 46)
-        for (i in 0 until 5) ThemedNavBtn(i, HexShape, if (compact) 44.dp else 52.dp, if (compact) 46.dp else 56.dp, !compact)
+        for (i in NAV_ORDER) ThemedNavBtn(i, HexShape, if (compact) 44.dp else 52.dp, if (compact) 46.dp else 56.dp, !compact)
     }
 }
 

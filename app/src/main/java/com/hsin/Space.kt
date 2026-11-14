@@ -414,6 +414,7 @@ private fun SpaceContent(vm: AppViewModel, land: Boolean, modifier: Modifier) {
             1 -> GameTab(vm, land)
             2 -> RecordsTab(vm)
             3 -> AlatTab(vm, land)
+            5 -> AdaptTab(vm)
             else -> SettingsTab(vm)
         }
     }
@@ -480,8 +481,11 @@ private fun Embers() {
 
 // ===================== navigasi =====================
 @Composable
+/** Urutan tombol navigasi: Beranda, Game, Adapt, Rekaman, Alat, Pengaturan. */
+internal val NAV_ORDER = listOf(0, 1, 5, 2, 3, 4)
+
 internal fun navName(i: Int): String = when (i) {
-    0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); 3 -> tx("Alat", "Tools"); else -> tx("Pengaturan", "Settings")
+    0 -> tx("Beranda", "Home"); 1 -> tx("Game", "Games"); 2 -> tx("Rekaman", "Records"); 3 -> tx("Alat", "Tools"); 5 -> "Adapt"; else -> tx("Pengaturan", "Settings")
 }
 
 @Composable
@@ -512,6 +516,13 @@ internal fun NavIcon(i: Int, color: Color, modifier: Modifier = Modifier) {
                 drawCircle(color, w * 0.22f, Offset(w * 0.68f, h * 0.32f), style = st)
                 drawCircle(SP.ink, w * 0.07f, Offset(w * 0.74f, h * 0.26f))
             }
+            5 -> {
+                drawCircle(color, w * 0.30f, Offset(w / 2, h / 2), style = st)
+                for (k in 0 until 8) {
+                    val a = Math.toRadians(k * 45.0)
+                    drawCircle(color, w * 0.075f, Offset(w / 2 + (w * 0.42f * Math.cos(a)).toFloat(), h / 2 + (h * 0.42f * Math.sin(a)).toFloat()))
+                }
+            }
             else -> {
                 for (k in 0 until 3) {
                     val y = h * (0.24f + 0.26f * k)
@@ -533,14 +544,14 @@ private fun NavRail(compact: Boolean) {
         verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp)
     ) {
         Logo(if (compact) 32 else 44)
-        for (i in 0 until 5) NavItem(i, compact)
+        for (i in NAV_ORDER) NavItem(i, compact)
     }
 }
 
 @Composable
 private fun NavBar() {
     Row(Modifier.fillMaxWidth().background(Color(0xCC000000)).padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-        for (i in 0 until 5) NavItem(i, false)
+        for (i in NAV_ORDER) NavItem(i, false)
     }
 }
 

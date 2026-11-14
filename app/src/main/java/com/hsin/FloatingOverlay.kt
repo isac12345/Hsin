@@ -127,6 +127,8 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private val menuBtns = ArrayList<TextView>()
     private val orbs = ArrayList<OrbView>()
     private var adaptLoad = -1
+    private val loadTags = ArrayList<TextView>()
+    private fun paintLoadTag(t: TextView) { t.text = if (adaptLoad >= 0 && !odOn) "B$adaptLoad" else "" }
     private var panelWheel: AdaptWheelView? = null
     private var modeSw: ModeSwitch? = null
     private var fpsBig: TextView? = null
@@ -386,7 +388,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         thinBatGrp = null; thinBatV = null; lastBat = -1
         thinGroups.fill(null)
         rings.clear()
-        orbs.clear()
+        orbs.clear(); loadTags.clear()
         panelWheel = null; modeSw = null
         menuBtns.clear()
         menu = null
@@ -994,13 +996,13 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
                         markActive()
                         if (mode == MODE_PILL) startSnap()
                     } else if (held >= 500L) {
-                        hide()
+                        cycleMode()
                     } else {
                         val now = SystemClock.uptimeMillis()
                         if (now - lastTapAt < 300L && mode == MODE_PILL) {
                             lastTapAt = 0L
                             pendingToggle?.let { v.removeCallbacks(it) }
-                            cycleMode()
+                            onRec?.invoke()
                         } else {
                             lastTapAt = now
                             val r = Runnable { toggle() }
@@ -1139,7 +1141,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             }
             if (mode == MODE_MENU) {
                 popFrame(now)
-                if (now - lastActive > 6000L) setMode(MODE_PILL)
+                if (now - lastActive > 5000L) setMode(MODE_PILL)
             }
             if (snapping) {
                 val t = ((now - snapT0) / 240f).coerceIn(0f, 1f)
@@ -1435,6 +1437,10 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         val b = textView("--", 15f, TEXT, true).apply { gravity = Gravity.CENTER; letterSpacing = -0.04f }
         if (forMenu) fpsMenu = b else fpsPill = b
         f.addView(b, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())))
+        val tag = textView("", 8f, P_ADAPT, true).apply { gravity = Gravity.CENTER }
+        loadTags.add(tag)
+        paintLoadTag(tag)
+        f.addView(tag, FrameLayout.LayoutParams(px(orbDp()), px(orbDp())).apply { topMargin = px(orbDp() * 0.30f.toInt().coerceAtLeast(0) + 11) })
         f.layoutParams = FrameLayout.LayoutParams(px(orbDp()), px(orbDp()))
         return f
     }
@@ -1977,6 +1983,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         adaptLoad = l
         for (o in orbs) o.setLoad(l)
         panelWheel?.setLoad(l)
+        for (t in loadTags) paintLoadTag(t)
     }
 
     fun setOvd(on: Boolean, level: String, avail: Boolean) {

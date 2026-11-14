@@ -16,7 +16,7 @@ import android.view.animation.Interpolator
 open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : View(ctx) {
     companion object {
         val DEG = floatArrayOf(180f, 270f, 360f, 540f)
-        val DUR = longArrayOf(700L, 900L, 1100L, 1500L)
+        val DUR = longArrayOf(500L, 650L, 800L, 1050L)
         val GOLD = floatArrayOf(0.25f, 0.5f, 0.75f, 1f)
         private val SILVER = intArrayOf(215, 222, 230)
         private val GOLDC = intArrayOf(232, 184, 74)
@@ -65,6 +65,7 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
                 if (q >= 1f) {
                     spinning = false
                     flashing = true; fT0 = now
+                    if (UiState.haptics) performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK, android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING)
                     if (load == 3 && !puncak && !reduce()) { contOn = true; cT0 = now; cBase = angle }
                 } else keep = true
             }
@@ -177,6 +178,7 @@ open class AdaptWheelView(ctx: Context, private val reduce: () -> Boolean) : Vie
         p.strokeWidth = r * (0.06f + 0.04f * flash)
         p.color = Color.argb(al, Color.red(ringCol), Color.green(ringCol), Color.blue(ringCol))
         c.drawCircle(cx, cx, r * 0.72f, p)
+        p.style = Paint.Style.STROKE
         val kr = r * 0.11f
         for (i in 0 until 8) {
             c.save()

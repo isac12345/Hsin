@@ -218,6 +218,11 @@ object Hsin {
     suspend fun ovdStart(): Root.Res = ctl("ovd start", 20_000L)
 
     /** Satu panggilan `hsinctl diagnose`; keluaran diparse di Diagnose.kt. */
+    /** `hsinctl adapt list|get|reset`: dipanggil hanya saat halaman dibuka atau tombol ditekan, tanpa polling. */
+    suspend fun adaptList(): Root.Res = ctl("adapt list", 15_000L)
+    suspend fun adaptGet(pkg: String): Root.Res = if (pkg.all { it.isLetterOrDigit() || it == '.' || it == '_' }) ctl("adapt get $pkg", 10_000L) else Root.Res(1, "")
+    suspend fun adaptReset(): Root.Res = ctl("adapt reset", 15_000L)
+
     suspend fun diagnose(): Root.Res = ctl("diagnose", 25_000L)
 
     /** `hsinctl framepacing status`: framepacing=, framepredict=, tersimpan=. Kosong bila modul lama. */
