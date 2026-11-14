@@ -222,6 +222,14 @@ AD_KBASE_OWN=1; AD_KB_SAVE1=1; AD_KB_SAVE2=2; AD_KB_SAVE3=55
 ad_kbase_own_restore
 chk "tidak menyalin sisa boost" "$(kb)" "0/8/88"
 
+echo "== sisa tingkat boost padahal beban 0 dibersihkan"
+printf '1\n' > "$P/gpu_boost_level2"; printf '2\n' > "$P/gpu_pollingtime"; printf '55\n' > "$P/gpu_upthreshold"
+AD_OPEN=0; AD_KBASE_OWN=0; T_NOW=120000
+printf 'beban=0\n' > "$AD_DIR/com.sisa.conf"
+tick com.sisa
+chk "kbase kembali bawaan" "$(kb)" "0/8/88"
+ad_end
+
 echo "== jank_pct tidak lebih dari 100 (data lama korup)"
 mkdir -p "$AD_DIR"
 printf 'n=2

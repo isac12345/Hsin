@@ -189,6 +189,26 @@ ad_kbase_own_apply() {
     AD_KBASE_OWN=1
 }
 
+# Sisa tingkat boost dari sesi lama (monitor mati mendadak) dibersihkan saat
+# tidak ada bantuan yang dibutuhkan, supaya GPU tidak tertinggal panas.
+ad_kbase_fix_leftover() {
+    command -v gb_kbase_apply >/dev/null 2>&1 || return 0
+    _kb="${SYSFS_MODULE_PREFIX:-/sys/module}/mali_kbase/parameters"
+    [ -d "$_kb" ] || return 0
+    ad_gb_active && return 0
+    _cur="$(cat "$_kb/gpu_boost_level2" 2>/dev/null | tr -d '[:space:]') $(cat "$_kb/gpu_pollingtime" 2>/dev/null | tr -d '[:space:]') $(cat "$_kb/gpu_upthreshold" 2>/dev/null | tr -d '[:space:]')"
+    case "$_cur" in
+        "$AD_KBASE_1"|"$AD_KBASE_2"|"$AD_KBASE_3") ;;
+        *) return 0 ;;
+    esac
+    GB_KBASE_BOOST=${AD_KBASE_0%% *}
+    _r0=${AD_KBASE_0#* }
+    GB_KBASE_POLL=${_r0%% *}
+    GB_KBASE_UP=${_r0#* }
+    gb_kbase_apply
+    ad_log "pulihkan sisa boost: $_cur -> $AD_KBASE_0"
+}
+
 ad_kbase_own_restore() {
     [ "$AD_KBASE_OWN" = "1" ] || return 0
     _kb="${SYSFS_MODULE_PREFIX:-/sys/module}/mali_kbase/parameters"
@@ -329,7 +349,7 @@ ad_apply() {   # pasang beban sekarang
     # Penanda untuk APK (notifikasi/orb): paket|beban|game|epoch
     printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" > "$AD_STATE/.adapt_now" 2>/dev/null
     if [ "$AD_IS_GAME" = "1" ]; then return 0; fi   # game: gameboost yang menulis
-    if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; return 0; fi
+    if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; ad_kbase_fix_leftover; return 0; fi
     ad_kbase_own_apply
 }
 
