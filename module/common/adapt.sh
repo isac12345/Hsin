@@ -49,7 +49,6 @@ AD_BEBAN=""
 AD_BKEY=beban
 AD_IS_GAME=0
 AD_OPEN=0
-AD_FPS_OWN=0
 AD_KBASE_OWN=0
 AD_KB_SAVE1=""
 AD_KB_SAVE2=""
@@ -254,20 +253,6 @@ ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     fi
 }
 
-# Batas FPS per game (opsional). Berkas: $AD_STATE/fps_cap.conf, baris
-# "paket=30|45|60|90|120". ROM ini menolak "--fps disable", jadi pelepasannya
-# memakai 120 (sama dengan refresh panel maksimum = tanpa batas nyata).
-ad_fps_get() {
-    [ -f "$AD_STATE/fps_cap.conf" ] || return 1
-    sed -n "s/^$1=//p" "$AD_STATE/fps_cap.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]'
-}
-
-ad_fps_set() {   # $1=pkg $2=angka
-    case "$2" in 30|45|60|90|120) ;; *) return 1 ;; esac
-    command -v cmd >/dev/null 2>&1 || return 1
-    cmd game set --fps "$2" "$1" >/dev/null 2>&1
-}
-
 ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
     [ -n "$AD_PKG" ] || return 0
     mkdir -p "$AD_DIR" 2>/dev/null
@@ -336,14 +321,6 @@ ad_open() {   # $1=pkg
     case "$_sesi" in ''|*[!0-9]*) _sesi=0 ;; esac
     ad_cset "$1" sesi $((_sesi + 1))
     ad_apply
-    # Batas FPS per game: dipasang sekali di awal, tidak diubah saat main.
-    if [ "$AD_IS_GAME" = "1" ]; then
-        _fps=$(ad_fps_get "$1")
-        if [ -n "$_fps" ] && ad_fps_set "$1" "$_fps"; then
-            AD_FPS_OWN=1
-            ad_log "batas fps $1 = $_fps"
-        fi
-    fi
     ad_log "mulai $1 game=$AD_IS_GAME beban=$AD_BEBAN sesi=$((_sesi + 1))"
 }
 
@@ -362,11 +339,6 @@ ad_end() {
     ad_flush
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
     ad_kbase_own_restore
-    # Lepas batas FPS game yang tadi dipasang (bukan milik pengguna).
-    if [ "$AD_FPS_OWN" = "1" ]; then
-        ad_fps_set "$AD_PKG" 120
-        AD_FPS_OWN=0
-    fi
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
     ad_log "selesai $AD_PKG beban=$AD_BEBAN $_tail"
     AD_PKG=""

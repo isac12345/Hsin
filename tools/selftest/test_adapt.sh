@@ -5,7 +5,7 @@
 # suhu 48 C menahan kenaikan, 50 C memaksa turun; baterai <= 15% menahan;
 # jeda 30 dtk antar perubahan; app diam tidak dihitung; bank/kamera dilewati;
 # pindah app memulihkan kbase; catatan gabungan; batas app biasa 1, game 3;
-# mode Puncak mematikan Adapt; batas FPS per game dipasang sekali di awal.
+# mode Puncak mematikan Adapt; sisa tingkat boost dibersihkan saat beban 0.
 D="$(cd "$(dirname "$0")" && pwd)"
 C="${COMMON_DIR:-$D/../../module/common}"
 T=$(mktemp -d "${TMPDIR:-/tmp}/adapt.XXXXXX"); trap 'rm -rf "$T"' EXIT
@@ -31,9 +31,6 @@ monitor_fps_stat() { printf '%s' "${T_FPS:-60 60 16}"; }
 get_game_profile() { case "$1" in com.game.*) printf 'performance' ;; *) : ;; esac; }
 ad_in_call() { return 1; }
 date() { if [ -n "$T_NOW" ]; then printf '%s\n' "$T_NOW"; else command date "$@"; fi; }
-# catat permintaan batas fps tanpa memanggil cmd game sungguhan
-ad_fps_set() { printf '%s=%s\n' "$1" "$2" >> "$T/fps_req"; }
-FPSREQ() { sed -n "s/^$1=//p" "$T/fps_req" 2>/dev/null | tail -1; }
 
 kb() { printf '%s/%s/%s' "$(cat "$P/gpu_boost_level2")" "$(cat "$P/gpu_pollingtime")" "$(cat "$P/gpu_upthreshold")"; }
 tick() { T_NOW=$((T_NOW + ${2:-7})); ad_tick "$1"; }
@@ -188,15 +185,6 @@ tick com.puncak.a 8; tick com.puncak.a 8; tick com.puncak.a 8
 chk "tidak ada catatan" "$([ -f "$AD_DIR/com.puncak.a.conf" ] && echo ada || echo tidak)" "tidak"
 chk "beban tidak berubah" "$AD_OPEN" "0"
 rm -f "$T/state/active_profile"
-
-echo "== batas FPS per game: dipasang saat buka, dilepas saat tutup"
-rm -f "$T/fps_req" "$AD_DIR/com.game.z.conf"
-printf 'com.game.z=30\n' > "$T/state/fps_cap.conf"
-AD_OPEN=0; T_NOW=90000
-ad_tick com.game.z
-chk "fps 30 dipasang" "$(FPSREQ com.game.z)" "30"
-ad_end
-chk "fps dilepas (120)" "$(FPSREQ com.game.z)" "120"
 
 echo "== RAM sempit saja tidak menaikkan beban GPU"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=300000
