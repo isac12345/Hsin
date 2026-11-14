@@ -25,11 +25,13 @@ AD_STALL_JANK="${AD_STALL_JANK:-300}"
 AD_PSI_CPU="${AD_PSI_CPU:-60}"
 AD_PSI_IO="${AD_PSI_IO:-20}"
 AD_MEM_MIN_KB="${AD_MEM_MIN_KB:-400000}"
-AD_TEMP_MAX="${AD_TEMP_MAX:-50000}"
+AD_TEMP_MAX="${AD_TEMP_MAX:-200000}"   # tanpa batas suhu (pilihan pengguna)
 AD_BATT_MIN="${AD_BATT_MIN:-10}"
-AD_RAISE_SECS="${AD_RAISE_SECS:-15}"
+AD_RAISE_SECS="${AD_RAISE_SECS:-5}"
 AD_LOWER_SECS="${AD_LOWER_SECS:-40}"
-AD_NONGAME_MAX="${AD_NONGAME_MAX:-2}"
+AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
+AD_GAME_LOWER="${AD_GAME_LOWER:-0}"   # 0: beban game tidak diturunkan selama game berjalan
+AD_CHG_MAX="${AD_CHG_MAX:-2}"       # batas beban saat mengisi daya
 
 # Nilai kbase per beban: "boost poll upthreshold". Beban 0 = nilai bawaan
 # kernel di HP uji (0/8/88), jadi beban 0 berarti tidak mengubah apa pun.
@@ -40,6 +42,7 @@ AD_KBASE_3="1 1 30"
 
 AD_PKG=""
 AD_BEBAN=""
+AD_BKEY=beban
 AD_IS_GAME=0
 AD_OPEN=0
 AD_KBASE_OWN=0
@@ -191,17 +194,19 @@ ad_kbase_own_restore() {
     printf '%s\n' "$AD_KB_SAVE3" > "$_kb/gpu_upthreshold" 2>/dev/null
 }
 
+ad_charging() {
+    case "$(cat /sys/class/power_supply/battery/status 2>/dev/null)" in Charging|Full) return 0 ;; esac
+    return 1
+}
 ad_max_beban() {
-    if [ "$AD_IS_GAME" = "1" ]; then printf '3'; else printf '%s' "$AD_NONGAME_MAX"; fi
+    if [ "$AD_IS_GAME" = "1" ]; then _m=3; else _m=$AD_NONGAME_MAX; fi
+    if ad_charging && [ "$_m" -gt "$AD_CHG_MAX" ]; then _m=$AD_CHG_MAX; fi
+    printf '%s' "$_m"
 }
 
 ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     if [ "$AD_IS_GAME" = "1" ]; then
-        case "${DEVICE_TIER:-mid}" in
-            low)  printf '3' ;;
-            high) printf '1' ;;
-            *)    printf '2' ;;
-        esac
+        printf '2'    # game baru mulai di beban 2 (pilihan pengguna)
     else
         printf '0'    # aplikasi biasa: mulai tanpa bantuan
     fi
@@ -238,7 +243,7 @@ ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
 
 ad_flush() {
     ad_save
-    ad_cset "$AD_PKG" beban "$AD_BEBAN"
+    ad_cset "$AD_PKG" "${AD_BKEY:-beban}" "$AD_BEBAN"
     ad_cset "$AD_PKG" terakhir "$(date '+%Y-%m-%d %H:%M' 2>/dev/null || date)"
 }
 
@@ -252,7 +257,11 @@ ad_open() {   # $1=pkg
     AD_CALM_SECS=0
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
-    AD_BEBAN=$(ad_cget "$1" beban)
+    if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
+    AD_BEBAN=$(ad_cget "$1" "$AD_BKEY")
+    # catatan lama yang tetap patah parah (>=60%) dibuang: mulai lagi dari awal
+    _jp=$(ad_cget "$1" jank_pct); case "$_jp" in ''|*[!0-9]*) _jp=0 ;; esac
+    [ "$_jp" -ge 60 ] 2>/dev/null && AD_BEBAN=""
     case "$AD_BEBAN" in ''|*[!0-9]*) AD_BEBAN=$(ad_tier_beban) ;; esac
     _max=$(ad_max_beban)
     [ "$AD_BEBAN" -gt "$_max" ] 2>/dev/null && AD_BEBAN=$_max
@@ -389,7 +398,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             AD_LAST_MENTOK=$_now
             ad_log "mentok: $AD_PKG beban=$AD_BEBAN ($_why) suhu=$((_tmp / 1000))C"
         fi
-    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ]; then
+    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_GAME_LOWER" = "1" ]; }; then
         AD_CALM_SECS=0
         AD_BEBAN=$((AD_BEBAN - 1))
         ad_apply

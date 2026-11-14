@@ -791,7 +791,7 @@ _gb_apply_vm() {
     case "$_level" in
         extreme)
             # Modul33 stabil: swappiness=40, vfs=100 (cache awet, kurang IO-stutter), dirty=10, dirty_bg=1, page-cluster=0
-            _gb_write "$_proc/vm/swappiness" "40" "VM"
+            _gb_write "$_proc/vm/swappiness" "100" "VM"
             _gb_write "$_proc/vm/vfs_cache_pressure" "100" "VM"
             _gb_write "$_proc/vm/dirty_ratio" "10" "VM"
             _gb_write "$_proc/vm/dirty_background_ratio" "1" "VM"
@@ -799,7 +799,7 @@ _gb_apply_vm() {
             ;;
         performance)
             # Performance mild rasa v20: swappiness=60, vfs=50, dirty=15, dirty_bg=5, page-cluster=0
-            _gb_write "$_proc/vm/swappiness" "60" "VM"
+            _gb_write "$_proc/vm/swappiness" "100" "VM"
             _gb_write "$_proc/vm/vfs_cache_pressure" "50" "VM"
             _gb_write "$_proc/vm/dirty_ratio" "15" "VM"
             _gb_write "$_proc/vm/dirty_background_ratio" "5" "VM"

@@ -24,6 +24,7 @@ export SYSFS_MODULE_PREFIX="$T/mod" SYSFS_POWER_PREFIX="$T/power"
 export AD_STATE="$T/state"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
+AD_NONGAME_MAX=2
 
 # ganti pembacaan PSI/RAM dengan nilai uji
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
@@ -125,7 +126,7 @@ echo "== game: batas beban 3, kbase ditulis gameboost"
 T_FPS="6 60 900"; T_PSI=70; DEVICE_TIER=low
 AD_OPEN=0; T_NOW=40000
 ad_tick com.game.x
-chk "beban awal game (tier low)" "$AD_BEBAN" "3"
+chk "beban awal game (selalu 2)" "$AD_BEBAN" "2"
 chk "game tidak menulis kbase sendiri" "$(kb)" "0/8/88"
 
 echo "== RAM sempit saja tidak menaikkan beban GPU"
