@@ -196,6 +196,18 @@ ad_kbase_own_restore() {
     case "$AD_KB_SAVE1$AD_KB_SAVE2$AD_KB_SAVE3" in
         ''|*[!0-9]*) return 0 ;;
     esac
+    # Kalau nilai "asli" yang tersimpan ternyata salah satu tingkat boost kita
+    # sendiri (sisa sesi yang tidak sempat dipulihkan), jangan disalin lagi:
+    # kembalikan ke nilai bawaan beban 0. Tanpa ini GPU bisa tertinggal di
+    # tingkat 2 padahal tidak ada aplikasi yang sedang dibantu (panas + boros).
+    case "$AD_KB_SAVE1 $AD_KB_SAVE2 $AD_KB_SAVE3" in
+        "$AD_KBASE_1"|"$AD_KBASE_2"|"$AD_KBASE_3")
+            AD_KB_SAVE1=${AD_KBASE_0%% *}
+            _r2=${AD_KBASE_0#* }
+            AD_KB_SAVE2=${_r2%% *}
+            AD_KB_SAVE3=${_r2#* }
+            ;;
+    esac
     printf '%s\n' "$AD_KB_SAVE1" > "$_kb/gpu_boost_level2" 2>/dev/null
     printf '%s\n' "$AD_KB_SAVE2" > "$_kb/gpu_pollingtime" 2>/dev/null
     printf '%s\n' "$AD_KB_SAVE3" > "$_kb/gpu_upthreshold" 2>/dev/null
