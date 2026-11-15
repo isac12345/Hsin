@@ -363,6 +363,14 @@ ad_save
 chk "jank_pct maksimal 100" "$(conf com.korup jank_pct)" "100"
 AD_PKG=""
 
+echo "== suhu SoC: bacaan ngawur dari zona lain diabaikan"
+for _n in 1 2 3 4; do mkdir -p "$T/thermal/thermal_zone$_n"; done
+printf '930000\n' > "$T/thermal/thermal_zone1/temp"   # 930 C: mustahil
+printf '114000\n' > "$T/thermal/thermal_zone2/temp"   # 114 C: di luar batas wajar
+printf '41800\n'  > "$T/thermal/thermal_zone3/temp"
+printf -- '-39742\n' > "$T/thermal/thermal_zone4/temp"  # negatif
+chk "zona ngawur dilewati, maks wajar 45 C" "$(ad_soc_temp_mc)" "45000"
+
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

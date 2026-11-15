@@ -192,6 +192,10 @@ ad_soc_temp_mc() {
         _v=$(cat "$_z" 2>/dev/null | tr -d '[:space:]')
         case "$_v" in ''|*[!0-9]*) continue ;; esac
         [ "$_v" -lt 1000 ] 2>/dev/null && _v=$((_v * 1000))   # sebagian kernel pakai 0,1 C
+        # Sebagian zona di ROM tertentu melaporkan angka ngawur (930 C, 114 C).
+        # Tanpa saringan ini nilai itu terbaca sebagai kritis dan menurunkan
+        # beban tanpa sebab. Batas wajar SoC: di bawah 105 C.
+        [ "$_v" -gt 105000 ] 2>/dev/null && continue
         [ "$_v" -gt "$_mx" ] && _mx=$_v
     done
     printf '%s' "$_mx"
@@ -606,7 +610,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             _bad=$AD_TRIED_LVL; _jr=$(ad_wj_r)
             AD_TRIED_LVL=""
             [ "$_bad" -ge 2 ] 2>/dev/null && AD_BAD_LVL=$_bad
-            _msg="turun: naik ke $_bad tidak menolong (jank ${_jr}/1000), beban=$AD_BEBAN"
+            _msg="turun: naik ke $_bad tidak menolong (jank ${_jr}/1000), beban=$((AD_BEBAN - 1))"
             [ "$AD_BAD_LVL" = "$_bad" ] && _msg="$_msg, beban $_bad dilewati sesi ini"
             if [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
                 AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
