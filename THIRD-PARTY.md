@@ -47,19 +47,12 @@ builds unless stated otherwise.
   distribution that ships the same build.
 - Used only by scripts that need applets missing from the device toolbox.
 
-### AsoulOpt
+### Not included
 
-- Upstream: https://github.com/nakixii/Magisk_AsoulOpt
-- Author: nakixii
-- License: no license file is published upstream. The bundled zip is
-  redistributed as part of the module installation flow only; it is installed
-  by the user's root manager when the user runs the module installer.
-- File: `module/uperf/modules/asoulopt.zip`
-- SHA-256: `90dee40e952a183f56e82baf1565e01261cc7b85d2dfc92b57af044351382f6f`
-- Because no license is declared upstream, treat this component as
-  all-rights-reserved. If you redistribute HSIN, remove this file or obtain
-  permission from its author first. HSIN degrades gracefully when the file is
-  absent: installation is skipped and logged.
+AsoulOpt (https://github.com/nakixii/Magisk_AsoulOpt, author nakixii) is not
+included in this repository. It is published upstream without a license, so it
+cannot be redistributed here. HSIN runs without it; the installation step that
+used to install it has been removed.
 
 ## Data
 
