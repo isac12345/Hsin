@@ -552,7 +552,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             # dipertahankan, tidak diturunkan hanya karena masih ada tersendat.
             AD_HELP_LVL=$AD_TRIED_LVL
             AD_TRIED_LVL=""
-            ad_log "tahan: naik ke $AD_HELP_LVL menolong (jank $(ad_wj_r)/1000, dulu ${AD_PREV_JR}/1000), tetap beban $AD_BEBAN ($AD_PKG)"
+            _pv="?"
+            [ "${AD_PREV_JR:--1}" -ge 0 ] 2>/dev/null && _pv="${AD_PREV_JR}/1000"
+            ad_log "tahan: naik ke $AD_HELP_LVL menolong (jank $(ad_wj_r)/1000, dulu $_pv), tetap beban $AD_BEBAN ($AD_PKG)"
         elif [ -n "$AD_TRIED_LVL" ] && [ "$_hlp" = "0" ]; then
             # Kenaikan tidak menolong: mundur satu tingkat dan catat tingkat itu
             # supaya tidak dicoba lagi sesi ini (dulu naik-turun 1-2-3-1 terus,
