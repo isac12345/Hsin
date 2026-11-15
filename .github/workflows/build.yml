@@ -48,6 +48,9 @@ jobs:
             echo "Secret KEYSTORE_BASE64 kosong: APK ditandatangani debug key."
           fi
 
+      - name: Uji unit APK
+        run: gradle :app:testDebugUnitTest --no-daemon --console=plain
+
       - name: Build APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
