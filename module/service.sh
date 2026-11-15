@@ -149,7 +149,7 @@ echo "[INIT] Storage Devices: $STORAGE_DEVICES" >> "$LOG_FILE"
 # ACTIVE_PROFILE + *_PERCENT dari load_profile. Kalau load sesudah tune,
 # boot selalu jalan dengan var kosong (fallback 100/balanced) walau
 # active_profile=performance. Blok ini hanya butuh profiles.sh (tahap 2),
-# tidak bergantung pada tune/M2/summary/asoulopt/companion/fas-rs.
+# tidak bergantung pada tune/M2/summary/companion/fas-rs.
 ACTIVE_PROFILE_FILE="$WORK_DIR/active_profile"
 CURRENT_STATE_FILE="$WORK_DIR/current_state"
 BOOT_PROFILE="balanced"
@@ -335,20 +335,6 @@ if [ -f "$MODDIR/common/sync_uperf_exclusion.sh" ]; then
 fi
 echo "[BOOT] tahap sync_uperf_exclusion selesai" >> "$LOG_FILE"
 
-# 7.6 One-shot install AsoulOpt (thread-affinity daemon) saat boot pertama.
-#     Ditunda ke sini (bukan customize.sh) supaya tidak nested-install di
-#     tengah proses instalasi modul ini sendiri, dan supaya boot sudah
-#     completed (syarat ksud module install). Flag mencegah percobaan ulang
-#     BILA sukses (return 0). Return 1 = gagal/retry -> log + coba lagi boot berikutnya.
-if [ -f "$MODDIR/common/asoulopt_install.sh" ]; then
-    . "$MODDIR/common/asoulopt_install.sh"
-    asoulopt_msg() { echo "[AsoulOpt] $1" >> "$LOG_FILE"; }
-    asoulopt_install_once "$MODDIR/uperf/asoulopt-staged.zip" "$WORK_DIR/.asoulopt_installed" ||
-        echo "[AsoulOpt] percobaan gagal, akan dicoba lagi saat boot berikutnya" >> "$LOG_FILE"
-else
-    echo "[AsoulOpt] helper asoulopt_install.sh tidak ditemukan, dilewati" >> "$LOG_FILE"
-fi
-echo "[BOOT] tahap asoulopt selesai" >> "$LOG_FILE"
 
 # 7.7 One-shot install Companion APK (HSIN) kalau customize.sh
 #     belum sempat (flash via recovery: pm tidak tersedia saat instalasi).

@@ -85,7 +85,7 @@ rm -f "$WORK_DIR"/.monitor-dumpsys.* 2>/dev/null
 echo "[UNINSTALL] HSIN state cleaned (game list preserved)"
 
 # --- Uperf backend cleanup (kept minimal & non-blocking) ---
-# M6: hanya hapus config uperf/fas-rs/AsoulOpt bila penanda HSIN ada.
+# M6: hanya hapus config uperf/fas-rs bila penanda HSIN ada.
 # JANGAN pernah hapus config modul lain.
 UPERF_USER_PATH="/sdcard/Android/yc/uperf"
 HSIN_MARKER="/data/adb/hsin/.hsin_installed"

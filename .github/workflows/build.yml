@@ -1,8 +1,13 @@
 name: build
 on:
   push:
-    branches: [main]
-  workflow_dispatch: {}
+    branches: [main, 'release/**']
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: "Buat draft release dari hasil build ini (tidak pernah publish otomatis)"
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -42,6 +47,9 @@ jobs:
           else
             echo "Secret KEYSTORE_BASE64 kosong: APK ditandatangani debug key."
           fi
+
+      - name: Uji unit APK
+        run: gradle :app:testDebugUnitTest --no-daemon --console=plain
 
       - name: Build APK
         env:
@@ -83,3 +91,36 @@ jobs:
         with:
           name: HSIN-v5.0
           path: dist/*
+
+  draft-release:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.draft_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HSIN-v5.0
+          path: dist
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum ./* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Draft release (tidak pernah publish otomatis)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v5.0"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" --draft --title "HSIN v5.0" \
+              --notes-file RELEASE.md dist/*
+          fi
+          echo "Draft release siap ditinjau di tab Releases. Publish hanya manual."

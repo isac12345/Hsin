@@ -85,7 +85,7 @@ rm -f "$WORK_DIR/hsin.log"
 # saat boot, bukan restore nilai boost lama), log + cache monitor.
 # Yang DIPERTAHANKAN (data user): game_profile_map.conf (daftar game),
 # active_profile/current_state, SF_LATCH_UNSIGNALED, .disable_tweaks,
-# .hsin/.companion/.asoulopt_installed.
+# .hsin/.companion.
 rm -f "$WORK_DIR/boost_level" "$WORK_DIR/GAMEBOOST_LEVEL" \
     "$WORK_DIR/.gb_active" "$WORK_DIR/.gb_cooldown_count" \
     "$WORK_DIR/.gb_level_orig" "$WORK_DIR/.gb_pending" \
@@ -239,31 +239,6 @@ fi
 rm -rf "$MODPATH/uperf/config"
 
 # ---------------------------------------------------------
-# 4. Stage AsoulOpt (thread-affinity daemon, modul terpisah).
-#    Instalasi aktual DITUNDA ke service.sh (boot pertama, one-shot):
-#    customize.sh ini sendiri sedang berjalan sebagai proses instalasi,
-#    jadi nested install modul lain di sini berisiko race dengan
-#    installer root manager yang sedang aktif.
-# ---------------------------------------------------------
-ASOULOPT_STAGED="$MODPATH/uperf/asoulopt-staged.zip"
-if [ "$UPERF_SUPPORTED" = "1" ] && [ -f "$MODPATH/uperf/modules/asoulopt.zip" ]; then
-    if [ -f "$MODPATH/common/asoulopt_install.sh" ]; then
-        . "$MODPATH/common/asoulopt_install.sh"
-        asoulopt_msg() { ui_print "$1"; }
-        asoulopt_detect_manager
-        ASOULOPT_MANAGER_NOW="$ASOULOPT_MANAGER"
-        ui_print "- Root manager terdeteksi: $ASOULOPT_MANAGER_NOW."
-        ui_print "- AsoulOpt dijadwalkan dipasang otomatis saat boot pertama (service.sh, sekali saja)."
-    else
-        ui_print "! Helper asoulopt_install.sh tidak ditemukan, AsoulOpt dilewati."
-    fi
-    mv -f "$MODPATH/uperf/modules/asoulopt.zip" "$ASOULOPT_STAGED" 2>/dev/null
-else
-    ui_print "- Melewati AsoulOpt (chipset tidak didukung atau paket tidak ada)."
-fi
-rm -rf "$MODPATH/uperf/modules"
-
-# ---------------------------------------------------------
 # 5. Set permission
 # ---------------------------------------------------------
 set_perm_recursive "$MODPATH" 0 0 0755 0644
@@ -300,7 +275,6 @@ set_perm "$MODPATH/common/livecheck.sh" 0 0 0755
         fi
     done
 )
-set_perm "$MODPATH/common/asoulopt_install.sh" 0 0 0644
 set_perm "$MODPATH/common/companion_install.sh" 0 0 0644
 set_perm "$MODPATH/common/profiles.sh" 0 0 0644
 
@@ -358,8 +332,8 @@ fi
 # 7. Companion APK (HSIN, kontrol native utama).
 #    Coba install langsung di sini HANYA kalau Android booted (flash via
 #    manager app): pm install menyentuh PackageManagerService, BUKAN
-#    subsistem modul, jadi tidak kena race nested-install seperti kasus
-#    AsoulOpt dulu. Kalau flash via recovery (pm tidak ada / belum boot),
+#    subsistem modul, jadi tidak kena race nested-install. Kalau flash via
+#    recovery (pm tidak ada / belum boot),
 #    lewati diam-diam - service.sh akan coba sekali saat boot pertama.
 #    Guard versi di companion_install.sh: tidak install ulang kalau sudah
 #    current (preferensi/permission user aman), tidak pernah downgrade.

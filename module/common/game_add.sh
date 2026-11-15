@@ -7,11 +7,9 @@
 # add: tambah/ubah game ke REPO fasrs/games.toml, sentuh merge flag
 #      untuk service.sh, sync uperf exclusion, tulis game_profile_map.conf.
 #      Default fps="30,60", default profile="performance" (game baru langsung dapat boost).
-# list: tampilkan gabungan games.toml + uperf regex + status asoulopt.
+# list: tampilkan gabungan games.toml + uperf regex + profile map.
 #
 # CATATAN:
-# - AsoulOpt binary hardcoded 270 paket. Script ini TIDAK menambah ke
-#   asoulopt. List hanya melaporkan "asoulopt: hardcoded, cek manual via strings".
 # - Merge flag = /sdcard/Android/fas-rs/.need_merge (dibaca service.sh).
 
 MODDIR="$(dirname "$(readlink -f "$0")")"
@@ -274,11 +272,6 @@ do_list() {
 
     echo ""
 
-    # Bagian 3: asoulopt status
-    echo "=== asoulopt ==="
-    echo "  asoulopt: hardcoded, cek manual via strings"
-    echo "  (binary mencakup ~270 paket; TIDAK bisa ditambah dari sini)"
-
     echo ""
 
     # Bagian 4: game_profile_map.conf
@@ -366,9 +359,7 @@ case "$1" in
         echo "            game_add.sh add com.example.game 30,60,90 performance"
         echo ""
         echo "  list"
-        echo "    Tampilkan gabungan: games.toml + uperf regex + asoulopt + profile map."
-        echo ""
-        echo "  CATATAN: AsoulOpt binary hardcoded, tidak bisa ditambah dari sini."
+        echo "    Tampilkan gabungan: games.toml + uperf regex + profile map."
         exit 1
         ;;
 esac
