@@ -562,10 +562,12 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             _bad=$AD_TRIED_LVL; _jr=$(ad_wj_r)
             AD_TRIED_LVL=""
             [ "$_bad" -ge 2 ] 2>/dev/null && AD_BAD_LVL=$_bad
+            _msg="turun: naik ke $_bad tidak menolong (jank ${_jr}/1000), beban=$AD_BEBAN"
+            [ "$AD_BAD_LVL" = "$_bad" ] && _msg="$_msg, beban $_bad dilewati sesi ini"
             if [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
                 AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
                 ad_apply; ad_flush
-                ad_log "turun: naik ke $_bad tidak menolong (jank ${_jr}/1000), beban=$AD_BEBAN, beban $_bad dilewati sesi ini ($AD_PKG)"
+                ad_log "$_msg ($AD_PKG)"
             else
                 ad_log "mentok: naik ke $_bad tidak menolong (jank ${_jr}/1000), tetap beban $AD_BEBAN ($AD_PKG)"
             fi
