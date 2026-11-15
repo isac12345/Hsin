@@ -38,6 +38,8 @@ date() { if [ -n "$T_NOW" ]; then printf '%s\n' "$T_NOW"; else command date "$@"
 kb() { printf '%s/%s/%s' "$(cat "$P/gpu_boost_level2")" "$(cat "$P/gpu_pollingtime")" "$(cat "$P/gpu_upthreshold")"; }
 tick() { T_NOW=$((T_NOW + ${2:-7})); ad_tick "$1"; }
 conf() { sed -n "s/^$2=//p" "$AD_DIR/$1.conf" 2>/dev/null | tail -1; }
+jank() { T_FPS="6 60 900"; T_PSI=5; T_MEM=2000000; }
+lancar() { T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000; }
 
 echo "== app biasa tersendat: beban 0 -> 1"
 T_NOW=1000; T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
@@ -166,24 +168,57 @@ ad_tick com.game.x
 chk "beban awal game 1" "$AD_BEBAN" "1"
 chk "game tidak menulis kbase sendiri" "$(kb)" "0/8/88"
 
-echo "== game: maksimal 2 kenaikan per sesi, lalu turun karena tidak menolong"
+echo "== game: kenaikan yang menolong dipertahankan (boleh sampai 3)"
 AD_CHG_GAP=0
-rm -f "$AD_DIR/com.game.x.conf"
+rm -f "$AD_DIR/com.game.good.conf"
+jank
 AD_OPEN=0; T_NOW=41000
-ad_tick com.game.x
-tick com.game.x 10; tick com.game.x 20
-chk "naik ke 2" "$(conf com.game.x beban)" "2"
-tick com.game.x 10; tick com.game.x 20
-chk "naik ke 3" "$(conf com.game.x beban)" "3"
-tick com.game.x 10; tick com.game.x 20
-chk "jatah habis lalu turun" "$(conf com.game.x beban)" "2"
-tick com.game.x 10; tick com.game.x 20
-chk "turun lagi ke 1" "$(conf com.game.x beban)" "1"
-tick com.game.x 10; tick com.game.x 20
-chk "berhenti di 1, tidak ke 0" "$(conf com.game.x beban)" "1"
+ad_tick com.game.good
+chk "mulai beban 1" "$AD_BEBAN" "1"
+tick com.game.good 30
+chk "naik ke 2 karena tersendat" "$(conf com.game.good beban)" "2"
+tick com.game.good 30                   # jendela baru: 1 sampel, belum dinilai
+lancar; tick com.game.good 30
+jank;   tick com.game.good 30           # 3 sampel, masih menunggu
+lancar; tick com.game.good 30
+jank;   tick com.game.good 30           # 5 sampel, 3 tersendat = 600/1000
+chk "naik ke 2 menolong: tetap 2" "$(conf com.game.good beban)" "2"
+chk "tingkat 2 dicatat menolong" "$AD_HELP_LVL" "2"
+jank; tick com.game.good 30
+chk "masih boleh naik ke 3" "$(conf com.game.good beban)" "3"
+lancar; tick com.game.good 30; tick com.game.good 30
+chk "lancar setelah naik = menolong: tetap 3" "$AD_HELP_LVL" "3"
+chk "jatah naik habis" "$AD_RAISE_N" "2"
+jank; for _i in 1 2 3; do tick com.game.good 30; done
+chk "tersendat tapi tidak turun dari tingkat yang menolong" "$(conf com.game.good beban)" "3"
+
+echo "== game: kenaikan yang tidak menolong tidak dicoba lagi"
+rm -f "$AD_DIR/com.game.bad.conf"
+T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
+AD_OPEN=0; T_NOW=60000
+ad_tick com.game.bad
+tick com.game.bad 30
+chk "naik ke 2 dulu" "$(conf com.game.bad beban)" "2"
+tick com.game.bad 30; tick com.game.bad 30; tick com.game.bad 30; tick com.game.bad 30
+chk "tidak menolong: balik ke 1" "$(conf com.game.bad beban)" "1"
+chk "tingkat 2 dilewati" "$AD_BAD_LVL" "2"
+chk "batas atas jadi 1" "$(ad_max_beban)" "1"
+for _i in 1 2 3 4 5; do tick com.game.bad 30; done
+chk "tidak naik ke 2 lagi" "$(conf com.game.bad beban)" "1"
+chk "tidak ikut turun ke 0" "$(conf com.game.bad beban)" "1"
+
+echo "== game tidak turun ke 0 saat lancar"
+rm -f "$AD_DIR/com.game.one.conf"
+T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000
+AD_OPEN=0; T_NOW=65000
+ad_tick com.game.one
+chk "mulai beban 1" "$AD_BEBAN" "1"
+tick com.game.one 30; tick com.game.one 30; tick com.game.one 30
+chk "lancar lama tetap di 1" "$AD_BEBAN" "1"
 
 echo "== jeda minimal 30 detik antar perubahan"
 AD_CHG_GAP=30
+T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
 rm -f "$AD_DIR/com.game.w.conf"
 AD_OPEN=0; T_NOW=50000
 ad_tick com.game.w
@@ -214,15 +249,17 @@ rm -f "$AD_DIR/com.game.long.conf"
 T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000
 AD_OPEN=0; T_NOW=200000
 ad_tick com.game.long
-tick com.game.long 20; tick com.game.long 20
-chk "naik sampai puncak 3" "$(conf com.game.long beban)" "3"
-chk "jatah naik habis" "$AD_RAISE_N" "2"
+chk "mulai beban 1" "$AD_BEBAN" "1"
+# simulasi: jatah sudah habis dan sudah 10 menit main; dibuat lancar supaya
+# tick ini hanya menguji pengisian ulang.
 T_FPS="60 60 16"; T_PSI=5
-for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22; do tick com.game.long 30; done
+AD_RAISE_N=2; AD_BAD_LVL=2; AD_LAST_RESET=$((T_NOW - 601))
+tick com.game.long 30
 chk "jatah naik diisi ulang" "$AD_RAISE_N" "0"
+chk "tingkat sia-sia boleh dicoba lagi" "$AD_BAD_LVL" "0"
 T_FPS="6 60 900"; T_PSI=70
-tick com.game.long 20
-chk "bisa naik lagi setelah 10 menit" "$(conf com.game.long beban)" "1"
+tick com.game.long 30; tick com.game.long 30
+chk "bisa naik lagi setelah 10 menit" "$(conf com.game.long beban)" "2"
 AD_CHG_GAP=30
 
 echo "== game boleh turun saat sudah lancar lama"

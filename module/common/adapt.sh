@@ -40,6 +40,9 @@ AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
 AD_RAISE_RESET="${AD_RAISE_RESET:-600}"  # tiap 10 menit main: jatah naik diisi ulang
 AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai jatah naik
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
+AD_EVAL_N="${AD_EVAL_N:-4}"           # sampel minimal sebelum menilai kenaikan
+AD_HELP_JR="${AD_HELP_JR:-100}"       # jank <= 100/1000 = sudah cukup lancar
+AD_HELP_GAIN="${AD_HELP_GAIN:-20}"    # atau >= 20% lebih baik dari sebelum naik
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
 AD_GAME_LOWER="${AD_GAME_LOWER:-1}"   # 1: beban game boleh turun saat sudah lancar
 AD_CHG_MAX="${AD_CHG_MAX:-2}"       # batas beban saat mengisi daya
@@ -65,6 +68,12 @@ AD_OPEN_TS=0
 AD_LAST_RESET=0
 AD_LAST_CHG=0
 AD_RAISE_N=0
+AD_PREV_JR=-1    # jank per 1000 sampel sebelum kenaikan terakhir
+AD_WN=0          # sampel jendela sejak perubahan beban terakhir
+AD_WJ=0          # sampel jendela yang tersendat
+AD_TRIED_LVL=""  # tingkat hasil kenaikan yang sedang dinilai
+AD_HELP_LVL=0    # tingkat tertinggi yang terbukti menolong sesi ini
+AD_BAD_LVL=0     # tingkat yang terbukti tidak menolong sesi ini
 AD_JANK_SECS=0
 AD_CALM_SECS=0
 AD_SN=0
@@ -262,8 +271,29 @@ ad_charging() {
     case "$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status" 2>/dev/null)" in Charging|Full) return 0 ;; esac
     return 1
 }
+ad_wj_r() {   # jank per 1000 sampel sejak perubahan beban terakhir (-1 = belum ada)
+    [ "${AD_WN:-0}" -gt 0 ] 2>/dev/null || { printf '%s' "-1"; return 0; }
+    printf '%s' $((AD_WJ * 1000 / AD_WN))
+}
+
+# 1 = kenaikan terakhir menolong, 0 = tidak, -1 = sampel belum cukup
+ad_raise_helped() {
+    [ "${AD_WN:-0}" -ge "$AD_EVAL_N" ] 2>/dev/null || { printf '%s' "-1"; return 0; }
+    _r=$(ad_wj_r)
+    if [ "$_r" -le "$AD_HELP_JR" ]; then printf '1'; return 0; fi
+    if [ "${AD_PREV_JR:--1}" -ge 0 ] 2>/dev/null && \
+       [ "$_r" -le $((AD_PREV_JR - AD_PREV_JR * AD_HELP_GAIN / 100)) ]; then
+        printf '1'; return 0
+    fi
+    printf '0'
+}
+
 ad_max_beban() {
     if [ "$AD_IS_GAME" = "1" ]; then _m=3; else _m=$AD_NONGAME_MAX; fi
+    # Tingkat yang sudah terbukti tidak menolong tidak dicoba lagi sesi ini.
+    if [ "${AD_BAD_LVL:-0}" -ge 2 ] 2>/dev/null && [ "$_m" -ge "$AD_BAD_LVL" ]; then
+        _m=$((AD_BAD_LVL - 1))
+    fi
     if ad_charging && [ "$_m" -gt "$AD_CHG_MAX" ]; then _m=$AD_CHG_MAX; fi
     printf '%s' "$_m"
 }
@@ -324,6 +354,8 @@ ad_open() {   # $1=pkg
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_OPEN_TS=$AD_LAST_TS
     AD_LAST_RESET=$AD_LAST_TS
+    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1
+    AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
     AD_BEBAN=$(ad_cget "$1" "$AD_BKEY")
@@ -351,6 +383,7 @@ ad_open() {   # $1=pkg
 
 ad_apply() {   # pasang beban sekarang
     ad_kbase_set "$AD_BEBAN"
+    AD_WN=0; AD_WJ=0; AD_TRIED_LVL=""   # jendela penilaian mulai dari sini
     # Penanda untuk APK (notifikasi/orb): paket|beban|game|epoch
     printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" > "$AD_STATE/.adapt_now" 2>/dev/null
     if [ "$AD_IS_GAME" = "1" ]; then return 0; fi   # game: gameboost yang menulis
@@ -371,6 +404,8 @@ ad_end() {
     AD_BEBAN=""
     AD_JANK_SECS=0
     AD_CALM_SECS=0
+    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1
+    AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
 }
 
 ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
@@ -444,6 +479,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         [ "$_mem" -lt 700000 ] && _calm=0
     fi
 
+    AD_WN=$((AD_WN + 1))
+    [ "$_jank" -eq 1 ] && AD_WJ=$((AD_WJ + 1))
+
     # --- akumulasi waktu (bukan jumlah tick: interval game dan app beda) ---
     _now=$(date +%s 2>/dev/null)
     case "$_now" in ''|*[!0-9]*) _now=$AD_LAST_TS ;; esac
@@ -472,6 +510,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             AD_RAISE_N=0
             ad_log "jatah naik diisi ulang ($(($AD_RAISE_RESET / 60)) menit main, $AD_PKG)"
         fi
+        # Satu kesempatan lagi untuk tingkat yang dulu dinilai sia-sia, supaya
+        # satu pengukuran keliru (mis. saat loading) tidak mengunci sesi.
+        AD_BAD_LVL=0
     fi
 
     # --- catat sampel (gabungan) ---
@@ -504,7 +545,31 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     if [ "$AD_JANK_SECS" -ge "$AD_RAISE_SECS" ] && [ "$_gap_ok" = "1" ]; then
         AD_JANK_SECS=0
-        if [ "$_tmp" -ge "$AD_TEMP_MAX" ]; then
+        _hlp=-1
+        [ -n "$AD_TRIED_LVL" ] && _hlp=$(ad_raise_helped)
+        if [ -n "$AD_TRIED_LVL" ] && [ "$_hlp" = "1" ]; then
+            # Kenaikan terakhir terbukti menolong di perangkat ini: tingkat itu
+            # dipertahankan, tidak diturunkan hanya karena masih ada tersendat.
+            AD_HELP_LVL=$AD_TRIED_LVL
+            AD_TRIED_LVL=""
+            ad_log "tahan: naik ke $AD_HELP_LVL menolong (jank $(ad_wj_r)/1000, dulu ${AD_PREV_JR}/1000), tetap beban $AD_BEBAN ($AD_PKG)"
+        elif [ -n "$AD_TRIED_LVL" ] && [ "$_hlp" = "0" ]; then
+            # Kenaikan tidak menolong: mundur satu tingkat dan catat tingkat itu
+            # supaya tidak dicoba lagi sesi ini (dulu naik-turun 1-2-3-1 terus,
+            # dan itu sendiri yang bikin gambar patah).
+            _bad=$AD_TRIED_LVL; _jr=$(ad_wj_r)
+            AD_TRIED_LVL=""
+            [ "$_bad" -ge 2 ] 2>/dev/null && AD_BAD_LVL=$_bad
+            if [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
+                AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
+                ad_apply; ad_flush
+                ad_log "turun: naik ke $_bad tidak menolong (jank ${_jr}/1000), beban=$AD_BEBAN, beban $_bad dilewati sesi ini ($AD_PKG)"
+            else
+                ad_log "mentok: naik ke $_bad tidak menolong (jank ${_jr}/1000), tetap beban $AD_BEBAN ($AD_PKG)"
+            fi
+        elif [ -n "$AD_TRIED_LVL" ]; then
+            :   # sampel belum cukup untuk menilai; jangan naik lagi dulu
+        elif [ "$_tmp" -ge "$AD_TEMP_MAX" ]; then
             ad_log "tahan: suhu baterai $((_tmp / 1000))C, tidak menaikkan beban ($AD_PKG)"
         elif [ "$_soc" -ge "$AD_SOC_MAX" ]; then
             ad_log "tahan: suhu otak HP $((_soc / 1000))C, tidak menaikkan beban ($AD_PKG)"
@@ -520,14 +585,17 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
                 ad_log "tahan: ram sempit ($_why), tidak menaikkan beban ($AD_PKG)"
             fi
         elif [ "$AD_BEBAN" -lt "$_max" ] && [ "$AD_RAISE_N" -lt "$AD_MAX_RAISE" ]; then
+            AD_PREV_JR=$(ad_wj_r)
             AD_BEBAN=$((AD_BEBAN + 1)); AD_RAISE_N=$((AD_RAISE_N + 1)); AD_LAST_CHG=$_now
             ad_apply
+            AD_TRIED_LVL=$AD_BEBAN
             ad_flush
             ad_log "naik: $AD_PKG beban=$AD_BEBAN (ke-$AD_RAISE_N/$AD_MAX_RAISE) ($_why) suhu=$((_tmp / 1000))C ram=$((_mem / 1024))MB"
-        elif [ "$AD_BEBAN" -gt 0 ] && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
-            # Naik tidak menolong: mundur supaya tidak menambah panas. Game
-            # berhenti di beban 1, tidak sampai 0, supaya tetap ada bantuan
-            # minimal selama main (dulu jatuh ke 0 lalu terkunci di sana).
+        elif [ "$AD_BEBAN" -gt "${AD_HELP_LVL:-0}" ] \
+            && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_BEBAN" -gt 1 ]; }; then
+            # Tidak ada kenaikan yang bisa dinilai, tetapi masih tersendat:
+            # mundur supaya tidak menambah panas. Tingkat yang sudah terbukti
+            # menolong tidak diturunkan. Game berhenti di beban 1.
             AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
             ad_apply
             ad_flush
@@ -536,8 +604,14 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
             AD_LAST_MENTOK=$_now
             ad_log "mentok: $AD_PKG beban=$AD_BEBAN ($_why) suhu=$((_tmp / 1000))C"
         fi
-    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt 0 ] && [ "$_gap_ok" = "1" ] \
-        && { [ "$AD_IS_GAME" != "1" ] || [ "$AD_GAME_LOWER" = "1" ]; }; then
+    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ -n "$AD_TRIED_LVL" ]; then
+        # Lancar tepat setelah naik = naik itu menolong. Tingkatnya dipakai
+        # terus, jangan diturunkan lagi (itu yang bikin naik-turun berulang).
+        AD_CALM_SECS=0
+        AD_HELP_LVL=$AD_TRIED_LVL; AD_TRIED_LVL=""
+        ad_log "tahan: naik ke $AD_HELP_LVL menolong (lancar $AD_LOWER_SECS s), tetap beban $AD_BEBAN ($AD_PKG)"
+    elif [ "$AD_CALM_SECS" -ge "$AD_LOWER_SECS" ] && [ "$AD_BEBAN" -gt "${AD_HELP_LVL:-0}" ] && [ "$_gap_ok" = "1" ] \
+        && { [ "$AD_IS_GAME" != "1" ] || { [ "$AD_GAME_LOWER" = "1" ] && [ "$AD_BEBAN" -gt 1 ]; }; }; then
         AD_CALM_SECS=0
         AD_BEBAN=$((AD_BEBAN - 1)); AD_LAST_CHG=$_now
         ad_apply
