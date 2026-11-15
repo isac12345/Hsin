@@ -192,6 +192,19 @@ chk "jatah naik habis" "$AD_RAISE_N" "2"
 jank; for _i in 1 2 3; do tick com.game.good 30; done
 chk "tersendat tapi tidak turun dari tingkat yang menolong" "$(conf com.game.good beban)" "3"
 
+echo "== game: perbaikan kecil pun dihitung menolong (tanpa ambang persen)"
+AD_CHG_GAP=0
+rm -f "$AD_DIR/com.game.kecil.conf"
+jank
+AD_OPEN=0; T_NOW=55000
+ad_tick com.game.kecil
+tick com.game.kecil 30
+chk "naik ke 2 dulu" "$(conf com.game.kecil beban)" "2"
+lancar; tick com.game.kecil 30
+jank; tick com.game.kecil 30; tick com.game.kecil 30; tick com.game.kecil 30
+chk "jank 750 dari 1000: tetap 2" "$(conf com.game.kecil beban)" "2"
+chk "dicatat menolong" "$AD_HELP_LVL" "2"
+
 echo "== game: kenaikan yang tidak menolong tidak dicoba lagi"
 rm -f "$AD_DIR/com.game.bad.conf"
 T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000

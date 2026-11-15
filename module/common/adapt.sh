@@ -42,7 +42,6 @@ AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai j
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
 AD_EVAL_N="${AD_EVAL_N:-4}"           # sampel minimal sebelum menilai kenaikan
 AD_HELP_JR="${AD_HELP_JR:-100}"       # jank <= 100/1000 = sudah cukup lancar
-AD_HELP_GAIN="${AD_HELP_GAIN:-20}"    # atau >= 20% lebih baik dari sebelum naik
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
 AD_GAME_LOWER="${AD_GAME_LOWER:-1}"   # 1: beban game boleh turun saat sudah lancar
 AD_CHG_MAX="${AD_CHG_MAX:-2}"       # batas beban saat mengisi daya
@@ -276,13 +275,14 @@ ad_wj_r() {   # jank per 1000 sampel sejak perubahan beban terakhir (-1 = belum 
     printf '%s' $((AD_WJ * 1000 / AD_WN))
 }
 
-# 1 = kenaikan terakhir menolong, 0 = tidak, -1 = sampel belum cukup
+# 1 = kenaikan terakhir menolong, 0 = tidak, -1 = sampel belum cukup.
+# Menolong = jank berkurang sama sekali dibanding sebelum naik (bukan pakai
+# ambang persen yang perlu disetel per HP), atau jendela sudah cukup lancar.
 ad_raise_helped() {
     [ "${AD_WN:-0}" -ge "$AD_EVAL_N" ] 2>/dev/null || { printf '%s' "-1"; return 0; }
     _r=$(ad_wj_r)
     if [ "$_r" -le "$AD_HELP_JR" ]; then printf '1'; return 0; fi
-    if [ "${AD_PREV_JR:--1}" -ge 0 ] 2>/dev/null && \
-       [ "$_r" -le $((AD_PREV_JR - AD_PREV_JR * AD_HELP_GAIN / 100)) ]; then
+    if [ "${AD_PREV_JR:--1}" -ge 0 ] 2>/dev/null && [ "$_r" -lt "$AD_PREV_JR" ]; then
         printf '1'; return 0
     fi
     printf '0'
