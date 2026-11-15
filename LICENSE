@@ -1,12 +1,23 @@
-Alpha Fusion v1 — kode integrasi Alpha
+HSIN v5.0 - Android performance module and companion app
 
-Kode/skrip asli Alpha dalam rilis ini (service.sh, customize.sh,
-uninstall.sh, common/, system.prop, docs) dilisensikan di bawah
-GNU General Public License v3.0. Teks lengkap lisensi di bawah.
+Copyright (C) 2024-2026 the HSIN authors.
 
-Pengecualian: direktori fasrs/ tetap di bawah GPL-3.0 upstream
-(shadow3aaa, lihat fasrs/LICENSE) dan direktori uperf/ tetap di bawah
-Apache-2.0 upstream (Matt Yang, lihat uperf/LICENSE).
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option)
+any later version.
+
+The code written for HSIN (service.sh, customize.sh, uninstall.sh,
+module/common, module/bin/pgr-log, native/hsin-fpsd.c, app sources and
+these documents) is licensed under the GNU General Public License v3.0.
+The full license text follows.
+
+Third-party components keep their own licenses and are listed in
+THIRD-PARTY.md. License texts shipped with them:
+
+- module/fasrs/LICENSE        GNU GPL v3.0 (fas-rs, shadow3aaa)
+- module/uperf/LICENSE        Apache License 2.0 (uperf, Matt Yang)
+- module/uperf/bin/busybox/LICENSE   GNU GPL v2.0 (BusyBox)
 
 ==================================================================
 
