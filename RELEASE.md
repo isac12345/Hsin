@@ -45,6 +45,14 @@ Flash `HSIN-v5.0-module.zip` in Magisk or KernelSU and reboot. The app is
 installed from inside the zip. A standalone APK is published for manual
 installation. See `README.md`.
 
+### Fix in this build
+
+- The SoC temperature reader now ignores implausible readings reported by some
+  thermal zones (for example 930 C or 114 C on the reference device). Those
+  readings previously triggered the critical temperature guard and lowered the
+  load for no reason.
+- The log line for an unhelpful raise now reports the load after it is lowered.
+
 ### Known limitations
 
 - The release has been tested on a single device: itel P65, Unisoc T606,
@@ -76,8 +84,8 @@ installation. See `README.md`.
 SHA-256 of the artifacts attached to this release:
 
 ```
-f1109052cd09915b891f9c90318c94e456e01b1cff9e02ead933e4ceca765c92  HSIN-v5.0-module.zip
-77781aae4e1c39a94bfb319ca87522d05c4f76d9f3218bffc5be0b327b921b6d  HSIN-v5.0.apk
+486fd73af9859c42a90f06b0c836bfe67c8c59b80c74164087632ecf9a45236d  HSIN-v5.0-module.zip
+a42c8656b4bf79d30adf4f8fe44c46f2e79fc592563bd738281c523449ba3b54  HSIN-v5.0.apk
 ```
 
 The same values are published as `SHA256SUMS.txt` next to the artifacts. A
