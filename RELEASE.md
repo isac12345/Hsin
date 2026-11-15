@@ -73,15 +73,16 @@ installation. See `README.md`.
 
 ### Checksums
 
-Fill in after the CI build that produces the published artifacts.
+SHA-256 of the artifacts attached to this release:
 
 ```
-<sha256>  HSIN-v5.0-module.zip
-<sha256>  HSIN-v5.0.apk
+f1109052cd09915b891f9c90318c94e456e01b1cff9e02ead933e4ceca765c92  HSIN-v5.0-module.zip
+77781aae4e1c39a94bfb319ca87522d05c4f76d9f3218bffc5be0b327b921b6d  HSIN-v5.0.apk
 ```
 
-The CI run also publishes `SHA256SUMS.txt` next to the artifacts in the draft
-release.
+The same values are published as `SHA256SUMS.txt` next to the artifacts. A
+rebuild produces different values: verify against the checksum file that ships
+with the release you downloaded.
 
 ### Verification
 
