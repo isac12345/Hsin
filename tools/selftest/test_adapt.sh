@@ -38,8 +38,27 @@ date() { if [ -n "$T_NOW" ]; then printf '%s\n' "$T_NOW"; else command date "$@"
 kb() { printf '%s/%s/%s' "$(cat "$P/gpu_boost_level2")" "$(cat "$P/gpu_pollingtime")" "$(cat "$P/gpu_upthreshold")"; }
 tick() { T_NOW=$((T_NOW + ${2:-7})); ad_tick "$1"; }
 conf() { sed -n "s/^$2=//p" "$AD_DIR/$1.conf" 2>/dev/null | tail -1; }
+ad_gamefps_set() { T_FPS_SET="$2"; printf '%s\n' "$2" > "$T/fps_set"; }
+ad_fps_cur() { printf '%s' "${T_FPS_CUR:-}"; }
 jank() { T_FPS="6 60 900"; T_PSI=5; T_MEM=2000000; }
 lancar() { T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000; }
+
+echo "== batas FPS dipilih dari kemampuan perangkat (bukan angka statis)"
+printf 'REFRESH_MAX=144\n' > "$AD_STATE/device_profile.env"
+chk "p1 125 dari layar 144: pilih 120" "$(ad_fps_pick 130 125)" "120"
+chk "p1 70: pilih 60" "$(ad_fps_pick 90 70)" "60"
+chk "p1 29: pilih 30" "$(ad_fps_pick 40 29)" "30"
+chk "p1 20 tidak sanggup apa pun" "$(ad_fps_pick 40 20)" ""
+printf 'REFRESH_MAX=60\n' > "$AD_STATE/device_profile.env"
+chk "layar 60 Hz: pilih 60" "$(ad_fps_pick 60 59)" "60"
+printf 'REFRESH_MAX=144\n' > "$AD_STATE/device_profile.env"
+rm -f "$T/fps_set"
+AD_PKG=com.game.pick
+T_FPS_CUR=30; ad_fps_once 130 125
+chk "batas yang sudah ada tidak ditimpa" "$([ -f "$T/fps_set" ] && echo ada || echo kosong)" "kosong"
+T_FPS_CUR=""; ad_fps_once 130 125
+chk "batas kosong diisi hasil ukur" "$(cat "$T/fps_set" 2>/dev/null)" "120"
+chk "pilihan dicatat sebagai otomatis" "$(ad_cget com.game.pick fps_auto)" "120"
 
 echo "== app biasa tersendat: beban 0 -> 1"
 T_NOW=1000; T_FPS="6 60 900"; T_PSI=70; T_MEM=2000000

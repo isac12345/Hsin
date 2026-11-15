@@ -39,6 +39,7 @@ AD_LOWER_SECS="${AD_LOWER_SECS:-60}"
 AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
 AD_RAISE_RESET="${AD_RAISE_RESET:-600}"  # tiap 10 menit main: jatah naik diisi ulang
 AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai jatah naik
+AD_FPS_HOLD="${AD_FPS_HOLD:-92}"       # 1% low harus >= 92% kandidat FPS supaya dinilai sanggup
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
 AD_EVAL_N="${AD_EVAL_N:-4}"           # sampel minimal sebelum menilai kenaikan
 AD_HELP_JR="${AD_HELP_JR:-100}"       # jank <= 100/1000 = sudah cukup lancar
@@ -70,6 +71,7 @@ AD_RAISE_N=0
 AD_PREV_JR=-1    # jank per 1000 sampel sebelum kenaikan terakhir
 AD_WN=0          # sampel jendela sejak perubahan beban terakhir
 AD_WJ=0          # sampel jendela yang tersendat
+AD_FPS_TRIED=0   # batas FPS sudah dipilih sesi ini
 AD_TRIED_LVL=""  # tingkat hasil kenaikan yang sedang dinilai
 AD_HELP_LVL=0    # tingkat tertinggi yang terbukti menolong sesi ini
 AD_BAD_LVL=0     # tingkat yang terbukti tidak menolong sesi ini
@@ -270,6 +272,41 @@ ad_charging() {
     case "$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status" 2>/dev/null)" in Charging|Full) return 0 ;; esac
     return 1
 }
+# --- batas FPS sesuai kemampuan perangkat --------------------------------
+ad_fps_cur() {   # batas fps yang sekarang dipasang untuk $1 (kosong = belum ada)
+    sed -n "s/^$(printf '%s' "$1" | sed 's/\./\\./g'):fps=//p" \
+        "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]'
+}
+
+# Refresh tertinggi yang 1% low-nya masih >= AD_FPS_HOLD persen: itulah batas
+# yang perangkat ini benar-benar sanggup, bukan angka statis per kelas HP.
+ad_fps_pick() {   # $1=rata $2=1%low
+    _mx=$(sed -n 's/^REFRESH_MAX=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
+    case "$_mx" in ''|*[!0-9]*) return 0 ;; esac
+    for _r in 144 120 90 60 30; do
+        [ "$_r" -le "$_mx" ] || continue
+        [ "$2" -ge $((_r * AD_FPS_HOLD / 100)) ] 2>/dev/null && { printf '%s' "$_r"; return 0; }
+    done
+}
+
+ad_gamefps_set() {   # $1=pkg $2=fps -> tulis batas fps + refresh lewat hsinctl
+    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+        gamefps set "$1" "$2" >/dev/null 2>&1
+}
+
+ad_fps_once() {   # $1=rata $2=1%low; dipakai sekali per sesi game
+    case "${1:-}:${2:-}" in *[!0-9:]*|:*|*:) return 0 ;; esac
+    _cur=$(ad_fps_cur "$AD_PKG")
+    # Batas yang sudah ada (diatur pengguna atau seed) tidak ditimpa.
+    [ -z "$_cur" ] || [ "$_cur" = "off" ] || return 0
+    _fps=$(ad_fps_pick "$1" "$2")
+    [ -n "$_fps" ] || return 0
+    if ad_gamefps_set "$AD_PKG" "$_fps"; then
+        ad_cset "$AD_PKG" fps_auto "$_fps"
+        ad_log "fps: batas $_fps dipilih dari ukur (rata=$1 p1=$2), aktif saat game dibuka lagi ($AD_PKG)"
+    fi
+}
+
 ad_wj_r() {   # jank per 1000 sampel sejak perubahan beban terakhir (-1 = belum ada)
     [ "${AD_WN:-0}" -gt 0 ] 2>/dev/null || { printf '%s' "-1"; return 0; }
     printf '%s' $((AD_WJ * 1000 / AD_WN))
@@ -354,7 +391,7 @@ ad_open() {   # $1=pkg
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_OPEN_TS=$AD_LAST_TS
     AD_LAST_RESET=$AD_LAST_TS
-    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1
+    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0
     AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
@@ -494,6 +531,13 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # karena dulu dua kenaikan habis sebelum game benar-benar mulai.
     if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_SECS" ] 2>/dev/null; then
         _jank=0; _calm=0
+    fi
+
+    # --- batas FPS mengikuti kemampuan nyata perangkat (sekali per sesi) ---
+    if [ "$AD_IS_GAME" = "1" ] && [ "$AD_FPS_TRIED" = "0" ] && [ -n "$_avg" ] && [ -n "$_p1" ] \
+        && [ $((_now - AD_OPEN_TS)) -ge "$AD_WARM_SECS" ] 2>/dev/null; then
+        AD_FPS_TRIED=1
+        ad_fps_once "$_avg" "$_p1"
     fi
     if [ "$_jank" -eq 1 ]; then
         AD_JANK_SECS=$((AD_JANK_SECS + _dt)); AD_CALM_SECS=0
