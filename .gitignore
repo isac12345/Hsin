@@ -1,7 +1,37 @@
+# Signing material - never commit
 *.jks
 *.keystore
+*.p12
+*.pem
+*.key
+*.pcks12
+
+# Local configuration and secrets
 local.properties
+.env
+.env.*
+*.env.local
+
+# Build output
 build/
-.gradle/
-.idea/
+dist/
 out/
+.gradle/
+.kotlin/
+captures/
+module/companion/*.apk
+app/release/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+
+# Logs and temporary files
+*.log
+*.log.*
+*.tmp
+*.bak
