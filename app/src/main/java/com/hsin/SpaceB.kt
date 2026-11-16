@@ -509,6 +509,7 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             }
             val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
             if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
+            if (resCur > 0) SText(tx("Peringatan: sebagian ROM memotong tampilan game saat resolusi diturunkan. Kalau layar game terpotong atau bergeser, kembalikan ke 100%.", "Warning: some ROMs crop the game view when resolution is lowered. If the game screen is cropped or shifted, set it back to 100%."), 10.sp, SP.red)
             SText(tx("Rendering", "Rendering"), 11.sp, SP.dim)
             val rend by produceState("default", g.pkg, ver) { value = Hsin.gameRender(g.pkg) }
             val rKeys = listOf("default", "skiagl", "skiavk")
