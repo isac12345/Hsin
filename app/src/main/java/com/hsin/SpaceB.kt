@@ -503,9 +503,14 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             }
             SText(tx("Resolusi game", "Game resolution"), 11.sp, SP.dim)
             val resKeys = listOf("off", "0.85", "0.7", "0.55")
-            val resCur = resKeys.indexOfFirst { k -> k != "off" && (fx["downscale"]?.toDoubleOrNull() ?: 1.0) in ((k.toDouble() - 0.03)..(k.toDouble() + 0.03)) }.let { if (it < 0) 0 else it }
+            val curDs = (fx["downscale"]?.toDoubleOrNull() ?: 1.0).coerceIn(0.10, 1.0)
+            val resCur = resKeys.indexOfFirst { k -> k != "off" && kotlin.math.abs(curDs - k.toDouble()) <= 0.005 }.let { if (it < 0 && curDs >= 0.995) 0 else it }
             HChips(listOf("100%", "85%", "70%", "55%"), resCur, col) {
                 vm.setGameFx(g.pkg, "downscale", resKeys[it]); ver++
+            }
+            var dsPct by remember(g.pkg, fx["downscale"]) { mutableIntStateOf(Math.round(curDs * 100).toInt()) }
+            SliderRow(tx("Resolusi bebas", "Custom resolution"), dsPct.toFloat(), 10f..100f, "$dsPct%", { dsPct = Math.round(it) }) {
+                vm.setGameFx(g.pkg, "downscale", dsValue(dsPct)); ver++
             }
             val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
             if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)

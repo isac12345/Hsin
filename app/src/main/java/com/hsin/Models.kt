@@ -98,6 +98,9 @@ sealed class Dlg {
     ) : Dlg()
 }
 
+/** Nilai downscale untuk modul dari persen: 100 -> "off", selain itu dua desimal dengan titik (locale-aman). */
+fun dsValue(pct: Int): String = if (pct >= 100) "off" else String.format(java.util.Locale.US, "%.2f", pct.coerceAtLeast(10) / 100.0)
+
 fun profileLabel(p: String): String = when (p) {
     "battery", "balanced", "performance" -> "Adapt"
     "overdrive" -> "Puncak"

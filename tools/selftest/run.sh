@@ -167,7 +167,10 @@ echo "== 3. opsi per game"
 chk "set gamemode" "$(gh_opt_set com.x.game gamemode performance)" "OK: com.x.game gamemode=performance"
 chk "set downscale" "$(gh_opt_set com.x.game downscale 0.7)" "OK: com.x.game downscale=0.7"
 chk "get downscale" "$(gh_opt_get com.x.game downscale off)" "0.7"
-has "downscale di luar rentang ditolak" "$(gh_opt_set com.x.game downscale 0.3)" "ERROR"
+has "downscale di bawah 0.10 ditolak" "$(gh_opt_set com.x.game downscale 0.05)" "ERROR"
+for _v in 0.10 0.99 0.70 1.00; do has "downscale $_v diterima" "$(gh_opt_set com.x.game downscale $_v)" "OK"; done
+for _v in 0.995 1.01 0.5.5 2; do has "downscale $_v ditolak" "$(gh_opt_set com.x.game downscale $_v)" "ERROR"; done
+gh_opt_set com.x.game downscale 0.7 >/dev/null
 has "downscale bukan angka ditolak" "$(gh_opt_set com.x.game downscale abc)" "ERROR"
 has "gamemode salah ditolak" "$(gh_opt_set com.x.game gamemode turbo)" "ERROR"
 has "package berbahaya ditolak" "$(gh_opt_set 'a;rm' gamemode off)" "ERROR"

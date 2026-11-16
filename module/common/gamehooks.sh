@@ -158,7 +158,8 @@ gh_opt_set() {
         gamemode)
             case "$3" in off|default|standard|performance|battery) ;; *) echo "ERROR: gamemode = off|standard|performance|battery"; return 1 ;; esac ;;
         downscale)
-            case "$3" in off|default|0.[5-9]|0.[5-9][0-9]|1|1.0|1.00) ;; *) echo "ERROR: downscale = off atau 0.5 sampai 1.0"; return 1 ;; esac ;;
+            # Rentang 0.10-1.00, maksimal 2 desimal; API Game Mode Android sendiri membatasi 0.1-1.0.
+            case "$3" in off|default|0.[1-9]|0.[1-9][0-9]|1|1.0|1.00) ;; *) echo "ERROR: downscale = off atau 0.10 sampai 1.00"; return 1 ;; esac ;;
         fps)
             case "$3" in off|default) ;; ''|*[!0-9]*) echo "ERROR: fps = off atau angka 10 sampai 240"; return 1 ;;
                 *) [ "$3" -ge 10 ] && [ "$3" -le 240 ] || { echo "ERROR: fps = off atau angka 10 sampai 240"; return 1; } ;; esac ;;
