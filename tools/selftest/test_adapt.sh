@@ -421,9 +421,9 @@ printf 'com.game.p:downscale=0.60\ncom.game.p:fps=30\n' > "$AD_STATE/game_opts.c
 T_FPS_CUR=30
 printf 'n=1001\np1_avg=15\njank_pct=52\nstall_max=900\n' > "$AD_DIR/com.game.p.conf"
 ad_preset_learn com.game.p
-chk "stabil dari jank 52 (0.60 -> 0.45)" "$(conf com.game.p pre_stabil)" "0.45,30,performance"
-chk "performa lebih rendah, batas 0.40" "$(conf com.game.p pre_performa)" "0.40,30,performance"
-chk "grafik lebih tinggi, mode standard" "$(conf com.game.p pre_grafik)" "0.60,30,standard"
+chk "stabil tidak di bawah resolusi pilihan (0.60)" "$(conf com.game.p pre_stabil)" "0.60,30,performance"
+chk "performa juga tidak di bawah 0.60" "$(conf com.game.p pre_performa)" "0.60,30,performance"
+chk "grafik 15 poin di atas, mode standard" "$(conf com.game.p pre_grafik)" "0.75,30,standard"
 printf 'n=100\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.q.conf"
 printf 'com.game.q:downscale=0.60\n' >> "$AD_STATE/game_opts.conf"
 ad_preset_learn com.game.q
@@ -432,6 +432,21 @@ printf 'com.game.p:PRESET=stabil\n' >> "$AD_STATE/game_opts.conf"
 printf 'n=1001\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.p.conf"
 ad_preset_learn com.game.p
 chk "preset aktif: tidak dihitung ulang" "$(conf com.game.p pre_stabil)" ""
+rm -f "$AD_STATE/game_opts.conf"
+
+echo "== resolusi yang sengaja diturunkan jadi batas bawah preset"
+printf 'com.game.f:downscale=0.60\ncom.game.f:fps=30\n' > "$AD_STATE/game_opts.conf"
+printf 'n=1001\np1_avg=15\njank_pct=52\nstall_max=900\n' > "$AD_DIR/com.game.f.conf"
+ad_preset_learn com.game.f
+chk "stabil tidak di bawah 60%" "$(conf com.game.f pre_stabil)" "0.60,30,performance"
+chk "performa tidak di bawah 60%" "$(conf com.game.f pre_performa)" "0.60,30,performance"
+chk "grafik naik 15 poin" "$(conf com.game.f pre_grafik)" "0.75,30,standard"
+printf 'com.game.f:downscale=0.40\ncom.game.f:PRESET=performa\n' > "$AD_STATE/game_opts.conf"
+ad_preset_learn com.game.f 60
+chk "hitung ulang paksa dari acuan 60 walau preset aktif" "$(conf com.game.f pre_stabil)" "0.60,30,performance"
+printf 'com.game.f:downscale=off\n' > "$AD_STATE/game_opts.conf"
+ad_preset_learn com.game.f
+chk "resolusi 100: boleh turun (jank 52 -> 85)" "$(conf com.game.f pre_stabil)" "0.85,30,performance"
 rm -f "$AD_STATE/game_opts.conf"
 
 echo "== hsinctl gamepreset"

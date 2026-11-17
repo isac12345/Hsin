@@ -193,6 +193,11 @@ object Hsin {
         return kv(ctl("gamepreset get $pkg").out)
     }
 
+    suspend fun learnGamePreset(pkg: String, pct: Int): Root.Res {
+        if (!PKG_RE.matches(pkg) || pct !in 10..100) return Root.Res(1, "ERROR: resolusi acuan tidak valid")
+        return ctl("gamepreset learn $pkg $pct")
+    }
+
     suspend fun setGamePreset(pkg: String, name: String): Root.Res {
         if (!PKG_RE.matches(pkg) || name !in setOf("manual", "grafik", "stabil", "performa")) return Root.Res(1, "ERROR: preset tidak valid")
         return ctl("gamepreset set $pkg $name")

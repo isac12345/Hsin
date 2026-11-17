@@ -527,6 +527,9 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
             SliderRow(tx("Resolusi bebas", "Custom resolution"), dsPct.toFloat(), 10f..100f, "$dsPct%", { dsPct = Math.round(it) }) {
                 vm.setGameFx(g.pkg, "downscale", dsValue(dsPct)); ver++
             }
+            val learnMsg = tx("Preset dihitung ulang dari resolusi $dsPct%.", "Presets recalculated from $dsPct% resolution.")
+            HBtn(tx("Hitung ulang preset dari $dsPct%", "Recalculate presets from $dsPct%")) { vm.learnGamePreset(g.pkg, dsPct, learnMsg) { ver++ } }
+            SText(tx("Preset tidak akan menurunkan resolusi di bawah resolusi yang kamu pilih sendiri (di bawah 100%).", "Presets never go below the resolution you chose yourself (under 100%)."), 10.sp, SP.faint)
             val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
             if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
             if (resCur > 0) SText(tx("Peringatan: sebagian ROM memotong tampilan game saat resolusi diturunkan. Kalau layar game terpotong atau bergeser, kembalikan ke 100%.", "Warning: some ROMs crop the game view when resolution is lowered. If the game screen is cropped or shifted, set it back to 100%."), 10.sp, SP.red)

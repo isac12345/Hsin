@@ -483,28 +483,33 @@ ad_cdel() {   # $1=pkg $2=key
 # ---- preset per game (Grafik / Stabil / Performa), dipelajari dari catatan sesi ----
 # Dipelajari hanya dari sesi tanpa preset aktif (pengaturan manual), supaya angkanya tidak ikut
 # bergeser setiap kali preset dipakai. Aturan sederhana dan transparan, bukan hasil uji bertahap:
-#   Stabil   = resolusi sekarang diturunkan 15/10/0 poin menurut jank dan rasio 1% low terhadap batas FPS
+#   Stabil   = resolusi sekarang diturunkan 15/10/0 poin menurut jank dan rasio 1% low terhadap batas FPS,
+#              tetapi tidak di bawah resolusi yang sengaja dipilih pengguna (< 100%)
 #   Performa = Stabil - 15 poin, Game Mode performance
 #   Grafik   = Stabil + 15 poin (maks 100), Game Mode standard
-ad_preset_learn() {   # $1=pkg game
+ad_preset_learn() {   # $1=pkg game  [$2=resolusi acuan dalam persen; diberikan = hitung ulang paksa]
     _lp="$1"
-    [ -n "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):PRESET=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" ] && return 0
+    case "$2" in ''|*[!0-9]*) _ref="" ;; *) _ref="$2" ;; esac
+    [ -z "$_ref" ] && [ -n "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):PRESET=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" ] && return 0
     _jp=$(ad_cget "$_lp" jank_pct); _pa=$(ad_cget "$_lp" p1_avg); _sn=$(ad_cget "$_lp" n)
     for _v in "$_jp" "$_pa" "$_sn"; do case "$_v" in ''|*[!0-9]*) return 0 ;; esac; done
     [ "$_sn" -ge 300 ] || return 0
     _fps=$(ad_fps_cur "$_lp"); case "$_fps" in ''|*[!0-9]*|0) _fps=$(ad_cget "$_lp" fps_auto) ;; esac
     case "$_fps" in ''|*[!0-9]*|0) _fps=30 ;; esac
     _cur=$(ad_ds_pct "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):downscale=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')")
+    [ -n "$_ref" ] && _cur=$_ref
+    # Resolusi yang sengaja diturunkan pengguna (< 100) dianggap batas bawahnya: preset tidak
+    # menurunkan lagi di bawah itu. Bawaan 100 boleh turun sampai 40.
+    _floor=40; [ "$_cur" -lt 100 ] && [ "$_cur" -gt 40 ] && _floor=$_cur
+    [ "$_cur" -le 40 ] && _floor=$_cur
     _r=$((_pa * 100 / _fps))
     if [ "$_jp" -ge 30 ] || [ "$_r" -lt 60 ]; then _st=$((_cur - 15))
     elif [ "$_jp" -ge 15 ] || [ "$_r" -lt 80 ]; then _st=$((_cur - 10))
     else _st=$_cur; fi
-    _pf=$((_st - 15)); _gr=$((_st + 15))
-    for _n in _st _pf _gr; do
-        eval "_x=\$$_n"
-        [ "$_x" -lt 40 ] && eval "$_n=40"
-        [ "$_x" -gt 100 ] && eval "$_n=100"
-    done
+    [ "$_st" -lt "$_floor" ] && _st=$_floor
+    [ "$_st" -gt 100 ] && _st=100
+    _pf=$((_st - 15)); [ "$_pf" -lt "$_floor" ] && _pf=$_floor
+    _gr=$((_st + 15)); [ "$_gr" -gt 100 ] && _gr=100
     ad_cset "$_lp" pre_stabil "$(ad_ds_fmt $_st),$_fps,performance"
     ad_cset "$_lp" pre_performa "$(ad_ds_fmt $_pf),$_fps,performance"
     ad_cset "$_lp" pre_grafik "$(ad_ds_fmt $_gr),$_fps,standard"

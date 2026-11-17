@@ -366,6 +366,14 @@ cmd_gamepreset() {
                     echo "OK: $2 preset=$3 downscale=$_pd fps=$_pfp mode=$_pm (berlaku di buka berikutnya)" ;;
                 *) echo "ERROR: preset = grafik|stabil|performa|manual"; return 1 ;;
             esac ;;
+        learn)   # hitung ulang dari statistik tersimpan; $3 = resolusi acuan (persen) yang kamu pakai saat main
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            case "$3" in ''|*[!0-9]*) echo "ERROR: resolusi acuan = angka persen 10-100"; return 1 ;; esac
+            [ "$3" -ge 10 ] && [ "$3" -le 100 ] || { echo "ERROR: resolusi acuan = angka persen 10-100"; return 1; }
+            [ -f "$STATE_DIR/adapt/$2.conf" ] || { echo "ERROR: belum ada data untuk $2, main sekali dulu"; return 1; }
+            ( AD_STATE="$STATE_DIR"; AD_DIR="$STATE_DIR/adapt"; . "$COMMON/adapt.sh" >/dev/null 2>&1; ad_preset_learn "$2" "$3" )
+            [ -n "$(sed -n 's/^pre_stabil=//p' "$STATE_DIR/adapt/$2.conf")" ] || { echo "ERROR: data belum cukup (minimal 300 sampel)"; return 1; }
+            echo "OK: preset dihitung ulang dari resolusi $3%" ;;
         reset)
             valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
             _pf="$STATE_DIR/adapt/$2.conf"
@@ -373,7 +381,7 @@ cmd_gamepreset() {
             gh_opt_set "$2" PRESET default >/dev/null
             pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
             echo "OK: preset $2 dihapus" ;;
-        *) echo "Usage: gamepreset get <pkg> | set <pkg> <grafik|stabil|performa|manual> | reset <pkg>"; return 1 ;;
+        *) echo "Usage: gamepreset get <pkg> | set <pkg> <grafik|stabil|performa|manual> | learn <pkg> <persen> | reset <pkg>"; return 1 ;;
     esac
 }
 
