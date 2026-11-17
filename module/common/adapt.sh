@@ -872,8 +872,9 @@ ad_auto_tune() {   # $1=pkg game
     _chg=0
     [ "$_nds" != "$_cur" ] && _chg=1
     [ "$_nfps" != "$_fps" ] && _chg=1
-    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
-        gameauto set "$_ap" "$(ad_ds_fmt "$_nds")" "${_nfps:-keep}" >/dev/null 2>&1
+    _aset=$(sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+        gameauto set "$_ap" "$(ad_ds_fmt "$_nds")" "${_nfps:-keep}" 2>&1) \
+        || ad_log "auto: $_ap gagal menyimpan pengaturan ($_aset)"
     if [ "$_chg" = 1 ]; then
         _f="$AD_DIR/$_ap.conf"
         grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
