@@ -100,7 +100,7 @@ _mount() {
         _log WARN "mount --bind gagal"
         return 1
     fi
-    : > "$MARK"
+    printf '' > "$MARK"
     # flush cache DNS supaya aturan baru langsung berlaku (perintah tidak ada di semua ROM)
     ndc resolver flushdefaultif >/dev/null 2>&1
     return 0

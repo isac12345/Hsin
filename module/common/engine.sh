@@ -809,7 +809,7 @@ tune_input() {
         return 0
     fi
     if [ ! -f "$snap_file" ]; then
-        : > "$snap_file.tmp" 2>/dev/null || {
+        printf '' > "$snap_file.tmp" 2>/dev/null || {
             log_msg "SKIPPED" "$category" "snapshot tidak bisa ditulis, skip aman"
             return 0
         }

@@ -62,7 +62,7 @@ if [ -d "$OLD_DIR" ] && [ ! -f "$WORK_DIR/.migrated_from_alpha" ]; then
     done
     [ -f "$WORK_DIR/alpha.log" ] && mv -f "$WORK_DIR/alpha.log" "$WORK_DIR/hsin.log" 2>/dev/null
     rm -f "$WORK_DIR"/*.pid "$WORK_DIR/.bubble_want" 2>/dev/null
-    : > "$WORK_DIR/.migrated_from_alpha"
+    printf '' > "$WORK_DIR/.migrated_from_alpha"
 fi
 if [ -d "$OLD_MOD" ]; then
     ui_print "- Modul Alpha lama dinonaktifkan (boleh dihapus manual dari daftar modul)."
@@ -108,8 +108,8 @@ fi
 # Penanda .flags_v49_seeded dipakai ulang: kalau sudah pernah seed (v49/v50),
 # flash berikut TIDAK membuat apa pun lagi.
 if [ ! -e "$WORK_DIR/.flags_v49_seeded" ]; then
-    : > "$WORK_DIR/GB_COOLDOWN_EXTREME" 2>/dev/null
-    : > "$WORK_DIR/.flags_v49_seeded" 2>/dev/null
+    printf '' > "$WORK_DIR/GB_COOLDOWN_EXTREME" 2>/dev/null
+    printf '' > "$WORK_DIR/.flags_v49_seeded" 2>/dev/null
     ui_print "- Default aktif: GB_COOLDOWN_EXTREME (owns-CPU: AUTO)"
 fi
 

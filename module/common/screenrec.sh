@@ -138,7 +138,7 @@ rec_stop() {
         echo "OK: tidak sedang merekam"
         return 0
     fi
-    : > "$STOP_FILE"
+    printf '' > "$STOP_FILE"
     # screenrecord menutup mp4 dengan benar hanya lewat SIGINT/SIGHUP (bukan SIGTERM)
     rec_sig 2
     rec_wait_exit 6

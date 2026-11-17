@@ -157,7 +157,7 @@ gpu_dir() {
 # Simpan nilai asli sekali (kalau .ovd_prev sudah ada, jangan timpa: itu nilai asli sebelum crash).
 save_prev() {
     [ -f "$OVD_PREV" ] && return 0
-    : > "$OVD_PREV.tmp" 2>/dev/null || return 1
+    printf '' > "$OVD_PREV.tmp" 2>/dev/null || return 1
     for _p in "$CPUFREQ"/policy*; do
         [ -f "$_p/scaling_min_freq" ] || continue
         printf 'cpu|%s|%s|%s\n' "$_p" "$(rd "$_p/scaling_min_freq")" "$(rd "$_p/scaling_max_freq")" >> "$OVD_PREV.tmp"

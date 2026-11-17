@@ -331,7 +331,7 @@ _gb_backup_native() {
         rm -f "$NATIVE_CONF" 2>/dev/null
     fi
     mkdir -p "$CONF_DIR" 2>/dev/null
-    : > "$NATIVE_CONF.tmp" 2>/dev/null || return 1
+    printf '' > "$NATIVE_CONF.tmp" 2>/dev/null || return 1
     local _pol _gov _mn _mx _avail _mx_val _v
     for _pol in $CPU_POLICIES; do
         [ -d "$SYSFS_CPU_PREFIX/cpufreq/$_pol" ] || continue

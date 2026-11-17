@@ -243,7 +243,7 @@ cmd_flag() {
     in_whitelist "$_n" || { echo "ERROR: flag tidak dikenal: $_n"; return 1; }
     case "$_op" in
         get) [ -f "$STATE_DIR/$_n" ] && echo 1 || echo 0 ;;
-        set) : > "$STATE_DIR/$_n" 2>/dev/null && echo "OK: $_n=1" || { echo "ERROR: gagal tulis"; return 1; } ;;
+        set) printf '' > "$STATE_DIR/$_n" 2>/dev/null && echo "OK: $_n=1" || { echo "ERROR: gagal tulis"; return 1; } ;;
         clear) rm -f "$STATE_DIR/$_n" 2>/dev/null; echo "OK: $_n=0" ;;
         *) echo "Usage: flag get|set|clear <NAMA>"; return 1 ;;
     esac
@@ -389,7 +389,7 @@ cmd_gameauto() {
             _pf="$STATE_DIR/adapt/$2.conf"
             [ -f "$_pf" ] && { grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts|saran_tampil|saran_ditawarkan|pre_[a-z]+)=' "$_pf" > "$_pf.tmp.$$" 2>/dev/null; mv -f "$_pf.tmp.$$" "$_pf"; }
             # penanda untuk monitor: buang sampel yang masih di memori (adapt.sh membacanya)
-            mkdir -p "$STATE_DIR/adapt" 2>/dev/null; : > "$STATE_DIR/adapt/$2.reset"
+            mkdir -p "$STATE_DIR/adapt" 2>/dev/null; printf '' > "$STATE_DIR/adapt/$2.reset"
             for _k in downscale gamemode PRESET; do gh_opt_set "$2" "$_k" default >/dev/null; done
             tw_game_fps "$2" off >/dev/null
             pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"

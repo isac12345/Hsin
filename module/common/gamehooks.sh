@@ -359,7 +359,7 @@ _gh_refresh_on() {
     # utama: backdoor SurfaceFlinger
     _ghh_idx=$(_gh_sf_index_for "$_ghh")
     if _gh_num "$_ghh_idx" && _gh_sf_call "$_ghh_idx"; then
-        : > "$GH_SF_MARK" 2>/dev/null
+        printf '' > "$GH_SF_MARK" 2>/dev/null
         # SF butuh waktu pindah mode: tunggu sampai ~1,5 dtk sebelum menyimpulkan indeksnya salah
         _ghh_try=0
         while :; do
@@ -821,7 +821,7 @@ _gh_idle_off() {
 
 gh_start() {
     printf '%s\n' "$1" > "$GH_MARK" 2>/dev/null
-    if [ ! -f "$GH_STATE/.perf_stable_v1" ]; then : > "$GH_STATE/GAME_DND_ON" 2>/dev/null; : > "$GH_STATE/.perf_stable_v1" 2>/dev/null; fi
+    if [ ! -f "$GH_STATE/.perf_stable_v1" ]; then printf '' > "$GH_STATE/GAME_DND_ON" 2>/dev/null; printf '' > "$GH_STATE/.perf_stable_v1" 2>/dev/null; fi
     _gh_idle_on
     rm -f "$GH_PEND"
     _gh_log INFO "game aktif: $1"

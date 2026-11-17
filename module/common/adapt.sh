@@ -193,7 +193,7 @@ ad_own_on() {   # $1=pkg; return 0 = Adapt memegang frekuensi sesi ini
     [ -f "$AD_STATE/.ovd_active" ] && return 1
     # sisa sesi lama (crash): pulihkan dulu supaya nilai asli yang tersimpan benar
     if [ -f "$AD_OWN_FILE" ] || [ -f "$AD_OWN_PREV" ] || [ -f "$AD_OWN_STOP" ]; then ad_own_off recover; fi
-    : > "$AD_OWN_PREV.tmp" 2>/dev/null || { ad_log "[OWN] gagal menyimpan nilai asli, jalan seperti biasa"; return 1; }
+    printf '' > "$AD_OWN_PREV.tmp" 2>/dev/null || { ad_log "[OWN] gagal menyimpan nilai asli, jalan seperti biasa"; return 1; }
     _owok=0
     for _owd in "$AD_CPUFREQ"/policy*; do
         [ -f "$_owd/scaling_min_freq" ] && [ -f "$_owd/scaling_max_freq" ] || continue
@@ -658,7 +658,7 @@ ad_migrate_v2() {
     [ -f "$AD_STATE/.stats_v2" ] && return 0
     # Penanda dibuat DULU: kalau tidak bisa ditulis, berhenti. Lebih baik data tetap skala lama
     # daripada dibagi 5 berulang di tiap aplikasi yang dibuka sampai nol.
-    : > "$AD_STATE/.stats_v2" 2>/dev/null || { ad_log "migrasi statistik dilewati: penanda tidak bisa ditulis"; return 0; }
+    printf '' > "$AD_STATE/.stats_v2" 2>/dev/null || { ad_log "migrasi statistik dilewati: penanda tidak bisa ditulis"; return 0; }
     if [ -d "$AD_DIR" ]; then
         for _mf in "$AD_DIR"/*.conf; do
             [ -f "$_mf" ] || continue

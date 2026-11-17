@@ -37,6 +37,14 @@ jobs:
       - name: Cek script modul
         run: bash tools/check_module.sh
 
+      - name: Selftest modul (dash, mirip shell HP)
+        run: |
+          sudo apt-get install -y dash >/dev/null 2>&1 || true
+          for t in test_own test_adapt test_fpsd test_map; do
+            dash tools/selftest/$t.sh > "/tmp/$t.log" 2>&1 || { tail -n 30 "/tmp/$t.log"; echo "GAGAL: $t"; exit 1; }
+            tail -n 1 "/tmp/$t.log"
+          done
+
       - name: Siapkan keystore dari Secrets (opsional)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
