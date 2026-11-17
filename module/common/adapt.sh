@@ -643,6 +643,7 @@ ad_open() {   # $1=pkg
     AD_JANK_SECS=0
     AD_CALM_SECS=0
     AD_RAISE_N=0
+    AD_LAST_AVG=""
     AD_LAST_CHG=0
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_OPEN_TS=$AD_LAST_TS
@@ -890,7 +891,7 @@ ad_end() {
     [ "$AD_IS_GAME" = "1" ] && ad_saran "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_preset_learn "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_auto_tune "$AD_PKG"
-    _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
+    _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) p1_rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)% fps=${AD_LAST_AVG:--}"
     [ "$AD_OWN" = "1" ] && ad_own_off selesai
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
@@ -965,7 +966,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # --- nilai: tersendat atau lancar ---
     _jank=0; _calm=0; _why=""
     if [ -n "$_avg" ] && [ "$_avg" -ge "$AD_AVG_MIN" ]; then
-        if [ "$_p1" -lt "$AD_TARGET_P1" ]; then _jank=1; _why="1%low=$_p1"; fi
+        if [ "$_p1" -lt "$AD_TARGET_P1" ]; then _jank=1; _why="1%low=$_p1 rata=$_avg"; fi
         # Frame pacing: 1% low jauh di bawah rata-rata = ada drop besar walau
         # FPS rata-rata masih kelihatan bagus (mis. 30 turun ke 15 sebentar).
         if [ $((_p1 * 100)) -lt $((_avg * AD_P1_RATIO)) ]; then
@@ -989,6 +990,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         [ "$_mem" -lt 700000 ] && _calm=0
     fi
 
+    [ -n "$_avg" ] && AD_LAST_AVG=$_avg
     AD_WN=$((AD_WN + 1))
     [ "$_jank" -eq 1 ] && AD_WJ=$((AD_WJ + 1))
 
