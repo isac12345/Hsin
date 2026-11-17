@@ -1004,8 +1004,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # Awal sesi game = loading dan pemanasan. Jangan pakai jatah naik di sini,
     # karena dulu dua kenaikan habis sebelum game benar-benar mulai.
+    _warm=0
     if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_SECS" ] 2>/dev/null; then
-        _jank=0; _calm=0
+        _jank=0; _calm=0; _warm=1
     fi
 
     # --- batas FPS mengikuti kemampuan nyata perangkat (sekali per sesi) ---
@@ -1035,7 +1036,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     fi
 
     # --- catat sampel (gabungan) ---
-    if [ -n "$_p1" ]; then
+    # Sampel pemanasan/loading tidak dicatat: dulu 1% low-nya menarik rata-rata
+    # turun, lalu auto tune menurunkan resolusi karena beban loading, bukan main.
+    if [ -n "$_p1" ] && [ "$_warm" = "0" ]; then
         AD_SN=$((AD_SN + 1))
         AD_SS=$((AD_SS + _p1))
         if [ -z "$AD_SMIN" ] || [ "$_p1" -lt "$AD_SMIN" ]; then AD_SMIN=$_p1; fi

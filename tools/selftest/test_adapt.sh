@@ -271,6 +271,7 @@ ad_tick com.game.warm
 tick com.game.warm 15; tick com.game.warm 15; tick com.game.warm 15
 chk "belum naik saat pemanasan" "$AD_BEBAN" "1"
 chk "jatah belum terpakai" "$AD_RAISE_N" "0"
+chk "sampel loading tidak dicatat" "$AD_SN" "0"
 tick com.game.warm 15; tick com.game.warm 15; tick com.game.warm 15
 chk "naik setelah pemanasan" "$(conf com.game.warm beban)" "2"
 AD_WARM_SECS=0
