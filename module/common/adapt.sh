@@ -541,12 +541,55 @@ ad_ds_fmt() {   # persen -> nilai downscale (100 = off)
     if [ "$1" -ge 100 ]; then printf 'off'; else printf '%d.%02d' $(($1 / 100)) $(($1 % 100)); fi
 }
 
+# ---- penyetelan otomatis resolusi + FPS per game (umpan balik antar sesi) ----
+# Setiap sesi game yang datanya cukup: tersendat -> resolusi turun 5 poin (FPS turun satu tangga bila
+# parah), sangat lancar -> naik 5 poin (FPS naik satu tangga). Resolusi dibatasi lantai menurut kelas HP
+# (low 55, mid 60, high 70) dan 100. Statistik direset setiap ada perubahan supaya sesi berikutnya
+# mengukur pengaturan yang baru. Nilai dipasang lebih dulu (pre-arm) dan berlaku di buka berikutnya.
+AD_AUTO_MIN_N="${AD_AUTO_MIN_N:-120}"
+ad_auto_tune() {   # $1=pkg game
+    _ap="$1"
+    _ore=$(printf '%s' "$_ap" | sed 's/\./\\./g')
+    [ "$(sed -n "s/^$_ore:AUTO=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" = "off" ] && return 0
+    _jp=$(ad_cget "$_ap" jank_pct); _pa=$(ad_cget "$_ap" p1_avg); _sn=$(ad_cget "$_ap" n)
+    for _v in "$_jp" "$_pa" "$_sn"; do case "$_v" in ''|*[!0-9]*) return 0 ;; esac; done
+    [ "$_sn" -ge "$AD_AUTO_MIN_N" ] || return 0
+    _tier=$(sed -n 's/^DEVICE_TIER=//p' "$AD_STATE/detected.conf" 2>/dev/null | tail -n 1 | tr -d '"[:space:]')
+    case "$_tier" in low) _floor=${AD_AUTO_FLOOR_LOW:-55} ;; high) _floor=${AD_AUTO_FLOOR_HIGH:-70} ;; *) _floor=${AD_AUTO_FLOOR_MID:-60} ;; esac
+    _cur=$(ad_ds_pct "$(sed -n "s/^$_ore:downscale=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')")
+    _fps=$(ad_fps_cur "$_ap"); case "$_fps" in ''|*[!0-9]*|0) _fps=$(ad_cget "$_ap" fps_auto) ;; esac
+    case "$_fps" in ''|*[!0-9]*|0) _fps="" ;; esac
+    _nds=$_cur; _nfps=$_fps
+    _r=100; [ -n "$_fps" ] && _r=$((_pa * 100 / _fps))
+    if [ "$_jp" -ge 30 ] || [ "$_r" -lt 60 ]; then
+        _nds=$((_cur - 5))
+        { [ "$_jp" -ge 40 ] || [ "$_r" -lt 50 ]; } && [ -n "$_fps" ] && _nfps=$(ad_fps_step down "$_fps")
+    elif [ "$_jp" -le 5 ] && [ "$_r" -ge 92 ]; then
+        _nds=$((_cur + 5))
+        [ -n "$_fps" ] && _nfps=$(ad_fps_step up "$_fps")
+    fi
+    [ "$_nds" -lt "$_floor" ] && _nds=$_floor
+    [ "$_nds" -gt 100 ] && _nds=100
+    _chg=0
+    [ "$_nds" != "$_cur" ] && _chg=1
+    [ "$_nfps" != "$_fps" ] && _chg=1
+    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+        gameauto set "$_ap" "$(ad_ds_fmt "$_nds")" "${_nfps:-keep}" >/dev/null 2>&1
+    if [ "$_chg" = 1 ]; then
+        _f="$AD_DIR/$_ap.conf"
+        grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
+            && mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
+        ad_log "auto: $_ap resolusi $_cur%->$_nds% fps ${_fps:--}->${_nfps:--} (jank=${_jp}% p1=${_pa} lantai=$_floor)"
+    fi
+}
+
 ad_end() {
     [ "$AD_OPEN" = "1" ] || return 0
     _tail=""
     ad_flush
     [ "$AD_IS_GAME" = "1" ] && ad_saran "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_preset_learn "$AD_PKG"
+    [ "$AD_IS_GAME" = "1" ] && ad_auto_tune "$AD_PKG"
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null

@@ -468,6 +468,45 @@ chk "paling bawah 30 tidak turun lagi" "$(conf com.game.g pre_stabil | cut -d, -
 printf 'REFRESH_MAX=144\n' > "$AD_STATE/device_profile.env"
 rm -f "$AD_STATE/game_opts.conf"
 
+echo "== otomatis: resolusi + FPS disetel dari hasil sesi"
+export HSIN_STATE_DIR="$AD_STATE" AD_HSC="$C/hsinctl.sh"
+printf 'REFRESH_MAX=144\n' > "$AD_STATE/device_profile.env"
+rm -f "$AD_STATE/detected.conf"
+printf 'com.game.a:downscale=off\n' > "$AD_STATE/game_opts.conf"; T_FPS_CUR=30
+printf 'n=500\np1_avg=15\njank_pct=52\nstall_max=900\nbeban=2\n' > "$AD_DIR/com.game.a.conf"
+ad_auto_tune com.game.a
+chk "jank tinggi: resolusi 100 -> 95" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.95"
+chk "mode performance dipasang" "$(sed -n 's/^com.game.a:gamemode=//p' "$AD_STATE/game_opts.conf")" "performance"
+chk "PRESET=auto" "$(sed -n 's/^com.game.a:PRESET=//p' "$AD_STATE/game_opts.conf")" "auto"
+chk "statistik direset setelah berubah" "$(conf com.game.a n)" ""
+chk "beban tetap diingat" "$(conf com.game.a beban)" "2"
+printf 'com.game.a:downscale=0.60\n' > "$AD_STATE/game_opts.conf"
+printf 'n=500\np1_avg=15\njank_pct=52\nstall_max=900\n' > "$AD_DIR/com.game.a.conf"
+ad_auto_tune com.game.a
+chk "lantai mid 60: tidak turun lagi" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.60"
+chk "tanpa perubahan: statistik tetap" "$(conf com.game.a n)" "500"
+printf 'DEVICE_TIER="low"\n' > "$AD_STATE/detected.conf"
+printf 'com.game.a:downscale=0.60\n' > "$AD_STATE/game_opts.conf"
+ad_auto_tune com.game.a
+chk "kelas low: lantai 55, turun ke 55" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.55"
+rm -f "$AD_STATE/detected.conf"
+printf 'com.game.a:downscale=0.80\n' > "$AD_STATE/game_opts.conf"; T_FPS_CUR=30
+printf 'n=500\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.a.conf"
+ad_auto_tune com.game.a
+chk "sangat lancar: resolusi naik 85" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
+chk "sangat lancar: FPS naik 45" "$(sed -n 's/^com.game.a:fps=//p' "$AD_STATE/game_opts.conf")" "45"
+printf 'n=50\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.a.conf"
+printf 'com.game.a:downscale=0.85\n' > "$AD_STATE/game_opts.conf"
+ad_auto_tune com.game.a
+chk "data kurang (<120): tidak diubah" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
+printf 'com.game.a:downscale=0.85\ncom.game.a:AUTO=off\n' > "$AD_STATE/game_opts.conf"
+printf 'n=500\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.a.conf"
+ad_auto_tune com.game.a
+chk "AUTO=off: tidak diubah" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
+sh "$C/hsinctl.sh" gameauto mode com.game.a off >/dev/null 2>&1
+chk "mode off mengembalikan bawaan" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" ""
+rm -f "$AD_STATE/game_opts.conf"; unset AD_HSC HSIN_STATE_DIR
+
 echo "== hsinctl gamepreset"
 export HSIN_STATE_DIR="$AD_STATE"
 printf 'pre_stabil=0.45,30,performance\n' > "$AD_DIR/com.game.h.conf"

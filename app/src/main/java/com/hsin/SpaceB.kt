@@ -502,66 +502,31 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                     ) { SText(mname(m), 12.sp, lerpColor(m.color, SP.ink, a), FontWeight.Bold) }
                 }
             }
-            SText(tx("Preset game", "Game preset"), 11.sp, SP.dim)
-            val pre by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Hsin.gamePreset(g.pkg) }
-            val pKeys = listOf("manual", "grafik", "stabil", "performa")
-            val noData = tx("Belum ada data. Main game ini sekali dulu.", "No data yet. Play this game once first.")
-            val okMsg = tx("Preset dipasang. Berlaku saat game dibuka.", "Preset set. Applies when the game opens.")
-            val havePre = pKeys.drop(1).any { !pre[it].isNullOrEmpty() }
-            HChips(listOf(tx("Manual", "Manual"), tx("Grafik", "Graphics"), tx("Stabil", "Stable"), tx("Performa", "Performance")),
-                pKeys.indexOf(pre["preset"] ?: "manual").coerceAtLeast(0), col) {
-                val k = pKeys[it]
-                if (k != "manual" && pre[k].isNullOrEmpty()) vm.toast(noData)
-                else vm.setGamePreset(g.pkg, k, okMsg) { ver++ }
+            // Resolusi, FPS, dan Game Mode diatur modul sendiri dari hasil main (tanpa pengaturan manual).
+            val au by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Hsin.gameAuto(g.pkg) }
+            val autoOn = (au["auto"] ?: "on") != "off"
+            SText(tx("Resolusi, FPS, dan Game Mode", "Resolution, FPS and Game Mode"), 11.sp, SP.dim)
+            HChips(listOf(tx("Otomatis", "Automatic"), tx("Bawaan game", "Game default")), if (autoOn) 0 else 1, col) {
+                vm.gameAutoMode(g.pkg, it == 0) { ver++ }
             }
-            if (!havePre) SText(tx("Belum ada data. Main game ini sekali (minimal beberapa menit) lalu preset muncul.", "No data yet. Play this game once (a few minutes) and presets appear."), 10.sp, SP.faint)
-            else SText(pKeys.drop(1).joinToString("  ") { k -> val v = pre[k].orEmpty().split(","); val d = v.getOrNull(0).orEmpty().let { x -> if (x == "off") "100%" else (x.toDoubleOrNull()?.let { y -> Math.round(y * 100).toString() + "%" } ?: x) }; k.replaceFirstChar { c -> c.uppercase() } + " " + d + "/" + v.getOrNull(1).orEmpty() }, 10.sp, SP.faint)
-            SText(tx("Resolusi game", "Game resolution"), 11.sp, SP.dim)
-            val resKeys = listOf("off", "0.85", "0.7", "0.55")
-            val curDs = (fx["downscale"]?.toDoubleOrNull() ?: 1.0).coerceIn(0.10, 1.0)
-            val resCur = resKeys.indexOfFirst { k -> k != "off" && kotlin.math.abs(curDs - k.toDouble()) <= 0.005 }.let { if (it < 0 && curDs >= 0.995) 0 else it }
-            HChips(listOf("100%", "85%", "70%", "55%"), resCur, col) {
-                vm.setGameFx(g.pkg, "downscale", resKeys[it]); ver++
+            val dsV = au["downscale"].orEmpty(); val fpsV = au["fps"].orEmpty()
+            val dsTxt = if (dsV.isEmpty() || dsV == "off") "100%" else (dsV.toDoubleOrNull()?.let { y -> Math.round(y * 100).toString() + "%" } ?: dsV)
+            val hasVals = (dsV.isNotEmpty() && dsV != "off") || (fpsV.isNotEmpty() && fpsV != "off")
+            SText(
+                when {
+                    !autoOn -> tx("Tidak ada pengaturan resolusi atau FPS dari HSIN untuk game ini.", "HSIN does not set resolution or FPS for this game.")
+                    hasVals -> tx("Sekarang: resolusi $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "bawaan" else fpsV}. Disesuaikan dari hasil main; berlaku saat game dibuka.", "Now: resolution $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "default" else fpsV}. Adjusted from play results; applies when the game opens.")
+                    else -> tx("Belum ada data. Main game ini beberapa menit, lalu HSIN mengatur sendiri sesuai kemampuan HP.", "No data yet. Play this game for a few minutes and HSIN tunes it to your phone.")
+                }, 10.sp, SP.faint)
+            if (autoOn && hasVals) {
+                val resetMsg = tx("Data dihapus, belajar dari awal.", "Data cleared, learning from scratch.")
+                HBtn(tx("Belajar ulang dari awal", "Learn again from scratch")) { vm.gameAutoReset(g.pkg, resetMsg) { ver++ } }
             }
-            var dsPct by remember(g.pkg, fx["downscale"]) { mutableIntStateOf(Math.round(curDs * 100).toInt()) }
-            SliderRow(tx("Resolusi bebas", "Custom resolution"), dsPct.toFloat(), 10f..100f, "$dsPct%", { dsPct = Math.round(it) }) {
-                vm.setGameFx(g.pkg, "downscale", dsValue(dsPct)); ver++
-            }
-            val learnMsg = tx("Preset dihitung ulang dari resolusi $dsPct%.", "Presets recalculated from $dsPct% resolution.")
-            HBtn(tx("Hitung ulang preset dari $dsPct%", "Recalculate presets from $dsPct%")) { vm.learnGamePreset(g.pkg, dsPct, learnMsg) { ver++ } }
-            SText(tx("Preset tidak akan menurunkan resolusi di bawah resolusi yang kamu pilih sendiri (di bawah 100%).", "Presets never go below the resolution you chose yourself (under 100%)."), 10.sp, SP.faint)
-            val resCheck by produceState("", g.pkg, ver, fx["downscale"]) { value = Hsin.downscaleStatus(g.pkg, fx["downscale"].orEmpty()) }
-            if (resCheck.isNotEmpty()) SText(resCheck, 10.sp, SP.faint)
-            if (resCur > 0) SText(tx("Peringatan: sebagian ROM memotong tampilan game saat resolusi diturunkan. Kalau layar game terpotong atau bergeser, kembalikan ke 100%.", "Warning: some ROMs crop the game view when resolution is lowered. If the game screen is cropped or shifted, set it back to 100%."), 10.sp, SP.red)
             SText(tx("Rendering", "Rendering"), 11.sp, SP.dim)
             val rend by produceState("default", g.pkg, ver) { value = Hsin.gameRender(g.pkg) }
             val rKeys = listOf("default", "skiagl", "skiavk")
             HChips(listOf(tx("Bawaan", "Default"), "SkiaGL", "Vulkan"), rKeys.indexOf(rend).coerceAtLeast(0), col) {
                 vm.setGameRender(g.pkg, rKeys[it]) { ver++ }
-            }
-            SText(tx("Game Mode Android", "Android Game Mode"), 11.sp, SP.dim)
-            val gmKeys = listOf("off", "standard", "performance", "battery")
-            HChips(listOf(tx("Mati", "Off"), tx("Standar", "Standard"), tx("Performa", "Performance"), tx("Hemat", "Battery")), gmKeys.indexOf(fx["gamemode"] ?: "off").coerceAtLeast(0), col) {
-                vm.setGameFx(g.pkg, "gamemode", gmKeys[it]); ver++
-            }
-            // Satu kontrol FPS: batas FPS game + refresh layar ikut (tidak pernah di atas layar).
-            LaunchedEffect(Unit) { if (vm.refreshRates.isEmpty()) vm.refreshRates = Hsin.refreshList(); if (vm.tw.isEmpty()) vm.loadTweaks() }
-            val maxHz = vm.refreshRates.maxOrNull() ?: vm.tw["REFRESH_MAX"]?.substringBefore('.')?.toIntOrNull() ?: 120
-            val fpsCur = fx["fps"]?.toIntOrNull()
-            SText(tx("Batas FPS (refresh layar ikut)", "FPS cap (screen refresh follows)"), 11.sp, SP.dim)
-            val presets = listOf(30, 45, 60, 90, 120).filter { it <= maxHz }
-            HChips(listOf(tx("Otomatis", "Auto")) + presets.map { "$it" }, if (fpsCur == null) 0 else (presets.indexOf(fpsCur) + 1).let { if (it == 0) -1 else it }, col) {
-                vm.setGameFps(g.pkg, if (it == 0) "off" else presets[it - 1].toString()) { ver++ }
-            }
-            val fpsErr = tx("FPS harus 10 sampai $maxHz", "FPS must be 10 to $maxHz")
-            var fpsTxt by remember(g.pkg, fpsCur) { mutableStateOf(fpsCur?.toString() ?: "") }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { Field(fpsTxt, { fpsTxt = it.filter { c -> c.isDigit() }.take(3) }, tx("Angka bebas 10-$maxHz", "Any number 10-$maxHz"), numeric = true) }
-                HBtn(tx("Terapkan", "Apply"), Modifier.width(110.dp)) {
-                    val n = fpsTxt.toIntOrNull()
-                    if (n == null || n < 10 || n > maxHz) vm.toast(fpsErr)
-                    else vm.setGameFps(g.pkg, n.toString()) { ver++ }
-                }
             }
             var more by remember(g.pkg) { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -166,8 +166,10 @@ gh_opt_set() {
         preload)
             case "$3" in off|default|on) ;; *) echo "ERROR: preload = off|on"; return 1 ;; esac ;;
         PRESET)
-            case "$3" in grafik|stabil|performa|default) ;; *) echo "ERROR: PRESET = grafik|stabil|performa|default"; return 1 ;; esac ;;
-        *) echo "ERROR: opsi tidak dikenal (PRIO|DND|LITE|HZ|OVD|gamemode|downscale|fps|preload|PRESET)"; return 1 ;;
+            case "$3" in grafik|stabil|performa|auto|default) ;; *) echo "ERROR: PRESET = grafik|stabil|performa|auto|default"; return 1 ;; esac ;;
+        AUTO)
+            case "$3" in on|off|default) ;; *) echo "ERROR: AUTO = on|off"; return 1 ;; esac ;;
+        *) echo "ERROR: opsi tidak dikenal (PRIO|DND|LITE|HZ|OVD|gamemode|downscale|fps|preload|PRESET|AUTO)"; return 1 ;;
     esac
     touch "$GH_OPTS" 2>/dev/null || { echo "ERROR: gagal tulis"; return 1; }
     grep -v "^$(_gh_re "$1"):$2=" "$GH_OPTS" > "$GH_OPTS.tmp.$$" 2>/dev/null

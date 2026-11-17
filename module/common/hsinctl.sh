@@ -191,7 +191,7 @@ cmd_status() {
     printf 'game_pkg=%s\ngame_secs=%s\n' "$_gp" "$_gs"
     printf 'adapt_now=%s\n' "$(rd "$STATE_DIR/.adapt_now")"
     _sf="$STATE_DIR/adapt/$_gp.conf"; _sv=""; _sw=""
-    if [ -n "$_gp" ] && [ -f "$_sf" ] && [ "$(sed -n 's/^saran_tampil=//p' "$_sf" | tail -n 1)" != "1" ]; then
+    if [ -n "$_gp" ] && [ -f "$_sf" ] && [ "$(gh_opt_get "$_gp" AUTO on)" = "off" ] && [ "$(sed -n 's/^saran_tampil=//p' "$_sf" | tail -n 1)" != "1" ]; then
         _sv=$(sed -n 's/^saran=//p' "$_sf" | tail -n 1 | tr -d '[:space:]')
         _sw=$(sed -n 's/^saran_why=//p' "$_sf" | tail -n 1)
     fi
@@ -335,6 +335,47 @@ cmd_gamerender() {
             ;;
         list) gh_render_list ;;
         *) echo "Usage: gamerender get <pkg> | set <pkg> <default|skiagl|skiavk|angle> | list"; return 1 ;;
+    esac
+}
+
+cmd_gameauto() {
+    case "$1" in
+        get)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            printf 'auto=%s\n' "$(gh_opt_get "$2" AUTO on)"
+            printf 'downscale=%s\nfps=%s\ngamemode=%s\n' "$(gh_opt_get "$2" downscale off)" "$(gh_opt_get "$2" fps off)" "$(gh_opt_get "$2" gamemode off)"
+            printf 'data_n=%s\n' "$(sed -n 's/^n=//p' "$STATE_DIR/adapt/$2.conf" 2>/dev/null | tail -n 1)"
+            ;;
+        set)    # dipanggil adapt.sh: <pkg> <downscale|off> <fps|keep>
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            [ "$(gh_opt_get "$2" AUTO on)" = "off" ] && { echo "OK: auto mati untuk $2"; return 0; }
+            gh_opt_set "$2" downscale "$3" >/dev/null || return 1
+            case "$4" in ''|keep) ;; *) tw_game_fps "$2" "$4" >/dev/null || return 1 ;; esac
+            gh_opt_set "$2" gamemode performance >/dev/null
+            gh_opt_set "$2" PRESET auto >/dev/null
+            gh_prearm "$2"
+            echo "OK: $2 auto downscale=$3 fps=${4:-keep}" ;;
+        mode)   # <pkg> on|off
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            case "$3" in
+                on) gh_opt_set "$2" AUTO default >/dev/null; echo "OK: auto aktif untuk $2" ;;
+                off)
+                    gh_opt_set "$2" AUTO off >/dev/null
+                    for _k in downscale gamemode PRESET; do gh_opt_set "$2" "$_k" default >/dev/null; done
+                    tw_game_fps "$2" off >/dev/null
+                    pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
+                    echo "OK: auto mati untuk $2, semua kembali bawaan" ;;
+                *) echo "Usage: gameauto mode <pkg> on|off"; return 1 ;;
+            esac ;;
+        reset)  # hapus data + nilai, mulai belajar dari awal
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            _pf="$STATE_DIR/adapt/$2.conf"
+            [ -f "$_pf" ] && { grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts|saran_tampil|saran_ditawarkan|pre_[a-z]+)=' "$_pf" > "$_pf.tmp.$$" 2>/dev/null; mv -f "$_pf.tmp.$$" "$_pf"; }
+            for _k in downscale gamemode PRESET; do gh_opt_set "$2" "$_k" default >/dev/null; done
+            tw_game_fps "$2" off >/dev/null
+            pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
+            echo "OK: data dan pengaturan otomatis $2 dihapus" ;;
+        *) echo "Usage: gameauto get <pkg> | mode <pkg> on|off | reset <pkg>"; return 1 ;;
     esac
 }
 
@@ -886,6 +927,7 @@ case "$1" in
     features) gh_caps; mf_caps ;;
     livecheck) sh "$COMMON/livecheck.sh" ;;
     trim) sh "$COMMON/trim.sh" "$2" ;;
+    gameauto) cmd_gameauto "$2" "$3" "$4" "$5" ;;
     gamepreset) cmd_gamepreset "$2" "$3" "$4" ;;
     gamefx) cmd_gamefx "$2" "$3" "$4" "$5" ;;
     gamefps) cmd_gamefps "$2" "$3" "$4" ;;

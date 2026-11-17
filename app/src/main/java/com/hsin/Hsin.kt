@@ -193,6 +193,18 @@ object Hsin {
         return kv(ctl("gamepreset get $pkg").out)
     }
 
+    /** Pengaturan otomatis per game: auto (on|off), downscale, fps, gamemode, data_n. */
+    suspend fun gameAuto(pkg: String): Map<String, String> {
+        if (!PKG_RE.matches(pkg)) return emptyMap()
+        return kv(ctl("gameauto get $pkg").out)
+    }
+
+    suspend fun setGameAutoMode(pkg: String, on: Boolean): Root.Res =
+        if (!PKG_RE.matches(pkg)) Root.Res(1, "ERROR: package tidak valid") else ctl("gameauto mode $pkg ${if (on) "on" else "off"}")
+
+    suspend fun resetGameAuto(pkg: String): Root.Res =
+        if (!PKG_RE.matches(pkg)) Root.Res(1, "ERROR: package tidak valid") else ctl("gameauto reset $pkg")
+
     suspend fun learnGamePreset(pkg: String, pct: Int): Root.Res {
         if (!PKG_RE.matches(pkg) || pct !in 10..100) return Root.Res(1, "ERROR: resolusi acuan tidak valid")
         return ctl("gamepreset learn $pkg $pct")
