@@ -69,6 +69,9 @@ fi
 # modul31: bersih total state HSIN. DIPERTAHANKAN hanya daftar game user
 # (game_profile_map.conf = mahal dibangun ulang); sisanya transient,
 # snapshot, log, cache, penanda -> hapus supaya install berikutnya fresh.
+# Adapt yang sedang memegang frekuensi: lanjutkan uperf/fas-rs yang dibekukan, lalu hapus penanda.
+for _ap in $(cat "$WORK_DIR/.adapt_stopped" 2>/dev/null); do kill -CONT "$_ap" 2>/dev/null; done
+rm -f "$WORK_DIR/.adapt_own" "$WORK_DIR/.adapt_prev" "$WORK_DIR/.adapt_stopped" "$WORK_DIR/ADAPT_OWN" "$WORK_DIR/ENGINE_MODE" 2>/dev/null
 rm -f "$WORK_DIR/boost_level" "$WORK_DIR/GAMEBOOST_LEVEL" \
     "$WORK_DIR/.gb_active" "$WORK_DIR/.gb_cooldown_count" \
     "$WORK_DIR/.gb_level_orig" "$WORK_DIR/.gb_pending" \

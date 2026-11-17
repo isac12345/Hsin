@@ -221,6 +221,8 @@ echo "[BOOT] tahap tuning selesai (applied=$APPLIED_COUNT skipped=$SKIPPED_COUNT
 
 # 6.9 Sisa state ekstra game dari sesi sebelumnya (DND, refresh rate, render, rekaman) dibersihkan
 # saat boot supaya tidak ada pengaturan yang tertinggal kalau HP mati di tengah game.
+# Boot baru: kernel dan fas-rs sudah mulai dari nol, jadi sisa penanda Adapt tidak berlaku lagi.
+rm -f "$WORK_DIR/.adapt_own" "$WORK_DIR/.adapt_prev" "$WORK_DIR/.adapt_stopped" 2>/dev/null
 if [ -f "$MODDIR/common/gamehooks.sh" ]; then
     HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$MODDIR" sh -c '. "$1/common/gamehooks.sh"; gh_recover; gh_prearm_all' _ "$MODDIR" >/dev/null 2>&1
 fi

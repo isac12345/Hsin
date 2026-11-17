@@ -84,6 +84,21 @@ AD_SMIN=""
 AD_SSTALL=0
 AD_LAST_MENTOK=0
 
+# Adapt memegang frekuensi CPU/GPU selama game (spek "Adapt pengendali penuh").
+# Penanda .adapt_own = Adapt satu-satunya penulis frekuensi; nilai asli di
+# .adapt_prev; pid uperf/fas-rs yang dibekukan di .adapt_stopped.
+AD_CPUFREQ="${HSIN_SYS_CPUFREQ:-/sys/devices/system/cpu/cpufreq}"
+AD_DEVFREQ="${HSIN_SYS_DEVFREQ:-/sys/class/devfreq}"
+AD_OWN_FILE="$AD_STATE/.adapt_own"
+AD_OWN_PREV="$AD_STATE/.adapt_prev"
+AD_OWN_STOP="$AD_STATE/.adapt_stopped"
+AD_OWN=0         # 1 = sesi ini memegang frekuensi
+AD_LCP=0         # lantai CPU sekarang (persen)
+AD_LGPU=0        # lantai GPU sekarang (persen)
+AD_OWN_LAST=0    # epoch perubahan lantai terakhir
+AD_OWN_N=0       # jumlah perubahan lantai sesi ini
+AD_OWN_FZ_TS=0   # epoch terakhir memeriksa pid yang lahir ulang
+
 ad_log() {
     if type monitor_log >/dev/null 2>&1; then
         monitor_log "ADAPT" "$1"
@@ -118,6 +133,96 @@ ad_kbase_set() {   # $1=beban -> titip ke gameboost (satu penulis)
     _rest=${_kv#* }
     GB_KBASE_POLL=${_rest%% *}
     GB_KBASE_UP=${_rest##* }
+}
+
+# ---- Adapt memegang frekuensi: simpan asli, bekukan uperf/fas-rs, pulihkan ----
+ad_rd() { _adv=""; [ -r "$1" ] && read -r _adv < "$1" 2>/dev/null; printf '%s' "$_adv"; }
+ad_wr() { printf '%s' "$2" > "$1" 2>/dev/null; }
+
+ad_own_enabled() {   # sakelar: file ADAPT_OWN berisi "off" = mati
+    [ "$(tr -d '[:space:]' < "$AD_STATE/ADAPT_OWN" 2>/dev/null)" != "off" ]
+}
+
+ad_gpu_dir() {
+    for _agd in "$AD_DEVFREQ"/*gpu* "$AD_DEVFREQ"/*mali* "$AD_DEVFREQ"/*kgsl* "$AD_DEVFREQ"/*ged* "$AD_DEVFREQ"/*pvr* "$AD_DEVFREQ"/*3d0*; do
+        [ -f "$_agd/min_freq" ] && [ -f "$_agd/max_freq" ] && [ -f "$_agd/available_frequencies" ] && { printf '%s' "$_agd"; return 0; }
+    done
+    return 1
+}
+
+ad_own_freeze() {   # bekukan uperf/fas-rs; pid yang lahir ulang ikut dibekukan
+    _owz=$(cat "$AD_OWN_STOP" 2>/dev/null)
+    for _own in uperf fas-rs; do
+        for _owp in $(pidof "$_own" 2>/dev/null); do
+            case " $_owz " in *" $_owp "*) continue ;; esac
+            kill -STOP "$_owp" 2>/dev/null && _owz="$_owz $_owp"
+        done
+    done
+    printf '%s\n' "$_owz" > "$AD_OWN_STOP" 2>/dev/null
+}
+
+ad_own_thaw() {
+    # Overdrive yang membeku ulang memegang pid-nya sendiri; jangan dilanjutkan dari sini.
+    if [ ! -f "$AD_STATE/.ovd_stopped" ]; then
+        for _owp in $(cat "$AD_OWN_STOP" 2>/dev/null); do kill -CONT "$_owp" 2>/dev/null; done
+    fi
+    rm -f "$AD_OWN_STOP"
+}
+
+ad_own_on() {   # $1=pkg; return 0 = Adapt memegang frekuensi sesi ini
+    [ "$AD_OWN" = "1" ] && return 0
+    ad_own_enabled || return 1
+    [ -f "$AD_STATE/.ovd_active" ] && return 1
+    # sisa sesi lama (crash): pulihkan dulu supaya nilai asli yang tersimpan benar
+    if [ -f "$AD_OWN_FILE" ] || [ -f "$AD_OWN_PREV" ] || [ -f "$AD_OWN_STOP" ]; then ad_own_off recover; fi
+    : > "$AD_OWN_PREV.tmp" 2>/dev/null || { ad_log "[OWN] gagal menyimpan nilai asli, jalan seperti biasa"; return 1; }
+    _owok=0
+    for _owd in "$AD_CPUFREQ"/policy*; do
+        [ -f "$_owd/scaling_min_freq" ] && [ -f "$_owd/scaling_max_freq" ] || continue
+        [ -w "$_owd/scaling_min_freq" ] && [ -w "$_owd/scaling_max_freq" ] && _owok=1
+        printf 'cpu|%s|%s|%s\n' "$_owd" "$(ad_rd "$_owd/scaling_min_freq")" "$(ad_rd "$_owd/scaling_max_freq")" >> "$AD_OWN_PREV.tmp"
+    done
+    _owg=$(ad_gpu_dir) && printf 'gpu|%s|%s|%s\n' "$_owg" "$(ad_rd "$_owg/min_freq")" "$(ad_rd "$_owg/max_freq")" >> "$AD_OWN_PREV.tmp"
+    if [ "$_owok" != "1" ]; then
+        rm -f "$AD_OWN_PREV.tmp"
+        ad_log "[OWN] node frekuensi CPU tidak bisa ditulis, jalan seperti biasa (tabel profil + gameboost)"
+        return 1
+    fi
+    mv -f "$AD_OWN_PREV.tmp" "$AD_OWN_PREV" 2>/dev/null
+    printf '%s\n%s\n' "$1" "$(date +%s 2>/dev/null)" > "$AD_OWN_FILE" 2>/dev/null
+    ad_own_freeze
+    AD_OWN=1; AD_LCP=0; AD_LGPU=0; AD_OWN_LAST=0; AD_OWN_N=0
+    AD_OWN_FZ_TS=$(date +%s 2>/dev/null)
+    ad_log "[OWN] mulai $1 lantai=0/0"
+    return 0
+}
+
+ad_own_off() {   # $1=alasan (opsional); pulihkan nilai asli, lanjutkan uperf/fas-rs, hapus penanda
+    _owsaw=$AD_OWN
+    if [ -f "$AD_OWN_PREV" ]; then
+        while IFS='|' read -r _owt _owd _owmn _owmx; do
+            [ -n "$_owd" ] && [ -d "$_owd" ] || continue
+            case "$_owt" in
+                cpu) case "$_owmn" in ''|*[!0-9]*) ;; *) ad_wr "$_owd/scaling_min_freq" "$_owmn" ;; esac   # turunkan min dulu, baru max
+                     case "$_owmx" in ''|*[!0-9]*) ;; *) ad_wr "$_owd/scaling_max_freq" "$_owmx" ;; esac ;;
+                gpu) case "$_owmn" in ''|*[!0-9]*) ;; *) ad_wr "$_owd/min_freq" "$_owmn" ;; esac
+                     case "$_owmx" in ''|*[!0-9]*) ;; *) ad_wr "$_owd/max_freq" "$_owmx" ;; esac ;;
+            esac
+        done < "$AD_OWN_PREV"
+    fi
+    ad_own_thaw
+    rm -f "$AD_OWN_FILE" "$AD_OWN_PREV"
+    if [ "$_owsaw" = "1" ] || [ "${1:-}" = "recover" ]; then
+        _owtm=$(ad_temp_mc); case "$_owtm" in ''|*[!0-9]*) _owtm=0 ;; esac
+        ad_log "[OWN] selesai ${AD_PKG:-sisa lama} (${AD_OWN_N} perubahan, suhu $((_owtm / 1000))C)${1:+ [$1]}"
+    fi
+    AD_OWN=0; AD_LCP=0; AD_LGPU=0; AD_OWN_LAST=0; AD_OWN_N=0
+}
+
+ad_own_recover() {   # penanda tanpa sesi terbuka = sisa lama (crash/monitor mulai ulang)
+    [ "$AD_OWN" = "1" ] && return 0
+    [ -f "$AD_OWN_FILE" ] || [ -f "$AD_OWN_PREV" ] || [ -f "$AD_OWN_STOP" ] || return 0
+    ad_own_off recover
 }
 
 # --- aplikasi yang tidak boleh disentuh ------------------------------------
@@ -422,6 +527,7 @@ ad_open() {   # $1=pkg
     _sesi=$(ad_cget "$1" sesi)
     case "$_sesi" in ''|*[!0-9]*) _sesi=0 ;; esac
     ad_cset "$1" sesi $((_sesi + 1))
+    [ "$AD_IS_GAME" = "1" ] && ad_own_on "$1"
     ad_apply
     ad_log "mulai $1 game=$AD_IS_GAME beban=$AD_BEBAN sesi=$((_sesi + 1))"
 }
@@ -591,6 +697,7 @@ ad_end() {
     [ "$AD_IS_GAME" = "1" ] && ad_preset_learn "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_auto_tune "$AD_PKG"
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
+    [ "$AD_OWN" = "1" ] && ad_own_off selesai
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
     ad_log "selesai $AD_PKG beban=$AD_BEBAN $_tail"
@@ -624,7 +731,18 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     if [ "$AD_OPEN" = "1" ] && [ "$AD_PKG" != "$_pkg" ]; then
         ad_end    # pindah aplikasi: semua kembali normal
     fi
-    [ "$AD_OPEN" = "1" ] || ad_open "$_pkg"
+    [ "$AD_OPEN" = "1" ] || { ad_own_recover; ad_open "$_pkg"; }
+
+    # Adapt memegang frekuensi: pid uperf/fas-rs yang lahir ulang ikut dibekukan (tiap >=20 dtk).
+    if [ "$AD_OWN" = "1" ]; then
+        if [ ! -f "$AD_OWN_FILE" ]; then
+            AD_OWN=0   # penanda dicabut pihak lain (Puncak): jangan menulis frekuensi lagi
+        else
+            _ozn=$(date +%s 2>/dev/null)
+            case "$_ozn" in ''|*[!0-9]*) _ozn=0 ;; esac
+            if [ $((_ozn - AD_OWN_FZ_TS)) -ge 20 ]; then AD_OWN_FZ_TS=$_ozn; ad_own_freeze; fi
+        fi
+    fi
 
     # Pembersih RAM otomatis saat sempit (memfx: PSI + ambang + jeda sendiri).
     command -v mf_relief_tick >/dev/null 2>&1 && mf_relief_tick "$_pkg"
@@ -833,5 +951,6 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 # Dipanggil saat layar mati / monitor berhenti: lepas semua bantuan.
 ad_release() {
     [ "$AD_OPEN" = "1" ] && ad_end
+    ad_own_recover
     return 0
 }
