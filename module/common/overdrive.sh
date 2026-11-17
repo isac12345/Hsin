@@ -388,6 +388,12 @@ do_start() {
     fi
     temp_state; _ts=$?
     [ "$_ts" -ge 2 ] && { echo "ERROR: suhu terlalu tinggi untuk Overdrive"; return 1; }
+    # Adapt yang sedang memegang frekuensi dilepas dulu (nilai asli dipulihkan, uperf/fas-rs dilanjutkan):
+    # tidak ada dua penulis, dan nilai asli yang disimpan di bawah bukan lantai milik Adapt.
+    if [ -f "$STATE_DIR/.adapt_own" ] || [ -f "$STATE_DIR/.adapt_prev" ] || [ -f "$STATE_DIR/.adapt_stopped" ]; then
+        ( HSIN_CONF_DIR="$STATE_DIR"; . "$OVD_DIR/adapt.sh" >/dev/null 2>&1; ad_own_off overdrive )
+        ovd_log INFO "Adapt melepas frekuensi untuk Puncak"
+    fi
     save_prev || { echo "ERROR: gagal menyimpan nilai asli"; return 1; }
     # Tanda aktif dipasang sebelum menulis: engine/gameboost melewati node frekuensi
     # selama tanda ini ada, jadi apply profil di tengah verifikasi tidak membatalkannya.

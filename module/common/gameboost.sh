@@ -114,6 +114,13 @@ _gb_write() {
                 _gb_log "SKIPPED" "$_cat node=$_node (Overdrive aktif)"; return 0
             } ;;
     esac
+    # Adapt memegang frekuensi selama game: satu penulis saja.
+    case "$_node" in
+        */cpufreq/*/scaling_min_freq|*/cpufreq/*/scaling_max_freq|*/devfreq/*/min_freq|*/devfreq/*/max_freq)
+            [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.adapt_own" ] && {
+                _gb_log "SKIPPED" "$_cat node=$_node (Adapt memegang frekuensi)"; return 0
+            } ;;
+    esac
     if [ ! -w "$_node" ]; then
         chmod 0644 "$_node" 2>/dev/null
     fi

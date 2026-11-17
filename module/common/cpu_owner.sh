@@ -36,6 +36,13 @@ cpu_detect_owner() {
         fi
     done
 
+    # Prioritas 0: Adapt memegang frekuensi selama sesi game (fas-rs/uperf dibekukan)
+    if [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.adapt_own" ]; then
+        CPU_OWNER="adapt"
+        _cpu_owner_log "INFO" "Adapt memegang frekuensi CPU/GPU selama game, tidak ada penulis lain"
+        return 0
+    fi
+
     # Prioritas 1: node /dev/fas_rs/mode ada & readable
     if [ -r "$fasrs_mode" ]; then
         CPU_OWNER="fas-rs"

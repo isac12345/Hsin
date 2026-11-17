@@ -88,6 +88,11 @@ apply_tweak() {
                 SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
                 log_msg "SKIPPED" "$category" "path=$path (Overdrive aktif)"
                 return 0
+            fi
+            if [ -f "${HSIN_STATE_DIR:-/data/adb/hsin}/.adapt_own" ]; then
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                log_msg "SKIPPED" "$category" "path=$path (Adapt memegang frekuensi)"
+                return 0
             fi ;;
     esac
 
