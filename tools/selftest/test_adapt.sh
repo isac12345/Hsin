@@ -416,6 +416,35 @@ HSIN_STATE_DIR="$AD_STATE" sh "$C/hsinctl.sh" saran done com.game.d >/dev/null 2
 chk "saran_tampil=1" "$(conf com.game.d saran_tampil)" "1"
 chk "saran_ditawarkan=55" "$(conf com.game.d saran_ditawarkan)" "55"
 
+echo "== preset game dipelajari dari catatan"
+printf 'com.game.p:downscale=0.60\ncom.game.p:fps=30\n' > "$AD_STATE/game_opts.conf"
+T_FPS_CUR=30
+printf 'n=1001\np1_avg=15\njank_pct=52\nstall_max=900\n' > "$AD_DIR/com.game.p.conf"
+ad_preset_learn com.game.p
+chk "stabil dari jank 52 (0.60 -> 0.45)" "$(conf com.game.p pre_stabil)" "0.45,30,performance"
+chk "performa lebih rendah, batas 0.40" "$(conf com.game.p pre_performa)" "0.40,30,performance"
+chk "grafik lebih tinggi, mode standard" "$(conf com.game.p pre_grafik)" "0.60,30,standard"
+printf 'n=100\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.q.conf"
+printf 'com.game.q:downscale=0.60\n' >> "$AD_STATE/game_opts.conf"
+ad_preset_learn com.game.q
+chk "data kurang (n<300): tanpa preset" "$(conf com.game.q pre_stabil)" ""
+printf 'com.game.p:PRESET=stabil\n' >> "$AD_STATE/game_opts.conf"
+printf 'n=1001\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.p.conf"
+ad_preset_learn com.game.p
+chk "preset aktif: tidak dihitung ulang" "$(conf com.game.p pre_stabil)" ""
+rm -f "$AD_STATE/game_opts.conf"
+
+echo "== hsinctl gamepreset"
+export HSIN_STATE_DIR="$AD_STATE"
+printf 'pre_stabil=0.45,30,performance\n' > "$AD_DIR/com.game.h.conf"
+chk "tanpa data ditolak" "$(sh "$C/hsinctl.sh" gamepreset set com.game.h grafik 2>&1 | cut -c1-5)" "ERROR"
+sh "$C/hsinctl.sh" gamepreset set com.game.h stabil >/dev/null 2>&1
+chk "downscale terisi" "$(sed -n 's/^com.game.h:downscale=//p' "$AD_STATE/game_opts.conf")" "0.45"
+chk "PRESET tercatat" "$(sed -n 's/^com.game.h:PRESET=//p' "$AD_STATE/game_opts.conf")" "stabil"
+sh "$C/hsinctl.sh" gamepreset set com.game.h manual >/dev/null 2>&1
+chk "manual menghapus PRESET" "$(sed -n 's/^com.game.h:PRESET=//p' "$AD_STATE/game_opts.conf")" ""
+unset HSIN_STATE_DIR
+
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

@@ -868,6 +868,15 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { gameFx = Hsin.gamefx(pkg) }
     }
 
+    fun setGamePreset(pkg: String, name: String, okMsg: String, done: () -> Unit) {
+        viewModelScope.launch {
+            val r = Hsin.setGamePreset(pkg, name)
+            toast(if (r.code == 0) okMsg else r.out.lines().firstOrNull { it.isNotBlank() } ?: "Gagal")
+            gameFx = Hsin.gamefx(pkg)
+            done()
+        }
+    }
+
     fun setGameFx(pkg: String, key: String, v: String) {
         gameFx = gameFx + (key to v)
         viewModelScope.launch {

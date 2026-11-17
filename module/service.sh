@@ -222,7 +222,7 @@ echo "[BOOT] tahap tuning selesai (applied=$APPLIED_COUNT skipped=$SKIPPED_COUNT
 # 6.9 Sisa state ekstra game dari sesi sebelumnya (DND, refresh rate, render, rekaman) dibersihkan
 # saat boot supaya tidak ada pengaturan yang tertinggal kalau HP mati di tengah game.
 if [ -f "$MODDIR/common/gamehooks.sh" ]; then
-    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$MODDIR" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$MODDIR" >/dev/null 2>&1
+    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$MODDIR" sh -c '. "$1/common/gamehooks.sh"; gh_recover; gh_prearm_all' _ "$MODDIR" >/dev/null 2>&1
 fi
 # MGLRU opt-in (MGLRU_MODE=on): sysfs tidak persisten antar boot, terapkan ulang. Default off = tidak menyentuh apa pun.
 if [ -f "$MODDIR/common/memfx.sh" ]; then

@@ -338,6 +338,45 @@ cmd_gamerender() {
     esac
 }
 
+cmd_gamepreset() {
+    case "$1" in
+        get)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            _pf="$STATE_DIR/adapt/$2.conf"
+            printf 'preset=%s\n' "$(gh_opt_get "$2" PRESET manual)"
+            for _n in grafik stabil performa; do
+                printf '%s=%s\n' "$_n" "$(sed -n "s/^pre_$_n=//p" "$_pf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')"
+            done ;;
+        set)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            case "$3" in
+                manual)
+                    gh_opt_set "$2" PRESET default >/dev/null
+                    pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
+                    echo "OK: $2 preset=manual" ;;
+                grafik|stabil|performa)
+                    _pv=$(sed -n "s/^pre_$3=//p" "$STATE_DIR/adapt/$2.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+                    [ -n "$_pv" ] || { echo "ERROR: belum ada data untuk $2, main sekali dulu"; return 1; }
+                    _pd=${_pv%%,*}; _pr=${_pv#*,}; _pfp=${_pr%%,*}; _pm=${_pr#*,}
+                    gh_opt_set "$2" downscale "$_pd" >/dev/null || return 1
+                    gh_opt_set "$2" fps "$_pfp" >/dev/null || return 1
+                    gh_opt_set "$2" gamemode "$_pm" >/dev/null || return 1
+                    gh_opt_set "$2" PRESET "$3" >/dev/null || return 1
+                    gh_prearm "$2"
+                    echo "OK: $2 preset=$3 downscale=$_pd fps=$_pfp mode=$_pm (berlaku di buka berikutnya)" ;;
+                *) echo "ERROR: preset = grafik|stabil|performa|manual"; return 1 ;;
+            esac ;;
+        reset)
+            valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+            _pf="$STATE_DIR/adapt/$2.conf"
+            [ -f "$_pf" ] && { grep -v '^pre_' "$_pf" > "$_pf.tmp.$$" 2>/dev/null; mv -f "$_pf.tmp.$$" "$_pf"; }
+            gh_opt_set "$2" PRESET default >/dev/null
+            pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
+            echo "OK: preset $2 dihapus" ;;
+        *) echo "Usage: gamepreset get <pkg> | set <pkg> <grafik|stabil|performa|manual> | reset <pkg>"; return 1 ;;
+    esac
+}
+
 cmd_gamefx() {
     case "$1" in
         get)
@@ -346,6 +385,7 @@ cmd_gamefx() {
             printf 'downscale=%s\n' "$(gh_opt_get "$2" downscale off)"
             printf 'fps=%s\n' "$(gh_opt_get "$2" fps off)"
             printf 'preload=%s\n' "$(gh_opt_get "$2" preload off)"
+            printf 'preset=%s\n' "$(gh_opt_get "$2" PRESET manual)"
             _gx=$(gh_render_get "$2"); printf 'render=%s\n' "${_gx:-default}"
             ;;
         set)
@@ -838,6 +878,7 @@ case "$1" in
     features) gh_caps; mf_caps ;;
     livecheck) sh "$COMMON/livecheck.sh" ;;
     trim) sh "$COMMON/trim.sh" "$2" ;;
+    gamepreset) cmd_gamepreset "$2" "$3" "$4" ;;
     gamefx) cmd_gamefx "$2" "$3" "$4" "$5" ;;
     gamefps) cmd_gamefps "$2" "$3" "$4" ;;
     tweak) cmd_tweak "$2" "$3" "$4" ;;

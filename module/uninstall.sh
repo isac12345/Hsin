@@ -37,7 +37,7 @@ _hsin_kill_pat "pgr-log"
 # Pulihkan ekstra game (DND, refresh rate, render per game) dan hentikan rekaman layar bila ada.
 _hsin_mod_u="${0%/*}"
 if [ -f "$_hsin_mod_u/common/gamehooks.sh" ]; then
-    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$_hsin_mod_u" sh -c '. "$1/common/gamehooks.sh"; gh_recover' _ "$_hsin_mod_u" >/dev/null 2>&1
+    HSIN_STATE_DIR="$WORK_DIR" HSIN_MOD_DIR="$_hsin_mod_u" sh -c '. "$1/common/gamehooks.sh"; gh_unarm_all; gh_recover' _ "$_hsin_mod_u" >/dev/null 2>&1
 fi
 [ -f "$_hsin_mod_u/common/memfx.sh" ] && HSIN_STATE_DIR="$WORK_DIR" sh -c '. "$1/common/memfx.sh"; mf_mglru_restore' _ "$_hsin_mod_u" >/dev/null 2>&1
 [ -f "$_hsin_mod_u/common/shield.sh" ] && HSIN_STATE_DIR="$WORK_DIR" sh "$_hsin_mod_u/common/shield.sh" off >/dev/null 2>&1

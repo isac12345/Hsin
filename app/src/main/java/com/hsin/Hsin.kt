@@ -187,6 +187,17 @@ object Hsin {
         return kv(ctl("gamefx get $pkg").out)
     }
 
+    /** Preset game: "preset" (manual|grafik|stabil|performa) + nilai dipelajari "downscale,fps,mode" per preset (kosong = belum ada data). */
+    suspend fun gamePreset(pkg: String): Map<String, String> {
+        if (!PKG_RE.matches(pkg)) return emptyMap()
+        return kv(ctl("gamepreset get $pkg").out)
+    }
+
+    suspend fun setGamePreset(pkg: String, name: String): Root.Res {
+        if (!PKG_RE.matches(pkg) || name !in setOf("manual", "grafik", "stabil", "performa")) return Root.Res(1, "ERROR: preset tidak valid")
+        return ctl("gamepreset set $pkg $name")
+    }
+
     suspend fun setGamefx(pkg: String, key: String, v: String): Root.Res {
         if (!PKG_RE.matches(pkg)) return Root.Res(1, "ERROR: package tidak valid")
         if (key !in setOf("gamemode", "downscale", "fps", "preload")) return Root.Res(1, "ERROR: opsi tidak dikenal")

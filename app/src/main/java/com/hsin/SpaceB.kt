@@ -502,6 +502,19 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                     ) { SText(mname(m), 12.sp, lerpColor(m.color, SP.ink, a), FontWeight.Bold) }
                 }
             }
+            SText(tx("Preset game", "Game preset"), 11.sp, SP.dim)
+            val pre by produceState<Map<String, String>>(emptyMap(), g.pkg, ver) { value = Hsin.gamePreset(g.pkg) }
+            val pKeys = listOf("manual", "grafik", "stabil", "performa")
+            val okMsg = tx("Preset dipasang. Berlaku saat game dibuka.", "Preset set. Applies when the game opens.")
+            val havePre = pKeys.drop(1).any { !pre[it].isNullOrEmpty() }
+            HChips(listOf(tx("Manual", "Manual"), tx("Grafik", "Graphics"), tx("Stabil", "Stable"), tx("Performa", "Performance")),
+                pKeys.indexOf(pre["preset"] ?: "manual").coerceAtLeast(0), col) {
+                val k = pKeys[it]
+                if (k != "manual" && pre[k].isNullOrEmpty()) vm.toast(tx("Belum ada data. Main game ini sekali dulu.", "No data yet. Play this game once first."))
+                else vm.setGamePreset(g.pkg, k, okMsg) { ver++ }
+            }
+            if (!havePre) SText(tx("Belum ada data. Main game ini sekali (minimal beberapa menit) lalu preset muncul.", "No data yet. Play this game once (a few minutes) and presets appear."), 10.sp, SP.faint)
+            else SText(pKeys.drop(1).joinToString("  ") { k -> val v = pre[k].orEmpty().split(","); val d = v.getOrNull(0).orEmpty().let { x -> if (x == "off") "100%" else (x.toDoubleOrNull()?.let { y -> Math.round(y * 100).toString() + "%" } ?: x) }; k.replaceFirstChar { c -> c.uppercase() } + " " + d + "/" + v.getOrNull(1).orEmpty() }, 10.sp, SP.faint)
             SText(tx("Resolusi game", "Game resolution"), 11.sp, SP.dim)
             val resKeys = listOf("off", "0.85", "0.7", "0.55")
             val curDs = (fx["downscale"]?.toDoubleOrNull() ?: 1.0).coerceIn(0.10, 1.0)

@@ -165,7 +165,9 @@ gh_opt_set() {
                 *) [ "$3" -ge 10 ] && [ "$3" -le 240 ] || { echo "ERROR: fps = off atau angka 10 sampai 240"; return 1; } ;; esac ;;
         preload)
             case "$3" in off|default|on) ;; *) echo "ERROR: preload = off|on"; return 1 ;; esac ;;
-        *) echo "ERROR: opsi tidak dikenal (PRIO|DND|LITE|HZ|OVD|gamemode|downscale|fps|preload)"; return 1 ;;
+        PRESET)
+            case "$3" in grafik|stabil|performa|default) ;; *) echo "ERROR: PRESET = grafik|stabil|performa|default"; return 1 ;; esac ;;
+        *) echo "ERROR: opsi tidak dikenal (PRIO|DND|LITE|HZ|OVD|gamemode|downscale|fps|preload|PRESET)"; return 1 ;;
     esac
     touch "$GH_OPTS" 2>/dev/null || { echo "ERROR: gagal tulis"; return 1; }
     grep -v "^$(_gh_re "$1"):$2=" "$GH_OPTS" > "$GH_OPTS.tmp.$$" 2>/dev/null
@@ -593,6 +595,48 @@ _gh_gm_on() {
     fi
 }
 
+# Pasang Game Mode (mode + downscale + fps) SEBELUM game dibuka, supaya berlaku walau game dibuka dari
+# launcher biasa. Tanpa tanda GH_GM_MARK: override ini sengaja tidak dibuang saat game keluar.
+gh_prearm() {   # $1=pkg
+    _ghg_pkg="$1"
+    case "$_ghg_pkg" in ''|*[!A-Za-z0-9._]*) return 1 ;; esac
+    [ -n "$(_gh_opt "$_ghg_pkg" PRESET)" ] || return 0
+    gh_feat_ok gamemode || return 0
+    _gh_gamecmd_ok || return 0
+    _ghg_mode=$(gh_opt_get "$_ghg_pkg" gamemode performance)
+    _ghg_ds=$(gh_opt_get "$_ghg_pkg" downscale off)
+    _ghg_fps=$(gh_opt_get "$_ghg_pkg" fps off)
+    gh_feat_ok downscale || _ghg_ds=off
+    case "$_ghg_mode" in
+        standard) _ghg_mn=1 ;; performance) _ghg_mn=2 ;; battery) _ghg_mn=3 ;; *) _ghg_mn=2 ;;
+    esac
+    if _gh_gm_try "$_ghg_mn" "$_ghg_ds" "$_ghg_fps" || _gh_gm_try "$_ghg_mn" "$_ghg_ds" off; then
+        _gh_log APPLIED "preset $(_gh_opt "$_ghg_pkg" PRESET) dipasang lebih dulu untuk $_ghg_pkg (mode $_ghg_mode downscale=$_ghg_ds fps=$_ghg_fps)"
+    else
+        _gh_log WARN "preset gagal dipasang lebih dulu untuk $_ghg_pkg"
+    fi
+}
+
+gh_prearm_all() {
+    [ -f "$GH_OPTS" ] || return 0
+    sed -n 's/^\([^:]*\):PRESET=.*/\1/p' "$GH_OPTS" 2>/dev/null | while IFS= read -r _gpa; do
+        pidof "$_gpa" >/dev/null 2>&1 && continue   # sedang jalan: biarkan, berlaku di buka berikutnya
+        gh_prearm "$_gpa"
+    done
+}
+
+# Buang override semua game berpreset (uninstall / preset dimatikan).
+gh_unarm() {   # $1=pkg
+    case "$1" in ''|*[!A-Za-z0-9._]*) return 1 ;; esac
+    _gh_gamecmd_ok && cmd game reset "$1" >/dev/null 2>&1
+    return 0
+}
+
+gh_unarm_all() {
+    [ -f "$GH_OPTS" ] || return 0
+    sed -n 's/^\([^:]*\):PRESET=.*/\1/p' "$GH_OPTS" 2>/dev/null | while IFS= read -r _gpu; do gh_unarm "$_gpu"; done
+}
+
 _gh_gm_try() {   # $1=mode (angka/nama) $2=downscale|off $3=fps|off; paket dari $_ghg_pkg
     _ghg_tm="$1"; _ghg_td="$2"; _ghg_tf="$3"
     set -- --mode "$_ghg_tm"
@@ -607,6 +651,11 @@ _gh_gm_off() {
     rm -f "$GH_GM_MARK"
     _ghg_p=${_ghg_p%%\|*}
     [ -n "$_ghg_p" ] || return 0
+    # Game dengan preset: override dipertahankan supaya buka berikutnya (dari launcher) sudah memakainya.
+    if [ -n "$(_gh_opt "$_ghg_p" PRESET)" ]; then
+        _gh_log INFO "game mode override dipertahankan untuk $_ghg_p (preset $(_gh_opt "$_ghg_p" PRESET))"
+        return 0
+    fi
     _gh_gamecmd_ok && cmd game reset "$_ghg_p" >/dev/null 2>&1
     _gh_log RESTORED "game mode override dibuang untuk $_ghg_p"
 }

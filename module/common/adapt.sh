@@ -480,11 +480,46 @@ ad_cdel() {   # $1=pkg $2=key
     grep -v "^$2=" "$_f" > "$_f.tmp.$$" 2>/dev/null; mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
 }
 
+# ---- preset per game (Grafik / Stabil / Performa), dipelajari dari catatan sesi ----
+# Dipelajari hanya dari sesi tanpa preset aktif (pengaturan manual), supaya angkanya tidak ikut
+# bergeser setiap kali preset dipakai. Aturan sederhana dan transparan, bukan hasil uji bertahap:
+#   Stabil   = resolusi sekarang diturunkan 15/10/0 poin menurut jank dan rasio 1% low terhadap batas FPS
+#   Performa = Stabil - 15 poin, Game Mode performance
+#   Grafik   = Stabil + 15 poin (maks 100), Game Mode standard
+ad_preset_learn() {   # $1=pkg game
+    _lp="$1"
+    [ -n "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):PRESET=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" ] && return 0
+    _jp=$(ad_cget "$_lp" jank_pct); _pa=$(ad_cget "$_lp" p1_avg); _sn=$(ad_cget "$_lp" n)
+    for _v in "$_jp" "$_pa" "$_sn"; do case "$_v" in ''|*[!0-9]*) return 0 ;; esac; done
+    [ "$_sn" -ge 300 ] || return 0
+    _fps=$(ad_fps_cur "$_lp"); case "$_fps" in ''|*[!0-9]*|0) _fps=$(ad_cget "$_lp" fps_auto) ;; esac
+    case "$_fps" in ''|*[!0-9]*|0) _fps=30 ;; esac
+    _cur=$(ad_ds_pct "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):downscale=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')")
+    _r=$((_pa * 100 / _fps))
+    if [ "$_jp" -ge 30 ] || [ "$_r" -lt 60 ]; then _st=$((_cur - 15))
+    elif [ "$_jp" -ge 15 ] || [ "$_r" -lt 80 ]; then _st=$((_cur - 10))
+    else _st=$_cur; fi
+    _pf=$((_st - 15)); _gr=$((_st + 15))
+    for _n in _st _pf _gr; do
+        eval "_x=\$$_n"
+        [ "$_x" -lt 40 ] && eval "$_n=40"
+        [ "$_x" -gt 100 ] && eval "$_n=100"
+    done
+    ad_cset "$_lp" pre_stabil "$(ad_ds_fmt $_st),$_fps,performance"
+    ad_cset "$_lp" pre_performa "$(ad_ds_fmt $_pf),$_fps,performance"
+    ad_cset "$_lp" pre_grafik "$(ad_ds_fmt $_gr),$_fps,standard"
+}
+
+ad_ds_fmt() {   # persen -> nilai downscale (100 = off)
+    if [ "$1" -ge 100 ]; then printf 'off'; else printf '%d.%02d' $(($1 / 100)) $(($1 % 100)); fi
+}
+
 ad_end() {
     [ "$AD_OPEN" = "1" ] || return 0
     _tail=""
     ad_flush
     [ "$AD_IS_GAME" = "1" ] && ad_saran "$AD_PKG"
+    [ "$AD_IS_GAME" = "1" ] && ad_preset_learn "$AD_PKG"
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
