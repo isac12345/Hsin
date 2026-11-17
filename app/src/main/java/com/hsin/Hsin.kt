@@ -64,6 +64,14 @@ object Hsin {
             saranPkg = m["saran_pkg"].orEmpty(),
             saranNilai = m["saran_nilai"].orEmpty(),
             saranWhy = m["saran_why"].orEmpty(),
+            adaptOwn = b(m, "adapt_own"),
+            adaptOwnPkg = m["adapt_own_pkg"].orEmpty(),
+            adaptCpu = m["adapt_cpu"].orEmpty(),
+            adaptDs = m["adapt_ds"].orEmpty(),
+            adaptFps = m["adapt_fps"].orEmpty(),
+            adaptTier = m["adapt_tier"].orEmpty(),
+            adaptOwnSwitch = m["adapt_own_switch"] != "off",
+            engineOff = m["engine_mode"] == "off",
         )
     }
 
@@ -76,6 +84,10 @@ object Hsin {
     suspend fun setProfile(p: String): Root.Res = ctl("profile $p", 45_000L)
 
     suspend fun conf(): Map<String, String> = kv(ctl("conf all").out)
+
+    suspend fun setAdaptOwn(on: Boolean): Boolean = ctl("adapt own ${if (on) "on" else "off"}").out.startsWith("OK")
+
+    suspend fun setEngineOff(off: Boolean): Boolean = ctl("engine mode ${if (off) "off" else "freeze"}").out.startsWith("OK")
 
     suspend fun setConf(k: String, v: String): Boolean = ctl("conf set $k $v").out.startsWith("OK")
 

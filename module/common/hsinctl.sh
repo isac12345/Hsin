@@ -39,6 +39,8 @@
 #   restore                   kembalikan semua ke normal (Puncak, DND, refresh rate, render, resolusi, frekuensi game)
 #   tweak caps|list|get <KEY>|set <KEY> <VAL>|reset|profile <mode>   tweak global (display/perf/tools), BUKAN per game
 #   gamefps get <pkg> | set <pkg> <10-240|off>   satu nilai FPS: batas FPS game + refresh layar (digabung)
+#   adapt own on|off|get      Adapt memegang frekuensi CPU/GPU selama game (bawaan on)
+#   engine mode freeze|off|get   uperf/fas-rs: dibekukan hanya saat Adapt/Puncak (freeze) atau permanen (off)
 #   modinfo                   module.prop
 #   diagnose                  ringkasan satu kali baca: mode, pemilik CPU, suhu, FPS/1% low, gagal apply terakhir
 
@@ -190,6 +192,21 @@ cmd_status() {
     fi
     printf 'game_pkg=%s\ngame_secs=%s\n' "$_gp" "$_gs"
     printf 'adapt_now=%s\n' "$(rd "$STATE_DIR/.adapt_now")"
+    # Adapt memegang frekuensi: penanda berisi paket, epoch, lantai CPU/GPU (persen)
+    _ao=0; _acp=""; _aop=""
+    if [ -f "$STATE_DIR/.adapt_own" ]; then
+        _ao=1; _aop=$(sed -n 1p "$STATE_DIR/.adapt_own" 2>/dev/null | tr -d '[:space:]')
+        _acp=$(sed -n 3p "$STATE_DIR/.adapt_own" 2>/dev/null | tr -d '[:space:]')
+    fi
+    _ap=${_aop:-$_gp}
+    _ads=""; _afp=""
+    if [ -n "$_ap" ]; then _ads=$(gh_opt_get "$_ap" downscale ""); _afp=$(gh_opt_get "$_ap" fps ""); fi
+    _atr=$(sed -n 's/^AD_DEV_TIER=//p' "$STATE_DIR/device_profile.env" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+    [ -n "$_atr" ] || _atr=$(sed -n 's/^DEVICE_TIER=//p' "$STATE_DIR/detected.conf" 2>/dev/null | tail -n 1 | tr -d '"[:space:]')
+    printf 'adapt_own=%s\nadapt_own_pkg=%s\nadapt_cpu=%s\nadapt_ds=%s\nadapt_fps=%s\nadapt_tier=%s\n' "$_ao" "$_aop" "$_acp" "$_ads" "$_afp" "$_atr"
+    printf 'adapt_own_switch=%s\nengine_mode=%s\n' \
+        "$([ "$(rd "$STATE_DIR/ADAPT_OWN")" = "off" ] && echo off || echo on)" \
+        "$([ "$(rd "$STATE_DIR/ENGINE_MODE")" = "off" ] && echo off || echo freeze)"
     _sf="$STATE_DIR/adapt/$_gp.conf"; _sv=""; _sw=""
     if [ -n "$_gp" ] && [ -f "$_sf" ] && [ "$(gh_opt_get "$_gp" AUTO on)" = "off" ] && [ "$(sed -n 's/^saran_tampil=//p' "$_sf" | tail -n 1)" != "1" ]; then
         _sv=$(sed -n 's/^saran=//p' "$_sf" | tail -n 1 | tr -d '[:space:]')
@@ -782,7 +799,38 @@ cmd_adapt() {
             ;;
         get) [ -n "$2" ] && cat "$_ad/$2.conf" 2>/dev/null ;;
         reset) rm -rf "$_ad" 2>/dev/null; echo "OK: data adaptasi dihapus, beban awal dari DEVICE_TIER" ;;
-        *) echo "Usage: hsinctl adapt [list|get <paket>|reset]"; return 1 ;;
+        own)
+            case "$2" in
+                on)  rm -f "$STATE_DIR/ADAPT_OWN"; echo "OK: Adapt memegang frekuensi saat game (berlaku di sesi berikutnya)" ;;
+                off) printf 'off\n' > "$STATE_DIR/ADAPT_OWN"; echo "OK: Adapt tidak memegang frekuensi (tabel profil + gameboost, berlaku di sesi berikutnya)" ;;
+                ''|get) [ "$(rd "$STATE_DIR/ADAPT_OWN")" = "off" ] && echo "adapt_own=off" || echo "adapt_own=on" ;;
+                *) echo "Usage: hsinctl adapt own [on|off|get]"; return 1 ;;
+            esac ;;
+        *) echo "Usage: hsinctl adapt [list|get <paket>|reset|own on|off]"; return 1 ;;
+    esac
+}
+
+# engine mode freeze|off: freeze (bawaan) = uperf/fas-rs dibekukan hanya selama Adapt/Puncak memegang
+# frekuensi. off = dibekukan permanen dan tidak dijalankan saat boot, sampai diubah kembali.
+cmd_engine() {
+    case "$1" in
+        mode)
+            case "$2" in
+                off)
+                    printf 'off\n' > "$STATE_DIR/ENGINE_MODE"
+                    for _ep in $(pidof uperf fas-rs 2>/dev/null); do kill -STOP "$_ep" 2>/dev/null; done
+                    echo "OK: uperf dan fas-rs dibekukan permanen (engine_mode=off)" ;;
+                freeze)
+                    rm -f "$STATE_DIR/ENGINE_MODE"
+                    # lanjutkan kecuali Adapt/Puncak sedang memegang (mereka yang melanjutkan saat selesai)
+                    if [ ! -f "$STATE_DIR/.adapt_own" ] && [ ! -f "$STATE_DIR/.ovd_stopped" ]; then
+                        for _ep in $(pidof uperf fas-rs 2>/dev/null); do kill -CONT "$_ep" 2>/dev/null; done
+                    fi
+                    echo "OK: uperf dan fas-rs normal di luar game (engine_mode=freeze); jika tidak jalan, mulai ulang HP" ;;
+                ''|get) [ "$(rd "$STATE_DIR/ENGINE_MODE")" = "off" ] && echo "engine_mode=off" || echo "engine_mode=freeze" ;;
+                *) echo "Usage: hsinctl engine mode [freeze|off|get]"; return 1 ;;
+            esac ;;
+        *) echo "Usage: hsinctl engine mode [freeze|off|get]"; return 1 ;;
     esac
 }
 
@@ -908,6 +956,7 @@ case "$1" in
     diagnose) cmd_diagnose ;;
     device) cmd_device ;;
     adapt) cmd_adapt "$2" "$3" ;;
+    engine) cmd_engine "$2" "$3" ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
     gamerender) cmd_gamerender "$2" "$3" "$4" ;;

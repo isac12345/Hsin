@@ -225,6 +225,13 @@ chk "sesi pertama lewat ad_tick: benih" "$(grep '^gameauto' "$T_HSC_LOG")" "game
 : > "$T_HSC_LOG"; ad_tick com.other.app; T_NOW=9100; ad_tick com.game.pertama
 chk "sesi kedua: tanpa benih lagi" "$(grep '^gameauto' "$T_HSC_LOG")" ""
 ad_tick com.other.app
+echo "== penanda memuat lantai sekarang; ENGINE_MODE=off tidak dilanjutkan"
+T_NOW=9500; ad_own_on com.game.m; AD_BEBAN=2; AD_PKG=com.game.m; AD_OWN_LAST=0; ad_own_apply
+chk "penanda baris 3 = lantai CPU/GPU" "$(sed -n 3p "$AD_OWN_FILE")" "70/70"
+printf 'off\n' > "$AD_STATE/ENGINE_MODE"
+ad_own_off selesai
+chk "ENGINE_MODE=off: fas-rs tetap beku" "$(st)" "T"
+rm -f "$AD_STATE/ENGINE_MODE"; kill -CONT "$(cat "$T/sleep.pid")"
 echo "== sisa penanda lama (crash) dipulihkan"
 ad_own_on com.game.i; AD_OWN=0; AD_OPEN=0
 printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"

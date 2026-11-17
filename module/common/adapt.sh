@@ -98,6 +98,7 @@ AD_LGPU=0        # lantai GPU sekarang (persen)
 AD_OWN_LAST=0    # epoch perubahan lantai terakhir
 AD_OWN_N=0       # jumlah perubahan lantai sesi ini
 AD_OWN_FZ_TS=0   # epoch terakhir memeriksa pid yang lahir ulang
+AD_OWN_T0=0      # epoch awal sesi memegang frekuensi
 AD_OWN_HOLD=""   # persen lantai yang sedang ditahan (supaya log tidak berulang)
 AD_OWN_UNK=0     # sudah memakai satu kenaikan saat suhu tidak terbaca
 
@@ -163,9 +164,15 @@ ad_own_freeze() {   # bekukan uperf/fas-rs; pid yang lahir ulang ikut dibekukan
     printf '%s\n' "$_owz" > "$AD_OWN_STOP" 2>/dev/null
 }
 
+ad_own_mark() {   # penanda: paket, epoch mulai, lantai CPU/GPU sekarang (dibaca hsinctl status)
+    [ -f "$AD_OWN_FILE" ] || return 0
+    printf '%s\n%s\n%s/%s\n' "$AD_PKG" "${AD_OWN_T0:-0}" "$AD_LCP" "$AD_LGPU" > "$AD_OWN_FILE.tmp" 2>/dev/null \
+        && mv -f "$AD_OWN_FILE.tmp" "$AD_OWN_FILE" 2>/dev/null
+}
+
 ad_own_thaw() {
-    # Overdrive yang membeku ulang memegang pid-nya sendiri; jangan dilanjutkan dari sini.
-    if [ ! -f "$AD_STATE/.ovd_stopped" ]; then
+    # Overdrive yang membeku ulang memegang pid-nya sendiri; ENGINE_MODE=off membekukan permanen.
+    if [ ! -f "$AD_STATE/.ovd_stopped" ] && [ "$(cat "$AD_STATE/ENGINE_MODE" 2>/dev/null | tr -d '[:space:]')" != "off" ]; then
         for _owp in $(cat "$AD_OWN_STOP" 2>/dev/null); do kill -CONT "$_owp" 2>/dev/null; done
     fi
     rm -f "$AD_OWN_STOP"
@@ -191,7 +198,8 @@ ad_own_on() {   # $1=pkg; return 0 = Adapt memegang frekuensi sesi ini
         return 1
     fi
     mv -f "$AD_OWN_PREV.tmp" "$AD_OWN_PREV" 2>/dev/null
-    printf '%s\n%s\n' "$1" "$(date +%s 2>/dev/null)" > "$AD_OWN_FILE" 2>/dev/null
+    AD_OWN_T0=$(date +%s 2>/dev/null)
+    printf '%s\n%s\n0/0\n' "$1" "$AD_OWN_T0" > "$AD_OWN_FILE" 2>/dev/null
     ad_own_freeze
     AD_OWN=1; AD_LCP=0; AD_LGPU=0; AD_OWN_LAST=0; AD_OWN_N=0; AD_OWN_HOLD=""; AD_OWN_UNK=0
     AD_OWN_FZ_TS=$(date +%s 2>/dev/null)
@@ -354,6 +362,7 @@ ad_own_apply() {   # pasang lantai dari AD_BEBAN (dipanggil tiap perubahan beban
     AD_OWN_HOLD=""
     [ "$AD_OWN_LAST" != "0" ] && AD_OWN_N=$((AD_OWN_N + 1))
     AD_OWN_LAST=$_oan
+    ad_own_mark
     return 0
 }
 

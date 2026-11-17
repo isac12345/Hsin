@@ -32,6 +32,18 @@ data class Status(
     val saranPkg: String = "",
     val saranNilai: String = "",
     val saranWhy: String = "",
+    /** Adapt sedang memegang frekuensi CPU/GPU (sesi game berjalan). */
+    val adaptOwn: Boolean = false,
+    val adaptOwnPkg: String = "",
+    /** lantai CPU/GPU sekarang dalam persen, format "cpu/gpu". */
+    val adaptCpu: String = "",
+    val adaptDs: String = "",
+    val adaptFps: String = "",
+    val adaptTier: String = "",
+    /** sakelar "Adapt pegang frekuensi": true = nyala (bawaan). */
+    val adaptOwnSwitch: Boolean = true,
+    /** uperf/fas-rs: false = dibekukan hanya saat Adapt/Puncak, true = dibekukan permanen. */
+    val engineOff: Boolean = false,
 )
 
 data class GameEntry(val pkg: String, val profile: String, val fps: String)

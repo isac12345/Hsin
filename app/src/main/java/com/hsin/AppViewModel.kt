@@ -459,6 +459,20 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setAdaptOwn(on: Boolean) {
+        viewModelScope.launch {
+            status = status.copy(adaptOwnSwitch = on)
+            if (!Hsin.setAdaptOwn(on)) toast("Gagal menyimpan pengaturan")
+        }
+    }
+
+    fun setEngineOff(off: Boolean) {
+        viewModelScope.launch {
+            status = status.copy(engineOff = off)
+            if (!Hsin.setEngineOff(off)) toast("Gagal menyimpan pengaturan")
+        }
+    }
+
     fun setThermalWarm(c: Int) {
         viewModelScope.launch {
             if (Hsin.setThermalWarm(c)) { status = status.copy(thermalWarmC = c); toast("Batas suhu $c°C disimpan") }

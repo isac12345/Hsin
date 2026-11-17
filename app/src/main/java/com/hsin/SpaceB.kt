@@ -518,6 +518,16 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                     hasVals -> tx("Sekarang: resolusi $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "bawaan" else fpsV}. Disesuaikan dari hasil main; berlaku saat game dibuka.", "Now: resolution $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "default" else fpsV}. Adjusted from play results; applies when the game opens.")
                     else -> tx("Belum ada data. Main game ini beberapa menit, lalu HSIN mengatur sendiri sesuai kemampuan HP.", "No data yet. Play this game for a few minutes and HSIN tunes it to your phone.")
                 }, 10.sp, SP.faint)
+            val st = vm.status
+            if (st.adaptOwn && st.adaptOwnPkg == g.pkg) {
+                val cg = st.adaptCpu.split("/")
+                val cpuP = cg.getOrNull(0)?.takeIf { it.isNotEmpty() && it != "0" }
+                val gpuP = cg.getOrNull(1)?.takeIf { it.isNotEmpty() && it != "0" }
+                SText(
+                    tx("Adapt sekarang: lantai CPU ${cpuP?.let { "$it%" } ?: "bawaan"}, GPU ${gpuP?.let { "$it%" } ?: "bawaan"}, resolusi $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "bawaan" else fpsV}.",
+                       "Adapt now: CPU floor ${cpuP?.let { "$it%" } ?: "default"}, GPU ${gpuP?.let { "$it%" } ?: "default"}, resolution $dsTxt, FPS ${if (fpsV.isEmpty() || fpsV == "off") "default" else fpsV}."),
+                    10.sp, SP.faint)
+            }
             if (autoOn && hasVals) {
                 val resetMsg = tx("Data dihapus, belajar dari awal.", "Data cleared, learning from scratch.")
                 HBtn(tx("Belajar ulang dari awal", "Learn again from scratch")) { vm.gameAutoReset(g.pkg, resetMsg) { ver++ } }
@@ -621,6 +631,8 @@ private fun TwChips(vm: AppViewModel, key: String, overKey: String, labels: List
 private fun AlatMesin(vm: AppViewModel, land: Boolean) {
     TwoCol(land, {
         Section(tx("PENGENDALI CPU", "CPU CONTROL")) {
+            HSwitch(tx("Adapt pegang frekuensi", "Adapt controls frequency"), tx("Saat game, Adapt yang mengatur lantai frekuensi CPU dan GPU dari kondisi nyata HP; fas-rs dan uperf dibekukan sebentar lalu dilanjutkan. Mati = cara lama (tabel profil). Berlaku di sesi game berikutnya.", "During a game, Adapt sets the CPU and GPU frequency floors from real phone conditions; fas-rs and uperf are paused and resumed afterwards. Off = old behaviour (profile table). Applies to the next game session."), vm.status.adaptOwnSwitch) { vm.setAdaptOwn(it) }
+            HSwitch(tx("Bekukan fas-rs dan uperf", "Freeze fas-rs and uperf"), tx("Dibekukan terus, bukan hanya saat game. Dipakai kalau ingin CPU sepenuhnya diatur Adapt dan profil.", "Frozen all the time, not only during games. For letting Adapt and profiles fully control the CPU."), vm.status.engineOff) { vm.setEngineOff(it) }
             HSwitch(tx("Kunci CPU pintar", "Smart CPU control"), tx("fas-rs menyesuaikan frekuensi CPU mengikuti beban game.", "fas-rs adapts CPU frequency to game load."), !vm.flag("GB_FASRS_FORCE_HSIN")) { vm.setFlag("GB_FASRS_FORCE_HSIN", !it) }
             HSwitch(tx("Turbo setelah dingin", "Turbo after cooldown"), tx("Boost penuh lagi begitu suhu turun.", "Full boost again once the phone cools down."), vm.flag("GB_COOLDOWN_EXTREME")) { vm.setFlag("GB_COOLDOWN_EXTREME", it) }
             HSwitch(tx("Fokus inti game", "Game core focus"), tx("Game dipersempit ke inti terbaik (cpuset).", "Game is narrowed to the best cores (cpuset)."), !vm.flag("NO_CPUSET")) { vm.setFlag("NO_CPUSET", !it) }

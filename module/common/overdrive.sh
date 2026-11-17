@@ -330,6 +330,8 @@ keep_frozen() {
 }
 
 thaw_engines() {
+    # ENGINE_MODE=off = pengguna membekukan uperf/fas-rs permanen: jangan dilanjutkan.
+    if [ "$(cat "$STATE_DIR/ENGINE_MODE" 2>/dev/null | tr -d '[:space:]')" = "off" ]; then rm -f "$OVD_STOPPED"; return 0; fi
     for _pid in $(cat "$OVD_STOPPED" 2>/dev/null) $(pidof uperf fas-rs 2>/dev/null); do
         kill -CONT "$_pid" 2>/dev/null
     done

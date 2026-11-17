@@ -355,7 +355,11 @@ fi
 # 8. Jalankan backend Uperf (thread/cgroup classifier only) di background.
 #    Terpisah dari alur di atas supaya wait_until_login miliknya (nunggu
 #    /sdcard bisa diakses) tidak memblokir monitor HSIN.
-if [ -f "$MODDIR/uperf/script/run_uperf.sh" ]; then
+ENGINE_OFF=0
+[ "$(cat "$WORK_DIR/ENGINE_MODE" 2>/dev/null | tr -d '[:space:]')" = "off" ] && ENGINE_OFF=1
+if [ "$ENGINE_OFF" = "1" ]; then
+    echo "[INFO] ENGINE_MODE=off: uperf dan fas-rs tidak dijalankan saat boot" >> "$LOG_FILE"
+elif [ -f "$MODDIR/uperf/script/run_uperf.sh" ]; then
     nohup sh "$MODDIR/uperf/script/run_uperf.sh" >> "$LOG_FILE" 2>&1 &
     echo "[INFO] uperf backend runner started pid=$!" >> "$LOG_FILE"
 fi
@@ -377,7 +381,9 @@ if echo "$FASRS_KREL" | awk -F. '{exit !( $1 < 5 || ($1 == 5 && $2 < 8) )}'; the
     FASRS_KERNEL_OK=0
 fi
 
-if [ -x "$MODDIR/fasrs/fas-rs" ] && [ "${FASRS_API:-0}" -gt 30 ] 2>/dev/null && [ "$FASRS_KERNEL_OK" = "1" ]; then
+if [ "$ENGINE_OFF" = "1" ]; then
+    _fasrs_ok=1
+elif [ -x "$MODDIR/fasrs/fas-rs" ] && [ "${FASRS_API:-0}" -gt 30 ] 2>/dev/null && [ "$FASRS_KERNEL_OK" = "1" ]; then
     sh "$MODDIR/fasrs/init_vtools.sh" "$(realpath "$MODDIR/module.prop")" 2>/dev/null
     setprop fas-rs-installed true 2>/dev/null
 
