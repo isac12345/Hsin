@@ -28,6 +28,10 @@ data class Status(
     val ver: Int = 0,
     /** paket|beban|game|epoch dari modul saat adapt aktif; kosong bila tidak. */
     val adaptNow: String = "",
+    /** saran resolusi sekali pakai dari modul untuk game yang sedang jalan (kosong = tidak ada). */
+    val saranPkg: String = "",
+    val saranNilai: String = "",
+    val saranWhy: String = "",
 )
 
 data class GameEntry(val pkg: String, val profile: String, val fps: String)

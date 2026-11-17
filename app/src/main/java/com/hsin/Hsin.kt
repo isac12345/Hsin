@@ -61,7 +61,16 @@ object Hsin {
             thermalWarmC = m["thermal_warm_c"]?.toIntOrNull() ?: 75,
             ver = m["ver"]?.toIntOrNull() ?: 0,
             adaptNow = m["adapt_now"].orEmpty(),
+            saranPkg = m["saran_pkg"].orEmpty(),
+            saranNilai = m["saran_nilai"].orEmpty(),
+            saranWhy = m["saran_why"].orEmpty(),
         )
+    }
+
+    /** Tandai saran sudah ditawarkan; apply=true memasang downscale dulu (aktif setelah game dibuka ulang). */
+    suspend fun saranDone(pkg: String, nilai: String, apply: Boolean) {
+        if (apply) ctl("gamefx set $pkg downscale $nilai")
+        ctl("saran done $pkg")
     }
 
     suspend fun setProfile(p: String): Root.Res = ctl("profile $p", 45_000L)

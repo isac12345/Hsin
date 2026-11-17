@@ -35,6 +35,8 @@ class BubbleService : Service() {
         const val ACT_SHOW = "com.hsin.SHOW_BUBBLE"
         const val ACT_FPSLOG = "com.hsin.FPS_LOG"
         const val ACT_WHEEL = "com.hsin.TEST_WHEEL"
+        const val ACT_SARAN = "com.hsin.SARAN"
+        const val NID_SARAN = 8
         const val EXTRA_P = "profile"
 
         private const val WANT = "/data/adb/hsin/.bubble_want"
@@ -210,6 +212,7 @@ class BubbleService : Service() {
                     batt = s.batt
                     gamePkg = s.gamePkg
                     adaptNow = s.adaptNow
+                    maybeSaran(s)
                     val aLoad = if (effOvd(s.ovd)) -1 else adaptNow.split("|").getOrNull(1)?.toIntOrNull() ?: -1
                     if (android.os.SystemClock.uptimeMillis() < testUntil) { /* uji roda dari Alat: jangan ditimpa modul */ }
                     else if (aLoad != lastAdaptLoad) {
@@ -280,6 +283,16 @@ class BubbleService : Service() {
                     if (gamePkg.isEmpty() && hudPkg.isEmpty()) Toast.makeText(this, trn("Buka game dulu untuk mode Puncak"), Toast.LENGTH_SHORT).show()
                     else toggleOvd(!ovdOn)
                 } else setProfile(it)
+            }
+            ACT_SARAN -> {
+                val pk = intent.getStringExtra("pkg").orEmpty()
+                val nv = intent.getStringExtra("nilai").orEmpty()
+                val pakai = intent.getBooleanExtra("pakai", false)
+                (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(NID_SARAN)
+                if (pk.isNotEmpty()) scope.launch {
+                    Hsin.saranDone(pk, nv, pakai)
+                    if (pakai) Toast.makeText(this@BubbleService, trn("Resolusi disimpan. Aktif setelah game dibuka ulang."), Toast.LENGTH_LONG).show()
+                }
             }
             ACT_WHEEL -> {
                 val n = intent.getIntExtra("load", 0)
@@ -462,6 +475,38 @@ class BubbleService : Service() {
             val t = i.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, -1)
             if (t > 0) tempC = t / 10f
         } catch (_: Exception) {}
+    }
+
+    private var saranShown = ""
+
+    /** Satu notifikasi saran per game per nilai; tidak di baterai rendah atau saat Puncak. */
+    private fun maybeSaran(s: Status) {
+        if (s.saranNilai.isEmpty() || s.saranPkg.isEmpty() || s.gamePkg != s.saranPkg) return
+        if (s.batt in 0..14 || s.ovd) return
+        val key = s.saranPkg + "|" + s.saranNilai
+        if (key == saranShown) return
+        saranShown = key
+        val pct = Math.round((s.saranNilai.toDoubleOrNull() ?: return) * 100).toInt()
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        fun act(code: Int, pakai: Boolean) = PendingIntent.getService(
+            this, code,
+            Intent(this, BubbleService::class.java).setAction(ACT_SARAN)
+                .putExtra("pkg", s.saranPkg).putExtra("nilai", s.saranNilai).putExtra("pakai", pakai),
+            flags,
+        )
+        val why = s.saranWhy.replaceFirstChar { it.uppercase() }
+        val n = NotificationCompat.Builder(this, CH)
+            .setSmallIcon(R.drawable.ic_stat_wheel)
+            .setContentTitle("Saran: resolusi $pct%")
+            .setContentText("$why. Aktif setelah game dibuka ulang.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$why. Aktif setelah game dibuka ulang."))
+            .setAutoCancel(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(0, "Pakai $pct%", act(210, true))
+            .addAction(0, "Tetap", act(211, false))
+            .build()
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NID_SARAN, n)
     }
 
     private fun updateNotification() {
