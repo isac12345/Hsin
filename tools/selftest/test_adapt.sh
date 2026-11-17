@@ -449,6 +449,25 @@ ad_preset_learn com.game.f
 chk "resolusi 100: boleh turun (jank 52 -> 85)" "$(conf com.game.f pre_stabil)" "0.85,30,performance"
 rm -f "$AD_STATE/game_opts.conf"
 
+echo "== batas FPS preset ikut hasil ukur"
+printf 'REFRESH_MAX=60\n' > "$AD_STATE/device_profile.env"
+printf 'com.game.g:fps=30\n' > "$AD_STATE/game_opts.conf"
+printf 'n=1001\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.g.conf"
+ad_preset_learn com.game.g
+chk "sanggup: grafik naik ke 45" "$(conf com.game.g pre_grafik | cut -d, -f2)" "45"
+chk "sanggup: stabil tetap 30" "$(conf com.game.g pre_stabil | cut -d, -f2)" "30"
+printf 'com.game.g:fps=60\n' > "$AD_STATE/game_opts.conf"; T_FPS_CUR=60
+printf 'n=1001\np1_avg=30\njank_pct=40\nstall_max=10\n' > "$AD_DIR/com.game.g.conf"
+ad_preset_learn com.game.g
+chk "kewalahan: stabil turun 60 -> 45" "$(conf com.game.g pre_stabil | cut -d, -f2)" "45"
+chk "kewalahan: grafik tetap 60" "$(conf com.game.g pre_grafik | cut -d, -f2)" "60"
+printf 'com.game.g:fps=30\n' > "$AD_STATE/game_opts.conf"; T_FPS_CUR=30
+printf 'n=1001\np1_avg=12\njank_pct=60\nstall_max=10\n' > "$AD_DIR/com.game.g.conf"
+ad_preset_learn com.game.g
+chk "paling bawah 30 tidak turun lagi" "$(conf com.game.g pre_stabil | cut -d, -f2)" "30"
+printf 'REFRESH_MAX=144\n' > "$AD_STATE/device_profile.env"
+rm -f "$AD_STATE/game_opts.conf"
+
 echo "== hsinctl gamepreset"
 export HSIN_STATE_DIR="$AD_STATE"
 printf 'pre_stabil=0.45,30,performance\n' > "$AD_DIR/com.game.h.conf"

@@ -510,9 +510,31 @@ ad_preset_learn() {   # $1=pkg game  [$2=resolusi acuan dalam persen; diberikan 
     [ "$_st" -gt 100 ] && _st=100
     _pf=$((_st - 15)); [ "$_pf" -lt "$_floor" ] && _pf=$_floor
     _gr=$((_st + 15)); [ "$_gr" -gt 100 ] && _gr=100
-    ad_cset "$_lp" pre_stabil "$(ad_ds_fmt $_st),$_fps,performance"
-    ad_cset "$_lp" pre_performa "$(ad_ds_fmt $_pf),$_fps,performance"
-    ad_cset "$_lp" pre_grafik "$(ad_ds_fmt $_gr),$_fps,standard"
+    # Batas FPS ikut hasil ukur: 1% low >= 92% batas = HP sanggup lebih, Grafik naik satu tangga;
+    # 1% low < 60% batas = kewalahan, Stabil dan Performa turun satu tangga (minimal 30).
+    # Catatan: selama batas dipasang, ukuran mentok di batas itu; kemampuan penuh baru terlihat
+    # kalau game pernah dimainkan tanpa batas (fps_auto dari ad_fps_once dipakai sebagai acuan).
+    _fa=$(ad_cget "$_lp" fps_auto); case "$_fa" in ''|*[!0-9]*|0) _fa="" ;; esac
+    _base=${_fa:-$_fps}
+    _fs=$_base; _fp=$_base; _fg=$_base
+    if [ $((_pa * 100)) -ge $((_base * 92)) ]; then _fg=$(ad_fps_step up "$_base")
+    elif [ $((_pa * 100)) -lt $((_base * 60)) ]; then _fs=$(ad_fps_step down "$_base"); _fp=$_fs; fi
+    ad_cset "$_lp" pre_stabil "$(ad_ds_fmt $_st),$_fs,performance"
+    ad_cset "$_lp" pre_performa "$(ad_ds_fmt $_pf),$_fp,performance"
+    ad_cset "$_lp" pre_grafik "$(ad_ds_fmt $_gr),$_fg,standard"
+}
+
+ad_fps_step() {   # $1=up|down $2=fps -> tangga 30 45 60 90 120 (naik tidak melewati refresh maksimum layar)
+    _mx=$(sed -n 's/^REFRESH_MAX=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
+    case "$_mx" in ''|*[!0-9]*) _mx=60 ;; esac
+    _prev=30; _res=$2
+    for _t in 30 45 60 90 120; do
+        [ "$_t" -le "$_mx" ] || break
+        if [ "$1" = up ] && [ "$_t" -gt "$2" ]; then _res=$_t; break; fi
+        if [ "$1" = down ] && [ "$_t" -ge "$2" ]; then _res=$_prev; break; fi
+        _prev=$_t
+    done
+    printf '%s' "$_res"
 }
 
 ad_ds_fmt() {   # persen -> nilai downscale (100 = off)
