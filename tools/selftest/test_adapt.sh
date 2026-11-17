@@ -277,6 +277,14 @@ chk "naik setelah pemanasan" "$(conf com.game.warm beban)" "2"
 AD_WARM_SECS=0
 AD_CHG_GAP=30
 
+echo "== loading tengah sesi: jeda 2 detik tidak dihitung tersendat"
+rm -f "$AD_DIR/com.game.load.conf"
+T_FPS="12 30 2000"; T_PSI=5; T_MEM=2000000
+AD_OPEN=0; T_NOW=255000
+ad_tick com.game.load
+chk "sampel loading tidak dicatat" "$AD_SN" "0"
+chk "beban tidak naik karena loading" "$AD_BEBAN" "1"
+
 echo "== sesi panjang: jatah naik diisi ulang tiap 10 menit main"
 AD_CHG_GAP=0
 rm -f "$AD_DIR/com.game.long.conf"

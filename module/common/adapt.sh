@@ -22,6 +22,7 @@ AD_STATE="${HSIN_CONF_DIR:-/data/adb/hsin}"
 AD_TARGET_P1="${AD_TARGET_P1:-20}"
 AD_AVG_MIN="${AD_AVG_MIN:-15}"
 AD_STALL_JANK="${AD_STALL_JANK:-300}"
+AD_STALL_LOADING="${AD_STALL_LOADING:-1500}"   # jeda >= ini = loading/pindah area, bukan render
 AD_P1_RATIO="${AD_P1_RATIO:-65}"     # 1% low < 65% rata-rata = frame pacing patah
 AD_PSI_CPU="${AD_PSI_CPU:-60}"
 AD_PSI_IO="${AD_PSI_IO:-20}"
@@ -543,7 +544,7 @@ ad_fps_pick() {   # $1=rata $2=1%low
 
 ad_gamefps_set() {   # $1=pkg $2=fps -> tulis batas fps + refresh lewat hsinctl
     sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
-        gamefps set "$1" "$2" >/dev/null 2>&1
+        gamefps set "$1" "$2" 2>&1
 }
 
 ad_fps_once() {   # $1=rata $2=1%low; dipakai sekali per sesi game
@@ -553,9 +554,12 @@ ad_fps_once() {   # $1=rata $2=1%low; dipakai sekali per sesi game
     [ -z "$_cur" ] || [ "$_cur" = "off" ] || return 0
     _fps=$(ad_fps_pick "$1" "$2")
     [ -n "$_fps" ] || return 0
-    if ad_gamefps_set "$AD_PKG" "$_fps"; then
+    _fso=$(ad_gamefps_set "$AD_PKG" "$_fps")
+    if [ $? -eq 0 ]; then
         ad_cset "$AD_PKG" fps_auto "$_fps"
         ad_log "fps: batas $_fps dipilih dari ukur (rata=$1 p1=$2), aktif saat game dibuka lagi ($AD_PKG)"
+    else
+        ad_log "fps: gagal menyimpan batas $_fps untuk $AD_PKG ($_fso)"
     fi
 }
 
@@ -731,8 +735,9 @@ ad_seed_game() {   # $1=pkg game tanpa riwayat: pasang benih resolusi + FPS lewa
     _sgf=$(sed -n 's/^AD_FPS_SEED=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
     case "$_sgd" in ''|*[!0-9]*) return 0 ;; esac
     case "$_sgf" in ''|*[!0-9]*) _sgf=keep ;; esac
-    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
-        gameauto set "$_sgp" "$(ad_ds_fmt "$_sgd")" "$_sgf" >/dev/null 2>&1
+    _sgo2=$(sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+        gameauto set "$_sgp" "$(ad_ds_fmt "$_sgd")" "$_sgf" 2>&1) \
+        || ad_log "benih: $_sgp gagal disimpan ($_sgo2)"
     ad_log "benih: $_sgp resolusi ${_sgd}% fps $_sgf (game baru, berlaku saat dibuka berikutnya)"
 }
 
@@ -1008,6 +1013,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_SECS" ] 2>/dev/null; then
         _jank=0; _calm=0; _warm=1
     fi
+    # Jeda sangat panjang (loading, pindah area, app ditahan) bukan masalah render.
+    # Tanpa ini satu freeze 2 detik menurunkan resolusi sesi berikutnya.
+    if [ "${_stall:-0}" -ge "$AD_STALL_LOADING" ] 2>/dev/null; then _jank=0; _calm=0; _warm=1; fi
 
     # --- batas FPS mengikuti kemampuan nyata perangkat (sekali per sesi) ---
     if [ "$AD_IS_GAME" = "1" ] && [ "$AD_FPS_TRIED" = "0" ] && [ -n "$_avg" ] && [ -n "$_p1" ] \
