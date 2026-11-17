@@ -508,6 +508,8 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     fi
     # Hanya Puncak/Overdrive yang aktif mematikan Adapt. Profil performance tetap Adapt
     # (mulai dari beban tinggi, lihat ad_tier_beban) supaya tidak mati selamanya setelah Puncak.
+    # Overdrive yang sedang menyala memegang frekuensi: Adapt tidak boleh ikut menulis.
+    [ -f "$AD_STATE/.ovd_active" ] && { [ "$AD_OPEN" = "1" ] && ad_end; return 0; }
     case "$(tr -d '[:space:]' < "$AD_STATE/active_profile" 2>/dev/null)" in
         puncak|overdrive)
             [ "$AD_OPEN" = "1" ] && ad_end

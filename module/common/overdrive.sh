@@ -404,9 +404,14 @@ do_start() {
     verify_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"
     sleep 2
     if ! verify_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"; then
-        do_stop "lantai frekuensi ditolak kernel"
-        echo "ERROR: lantai frekuensi tidak bertahan (ditolak kernel), Overdrive dibatalkan"
-        return 1
+        # Satu percobaan ulang: Game Mode/vendor kadang menimpa lantai beberapa detik setelah dipasang.
+        apply_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL" >/dev/null 2>&1
+        sleep 2
+        if ! verify_floors "$OVD_CPU_FULL" "$OVD_GPU_FULL"; then
+            do_stop "lantai frekuensi ditolak kernel"
+            echo "ERROR: Game Mode menahan frekuensi CPU, coba matikan Game Mode lalu ulangi"
+            return 1
+        fi
     fi
     rm -f "$OVD_LAST" "$OVD_PID"
     if command -v setsid >/dev/null 2>&1; then

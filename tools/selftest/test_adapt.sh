@@ -321,6 +321,13 @@ chk "sesi dibuka" "$AD_OPEN" "1"
 chk "game mulai di beban 3" "$AD_BEBAN" "3"
 AD_OPEN=0; rm -f "$T/state/active_profile"
 
+echo "== Overdrive menyala: Adapt berhenti walau profil performance"
+printf 'performance\n' > "$T/state/active_profile"; : > "$T/state/.ovd_active"
+AD_OPEN=0; T_NOW=95000
+tick com.game.ovd 1
+chk "sesi tidak dibuka saat Overdrive aktif" "$AD_OPEN" "0"
+rm -f "$T/state/.ovd_active" "$T/state/active_profile"
+
 echo "== RAM sempit saja tidak menaikkan beban GPU"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=300000
 rm -f "$AD_DIR/com.ram.conf"
