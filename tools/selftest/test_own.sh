@@ -280,6 +280,11 @@ chk "migrasi: rata-rata tetap" "$(ad_cget com.game.s3 p1_avg)" "30"
 ad_open com.game.s3; ad_end
 chk "migrasi hanya sekali" "$(ad_cget com.game.s3 n)" "100"
 AD_MIGRATE=0
+rm -rf "$AD_DIR" "$AD_STATE/.stats_v2"; mkdir -p "$AD_DIR"; AD_MIGRATE=1
+printf 'n=500\nsum_p1=15000\njank_n=50\n' > "$AD_DIR/com.game.s4.conf"
+mkdir "$AD_STATE/.stats_v2"   # direktori: -f gagal, tulis penanda gagal (meniru penyimpanan tak bisa ditulis)
+ad_migrate_v2; chk "penanda gagal ditulis: data tidak dibagi" "$(ad_cget com.game.s4 n)" "500"
+rmdir "$AD_STATE/.stats_v2"; AD_MIGRATE=0
 echo "== simpan berkala: sampel tidak hilang bila monitor mati di tengah sesi"
 rm -rf "$AD_DIR"; AD_SAMP_GAP=0; T_FPS="60 60 16"; T_NOW=40000
 ad_tick com.game.b1; T_NOW=40010; ad_tick com.game.b1; T_NOW=40030; ad_tick com.game.b1

@@ -656,6 +656,9 @@ ad_flush() {
 ad_migrate_v2() {
     [ "$AD_MIGRATE" = "1" ] || return 0
     [ -f "$AD_STATE/.stats_v2" ] && return 0
+    # Penanda dibuat DULU: kalau tidak bisa ditulis, berhenti. Lebih baik data tetap skala lama
+    # daripada dibagi 5 berulang di tiap aplikasi yang dibuka sampai nol.
+    : > "$AD_STATE/.stats_v2" 2>/dev/null || { ad_log "migrasi statistik dilewati: penanda tidak bisa ditulis"; return 0; }
     if [ -d "$AD_DIR" ]; then
         for _mf in "$AD_DIR"/*.conf; do
             [ -f "$_mf" ] || continue
@@ -667,7 +670,6 @@ ad_migrate_v2() {
         done
         ad_log "data statistik lama dimigrasi (sampel per jendela 10 dtk)"
     fi
-    : > "$AD_STATE/.stats_v2" 2>/dev/null
 }
 
 ad_open() {   # $1=pkg
