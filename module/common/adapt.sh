@@ -42,6 +42,12 @@ AD_RAISE_RESET="${AD_RAISE_RESET:-600}"  # tiap 10 menit main: jatah naik diisi 
 AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai jatah naik
 AD_FPS_HOLD="${AD_FPS_HOLD:-92}"       # 1% low harus >= 92% kandidat FPS supaya dinilai sanggup
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
+AD_SAMP_GAP="${AD_SAMP_GAP:-10}"       # satu sampel statistik per jendela ukur 10 dtk (fpsd), bukan tiap tick
+AD_HIST_MAX="${AD_HIST_MAX:-2000}"     # riwayat dibatasi: lebih dari ini diskalakan, rata-rata dan persen tetap
+AD_MIGRATE="${AD_MIGRATE:-1}"          # 0 = jangan migrasi data lama (uji)
+AD_LAST_SAMP_TS=0
+AD_SAVE_EVERY="${AD_SAVE_EVERY:-60}"   # simpan sampel tiap 60 dtk supaya crash/reboot tidak menghilangkannya
+AD_LAST_SAVE_TS=0
 AD_EVAL_N="${AD_EVAL_N:-4}"           # sampel minimal sebelum menilai kenaikan
 AD_HELP_JR="${AD_HELP_JR:-100}"       # jank <= 100/1000 = sudah cukup lancar
 AD_NONGAME_MAX="${AD_NONGAME_MAX:-1}"
@@ -623,6 +629,10 @@ ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
         if [ -z "$_min" ] || [ "$AD_SMIN" -lt "$_min" ]; then _min=$AD_SMIN; fi
     fi
     [ "$AD_SSTALL" -gt "$_stm" ] && _stm=$AD_SSTALL
+    # Riwayat dibatasi: rata-rata dan persen tidak berubah, tapi sesi baru tetap bisa menggeser angka.
+    if [ "$_n" -gt "$AD_HIST_MAX" ]; then
+        _sum=$((_sum * AD_HIST_MAX / _n)); _jn=$((_jn * AD_HIST_MAX / _n)); _n=$AD_HIST_MAX
+    fi
     # Clamp: data lama bisa punya jank_n > n (mis. dua monitor sempat jalan
     # bersamaan). Persentase tidak boleh lebih dari 100.
     [ "$_jn" -gt "$_n" ] && _jn=$_n
@@ -641,6 +651,25 @@ ad_flush() {
     ad_cset "$AD_PKG" terakhir "$(date '+%Y-%m-%d %H:%M' 2>/dev/null || date)"
 }
 
+# Data lama menghitung satu jendela 10 dtk sekitar 5 kali (tiap tick 2 dtk). Sekali saja,
+# n/sum_p1/jank_n dibagi 5; p1_avg dan jank_pct tetap karena pembilang dan penyebut sama-sama dibagi.
+ad_migrate_v2() {
+    [ "$AD_MIGRATE" = "1" ] || return 0
+    [ -f "$AD_STATE/.stats_v2" ] && return 0
+    if [ -d "$AD_DIR" ]; then
+        for _mf in "$AD_DIR"/*.conf; do
+            [ -f "$_mf" ] || continue
+            _mp=${_mf##*/}; _mp=${_mp%.conf}
+            for _mk in n sum_p1 jank_n; do
+                _mv=$(ad_cget "$_mp" "$_mk"); case "$_mv" in ''|*[!0-9]*) continue ;; esac
+                ad_cset "$_mp" "$_mk" $((_mv / 5))
+            done
+        done
+        ad_log "data statistik lama dimigrasi (sampel per jendela 10 dtk)"
+    fi
+    : > "$AD_STATE/.stats_v2" 2>/dev/null
+}
+
 ad_open() {   # $1=pkg
     AD_PKG="$1"
     AD_IS_GAME=0
@@ -655,7 +684,8 @@ ad_open() {   # $1=pkg
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_OPEN_TS=$AD_LAST_TS
     AD_LAST_RESET=$AD_LAST_TS
-    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0; AD_GOT_SAMPLE=0; AD_NOSAMP_WARN=0
+    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0; AD_GOT_SAMPLE=0; AD_NOSAMP_WARN=0; AD_LAST_SAMP_TS=0; AD_LAST_SAVE_TS=$AD_LAST_TS
+    ad_migrate_v2
     AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
@@ -768,7 +798,7 @@ ad_saran() {   # $1=pkg game; tulis saran/saran_why/saran_ts ke catatan, atau ha
     if [ "$_jp" -ge 30 ]; then _new=$((_cur - 5)); _why="sering tersendat (${_jp}%)"
     elif [ "$_fps" -gt 0 ] && [ $((_pa * 100)) -lt $((_fps * 60)) ]; then _new=$((_cur - 5)); _why="1% low rendah (${_pa} fps)"
     elif [ "$_sm" -gt 400 ]; then _new=$((_cur - 5)); _why="ada jeda ${_sm} ms"
-    elif [ "$_jp" -le 5 ] && [ "$_fps" -gt 0 ] && [ $((_pa * 100)) -ge $((_fps * 90)) ] && [ "$_sn" -ge 300 ]; then
+    elif [ "$_jp" -le 5 ] && [ "$_fps" -gt 0 ] && [ $((_pa * 100)) -ge $((_fps * 90)) ] && [ "$_sn" -ge 60 ]; then
         _new=$((_cur + 5)); _why="sudah lancar (p1 ${_pa} fps)"
     fi
     if [ -z "$_new" ] || [ "$_new" -lt 10 ] || [ "$_new" -gt 100 ] || [ "$_new" -eq "$_cur" ]; then
@@ -804,7 +834,7 @@ ad_preset_learn() {   # $1=pkg game  [$2=resolusi acuan dalam persen; diberikan 
     [ -z "$_ref" ] && [ -n "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):PRESET=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" ] && return 0
     _jp=$(ad_cget "$_lp" jank_pct); _pa=$(ad_cget "$_lp" p1_avg); _sn=$(ad_cget "$_lp" n)
     for _v in "$_jp" "$_pa" "$_sn"; do case "$_v" in ''|*[!0-9]*) return 0 ;; esac; done
-    [ "$_sn" -ge 300 ] || return 0
+    [ "$_sn" -ge 60 ] || return 0
     _fps=$(ad_fps_cur "$_lp"); case "$_fps" in ''|*[!0-9]*|0) _fps=$(ad_cget "$_lp" fps_auto) ;; esac
     case "$_fps" in ''|*[!0-9]*|0) _fps=30 ;; esac
     _cur=$(ad_ds_pct "$(sed -n "s/^$(printf '%s' "$_lp" | sed 's/\./\\./g'):downscale=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')")
@@ -857,7 +887,7 @@ ad_ds_fmt() {   # persen -> nilai downscale (100 = off)
 # parah), sangat lancar -> naik 5 poin (FPS naik satu tangga). Resolusi dibatasi lantai menurut kelas HP
 # (low 55, mid 60, high 70) dan 100. Statistik direset setiap ada perubahan supaya sesi berikutnya
 # mengukur pengaturan yang baru. Nilai dipasang lebih dulu (pre-arm) dan berlaku di buka berikutnya.
-AD_AUTO_MIN_N="${AD_AUTO_MIN_N:-120}"
+AD_AUTO_MIN_N="${AD_AUTO_MIN_N:-24}"   # 24 sampel x 10 dtk = 4 menit main
 ad_auto_tune() {   # $1=pkg game
     _ap="$1"
     _ore=$(printf '%s' "$_ap" | sed 's/\./\\./g')
@@ -1067,13 +1097,20 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # --- catat sampel (gabungan) ---
     # Sampel pemanasan/loading tidak dicatat: dulu 1% low-nya menarik rata-rata
     # turun, lalu auto tune menurunkan resolusi karena beban loading, bukan main.
-    if [ -n "$_p1" ] && [ "$_warm" = "0" ]; then
+    if [ -n "$_p1" ] && [ "$_warm" = "0" ] && [ $((_now - AD_LAST_SAMP_TS)) -ge "$AD_SAMP_GAP" ]; then
+        AD_LAST_SAMP_TS=$_now
         AD_GOT_SAMPLE=1
         AD_SN=$((AD_SN + 1))
         AD_SS=$((AD_SS + _p1))
         if [ -z "$AD_SMIN" ] || [ "$_p1" -lt "$AD_SMIN" ]; then AD_SMIN=$_p1; fi
         [ "${_stall:-0}" -gt "$AD_SSTALL" ] && AD_SSTALL=$_stall
         [ "$_jank" -eq 1 ] && AD_SJ=$((AD_SJ + 1))
+    fi
+
+    # Simpan berkala (hanya bila ada sampel baru, jadi tidak menulis n=0 palsu).
+    if [ "$AD_SN" -gt 0 ] && [ $((_now - AD_LAST_SAVE_TS)) -ge "$AD_SAVE_EVERY" ] 2>/dev/null; then
+        AD_LAST_SAVE_TS=$_now
+        ad_save
     fi
 
     # --- putuskan ---

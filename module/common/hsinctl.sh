@@ -432,7 +432,7 @@ cmd_gamepreset() {
             [ "$3" -ge 10 ] && [ "$3" -le 100 ] || { echo "ERROR: resolusi acuan = angka persen 10-100"; return 1; }
             [ -f "$STATE_DIR/adapt/$2.conf" ] || { echo "ERROR: belum ada data untuk $2, main sekali dulu"; return 1; }
             ( AD_STATE="$STATE_DIR"; AD_DIR="$STATE_DIR/adapt"; . "$COMMON/adapt.sh" >/dev/null 2>&1; ad_preset_learn "$2" "$3" )
-            [ -n "$(sed -n 's/^pre_stabil=//p' "$STATE_DIR/adapt/$2.conf")" ] || { echo "ERROR: data belum cukup (minimal 300 sampel)"; return 1; }
+            [ -n "$(sed -n 's/^pre_stabil=//p' "$STATE_DIR/adapt/$2.conf")" ] || { echo "ERROR: data belum cukup (minimal 60 sampel, sekitar 10 menit main)"; return 1; }
             echo "OK: preset dihitung ulang dari resolusi $3%" ;;
         reset)
             valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }

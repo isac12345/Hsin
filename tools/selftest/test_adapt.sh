@@ -26,6 +26,7 @@ export AD_STATE="$T/state"
 export HSIN_SYS_CPUFREQ="$T/nocpu" HSIN_SYS_DEVFREQ="$T/nodev"   # Adapt tidak boleh menyentuh sysfs asli saat uji
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
+AD_SAMP_GAP=0; AD_MIGRATE=0   # uji lama menghitung tiap tick, tanpa migrasi data; gerbang 10 dtk diuji khusus
 AD_WARM_SECS=0   # uji lain tidak perlu menunggu pemanasan; diuji khusus di bawah
 
 # ganti pembacaan PSI/RAM dengan nilai uji
@@ -434,10 +435,10 @@ ad_preset_learn com.game.p
 chk "stabil tidak di bawah resolusi pilihan (0.60)" "$(conf com.game.p pre_stabil)" "0.60,30,performance"
 chk "performa juga tidak di bawah 0.60" "$(conf com.game.p pre_performa)" "0.60,30,performance"
 chk "grafik 15 poin di atas, mode standard" "$(conf com.game.p pre_grafik)" "0.75,30,standard"
-printf 'n=100\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.q.conf"
+printf 'n=30\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.q.conf"
 printf 'com.game.q:downscale=0.60\n' >> "$AD_STATE/game_opts.conf"
 ad_preset_learn com.game.q
-chk "data kurang (n<300): tanpa preset" "$(conf com.game.q pre_stabil)" ""
+chk "data kurang (n<60): tanpa preset" "$(conf com.game.q pre_stabil)" ""
 printf 'com.game.p:PRESET=stabil\n' >> "$AD_STATE/game_opts.conf"
 printf 'n=1001\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.p.conf"
 ad_preset_learn com.game.p
@@ -516,10 +517,10 @@ printf 'n=500\np1_avg=29\njank_pct=2\nstall_max=10\n' > "$AD_DIR/com.game.a.conf
 ad_auto_tune com.game.a
 chk "sangat lancar: resolusi naik 85" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
 chk "sangat lancar: FPS naik 45" "$(sed -n 's/^com.game.a:fps=//p' "$AD_STATE/game_opts.conf")" "45"
-printf 'n=50\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.a.conf"
+printf 'n=10\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.a.conf"
 printf 'com.game.a:downscale=0.85\n' > "$AD_STATE/game_opts.conf"
 ad_auto_tune com.game.a
-chk "data kurang (<120): tidak diubah" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
+chk "data kurang (<24): tidak diubah" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.85"
 printf 'com.game.a:downscale=0.85\ncom.game.a:AUTO=off\n' > "$AD_STATE/game_opts.conf"
 printf 'n=500\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.a.conf"
 ad_auto_tune com.game.a

@@ -37,7 +37,7 @@ export SYSFS_POWER_PREFIX="$T/power" SYSFS_THERMAL_PREFIX="$T/thermal" SYSFS_MOD
 mkdir -p "$T/mod"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
-AD_WARM_SECS=0
+AD_WARM_SECS=0; AD_SAMP_GAP=0; AD_MIGRATE=0
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
 ad_memavail_kb() { printf '2000000'; }
 monitor_fps_stat() { [ "$T_FPS" = none ] || printf '%s' "${T_FPS:-60 60 16}"; }
@@ -258,6 +258,36 @@ ad_tick com.other.app
 printf 'x|1|1|1\n' > "$AD_STATE/.adapt_now"; AD_OPEN=0; ad_own_recover
 chk "penanda .adapt_now lama dihapus" "$([ -f "$AD_STATE/.adapt_now" ] && echo ada || echo hilang)" "hilang"
 T_FPS="60 60 16"
+echo "== sampel per jendela 10 dtk, riwayat dibatasi, migrasi data lama"
+AD_SAMP_GAP=10; rm -rf "$AD_DIR"; T_FPS="60 60 16"; T_NOW=30000
+ad_tick com.game.s1; ad_tick com.game.s1; T_NOW=30002; ad_tick com.game.s1; T_NOW=30004; ad_tick com.game.s1
+chk "empat tick dalam 4 dtk: satu sampel" "$AD_SN" "1"
+T_NOW=30012; ad_tick com.game.s1
+chk "10 dtk kemudian: sampel kedua" "$AD_SN" "2"
+ad_tick com.other.app
+AD_SAMP_GAP=0
+printf 'n=2400\nsum_p1=144000\njank_n=240\n' > "$AD_DIR/com.game.s2.conf"
+AD_PKG=com.game.s2; AD_SN=0; AD_SS=0; AD_SJ=0; ad_save
+chk "riwayat dibatasi 2000" "$(ad_cget com.game.s2 n)" "2000"
+chk "rata-rata p1 tetap 60" "$(ad_cget com.game.s2 p1_avg)" "60"
+chk "jank tetap 10%" "$(ad_cget com.game.s2 jank_pct)" "10"
+rm -rf "$AD_DIR" "$AD_STATE/.stats_v2"; mkdir -p "$AD_DIR"; AD_MIGRATE=1
+printf 'n=500\nsum_p1=15000\njank_n=50\np1_avg=30\njank_pct=10\n' > "$AD_DIR/com.game.s3.conf"
+ad_open com.game.s3; ad_end
+chk "migrasi: n dibagi 5" "$(ad_cget com.game.s3 n)" "100"
+chk "migrasi: sum_p1 dibagi 5" "$(ad_cget com.game.s3 sum_p1)" "3000"
+chk "migrasi: rata-rata tetap" "$(ad_cget com.game.s3 p1_avg)" "30"
+ad_open com.game.s3; ad_end
+chk "migrasi hanya sekali" "$(ad_cget com.game.s3 n)" "100"
+AD_MIGRATE=0
+echo "== simpan berkala: sampel tidak hilang bila monitor mati di tengah sesi"
+rm -rf "$AD_DIR"; AD_SAMP_GAP=0; T_FPS="60 60 16"; T_NOW=40000
+ad_tick com.game.b1; T_NOW=40010; ad_tick com.game.b1; T_NOW=40030; ad_tick com.game.b1
+chk "sebelum 60 dtk: belum tersimpan" "$(ad_cget com.game.b1 n)" ""
+T_NOW=40070; ad_tick com.game.b1
+chk "setelah 60 dtk: tersimpan tanpa ad_end" "$([ "$(ad_cget com.game.b1 n)" -ge 1 ] && echo ok)" "ok"
+chk "memori dikosongkan setelah simpan (tidak dobel)" "$AD_SN" "0"
+ad_tick com.other.app
 echo "== sisa penanda lama (crash) dipulihkan"
 ad_own_on com.game.i; AD_OWN=0; AD_OPEN=0
 printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"
