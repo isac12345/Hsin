@@ -190,6 +190,12 @@ cmd_status() {
     fi
     printf 'game_pkg=%s\ngame_secs=%s\n' "$_gp" "$_gs"
     printf 'adapt_now=%s\n' "$(rd "$STATE_DIR/.adapt_now")"
+    _sf="$STATE_DIR/adapt/$_gp.conf"; _sv=""; _sw=""
+    if [ -n "$_gp" ] && [ -f "$_sf" ] && [ "$(sed -n 's/^saran_tampil=//p' "$_sf" | tail -n 1)" != "1" ]; then
+        _sv=$(sed -n 's/^saran=//p' "$_sf" | tail -n 1 | tr -d '[:space:]')
+        _sw=$(sed -n 's/^saran_why=//p' "$_sf" | tail -n 1)
+    fi
+    printf 'saran_pkg=%s\nsaran_nilai=%s\nsaran_why=%s\n' "${_sv:+$_gp}" "$_sv" "$_sw"
     printf 'hud_pkg=%s\n' "$(rd "$STATE_DIR/.gh_active")"
     pid_alive "$STATE_DIR/.rec_pid" screenrec.sh && echo rec=1 || echo rec=0
     printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
@@ -392,6 +398,20 @@ cmd_logexport() {
         echo; echo "=== hud_debug.log ==="; tail -n 120 "$STATE_DIR/hud_debug.log" 2>/dev/null
     } > "$_lf" 2>&1
     echo "OK: $_lf"
+}
+
+cmd_saran() {   # saran done <pkg>: tandai sudah ditawarkan (Pakai/Tetap)
+    case "$1" in
+        done) valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
+              _sf="$STATE_DIR/adapt/$2.conf"; [ -f "$_sf" ] || { echo "OK"; return 0; }
+              _v=$(sed -n 's/^saran=//p' "$_sf" | tail -n 1 | tr -d '[:space:]')
+              case "$_v" in 1.00) _v=100 ;; 0.[0-9][0-9]) _v=${_v#0.}; _v=${_v#0} ;; *) _v="" ;; esac
+              grep -v -E '^(saran_tampil|saran_ditawarkan)=' "$_sf" > "$_sf.tmp.$$" 2>/dev/null
+              printf 'saran_tampil=1\n' >> "$_sf.tmp.$$"
+              case "$_v" in ''|*[!0-9]*) ;; *) printf 'saran_ditawarkan=%s\n' "$_v" >> "$_sf.tmp.$$" ;; esac
+              mv -f "$_sf.tmp.$$" "$_sf"; echo "OK" ;;
+        *) echo "Usage: saran done <pkg>"; return 1 ;;
+    esac
 }
 
 cmd_cfgbackup() {
@@ -827,6 +847,7 @@ case "$1" in
     bugreport) sh "$COMMON/bugreport.sh" ;;
     log) cmd_log "$2" ;;
     restore) cmd_restore ;;
+    saran) cmd_saran "$2" "$3" ;;
     cfgbackup) cmd_cfgbackup ;;
     cfgrestore) cmd_cfgrestore "$2" ;;
     modinfo) cat "$MODDIR/module.prop" ;;

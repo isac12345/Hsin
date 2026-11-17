@@ -436,10 +436,55 @@ ad_apply() {   # pasang beban sekarang
     ad_kbase_own_apply
 }
 
+# ---- saran resolusi (sekali pakai): dihitung di akhir sesi game dari catatan gabungan ----
+ad_ds_pct() {   # nilai downscale game_opts -> persen bulat (off/kosong = 100)
+    case "$1" in
+        ''|off|default|1|1.0|1.00) printf '100' ;;
+        0.[0-9]) printf '%s0' "${1#0.}" ;;
+        0.[0-9][0-9]) printf '%s' "${1#0.}" ;;
+        *) printf '100' ;;
+    esac
+}
+
+ad_saran() {   # $1=pkg game; tulis saran/saran_why/saran_ts ke catatan, atau hapus bila tidak ada alasan
+    _sp="$1"
+    _jp=$(ad_cget "$_sp" jank_pct); _pa=$(ad_cget "$_sp" p1_avg)
+    _sm=$(ad_cget "$_sp" stall_max); _sn=$(ad_cget "$_sp" n)
+    for _v in "$_jp" "$_pa" "$_sm" "$_sn"; do case "$_v" in ''|*[!0-9]*) return 0 ;; esac; done
+    _fps=$(ad_fps_cur "$_sp"); case "$_fps" in ''|*[!0-9]*|0) _fps=0 ;; esac
+    _cur=$(ad_ds_pct "$(sed -n "s/^$(printf '%s' "$_sp" | sed 's/\./\\./g'):downscale=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]')")
+    _new=""; _why=""
+    if [ "$_jp" -ge 30 ]; then _new=$((_cur - 5)); _why="sering tersendat (${_jp}%)"
+    elif [ "$_fps" -gt 0 ] && [ $((_pa * 100)) -lt $((_fps * 60)) ]; then _new=$((_cur - 5)); _why="1% low rendah (${_pa} fps)"
+    elif [ "$_sm" -gt 400 ]; then _new=$((_cur - 5)); _why="ada jeda ${_sm} ms"
+    elif [ "$_jp" -le 5 ] && [ "$_fps" -gt 0 ] && [ $((_pa * 100)) -ge $((_fps * 90)) ] && [ "$_sn" -ge 300 ]; then
+        _new=$((_cur + 5)); _why="sudah lancar (p1 ${_pa} fps)"
+    fi
+    if [ -z "$_new" ] || [ "$_new" -lt 10 ] || [ "$_new" -gt 100 ] || [ "$_new" -eq "$_cur" ]; then
+        ad_cdel "$_sp" saran; ad_cdel "$_sp" saran_why; ad_cdel "$_sp" saran_ts
+        return 0
+    fi
+    # sudah pernah ditawarkan dan nilainya belum berubah >= 10 poin: tetap dianggap tampil
+    _off=$(ad_cget "$_sp" saran_ditawarkan); case "$_off" in ''|*[!0-9]*) _off="" ;; esac
+    if [ -n "$_off" ]; then
+        _d=$((_new - _off)); [ "$_d" -lt 0 ] && _d=$((0 - _d))
+        [ "$_d" -ge 10 ] && ad_cset "$_sp" saran_tampil 0
+    fi
+    ad_cset "$_sp" saran "$(printf '%d.%02d' $((_new / 100)) $((_new % 100)))"
+    ad_cset "$_sp" saran_why "$_why"
+    ad_cset "$_sp" saran_ts "$(date +%s 2>/dev/null)"
+}
+
+ad_cdel() {   # $1=pkg $2=key
+    _f="$AD_DIR/$1.conf"; [ -f "$_f" ] || return 0
+    grep -v "^$2=" "$_f" > "$_f.tmp.$$" 2>/dev/null; mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
+}
+
 ad_end() {
     [ "$AD_OPEN" = "1" ] || return 0
     _tail=""
     ad_flush
+    [ "$AD_IS_GAME" = "1" ] && ad_saran "$AD_PKG"
     _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)%"
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null

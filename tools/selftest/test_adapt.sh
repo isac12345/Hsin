@@ -381,6 +381,34 @@ printf '41800\n'  > "$T/thermal/thermal_zone3/temp"
 printf -- '-39742\n' > "$T/thermal/thermal_zone4/temp"  # negatif
 chk "zona ngawur dilewati, maks wajar 45 C" "$(ad_soc_temp_mc)" "45000"
 
+echo "== saran resolusi (sekali pakai)"
+printf 'com.game.s:downscale=0.60\n' > "$AD_STATE/game_opts.conf"
+T_FPS_CUR=30
+printf 'n=1001\nsum_p1=15487\np1_min=0\nstall_max=8753\njank_n=523\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.s.conf"
+ad_saran com.game.s
+chk "jank 52 -> turun ke 0.55" "$(conf com.game.s saran)" "0.55"
+chk "alasan ada" "$(sed -n 's/^saran_why=//p' "$AD_DIR/com.game.s.conf")" "sering tersendat (52%)"
+printf 'n=400\nstall_max=20\np1_avg=29\njank_pct=3\n' > "$AD_DIR/com.game.s.conf"
+ad_saran com.game.s
+chk "lancar -> naik ke 0.65" "$(conf com.game.s saran)" "0.65"
+printf 'n=10\nstall_max=20\np1_avg=29\njank_pct=3\n' > "$AD_DIR/com.game.s.conf"
+ad_saran com.game.s
+chk "data kurang -> tanpa saran" "$(conf com.game.s saran)" ""
+printf 'beban=1\n' > "$AD_DIR/com.game.s.conf"
+ad_saran com.game.s
+chk "tanpa data -> tanpa saran" "$(conf com.game.s saran)" ""
+printf 'com.game.s:downscale=0.10\n' > "$AD_STATE/game_opts.conf"
+printf 'n=1001\nstall_max=900\np1_avg=15\njank_pct=52\n' > "$AD_DIR/com.game.s.conf"
+ad_saran com.game.s
+chk "sudah 0.10: tidak turun lagi" "$(conf com.game.s saran)" ""
+rm -f "$AD_STATE/game_opts.conf"
+
+echo "== hsinctl saran done menandai sudah ditawarkan"
+printf 'saran=0.55\nsaran_why=x\n' > "$AD_DIR/com.game.d.conf"
+HSIN_STATE_DIR="$AD_STATE" sh "$C/hsinctl.sh" saran done com.game.d >/dev/null 2>&1
+chk "saran_tampil=1" "$(conf com.game.d saran_tampil)" "1"
+chk "saran_ditawarkan=55" "$(conf com.game.d saran_ditawarkan)" "55"
+
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]
