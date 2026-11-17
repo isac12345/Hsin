@@ -23,6 +23,7 @@ export HSIN_CONF_DIR="$T/state" HSIN_LOG_FILE="$T/log" AD_DIR="$T/state/adapt"
 export SYSFS_MODULE_PREFIX="$T/mod" SYSFS_POWER_PREFIX="$T/power"
 export SYSFS_THERMAL_PREFIX="$T/thermal"
 export AD_STATE="$T/state"
+export HSIN_SYS_CPUFREQ="$T/nocpu" HSIN_SYS_DEVFREQ="$T/nodev"   # Adapt tidak boleh menyentuh sysfs asli saat uji
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
 AD_WARM_SECS=0   # uji lain tidak perlu menunggu pemanasan; diuji khusus di bawah

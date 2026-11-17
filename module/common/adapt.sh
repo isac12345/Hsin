@@ -98,6 +98,8 @@ AD_LGPU=0        # lantai GPU sekarang (persen)
 AD_OWN_LAST=0    # epoch perubahan lantai terakhir
 AD_OWN_N=0       # jumlah perubahan lantai sesi ini
 AD_OWN_FZ_TS=0   # epoch terakhir memeriksa pid yang lahir ulang
+AD_OWN_HOLD=""   # persen lantai yang sedang ditahan (supaya log tidak berulang)
+AD_OWN_UNK=0     # sudah memakai satu kenaikan saat suhu tidak terbaca
 
 ad_log() {
     if type monitor_log >/dev/null 2>&1; then
@@ -140,7 +142,7 @@ ad_rd() { _adv=""; [ -r "$1" ] && read -r _adv < "$1" 2>/dev/null; printf '%s' "
 ad_wr() { printf '%s' "$2" > "$1" 2>/dev/null; }
 
 ad_own_enabled() {   # sakelar: file ADAPT_OWN berisi "off" = mati
-    [ "$(tr -d '[:space:]' < "$AD_STATE/ADAPT_OWN" 2>/dev/null)" != "off" ]
+    [ "$(cat "$AD_STATE/ADAPT_OWN" 2>/dev/null | tr -d '[:space:]')" != "off" ]
 }
 
 ad_gpu_dir() {
@@ -191,7 +193,7 @@ ad_own_on() {   # $1=pkg; return 0 = Adapt memegang frekuensi sesi ini
     mv -f "$AD_OWN_PREV.tmp" "$AD_OWN_PREV" 2>/dev/null
     printf '%s\n%s\n' "$1" "$(date +%s 2>/dev/null)" > "$AD_OWN_FILE" 2>/dev/null
     ad_own_freeze
-    AD_OWN=1; AD_LCP=0; AD_LGPU=0; AD_OWN_LAST=0; AD_OWN_N=0
+    AD_OWN=1; AD_LCP=0; AD_LGPU=0; AD_OWN_LAST=0; AD_OWN_N=0; AD_OWN_HOLD=""; AD_OWN_UNK=0
     AD_OWN_FZ_TS=$(date +%s 2>/dev/null)
     ad_log "[OWN] mulai $1 lantai=0/0"
     return 0
@@ -223,6 +225,136 @@ ad_own_recover() {   # penanda tanpa sesi terbuka = sisa lama (crash/monitor mul
     [ "$AD_OWN" = "1" ] && return 0
     [ -f "$AD_OWN_FILE" ] || [ -f "$AD_OWN_PREV" ] || [ -f "$AD_OWN_STOP" ] || return 0
     ad_own_off recover
+}
+
+# ---- lantai CPU/GPU dari beban (semua angka dari daftar frekuensi HP) ----
+ad_own_pct() {   # beban -> persen lantai; 0 = tidak menulis lantai (biarkan kernel)
+    case "$1" in 1) printf 50 ;; 2) printf 70 ;; 3) printf 90 ;; *) printf 0 ;; esac
+}
+
+# $1=persen $2=direktori policy CPU atau devfreq GPU -> frekuensi tersedia terkecil
+# yang >= persen dari frekuensi tertinggi. Amplop: tidak di bawah cpuinfo_min_freq
+# dan tidak di atas cpuinfo_max_freq (bila node itu ada).
+ad_own_floor() {
+    _ofd=$2
+    _ofl=$(cat "$_ofd/scaling_available_frequencies" 2>/dev/null)
+    [ -n "$_ofl" ] || _ofl=$(cat "$_ofd/available_frequencies" 2>/dev/null)
+    _ofhi=$(ad_rd "$_ofd/cpuinfo_max_freq"); _oflo=$(ad_rd "$_ofd/cpuinfo_min_freq")
+    case "$_ofhi" in ''|*[!0-9]*) _ofhi="" ;; esac
+    case "$_oflo" in ''|*[!0-9]*) _oflo="" ;; esac
+    _ofmax=""
+    for _off in $_ofl; do
+        case "$_off" in ''|*[!0-9]*) continue ;; esac
+        [ -n "$_ofhi" ] && [ "$_off" -gt "$_ofhi" ] && continue
+        [ -n "$_oflo" ] && [ "$_off" -lt "$_oflo" ] && continue
+        if [ -z "$_ofmax" ] || [ "$_off" -gt "$_ofmax" ]; then _ofmax=$_off; fi
+    done
+    [ -n "$_ofmax" ] || return 1
+    _oft=$(( (_ofmax / 100) * $1 ))
+    _ofbest=""
+    for _off in $_ofl; do
+        case "$_off" in ''|*[!0-9]*) continue ;; esac
+        [ -n "$_ofhi" ] && [ "$_off" -gt "$_ofhi" ] && continue
+        [ -n "$_oflo" ] && [ "$_off" -lt "$_oflo" ] && continue
+        [ "$_off" -ge "$_oft" ] || continue
+        if [ -z "$_ofbest" ] || [ "$_off" -lt "$_ofbest" ]; then _ofbest=$_off; fi
+    done
+    printf '%s' "${_ofbest:-$_ofmax}"
+}
+
+ad_own_orig() {   # $1=direktori $2=min|max -> nilai asli dari .adapt_prev
+    while IFS='|' read -r _oot _ood _oomn _oomx; do
+        [ "$_ood" = "$1" ] || continue
+        if [ "$2" = "min" ]; then printf '%s' "$_oomn"; else printf '%s' "$_oomx"; fi
+        return 0
+    done < "$AD_OWN_PREV"
+    return 1
+}
+
+# $1=node min $2=node max $3=target min $4=batas max. Naik: tulis max dulu lalu min.
+# Turun: tulis min saja (max tetap; nilai asli dipulihkan di ad_own_off).
+ad_own_put() {
+    _opc=$(ad_rd "$2")
+    case "$_opc" in ''|*[!0-9]*) _opc=0 ;; esac
+    [ "$3" -gt "$_opc" ] && ad_wr "$2" "$4"
+    ad_wr "$1" "$3"
+    [ "$(ad_rd "$1")" = "$3" ]
+}
+
+# Kenaikan lantai ditahan oleh suhu, baterai, atau pembacaan yang tidak ada.
+# Mengeluarkan alasan di stdout dan return 0 bila harus ditahan.
+ad_own_block_raise() {
+    _obt=$(ad_temp_mc); _obs=$(ad_soc_temp_mc); _obb=$(ad_batt_pct)
+    case "$_obt" in ''|*[!0-9]*) _obt=0 ;; esac
+    case "$_obs" in ''|*[!0-9]*) _obs=0 ;; esac
+    case "$_obb" in ''|*[!0-9]*) _obb=100 ;; esac
+    if [ "$_obt" -ge "$AD_TEMP_MAX" ]; then printf 'baterai %sC' $((_obt / 1000)); return 0; fi
+    if [ "$_obs" -ge "$AD_SOC_MAX" ]; then printf 'SoC %sC' $((_obs / 1000)); return 0; fi
+    if [ "$_obb" -le "$AD_BATT_MIN" ] && ! ad_charging; then printf 'baterai %s%%' "$_obb"; return 0; fi
+    if [ "$_obt" -eq 0 ] && [ "$_obs" -eq 0 ]; then
+        # suhu tidak terbaca: anggap normal, tapi hanya satu kenaikan per sesi
+        if [ "${AD_OWN_UNK:-0}" = "1" ]; then printf 'suhu tidak terbaca'; return 0; fi
+        AD_OWN_UNK=1
+    fi
+    return 1
+}
+
+ad_own_apply() {   # pasang lantai dari AD_BEBAN (dipanggil tiap perubahan beban dan tiap tick)
+    [ "$AD_OWN" = "1" ] || return 0
+    [ -f "$AD_OWN_FILE" ] || return 0
+    _oap=$(ad_own_pct "$AD_BEBAN")
+    [ "$_oap" = "$AD_LCP" ] && return 0
+    _oan=$(date +%s 2>/dev/null); case "$_oan" in ''|*[!0-9]*) _oan=0 ;; esac
+    # Kenaikan: jeda >=20 dtk, maksimal 3 perubahan per sesi, dan batas suhu/baterai.
+    # Turun selalu boleh. Pasangan awal sesi (AD_OWN_LAST=0) sampai 50% tidak ditahan.
+    if [ "$_oap" -gt "$AD_LCP" ] && ! { [ "$AD_OWN_LAST" = "0" ] && [ "$_oap" -le 50 ]; }; then
+        if [ "$AD_OWN_LAST" != "0" ] && [ $((_oan - AD_OWN_LAST)) -lt 20 ]; then return 0; fi
+        if [ "$AD_OWN_N" -ge 3 ]; then return 0; fi
+        _obr=$(ad_own_block_raise) && {
+            [ "$AD_OWN_HOLD" != "$_oap" ] && ad_log "[OWN] lantai ${AD_LCP}%->${_oap}% ditahan ($_obr)"
+            AD_OWN_HOLD=$_oap
+            return 0
+        }
+    fi
+    _oaok=0; _oabad=0
+    for _oad in "$AD_CPUFREQ"/policy*; do
+        [ -f "$_oad/scaling_min_freq" ] && [ -w "$_oad/scaling_min_freq" ] || continue
+        if [ "$_oap" -le 0 ]; then
+            _oat=$(ad_own_orig "$_oad" min)
+        else
+            _oat=$(ad_own_floor "$_oap" "$_oad")
+        fi
+        case "$_oat" in ''|*[!0-9]*) continue ;; esac
+        _oac=$(ad_rd "$_oad/cpuinfo_max_freq"); [ -n "$_oac" ] || _oac=$(ad_own_floor 100 "$_oad")
+        if ad_own_put "$_oad/scaling_min_freq" "$_oad/scaling_max_freq" "$_oat" "$_oac"; then
+            _oaok=$((_oaok + 1)); ad_log "[CPU] ${_oad##*/} ${AD_LCP}%->${_oap}% =$_oat"
+        else
+            _oabad=$((_oabad + 1)); ad_log "[CPU] ${_oad##*/} ditolak kernel (target $_oat)"
+        fi
+    done
+    _oagd=$(ad_gpu_dir)
+    if [ -n "$_oagd" ] && [ -w "$_oagd/min_freq" ]; then
+        if [ "$_oap" -le 0 ]; then _oat=$(ad_own_orig "$_oagd" min); else _oat=$(ad_own_floor "$_oap" "$_oagd"); fi
+        case "$_oat" in ''|*[!0-9]*) ;; *)
+            _oac=$(ad_own_floor 100 "$_oagd")
+            if ad_own_put "$_oagd/min_freq" "$_oagd/max_freq" "$_oat" "$_oac"; then
+                ad_log "[GPU] ${AD_LGPU}%->${_oap}% =$_oat"; AD_LGPU=$_oap
+            else
+                ad_log "[GPU] ditolak kernel (target $_oat)"
+            fi ;;
+        esac
+    fi
+    if [ "$_oaok" -eq 0 ] && [ "$_oabad" -gt 0 ]; then
+        # Semua policy menolak: sesi ini jatuh ke perilaku lama (tabel profil + gameboost).
+        ad_own_off "gagal menulis"
+        ad_log "[OWN] kernel menolak lantai, sesi ini memakai tabel profil + gameboost"
+        return 1
+    fi
+    AD_LCP=$_oap
+    AD_OWN_HOLD=""
+    [ "$AD_OWN_LAST" != "0" ] && AD_OWN_N=$((AD_OWN_N + 1))
+    AD_OWN_LAST=$_oan
+    return 0
 }
 
 # --- aplikasi yang tidak boleh disentuh ------------------------------------
@@ -537,7 +669,7 @@ ad_apply() {   # pasang beban sekarang
     AD_WN=0; AD_WJ=0; AD_TRIED_LVL=""   # jendela penilaian mulai dari sini
     # Penanda untuk APK (notifikasi/orb): paket|beban|game|epoch
     printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" > "$AD_STATE/.adapt_now" 2>/dev/null
-    if [ "$AD_IS_GAME" = "1" ]; then return 0; fi   # game: gameboost yang menulis
+    if [ "$AD_IS_GAME" = "1" ]; then ad_own_apply; return 0; fi   # game: Adapt memasang lantai bila memegang frekuensi; kbase tetap lewat gameboost
     if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; ad_kbase_fix_leftover; return 0; fi
     ad_kbase_own_apply
 }
@@ -945,6 +1077,8 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         ad_flush
         ad_log "turun: $AD_PKG beban=$AD_BEBAN (lancar $AD_LOWER_SECS s)"
     fi
+    # Lantai yang tertahan (jeda/suhu) dicoba lagi tiap tick; murah bila sudah sama.
+    [ "$AD_OWN" = "1" ] && ad_own_apply
     return 0
 }
 
