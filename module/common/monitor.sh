@@ -256,6 +256,10 @@ get_game_profile() {
         esac
         case "$monitor_map_profile" in
             battery|balanced|performance) ;;
+            # App/CLI juga boleh menulis adapt|puncak. Tanpa ini game yang ditambahkan
+            # dengan profil itu dianggap bukan game: boost, Adapt, dan preset tidak jalan.
+            adapt) monitor_map_profile=balanced ;;
+            puncak) monitor_map_profile=performance ;;
             *) continue ;;
         esac
         if [ "$monitor_map_package" = "$monitor_lookup_package" ]; then
