@@ -23,7 +23,7 @@ printf '200000000\n' > "$T/df/gpu/min_freq"; printf '600000000\n' > "$T/df/gpu/m
 printf '361\n' > "$T/power/battery/temp"; printf '80\n' > "$T/power/battery/capacity"
 printf '45000\n' > "$T/thermal/thermal_zone0/temp"
 # uperf/fas-rs palsu: proses sleep sungguhan supaya SIGSTOP/SIGCONT bisa diperiksa
-sleep 300 & echo $! > "$T/sleep.pid"
+sleep 300 >/dev/null 2>&1 & echo $! > "$T/sleep.pid"
 cat > "$T/bin/pidof" <<EOP
 #!/bin/sh
 case "\$1" in fas-rs) cat "$T/sleep.pid" ;; esac
@@ -129,6 +129,17 @@ chk "jeda <20 dtk menahan" "$(mn policy0)" "800000"
 T_NOW=2425; ad_own_apply
 chk "jeda terpenuhi: naik" "$(mn policy0)" "1600000"
 ad_own_off selesai
+
+echo "== suhu tidak terbaca: hanya satu kenaikan per sesi"
+T_NOW=3000; ad_own_on com.game.d; AD_BEBAN=1; AD_OWN_LAST=0; ad_own_apply
+chk "lantai awal 50%" "$(mn policy0)" "800000"
+rm -f "$T/power/battery/temp" "$T/thermal/thermal_zone0/temp"
+T_NOW=3100; AD_BEBAN=2; ad_own_apply
+chk "tak terbaca: kenaikan pertama boleh" "$(mn policy0)" "1300000"
+T_NOW=3200; AD_BEBAN=3; ad_own_apply
+chk "tak terbaca: kenaikan kedua ditahan" "$(mn policy0)" "1300000"
+ad_own_off selesai
+printf '361\n' > "$T/power/battery/temp"; printf '45000\n' > "$T/thermal/thermal_zone0/temp"
 
 echo "== maksimal 3 perubahan naik per sesi"
 T_NOW=3000; ad_own_on com.game.d; AD_BEBAN=1; AD_OWN_LAST=0; ad_own_apply

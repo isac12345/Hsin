@@ -290,18 +290,20 @@ ad_own_put() {
 }
 
 # Kenaikan lantai ditahan oleh suhu, baterai, atau pembacaan yang tidak ada.
-# Mengeluarkan alasan di stdout dan return 0 bila harus ditahan.
+# Alasan diisi ke AD_OWN_WHY, return 0 bila harus ditahan. Jangan dipanggil
+# lewat $(...): AD_OWN_UNK harus tersimpan di shell induk (satu kenaikan saja).
 ad_own_block_raise() {
+    AD_OWN_WHY=""
     _obt=$(ad_temp_mc); _obs=$(ad_soc_temp_mc); _obb=$(ad_batt_pct)
     case "$_obt" in ''|*[!0-9]*) _obt=0 ;; esac
     case "$_obs" in ''|*[!0-9]*) _obs=0 ;; esac
     case "$_obb" in ''|*[!0-9]*) _obb=100 ;; esac
-    if [ "$_obt" -ge "$AD_TEMP_MAX" ]; then printf 'baterai %sC' $((_obt / 1000)); return 0; fi
-    if [ "$_obs" -ge "$AD_SOC_MAX" ]; then printf 'SoC %sC' $((_obs / 1000)); return 0; fi
-    if [ "$_obb" -le "$AD_BATT_MIN" ] && ! ad_charging; then printf 'baterai %s%%' "$_obb"; return 0; fi
+    if [ "$_obt" -ge "$AD_TEMP_MAX" ]; then AD_OWN_WHY="baterai $((_obt / 1000))C"; return 0; fi
+    if [ "$_obs" -ge "$AD_SOC_MAX" ]; then AD_OWN_WHY="SoC $((_obs / 1000))C"; return 0; fi
+    if [ "$_obb" -le "$AD_BATT_MIN" ] && ! ad_charging; then AD_OWN_WHY="baterai ${_obb}%"; return 0; fi
     if [ "$_obt" -eq 0 ] && [ "$_obs" -eq 0 ]; then
         # suhu tidak terbaca: anggap normal, tapi hanya satu kenaikan per sesi
-        if [ "${AD_OWN_UNK:-0}" = "1" ]; then printf 'suhu tidak terbaca'; return 0; fi
+        if [ "${AD_OWN_UNK:-0}" = "1" ]; then AD_OWN_WHY="suhu tidak terbaca"; return 0; fi
         AD_OWN_UNK=1
     fi
     return 1
@@ -318,11 +320,11 @@ ad_own_apply() {   # pasang lantai dari AD_BEBAN (dipanggil tiap perubahan beban
     if [ "$_oap" -gt "$AD_LCP" ] && ! { [ "$AD_OWN_LAST" = "0" ] && [ "$_oap" -le 50 ]; }; then
         if [ "$AD_OWN_LAST" != "0" ] && [ $((_oan - AD_OWN_LAST)) -lt 20 ]; then return 0; fi
         if [ "$AD_OWN_N" -ge 3 ]; then return 0; fi
-        _obr=$(ad_own_block_raise) && {
-            [ "$AD_OWN_HOLD" != "$_oap" ] && ad_log "[OWN] lantai ${AD_LCP}%->${_oap}% ditahan ($_obr)"
+        if ad_own_block_raise; then
+            [ "$AD_OWN_HOLD" != "$_oap" ] && ad_log "[OWN] lantai ${AD_LCP}%->${_oap}% ditahan ($AD_OWN_WHY)"
             AD_OWN_HOLD=$_oap
             return 0
-        }
+        fi
     fi
     _oaok=0; _oabad=0
     for _oad in "$AD_CPUFREQ"/policy*; do
