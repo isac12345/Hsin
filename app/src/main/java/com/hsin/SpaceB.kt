@@ -485,6 +485,7 @@ private fun GameDetail(vm: AppViewModel, g: GameEntry) {
                 }
             }
             SText(tx("Mode game ini", "This game's mode"), 11.sp, SP.dim)
+            if (cur == "puncak") SText(tx("Puncak mematikan Adapt untuk game ini. Pilih Adapt agar beban GPU menyesuaikan otomatis.", "Peak turns Adapt off for this game. Choose Adapt so GPU load adjusts automatically."), 10.sp, SP.faint)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (m in MODES) {
                     val sel = cur == m.key
