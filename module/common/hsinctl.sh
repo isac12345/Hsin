@@ -394,6 +394,34 @@ cmd_logexport() {
     echo "OK: $_lf"
 }
 
+cmd_cfgbackup() {
+    _bd="${HSIN_BACKUP_DIR:-/sdcard/Download}"
+    _bf="$_bd/hsin-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+    mkdir -p "$_bd" 2>/dev/null
+    _l=""
+    for _f in game_opts.conf game_render.conf game_profile_map.conf app.conf tweaks.conf device_mitigation.conf adapt; do
+        [ -e "$STATE_DIR/$_f" ] && _l="$_l $_f"
+    done
+    [ -n "$_l" ] || { echo "ERROR: tidak ada konfigurasi untuk dicadangkan"; return 1; }
+    # shellcheck disable=SC2086
+    tar -C "$STATE_DIR" -czf "$_bf" $_l 2>/dev/null || { echo "ERROR: gagal membuat cadangan"; return 1; }
+    echo "OK: $_bf"
+}
+
+cmd_cfgrestore() {
+    _rf="$1"
+    [ -f "$_rf" ] || { echo "ERROR: berkas tidak ada"; return 1; }
+    tar -tzf "$_rf" >/dev/null 2>&1 || { echo "ERROR: cadangan rusak"; return 1; }
+    _bad=$(tar -tzf "$_rf" 2>/dev/null | grep -vE '^(game_opts\.conf|game_render\.conf|game_profile_map\.conf|app\.conf|tweaks\.conf|device_mitigation\.conf|adapt(/[A-Za-z0-9._-]+)?/?)$')
+    [ -z "$_bad" ] || { echo "ERROR: cadangan berisi berkas tidak dikenal"; return 1; }
+    _t=$(date +%Y%m%d-%H%M%S)
+    for _f in game_opts.conf game_render.conf game_profile_map.conf app.conf tweaks.conf device_mitigation.conf; do
+        [ -f "$STATE_DIR/$_f" ] && cp "$STATE_DIR/$_f" "$STATE_DIR/$_f.bak-$_t" 2>/dev/null
+    done
+    tar -C "$STATE_DIR" -xzf "$_rf" 2>/dev/null || { echo "ERROR: gagal memulihkan"; return 1; }
+    echo "OK: dipulihkan (berkas lama disimpan *.bak-$_t)"
+}
+
 cmd_ovd() {
     [ -f "$COMMON/overdrive.sh" ] || { echo "ERROR: overdrive.sh tidak ada"; return 1; }
     case "$1" in
@@ -799,6 +827,8 @@ case "$1" in
     bugreport) sh "$COMMON/bugreport.sh" ;;
     log) cmd_log "$2" ;;
     restore) cmd_restore ;;
+    cfgbackup) cmd_cfgbackup ;;
+    cfgrestore) cmd_cfgrestore "$2" ;;
     modinfo) cat "$MODDIR/module.prop" ;;
     *) sed -n '2,42p' "$0" ;;
 esac

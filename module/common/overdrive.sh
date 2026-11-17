@@ -22,6 +22,8 @@ STATE_DIR="${HSIN_STATE_DIR:-/data/adb/hsin}"
 case "$0" in */*) OVD_DIR="${0%/*}" ;; *) OVD_DIR="." ;; esac
 OVD_ACTIVE="$STATE_DIR/.ovd_active"
 OVD_PREV="$STATE_DIR/.ovd_prev"
+# Kunci proteksi panas vendor yang dilonggarkan khusus Puncak; kunci yang tidak ada di ROM dilewati.
+OVD_VENDOR="rt_enable_templimit=false oplus_settings_hightemp_protect=-1 tran_temp_battery_warning=0 performance_mode_enable=1 high_performance_mode_on=1"
 OVD_PID="$STATE_DIR/.ovd_pid"
 OVD_STOPPED="$STATE_DIR/.ovd_stopped"
 OVD_LAST="$STATE_DIR/.ovd_last"
@@ -166,6 +168,13 @@ save_prev() {
         [ -w "$_x" ] && printf 'ext|%s|%s|\n' "$_x" "$(rd "$_x")" >> "$OVD_PREV.tmp"
     done
     command -v settings >/dev/null 2>&1 && printf 'sg|game_bypass_charging|%s|\n' "$(settings get global game_bypass_charging 2>/dev/null | tr -d '\r\n')" >> "$OVD_PREV.tmp"
+    if command -v settings >/dev/null 2>&1; then
+        for _kv in $OVD_VENDOR; do
+            _k=${_kv%%=*}
+            _o=$(settings get system "$_k" 2>/dev/null | tr -d '\r\n')
+            case "$_o" in ''|null) ;; *) printf 'ss|%s|%s|\n' "$_k" "$_o" >> "$OVD_PREV.tmp" ;; esac
+        done
+    fi
     mv -f "$OVD_PREV.tmp" "$OVD_PREV"
 }
 
@@ -176,6 +185,13 @@ apply_extras() {
         [ -w "$_x" ] && wr "$_x" 1
     done
     command -v settings >/dev/null 2>&1 && settings put global game_bypass_charging 1 >/dev/null 2>&1
+    if command -v settings >/dev/null 2>&1; then
+        for _kv in $OVD_VENDOR; do
+            _k=${_kv%%=*}; _n=${_kv#*=}
+            _o=$(settings get system "$_k" 2>/dev/null | tr -d '\r\n')
+            case "$_o" in ''|null) ;; *) settings put system "$_k" "$_n" >/dev/null 2>&1 ;; esac
+        done
+    fi
     return 0
 }
 
@@ -284,6 +300,7 @@ restore_prev() {
             ext) [ -w "$_d" ] && num "$_mn" && wr "$_d" "$_mn" ;;
             sg) command -v settings >/dev/null 2>&1 || continue
                 case "$_mn" in ''|null) settings delete global "$_d" >/dev/null 2>&1 ;; *) settings put global "$_d" "$_mn" >/dev/null 2>&1 ;; esac ;;
+            ss) command -v settings >/dev/null 2>&1 && settings put system "$_d" "$_mn" >/dev/null 2>&1 ;;
         esac
     done < "$OVD_PREV"
     rm -f "$OVD_PREV"

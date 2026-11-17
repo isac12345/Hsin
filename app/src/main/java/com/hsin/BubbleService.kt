@@ -223,7 +223,7 @@ class BubbleService : Service() {
                     if (gamePkg.isNotEmpty()) prefs.lastGame = gamePkg
                     hudPkg = s.hudPkg.ifEmpty { s.gamePkg }
                     recOn = s.rec || (prefs.recEngine == 1 && com.hsin.zrec.ZRec.mode() >= 2)
-                    floating?.setOvd(effOvd(s.ovd), s.ovdLevel, s.gamePkg.isNotEmpty())
+                    floating?.setOvd(effOvd(s.ovd), s.ovdLevel, s.hudPkg.isNotEmpty() || s.gamePkg.isNotEmpty())
                     floating?.setSession(s.gamePkg)
                     floating?.setProfileState(profile, recOn)
                     if (!orbAllowed()) {
@@ -277,7 +277,7 @@ class BubbleService : Service() {
         when (intent?.action) {
             ACT_SET -> intent.getStringExtra(EXTRA_P)?.let {
                 if (it == "puncak") {
-                    if (gamePkg.isEmpty()) Toast.makeText(this, trn("Buka game dulu untuk mode Puncak"), Toast.LENGTH_SHORT).show()
+                    if (gamePkg.isEmpty() && hudPkg.isEmpty()) Toast.makeText(this, trn("Buka game dulu untuk mode Puncak"), Toast.LENGTH_SHORT).show()
                     else toggleOvd(!ovdOn)
                 } else setProfile(it)
             }
@@ -355,7 +355,7 @@ class BubbleService : Service() {
         SoundFx.play(prefs, if (on) "boost" else "boostoff")
         pend(null, on)
         ovdOn = on
-        floating?.setOvd(on, "", gamePkg.isNotEmpty())
+        floating?.setOvd(on, "", hudPkg.isNotEmpty() || gamePkg.isNotEmpty())
         scope.launch {
             val r = if (on) Hsin.ovdStart() else Hsin.ovdStop()
             pendClear()
@@ -363,7 +363,7 @@ class BubbleService : Service() {
                 val msg = r.out.lines().firstOrNull { it.startsWith("ERROR") }?.removePrefix("ERROR:")?.trim() ?: "Puncak gagal"
                 Toast.makeText(this@BubbleService, msg, Toast.LENGTH_LONG).show()
             }
-            Hsin.status()?.let { ovdOn = it.ovd; floating?.setOvd(it.ovd, it.ovdLevel, it.gamePkg.isNotEmpty()); updateNotification() }
+            Hsin.status()?.let { ovdOn = it.ovd; floating?.setOvd(it.ovd, it.ovdLevel, it.hudPkg.isNotEmpty() || it.gamePkg.isNotEmpty()); updateNotification() }
         }
     }
 
