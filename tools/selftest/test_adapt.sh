@@ -495,6 +495,17 @@ printf 'n=500\np1_avg=15\njank_pct=52\nstall_max=900\n' > "$AD_DIR/com.game.a.co
 ad_auto_tune com.game.a
 chk "lantai mid 60: tidak turun lagi" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "0.60"
 chk "tanpa perubahan: statistik tetap" "$(conf com.game.a n)" "500"
+echo "== otomatis: penyimpanan gagal tidak dianggap berhasil"
+printf '#!/bin/sh\necho "ERROR: gagal tulis" >&2\nexit 1\n' > "$T/fail_hsc.sh"
+AD_HSC="$T/fail_hsc.sh"
+printf 'com.game.a:downscale=off\n' > "$AD_STATE/game_opts.conf"
+printf 'n=500\np1_avg=15\njank_pct=52\nstall_max=900\nbeban=2\n' > "$AD_DIR/com.game.a.conf"
+ad_auto_tune com.game.a
+chk "gagal simpan: nilai tidak berubah" "$(sed -n 's/^com.game.a:downscale=//p' "$AD_STATE/game_opts.conf")" "off"
+chk "gagal simpan: statistik dipertahankan" "$(conf com.game.a n)" "500"
+chk "gagal simpan: dicatat di log" "$(grep -c 'gagal menyimpan' "$T/log" 2>/dev/null)" "1"
+AD_HSC="$C/hsinctl.sh"
+
 printf 'DEVICE_TIER="low"\n' > "$AD_STATE/detected.conf"
 printf 'com.game.a:downscale=0.60\n' > "$AD_STATE/game_opts.conf"
 ad_auto_tune com.game.a

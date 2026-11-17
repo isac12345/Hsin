@@ -685,7 +685,10 @@ ad_apply() {   # pasang beban sekarang
     ad_kbase_set "$AD_BEBAN"
     AD_WN=0; AD_WJ=0; AD_TRIED_LVL=""   # jendela penilaian mulai dari sini
     # Penanda untuk APK (notifikasi/orb): paket|beban|game|epoch
-    printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" > "$AD_STATE/.adapt_now" 2>/dev/null
+    # Ditulis lewat tmp+mv: APK tidak boleh membaca baris separuh.
+    printf '%s|%s|%s|%s\n' "$AD_PKG" "$AD_BEBAN" "$AD_IS_GAME" "$(date +%s 2>/dev/null)" \
+        > "$AD_STATE/.adapt_now.tmp.$$" 2>/dev/null \
+        && mv -f "$AD_STATE/.adapt_now.tmp.$$" "$AD_STATE/.adapt_now" 2>/dev/null
     if [ "$AD_IS_GAME" = "1" ]; then ad_own_apply; return 0; fi   # game: Adapt memasang lantai bila memegang frekuensi; kbase tetap lewat gameboost
     if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; ad_kbase_fix_leftover; return 0; fi
     ad_kbase_own_apply
@@ -878,10 +881,11 @@ ad_auto_tune() {   # $1=pkg game
     _chg=0
     [ "$_nds" != "$_cur" ] && _chg=1
     [ "$_nfps" != "$_fps" ] && _chg=1
+    _aok=1
     _aset=$(sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
         gameauto set "$_ap" "$(ad_ds_fmt "$_nds")" "${_nfps:-keep}" 2>&1) \
-        || ad_log "auto: $_ap gagal menyimpan pengaturan ($_aset)"
-    if [ "$_chg" = 1 ]; then
+        || { _aok=0; ad_log "auto: $_ap gagal menyimpan pengaturan ($_aset)"; }
+    if [ "$_chg" = 1 ] && [ "$_aok" = "1" ]; then
         _f="$AD_DIR/$_ap.conf"
         grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
             && mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
