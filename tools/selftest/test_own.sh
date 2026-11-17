@@ -40,7 +40,7 @@ mkdir -p "$T/mod"
 AD_WARM_SECS=0
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
 ad_memavail_kb() { printf '2000000'; }
-monitor_fps_stat() { printf '%s' "${T_FPS:-60 60 16}"; }
+monitor_fps_stat() { [ "$T_FPS" = none ] || printf '%s' "${T_FPS:-60 60 16}"; }
 get_game_profile() { case "$1" in com.game.*) printf 'performance' ;; *) : ;; esac; }
 ad_in_call() { return 1; }
 date() { if [ -n "$T_NOW" ]; then printf '%s\n' "$T_NOW"; else command date "$@"; fi; }
@@ -243,6 +243,21 @@ printf 'off\n' > "$AD_STATE/ENGINE_MODE"
 ad_own_off selesai
 chk "ENGINE_MODE=off: fas-rs tetap beku" "$(st)" "T"
 rm -f "$AD_STATE/ENGINE_MODE"; kill -CONT "$(cat "$T/sleep.pid")"
+echo "== audit: reset dari luar, peringatan tanpa sampel, penanda sesi lama"
+rm -rf "$AD_DIR"; T_NOW=20000; T_FPS="60 60 16"; AD_WARM_SECS=0
+ad_tick com.game.r1; T_NOW=20010; ad_tick com.game.r1; T_NOW=20020; ad_tick com.game.r1
+: > "$AD_DIR/com.game.r1.reset"
+T_NOW=20030; ad_tick com.game.r1
+chk "reset: penanda dihapus monitor" "$([ -f "$AD_DIR/com.game.r1.reset" ] && echo ada || echo hilang)" "hilang"
+chk "reset: sampel memori hanya yang sesudahnya" "$AD_SN" "1"
+chk "reset: dilog" "$(grep -c 'direset dari luar' "$T/log")" "1"
+ad_tick com.other.app
+T_FPS=none; T_NOW=21000; ad_tick com.game.r2; T_NOW=21100; ad_tick com.game.r2; T_NOW=21200; ad_tick com.game.r2
+chk "tanpa sampel: satu peringatan" "$(grep -c 'r2 belum menghasilkan sampel\|com.game.r2 belum menghasilkan' "$T/log")" "1"
+ad_tick com.other.app
+printf 'x|1|1|1\n' > "$AD_STATE/.adapt_now"; AD_OPEN=0; ad_own_recover
+chk "penanda .adapt_now lama dihapus" "$([ -f "$AD_STATE/.adapt_now" ] && echo ada || echo hilang)" "hilang"
+T_FPS="60 60 16"
 echo "== sisa penanda lama (crash) dipulihkan"
 ad_own_on com.game.i; AD_OWN=0; AD_OPEN=0
 printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"

@@ -72,6 +72,8 @@ AD_RAISE_N=0
 AD_PREV_JR=-1    # jank per 1000 sampel sebelum kenaikan terakhir
 AD_WN=0          # sampel jendela sejak perubahan beban terakhir
 AD_WJ=0          # sampel jendela yang tersendat
+AD_GOT_SAMPLE=0  # sesi ini sudah mencatat minimal satu sampel
+AD_NOSAMP_WARN=0 # peringatan "tanpa sampel" sudah dicetak sesi ini
 AD_FPS_TRIED=0   # batas FPS sudah dipilih sesi ini
 AD_TRIED_LVL=""  # tingkat hasil kenaikan yang sedang dinilai
 AD_HELP_LVL=0    # tingkat tertinggi yang terbukti menolong sesi ini
@@ -231,6 +233,7 @@ ad_own_off() {   # $1=alasan (opsional); pulihkan nilai asli, lanjutkan uperf/fa
 }
 
 ad_own_recover() {   # penanda tanpa sesi terbuka = sisa lama (crash/monitor mulai ulang)
+    [ "$AD_OPEN" = "1" ] || rm -f "$AD_STATE/.adapt_now" 2>/dev/null   # penanda sesi lama (APK membaca)
     [ "$AD_OWN" = "1" ] && return 0
     [ -f "$AD_OWN_FILE" ] || [ -f "$AD_OWN_PREV" ] || [ -f "$AD_OWN_STOP" ] || return 0
     ad_own_off recover
@@ -652,7 +655,7 @@ ad_open() {   # $1=pkg
     AD_LAST_TS=$(date +%s 2>/dev/null)
     AD_OPEN_TS=$AD_LAST_TS
     AD_LAST_RESET=$AD_LAST_TS
-    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0
+    AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0; AD_GOT_SAMPLE=0; AD_NOSAMP_WARN=0
     AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
@@ -1047,10 +1050,25 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         AD_BAD_LVL=0
     fi
 
+    # Reset dari APK/hsinctl (gameauto reset): buang sampel yang masih di memori supaya
+    # tidak ditulis balik ke statistik yang baru saja dikosongkan.
+    if [ -f "$AD_DIR/$AD_PKG.reset" ]; then
+        AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
+        rm -f "$AD_DIR/$AD_PKG.reset" 2>/dev/null
+        ad_log "statistik $AD_PKG direset dari luar, sampel di memori dibuang"
+    fi
+    # Game sudah lewat pemanasan 60 dtk tanpa satu sampel pun: catat sebabnya (sekali per sesi).
+    if [ "$AD_IS_GAME" = "1" ] && [ "$AD_GOT_SAMPLE" = "0" ] && [ "$AD_NOSAMP_WARN" = "0" ] \
+        && [ $((_now - AD_OPEN_TS)) -ge $((AD_WARM_SECS + 60)) ] 2>/dev/null; then
+        AD_NOSAMP_WARN=1
+        ad_log "peringatan: $AD_PKG belum menghasilkan sampel FPS setelah $((_now - AD_OPEN_TS)) dtk; fpsd.status=[$(head -n 1 "$AD_STATE/fpsd.status" 2>/dev/null)]"
+    fi
+
     # --- catat sampel (gabungan) ---
     # Sampel pemanasan/loading tidak dicatat: dulu 1% low-nya menarik rata-rata
     # turun, lalu auto tune menurunkan resolusi karena beban loading, bukan main.
     if [ -n "$_p1" ] && [ "$_warm" = "0" ]; then
+        AD_GOT_SAMPLE=1
         AD_SN=$((AD_SN + 1))
         AD_SS=$((AD_SS + _p1))
         if [ -z "$AD_SMIN" ] || [ "$_p1" -lt "$AD_SMIN" ]; then AD_SMIN=$_p1; fi

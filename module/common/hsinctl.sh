@@ -388,6 +388,8 @@ cmd_gameauto() {
             valid_pkg "$2" || { echo "ERROR: package tidak valid"; return 1; }
             _pf="$STATE_DIR/adapt/$2.conf"
             [ -f "$_pf" ] && { grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|saran|saran_why|saran_ts|saran_tampil|saran_ditawarkan|pre_[a-z]+)=' "$_pf" > "$_pf.tmp.$$" 2>/dev/null; mv -f "$_pf.tmp.$$" "$_pf"; }
+            # penanda untuk monitor: buang sampel yang masih di memori (adapt.sh membacanya)
+            mkdir -p "$STATE_DIR/adapt" 2>/dev/null; : > "$STATE_DIR/adapt/$2.reset"
             for _k in downscale gamemode PRESET; do gh_opt_set "$2" "$_k" default >/dev/null; done
             tw_game_fps "$2" off >/dev/null
             pidof "$2" >/dev/null 2>&1 || gh_unarm "$2"
