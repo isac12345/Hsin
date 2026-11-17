@@ -1183,7 +1183,12 @@ FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
 # sini supaya monitor tidak memanggil hsinctl (banyak fork) tiap tick game.
 # Hasil: "p1 avg stall_ms". avg dipakai adapt.sh untuk membedakan aplikasi
 # yang benar-benar bergerak (game, sosmed) dari yang diam (layar baca).
-monitor_fps_stat() {   # $1=fpsd.out -> "p1 avg stall_ms"
+monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall_ms"
+    # Data milik app lain (mis. com.termux) bukan FPS game: jangan dipakai, kalau tidak 1% low palsu memicu boost.
+    if [ -n "$2" ]; then
+        _mfs_p=$(sed -n 's/^pkg=//p' "$1" 2>/dev/null | head -n 1)
+        [ "$_mfs_p" = "$2" ] || return 1
+    fi
     sed -n 's/^lat=//p' "$1" 2>/dev/null | head -n 1 | awk '{
         n = 0
         for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
@@ -1235,7 +1240,7 @@ check_fps_floor() {
     case "$_ff_now$_ff_mt" in ''|*[!0-9]*) return 0 ;; esac
     # Data lebih tua dari 5 dtk = daemon sedang mati/tidak melaporkan game ini.
     [ $((_ff_now - _ff_mt)) -le 5 ] || return 0
-    _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out") || return 0
+    _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out" "$_ff_pkg") || return 0
     _ff_p1=${_ff_stat%% *}
     _ff_rest=${_ff_stat#* }
     _ff_stall=${_ff_rest##* }

@@ -304,12 +304,22 @@ tick com.game.v 30; tick com.game.v 30; tick com.game.v 30
 chk "game turun ke 1" "$(conf com.game.v beban)" "1"
 
 echo "== mode Puncak mematikan Adapt"
-printf 'performance\n' > "$T/state/active_profile"
+printf 'puncak\n' > "$T/state/active_profile"
 AD_OPEN=0; T_NOW=80000; T_FPS="6 60 900"; T_PSI=70
 tick com.puncak.a 8; tick com.puncak.a 8; tick com.puncak.a 8
 chk "tidak ada catatan" "$([ -f "$AD_DIR/com.puncak.a.conf" ] && echo ada || echo tidak)" "tidak"
 chk "beban tidak berubah" "$AD_OPEN" "0"
 rm -f "$T/state/active_profile"
+
+echo "== profil performance: Adapt tetap jalan, game mulai di beban tertinggi"
+printf 'performance\n' > "$T/state/active_profile"
+T_FPS="60 60 16"; T_PSI=5; T_MEM=2000000
+rm -f "$AD_DIR/com.game.perf.conf"
+AD_OPEN=0; T_NOW=90000
+tick com.game.perf 1
+chk "sesi dibuka" "$AD_OPEN" "1"
+chk "game mulai di beban 3" "$AD_BEBAN" "3"
+AD_OPEN=0; rm -f "$T/state/active_profile"
 
 echo "== RAM sempit saja tidak menaikkan beban GPU"
 T_FPS="60 60 16"; T_PSI=5; T_MEM=300000

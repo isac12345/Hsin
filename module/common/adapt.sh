@@ -341,7 +341,11 @@ ad_max_beban() {
 
 ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     if [ "$AD_IS_GAME" = "1" ]; then
-        printf '1'    # game baru mulai di beban 1, naik hanya bila perlu
+        # profil performance: mulai dari beban tertinggi (turun sendiri saat tenang); lainnya mulai 1
+        case "$(tr -d '[:space:]' < "$AD_STATE/active_profile" 2>/dev/null)" in
+            performance) printf '3' ;;
+            *) printf '1' ;;    # game baru mulai di beban 1, naik hanya bila perlu
+        esac
     else
         printf '0'    # aplikasi biasa: mulai tanpa bantuan
     fi
@@ -457,9 +461,10 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         [ "$AD_OPEN" = "1" ] && ad_end
         return 0
     fi
-    # Mode Puncak (profil performance) mematikan Adapt: pengguna minta tenaga penuh.
+    # Hanya Puncak/Overdrive yang aktif mematikan Adapt. Profil performance tetap Adapt
+    # (mulai dari beban tinggi, lihat ad_tier_beban) supaya tidak mati selamanya setelah Puncak.
     case "$(tr -d '[:space:]' < "$AD_STATE/active_profile" 2>/dev/null)" in
-        performance|puncak|overdrive)
+        puncak|overdrive)
             [ "$AD_OPEN" = "1" ] && ad_end
             return 0
             ;;
@@ -475,7 +480,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # --- ukur ---
     _st=""
     command -v monitor_fps_stat >/dev/null 2>&1 && \
-        _st=$(monitor_fps_stat "${AD_STATE}/fpsd.out" 2>/dev/null)
+        _st=$(monitor_fps_stat "${AD_STATE}/fpsd.out" "$_pkg" 2>/dev/null)
     _p1=""; _avg=""; _stall=""
     if [ -n "$_st" ]; then
         _p1=${_st%% *}
