@@ -131,7 +131,7 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
     private val orbs = ArrayList<OrbView>()
     private var adaptLoad = -1
     private val loadTags = ArrayList<TextView>()
-    private fun paintLoadTag(t: TextView) { t.text = if (adaptLoad >= 0 && !odOn) "B$adaptLoad" else "" }
+    private fun paintLoadTag(t: TextView) { t.text = if (odOn) "PUNCAK" else if (adaptLoad >= 0) "B$adaptLoad" else "B-" }
     private var panelWheel: AdaptWheelView? = null
     private var modeSw: ModeSwitch? = null
     private var fpsBig: TextView? = null
