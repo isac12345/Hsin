@@ -192,6 +192,39 @@ chk "sesi baru setelah Puncak" "$([ -f "$AD_OWN_FILE" ] && echo ada || echo tida
 ad_tick com.other.app
 chk "pindah app: selesai" "$([ -f "$AD_OWN_FILE" ] && echo ada || echo hilang)" "hilang"
 chk "nilai asli kembali" "$(mn policy6)" "700000"
+
+echo "== benih perangkat dan game baru"
+mkdir -p "$T/cpu"; for i in 0 1 2 3 4 5 6 7; do mkdir -p "$T/cpu/cpu$i"; done
+export HSIN_SYS_CPU="$T/cpu"
+printf 'REFRESH_MAX=90\n' > "$AD_STATE/device_profile.env"
+ad_dev_seed
+chk "kelas mid (8 core, 2,3 GHz)" "$(sed -n 's/^AD_DEV_TIER=//p' "$AD_STATE/device_profile.env")" "mid"
+chk "benih resolusi mid" "$(sed -n 's/^AD_DS_SEED=//p' "$AD_STATE/device_profile.env")" "85"
+chk "benih FPS = refresh layar" "$(sed -n 's/^AD_FPS_SEED=//p' "$AD_STATE/device_profile.env")" "90"
+printf 'REFRESH_MAX=90\n' > "$AD_STATE/device_profile.env"; rm -rf "$T/cpu/cpu4" "$T/cpu/cpu5" "$T/cpu/cpu6" "$T/cpu/cpu7"
+ad_dev_seed
+chk "kelas low (4 core)" "$(sed -n 's/^AD_DEV_TIER=//p' "$AD_STATE/device_profile.env")" "low"
+chk "benih resolusi low lebih rendah" "$(sed -n 's/^AD_DS_SEED=//p' "$AD_STATE/device_profile.env")" "80"
+chk "benih FPS low turun satu tangga" "$(sed -n 's/^AD_FPS_SEED=//p' "$AD_STATE/device_profile.env")" "60"
+cat > "$T/hsc.sh" <<'EOH'
+#!/bin/sh
+echo "$*" >> "$T_HSC_LOG"
+EOH
+export AD_HSC="$T/hsc.sh" T_HSC_LOG="$T/hsc.log"; : > "$T_HSC_LOG"
+ad_seed_game com.game.baru
+chk "game baru diberi benih" "$(cat "$T_HSC_LOG")" "gameauto set com.game.baru 0.80 60"
+: > "$T_HSC_LOG"; printf 'com.game.punya:downscale=0.60\n' > "$AD_STATE/game_opts.conf"
+ad_seed_game com.game.punya
+chk "pilihan yang ada tidak ditimpa" "$(cat "$T_HSC_LOG")" ""
+printf 'com.game.mati:AUTO=off\n' >> "$AD_STATE/game_opts.conf"
+ad_seed_game com.game.mati
+chk "AUTO=off tidak diberi benih" "$(cat "$T_HSC_LOG")" ""
+rm -f "$AD_STATE/game_opts.conf"
+rm -rf "$AD_DIR"; T_NOW=9000; ad_tick com.game.pertama
+chk "sesi pertama lewat ad_tick: benih" "$(grep '^gameauto' "$T_HSC_LOG")" "gameauto set com.game.pertama 0.80 60"
+: > "$T_HSC_LOG"; ad_tick com.other.app; T_NOW=9100; ad_tick com.game.pertama
+chk "sesi kedua: tanpa benih lagi" "$(grep '^gameauto' "$T_HSC_LOG")" ""
+ad_tick com.other.app
 echo "== sisa penanda lama (crash) dipulihkan"
 ad_own_on com.game.i; AD_OWN=0; AD_OPEN=0
 printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"

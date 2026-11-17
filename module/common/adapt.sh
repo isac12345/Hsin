@@ -660,6 +660,7 @@ ad_open() {   # $1=pkg
     case "$_sesi" in ''|*[!0-9]*) _sesi=0 ;; esac
     ad_cset "$1" sesi $((_sesi + 1))
     [ "$AD_IS_GAME" = "1" ] && ad_own_on "$1"
+    [ "$AD_IS_GAME" = "1" ] && [ "$_sesi" -eq 0 ] && ad_seed_game "$1"
     ad_apply
     ad_log "mulai $1 game=$AD_IS_GAME beban=$AD_BEBAN sesi=$((_sesi + 1))"
 }
@@ -672,6 +673,55 @@ ad_apply() {   # pasang beban sekarang
     if [ "$AD_IS_GAME" = "1" ]; then ad_own_apply; return 0; fi   # game: Adapt memasang lantai bila memegang frekuensi; kbase tetap lewat gameboost
     if [ "$AD_BEBAN" -le 0 ] 2>/dev/null; then ad_kbase_own_restore; ad_kbase_fix_leftover; return 0; fi
     ad_kbase_own_apply
+}
+
+# ---- benih perangkat: game baru (belum ada riwayat) tidak mulai dari 100% ----
+# Kelas perangkat dari jumlah core dan frekuensi CPU tertinggi (kHz). Ambang bebas:
+#   low  = core <= 6 atau frekuensi tertinggi < 2,0 GHz
+#   high = core >= 8 dan frekuensi tertinggi >= 2,8 GHz
+#   mid  = selain itu
+# Benih resolusi: HP yang lebih lemah mulai lebih rendah (low 80, mid 85, high 90);
+# ad_auto_tune lalu menggeser dari hasil ukur. Benih FPS: refresh layar, satu tangga
+# lebih rendah untuk kelas low. Disimpan di device_profile.env (scan ulang tweaks.sh
+# menimpa berkas itu, jadi dihitung lagi bila kuncinya hilang).
+ad_dev_seed() {
+    _dpf="$AD_STATE/device_profile.env"
+    grep -q '^AD_DS_SEED=' "$_dpf" 2>/dev/null && return 0
+    _dcd="${HSIN_SYS_CPU:-/sys/devices/system/cpu}"
+    _dn=0
+    for _dc in "$_dcd"/cpu[0-9]*; do [ -d "$_dc" ] && _dn=$((_dn + 1)); done
+    _dmx=0
+    for _dc in "$AD_CPUFREQ"/policy*; do
+        _dv=$(ad_rd "$_dc/cpuinfo_max_freq"); case "$_dv" in ''|*[!0-9]*) continue ;; esac
+        [ "$_dv" -gt "$_dmx" ] && _dmx=$_dv
+    done
+    [ "$_dn" -gt 0 ] && [ "$_dmx" -gt 0 ] || return 1   # tidak terbaca: jangan menebak
+    if [ "$_dn" -le 6 ] || [ "$_dmx" -lt 2000000 ]; then _dt=low; _dds=80
+    elif [ "$_dn" -ge 8 ] && [ "$_dmx" -ge 2800000 ]; then _dt=high; _dds=90
+    else _dt=mid; _dds=85; fi
+    _drm=$(sed -n 's/^REFRESH_MAX=//p' "$_dpf" 2>/dev/null | tail -n 1); case "$_drm" in ''|*[!0-9]*) _drm=60 ;; esac
+    _dfp=30
+    for _dl in 30 45 60 90 120; do [ "$_dl" -le "$_drm" ] && _dfp=$_dl; done
+    [ "$_dt" = low ] && _dfp=$(ad_fps_step down "$_dfp")
+    { printf 'AD_DEV_TIER=%s\nAD_DS_SEED=%s\nAD_FPS_SEED=%s\n' "$_dt" "$_dds" "$_dfp"; } >> "$_dpf" 2>/dev/null
+    ad_log "benih perangkat: kelas=$_dt core=$_dn cpu_max=${_dmx}kHz resolusi=${_dds}% fps=$_dfp"
+    return 0
+}
+
+ad_seed_game() {   # $1=pkg game tanpa riwayat: pasang benih resolusi + FPS lewat hsinctl gameauto
+    _sgp="$1"
+    _sgo=$(printf '%s' "$_sgp" | sed 's/\./\\./g')
+    [ "$(sed -n "s/^$_sgo:AUTO=//p" "$AD_STATE/game_opts.conf" 2>/dev/null | tail -n 1)" = "off" ] && return 0
+    # pilihan yang sudah ada (pengguna atau sesi lama) tidak ditimpa
+    grep -q "^$_sgo:\(downscale\|fps\)=" "$AD_STATE/game_opts.conf" 2>/dev/null && return 0
+    ad_dev_seed || return 0
+    _sgd=$(sed -n 's/^AD_DS_SEED=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
+    _sgf=$(sed -n 's/^AD_FPS_SEED=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
+    case "$_sgd" in ''|*[!0-9]*) return 0 ;; esac
+    case "$_sgf" in ''|*[!0-9]*) _sgf=keep ;; esac
+    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+        gameauto set "$_sgp" "$(ad_ds_fmt "$_sgd")" "$_sgf" >/dev/null 2>&1
+    ad_log "benih: $_sgp resolusi ${_sgd}% fps $_sgf (game baru, berlaku saat dibuka berikutnya)"
 }
 
 # ---- saran resolusi (sekali pakai): dihitung di akhir sesi game dari catatan gabungan ----
