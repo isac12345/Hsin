@@ -49,7 +49,7 @@ wd_log "START" "watchdog pid=$$ interval=${WD_INTERVAL}s"
 
 BUBBLE_WANT="$STATE_DIR/.bubble_want"
 BUBBLE_PKG="com.hsin"
-BUBBLE_TICK="${HSIN_BUBBLE_TICK:-45}"
+BUBBLE_TICK="${HSIN_BUBBLE_TICK:-5}"   # 5 dtk: orb/notif kembali cepat setelah ROM membunuh app
 wd_n=0
 wd_per=$((WD_INTERVAL / BUBBLE_TICK)); [ "$wd_per" -ge 1 ] || wd_per=1
 
@@ -58,18 +58,16 @@ wd_per=$((WD_INTERVAL / BUBBLE_TICK)); [ "$wd_per" -ge 1 ] || wd_per=1
 bubble_revive() {
     [ -f "$BUBBLE_WANT" ] || return 0
     command -v am >/dev/null 2>&1 || return 0
-    _up=0
-    if [ -n "$(pidof "$BUBBLE_PKG" 2>/dev/null)" ]; then
-        dumpsys activity services "$BUBBLE_PKG/.BubbleService" 2>/dev/null | grep -q 'ServiceRecord' && _up=1
-    fi
-    [ "$_up" -eq 1 ] && return 0
+    # pidof saja tiap 5 dtk (murah). Proses hidup = service hampir pasti hidup; dumpsys
+    # tiap 5 dtk terlalu berat untuk cek yang jarang gagal.
+    [ -n "$(pidof "$BUBBLE_PKG" 2>/dev/null)" ] && return 0
     am start-foreground-service -n "$BUBBLE_PKG/.BubbleService" >/dev/null 2>&1 \
         || am startservice -n "$BUBBLE_PKG/.BubbleService" >/dev/null 2>&1
     wd_log REVIVE "floating mati, service dihidupkan ulang"
 }
 
 while [ "$WD_STOP" -eq 0 ]; do
-    sleep "$BUBBLE_TICK" 2>/dev/null || sleep 45
+    sleep "$BUBBLE_TICK" 2>/dev/null || sleep 5
     [ "$WD_STOP" -eq 0 ] || break
     bubble_revive
     wd_n=$((wd_n + 1))

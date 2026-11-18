@@ -190,6 +190,7 @@ class BubbleService : Service() {
             }
         }
         scope.launch {
+            var tick = 0
             while (isActive) {
                 val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
                 if (!pm.isInteractive) {
@@ -201,7 +202,10 @@ class BubbleService : Service() {
                     while (isActive && !pm.isInteractive && w < 15) { delay(2000); w++ }
                     continue
                 }
-                val s = Hsin.status()
+                // Status modul (satu proses su) tiap 4 putaran = 8 dtk; notifikasi sendiri
+                // disegarkan tiap 2 dtk dari data lokal, jadi angkanya tidak terasa telat.
+                tick++
+                val s = if (tick % 4 == 1) Hsin.status() else null
                 if (s == null) {
                     // status gagal/lambat: floating tetap dipastikan ada (jangan hilang menunggu su)
                     if (orbAllowed()) floating?.setGame("auto")
@@ -250,7 +254,7 @@ class BubbleService : Service() {
                 // baterai/suhu selalu dari sistem (tanpa su) supaya notifikasi tidak basi walau status gagal/lambat
                 readBattery()
                 updateNotification()
-                delay(if (gamePkg.isNotEmpty()) 8000L else 6000L)
+                delay(2000L)
             }
         }
     }
