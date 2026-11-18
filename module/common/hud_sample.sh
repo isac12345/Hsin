@@ -426,7 +426,8 @@ sample() {
 }
 
 # matikan timestats yang kita nyalakan sendiri (jangan dibiarkan aktif terus di SurfaceFlinger)
-trap '[ "$TS_ON" = 1 ] && dumpsys SurfaceFlinger --timestats -disable >/dev/null 2>&1; exit 0' EXIT HUP INT TERM
+# exit $rc: jangan paksa 0, kalau tidak pemanggil tidak bisa tahu --fpsd gagal.
+trap 'rc=$?; [ "$TS_ON" = 1 ] && dumpsys SurfaceFlinger --timestats -disable >/dev/null 2>&1; exit $rc' EXIT HUP INT TERM
 
 # Diagnosa FPS: tiap sumber dicoba sekali, hasil ditulis rapi (dipakai tombol Diagnosa FPS di app).
 diag() {
@@ -504,5 +505,11 @@ case "$1" in
             sleep "$_lp_slp"
         done
         ;;
-    *) echo "Usage: hud_sample.sh --once|--loop <package|auto>"; exit 1 ;;
+    --fpsd)   # arahkan daemon FPS ke paket ini (dipakai adapt.sh); tanpa sampel lain
+        [ -n "${2:-}" ] || { echo "Usage: hud_sample.sh --fpsd <package>"; exit 1; }
+        fpsd_ensure || { echo "fpsd tidak aktif"; exit 1; }
+        printf '%s' "$2" > "$FPSD_PKG" 2>/dev/null || { echo "gagal tulis $FPSD_PKG"; exit 1; }
+        echo "OK: fpsd -> $2"
+        ;;
+    *) echo "Usage: hud_sample.sh --once|--loop|--fpsd <package|auto>"; exit 1 ;;
 esac

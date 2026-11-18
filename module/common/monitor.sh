@@ -1188,6 +1188,12 @@ FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
 # Hasil: "p1 avg stall_ms". avg dipakai adapt.sh untuk membedakan aplikasi
 # yang benar-benar bergerak (game, sosmed) dari yang diam (layar baca).
 monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall_ms"
+    # Berkas basi = daemon mati/diam. Tanpa cek ini angka terakhir dipakai ulang
+    # sebagai sampel baru (n naik padahal tidak ada yang diukur). Jendela daemon 10 dtk.
+    _mfs_now=$(date +%s 2>/dev/null)
+    _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
+    case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
+    [ $((_mfs_now - _mfs_mt)) -le 15 ] || return 1
     # Data milik app lain (mis. com.termux) bukan FPS game: jangan dipakai, kalau tidak 1% low palsu memicu boost.
     if [ -n "$2" ]; then
         _mfs_p=$(sed -n 's/^pkg=//p' "$1" 2>/dev/null | head -n 1)

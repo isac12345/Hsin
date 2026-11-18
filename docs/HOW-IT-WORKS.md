@@ -118,6 +118,10 @@ and CPU pressure is below 30, I/O pressure below 10, and available RAM at least
   percentages stay the same.
 - If a game produces no FPS sample 60 s after warm-up, one warning with the
   `fpsd.status` line is written to `hsin.log`.
+- When a session opens, Adapt points the FPS daemon at that game
+  (`hud_sample.sh --fpsd <pkg>`, which also starts the daemon if it died). Without
+  this the daemon kept measuring whichever app the HUD last asked for, and every
+  sample was rejected by the package check.
 
 ### 3.4 Did the raise help
 

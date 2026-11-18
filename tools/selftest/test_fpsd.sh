@@ -14,6 +14,21 @@ printf 'pkg=com.game.a\nlat=%s\n' "$LAT" > "$T/b.out"
 chk "paket lain ditolak" "$(monitor_fps_stat "$T/a.out" com.game.a; echo "rc=$?")" "rc=1"
 chk "paket sama dipakai" "$(monitor_fps_stat "$T/b.out" com.game.a | cut -d' ' -f1 | grep -c '^[0-9]')" "1"
 chk "tanpa paket harapan tetap dibaca" "$(monitor_fps_stat "$T/a.out" | grep -c '^[0-9]')" "1"
+cp "$T/b.out" "$T/old.out"; touch -t 202001010000 "$T/old.out"
+chk "berkas basi (daemon mati) ditolak" "$(monitor_fps_stat "$T/old.out" com.game.a; echo "rc=$?")" "rc=1"
+echo "== hud_sample --fpsd: arahkan daemon ke game (tanpa ini sampel game ditolak)"
+mkdir -p "$T/modfake/bin" "$T/st"
+for a in arm64 arm32; do
+    printf '#!/bin/sh\n[ "$1" = "--selftest" ] && exit 0\nexit 0\n' > "$T/modfake/bin/hsin-fpsd-$a"
+    chmod +x "$T/modfake/bin/hsin-fpsd-$a"
+done
+HSIN_STATE_DIR="$T/st" HSIN_MODDIR="$T/modfake" sh "$C/hud_sample.sh" --fpsd com.game.a >/dev/null 2>&1
+chk "fpsd.pkg berisi game" "$(cat "$T/st/fpsd.pkg" 2>/dev/null)" "com.game.a"
+printf 'com.termux' > "$T/st/fpsd.pkg"
+HSIN_STATE_DIR="$T/st" HSIN_MODDIR="$T/modfake" HSIN_FPSD=0 sh "$C/hud_sample.sh" --fpsd com.game.a >/dev/null 2>&1
+chk "daemon mati: gagal (rc 1)" "$?" "1"
+chk "daemon mati: pkg tidak ditimpa" "$(cat "$T/st/fpsd.pkg")" "com.termux"
+chk "tanpa paket: ditolak" "$(HSIN_STATE_DIR="$T/st" HSIN_MODDIR="$T/modfake" sh "$C/hud_sample.sh" --fpsd >/dev/null 2>&1; echo $?)" "1"
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

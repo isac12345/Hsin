@@ -19,6 +19,10 @@
 
 AD_DIR="${HSIN_CONF_DIR:-/data/adb/hsin}/adapt"
 AD_STATE="${HSIN_CONF_DIR:-/data/adb/hsin}"
+# Dir common/ yang benar. monitor.sh mengeset MODDIR=.../common, service.sh
+# mengeset MODDIR=akar modul, jadi jangan langsung tempel "/common" ke MODDIR.
+AD_COMMON="${AD_COMMON:-${MODDIR:-/data/adb/modules/hsin}/common}"
+[ -f "$AD_COMMON/hsinctl.sh" ] || AD_COMMON="${MODDIR:-/data/adb/modules/hsin}"
 AD_TARGET_P1="${AD_TARGET_P1:-20}"
 AD_AVG_MIN="${AD_AVG_MIN:-15}"
 AD_STALL_JANK="${AD_STALL_JANK:-300}"
@@ -552,7 +556,7 @@ ad_fps_pick() {   # $1=rata $2=1%low
 }
 
 ad_gamefps_set() {   # $1=pkg $2=fps -> tulis batas fps + refresh lewat hsinctl
-    sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+    sh "${AD_HSC:-$AD_COMMON/hsinctl.sh}" \
         gamefps set "$1" "$2" 2>&1
 }
 
@@ -672,6 +676,13 @@ ad_migrate_v2() {
     fi
 }
 
+ad_fpsd_point() {   # $1=pkg; arahkan daemon FPS ke game ini (daemon juga dihidupkan bila mati)
+    # Tanpa ini daemon tetap mengukur paket terakhir yang diminta HUD, jadi sampel game
+    # ditolak (pkg tidak cocok) dan n tetap 0 walau fpsd.status=ok.
+    _afo=$(sh "${AD_HUD:-$AD_COMMON/hud_sample.sh}" --fpsd "$1" 2>&1) \
+        || ad_log "fps: daemon tidak siap ($_afo); sesi ini tanpa sampel"
+}
+
 ad_open() {   # $1=pkg
     AD_PKG="$1"
     AD_IS_GAME=0
@@ -712,6 +723,7 @@ ad_open() {   # $1=pkg
     ad_cset "$1" sesi $((_sesi + 1))
     [ "$AD_IS_GAME" = "1" ] && ad_own_on "$1"
     [ "$AD_IS_GAME" = "1" ] && [ "$_sesi" -eq 0 ] && ad_seed_game "$1"
+    [ "$AD_IS_GAME" = "1" ] && ad_fpsd_point "$1"
     ad_apply
     ad_log "mulai $1 game=$AD_IS_GAME beban=$AD_BEBAN sesi=$((_sesi + 1))"
 }
@@ -773,7 +785,7 @@ ad_seed_game() {   # $1=pkg game tanpa riwayat: pasang benih resolusi + FPS lewa
     _sgf=$(sed -n 's/^AD_FPS_SEED=//p' "$AD_STATE/device_profile.env" 2>/dev/null | tail -n 1)
     case "$_sgd" in ''|*[!0-9]*) return 0 ;; esac
     case "$_sgf" in ''|*[!0-9]*) _sgf=keep ;; esac
-    _sgo2=$(sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+    _sgo2=$(sh "${AD_HSC:-$AD_COMMON/hsinctl.sh}" \
         gameauto set "$_sgp" "$(ad_ds_fmt "$_sgd")" "$_sgf" 2>&1) \
         || ad_log "benih: $_sgp gagal disimpan ($_sgo2)"
     ad_log "benih: $_sgp resolusi ${_sgd}% fps $_sgf (game baru, berlaku saat dibuka berikutnya)"
@@ -917,7 +929,7 @@ ad_auto_tune() {   # $1=pkg game
     [ "$_nds" != "$_cur" ] && _chg=1
     [ "$_nfps" != "$_fps" ] && _chg=1
     _aok=1
-    _aset=$(sh "${AD_HSC:-${MODDIR:-/data/adb/modules/hsin}/common/hsinctl.sh}" \
+    _aset=$(sh "${AD_HSC:-$AD_COMMON/hsinctl.sh}" \
         gameauto set "$_ap" "$(ad_ds_fmt "$_nds")" "${_nfps:-keep}" 2>&1) \
         || { _aok=0; ad_log "auto: $_ap gagal menyimpan pengaturan ($_aset)"; }
     if [ "$_chg" = 1 ] && [ "$_aok" = "1" ]; then

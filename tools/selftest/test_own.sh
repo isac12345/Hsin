@@ -31,6 +31,9 @@ EOP
 chmod +x "$T/bin/pidof"; PATH="$T/bin:$PATH"
 st() { sed 's/.*) //' "/proc/$(cat "$T/sleep.pid")/stat" 2>/dev/null | cut -c1; }
 
+printf '#!/bin/sh\necho "$*" >> "$T_HUD_LOG"\n' > "$T/hud.sh"
+export T_HUD_LOG="$T/hud.log"
+export AD_HUD="$T/hud.sh"
 export HSIN_CONF_DIR="$T/state" HSIN_LOG_FILE="$T/log" AD_DIR="$T/state/adapt" AD_STATE="$T/state"
 export HSIN_STATE_DIR="$T/state" HSIN_SYS_CPUFREQ="$T/cf" HSIN_SYS_DEVFREQ="$T/df"
 export SYSFS_POWER_PREFIX="$T/power" SYSFS_THERMAL_PREFIX="$T/thermal" SYSFS_MODULE_PREFIX="$T/mod"
@@ -285,6 +288,20 @@ printf 'n=500\nsum_p1=15000\njank_n=50\n' > "$AD_DIR/com.game.s4.conf"
 mkdir "$AD_STATE/.stats_v2"   # direktori: -f gagal, tulis penanda gagal (meniru penyimpanan tak bisa ditulis)
 ad_migrate_v2; chk "penanda gagal ditulis: data tidak dibagi" "$(ad_cget com.game.s4 n)" "500"
 rmdir "$AD_STATE/.stats_v2"; AD_MIGRATE=0
+echo "== dir common benar walau MODDIR=.../common (seperti monitor.sh)"
+chk "MODDIR=common: AD_COMMON tetap dir common" \
+    "$( ( unset AD_COMMON; MODDIR="$C"; . "$C/adapt.sh"; printf '%s' "$AD_COMMON" ) )" "$C"
+chk "MODDIR=akar modul: AD_COMMON = akar/common" \
+    "$( ( unset AD_COMMON; MODDIR="${C%/common}"; . "$C/adapt.sh"; printf '%s' "$AD_COMMON" ) )" "$C"
+echo "== daemon FPS diarahkan ke game yang baru dibuka"
+rm -f "$T_HUD_LOG"; ad_open com.game.f1; ad_end
+chk "game: daemon diarahkan" "$(cat "$T_HUD_LOG")" "--fpsd com.game.f1"
+rm -f "$T_HUD_LOG"; ad_open com.other.app; ad_end
+chk "bukan game: daemon tidak disentuh" "$(cat "$T_HUD_LOG" 2>/dev/null)" ""
+printf '#!/bin/sh\necho "fpsd tidak aktif" >&2\nexit 1\n' > "$T/hud_fail.sh"
+AD_HUD="$T/hud_fail.sh"; rm -f "$T/log"; ad_open com.game.f2; ad_end
+chk "daemon gagal: dicatat di log" "$(grep -c 'daemon tidak siap' "$T/log")" "1"
+AD_HUD="$T/hud.sh"
 echo "== simpan berkala: sampel tidak hilang bila monitor mati di tengah sesi"
 rm -rf "$AD_DIR"; AD_SAMP_GAP=0; T_FPS="60 60 16"; T_NOW=40000
 ad_tick com.game.b1; T_NOW=40010; ad_tick com.game.b1; T_NOW=40030; ad_tick com.game.b1

@@ -22,6 +22,11 @@ class AdaptParseTest {
         assertEquals(0, r[0].beban)
     }
 
+    @Test fun tersendatKey() {
+        val r = parseAdaptList("com.game.x beban=1 sesi=3 p1_min=0 rata=14 tersendat=22% stall=900ms terakhir=2026-11-18 08:30")
+        assertEquals(22, r[0].jank)
+    }
+
     @Test fun sortedNewestFirst() {
         val r = parseAdaptList("a.b beban=0 terakhir=2026-11-13 10:00\nc.d beban=1 terakhir=2026-11-14 09:00\n")
         assertEquals("c.d", r[0].pkg)
