@@ -19,7 +19,7 @@ data class AdaptRow(val pkg: String, val v: Map<String, String>) {
     val sesi: Int? get() = num("sesi")
     val p1Min: Int? get() = num("p1_min")
     val rata: Int? get() = num("rata")
-    val jank: Int? get() = num("jank")
+    val jank: Int? get() = (num("tersendat") ?: num("jank"))
     val stallMs: Int? get() = num("stall")
     val terakhir: String get() = v["terakhir"].orEmpty()
 }

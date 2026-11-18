@@ -787,7 +787,7 @@ cmd_adapt() {
                 [ -f "$_f" ] || continue
                 _p=${_f##*/}; _p=${_p%.conf}
                 _cas=$(sed -n 's/^beban_cas=//p' "$_f" | tail -n 1)
-                printf '%s beban=%s cas=%s sesi=%s p1_min=%s rata=%s jank=%s%% stall=%sms terakhir=%s\n' \
+                printf '%s beban=%s cas=%s sesi=%s p1_min=%s rata=%s tersendat=%s%% stall=%sms terakhir=%s\n' \
                     "$_p" \
                     "$(sed -n 's/^beban=//p' "$_f" | tail -n 1)" \
                     "${_cas:--}" \
