@@ -96,6 +96,29 @@ and CPU pressure is below 30, I/O pressure below 10, and available RAM at least
   when a critical temperature is reached.
 - Between two changes there is always a gap of at least 30 seconds.
 
+### 3.3a What the statistics count
+
+- One statistics sample is taken per `AD_SAMP_GAP` = 10 seconds (the length of one
+  FPS-daemon window), not per monitor tick. Samples are therefore real time:
+  `n` = 24 is about 4 minutes of play, `n` = 60 about 10 minutes.
+- `jank_pct` is "share of sampled play time that was janky" (1% low below target,
+  strong frame-pacing drop, or a long stall). It is not a frame count. The session
+  summary in the app counts individual slow frames instead, so the two numbers are
+  different measures and are labelled differently in the app ("janky time" vs "jank").
+- Gaps of `AD_STALL_LOADING` = 1500 ms or more are treated as loading and are not
+  recorded. The warm-up (first 90 s) is not recorded either.
+- Auto tune needs `n` >= 24; presets and suggestions need `n` >= 60.
+- History is capped at `AD_HIST_MAX` = 2000 samples; above that, `n`, `sum_p1` and
+  `jank_n` are scaled down together so averages and percentages are unchanged but a
+  new session can still move them. `p1_min` and `stall_max` are kept for life.
+- Samples are saved every 60 seconds (only when there is something new), so a crash
+  or reboot loses at most one minute.
+- Data written by earlier versions (one sample per 2 s tick) is migrated once by
+  dividing `n`, `sum_p1` and `jank_n` by 5 (marker `.stats_v2`); averages and
+  percentages stay the same.
+- If a game produces no FPS sample 60 s after warm-up, one warning with the
+  `fpsd.status` line is written to `hsin.log`.
+
 ### 3.4 Did the raise help
 
 Before raising, the engine records the jank rate of the current window. After
