@@ -513,7 +513,14 @@ class BubbleService : Service() {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NID_SARAN, n)
     }
 
+    private var notifSig = ""
+
     private fun updateNotification() {
+        // Isi notifikasi hanya bergantung pada nilai ini; kalau sama, tidak perlu notify()
+        // (dulu dipanggil tiap 2 dtk walau angkanya tidak berubah).
+        val sig = "${modeNow()}|$gamePkg|$adaptNow|${prefs.bubbleHidden}|${floating?.lastFps}|$batt|${tempC.toInt()}"
+        if (sig == notifSig) return
+        notifSig = sig
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NID, buildNotification())
     }
