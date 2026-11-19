@@ -73,7 +73,7 @@ hs_now() {
 fpsd_read() {
     FL_LAT=""
     [ "$FPSD_ON" = 1 ] && [ "$FPSD_BAD" = 0 ] || return 1
-    printf '%s' "$1" > "$FPSD_PKG" 2>/dev/null
+    echo "$1" > "$FPSD_PKG" 2>/dev/null
     [ -r "$FPSD_OUT" ] || return 1
     _fr_m=$(stat -c %Y "$FPSD_OUT" 2>/dev/null) || return 1
     hs_now; _fr_n=$HS_NOW
@@ -211,7 +211,7 @@ first_int() {
     _fi=${_fi#"${_fi%%[0-9]*}"}
     _fi=${_fi%%[!0-9]*}
     [ -n "$_fi" ] || return 1
-    printf '%s' "$_fi"
+    FI="$_fi"
 }
 
 GPU_PATH=""
@@ -229,10 +229,11 @@ gp_path() {
 
 gpu_freq_mhz() {
     gp_path || return 1
-    _gf=$(first_int "$GPU_PATH/cur_freq") || _gf=$(first_int "$GPU_PATH/devfreq/cur_freq") || return 1
+    first_int "$GPU_PATH/cur_freq" || first_int "$GPU_PATH/devfreq/cur_freq" || return 1
+    _gf=$FI
     if [ "$_gf" -ge 10000000 ]; then _gf=$((_gf / 1000000))
     elif [ "$_gf" -ge 10000 ]; then _gf=$((_gf / 1000)); fi
-    printf '%s' "$_gf"
+    GPU_FREQ="$_gf"
 }
 
 gpu_load() {
@@ -246,13 +247,13 @@ gpu_load() {
         $GPU_PATH/device/utilization $GPU_PATH/device/gpu_utilization"
     for _g_n in $_g_nodes /sys/class/devfreq/*gpu*/load /sys/class/devfreq/*gpu*/utilisation \
         /sys/class/devfreq/*mali*/load; do
-        _g_v=$(first_int "$_g_n") && { printf '%s' "$_g_v"; return 0; }
+        first_int "$_g_n" && { GPU_LOAD="$FI"; return 0; }
     done
     # Adreno: gpubusy = "busy total" (selisih interval), lainnya persen langsung
     if [ -r /sys/class/kgsl/kgsl-3d0/gpubusy ]; then
         read -r _g_b _g_t < /sys/class/kgsl/kgsl-3d0/gpubusy 2>/dev/null
         case "$_g_b$_g_t" in ''|*[!0-9]*) ;; *)
-            [ "$_g_t" -gt 0 ] && { printf '%s' $((_g_b * 100 / _g_t)); return 0; }
+            [ "$_g_t" -gt 0 ] && { GPU_LOAD=$((_g_b * 100 / _g_t)); return 0; }
         ;; esac
     fi
     return 1
@@ -269,12 +270,12 @@ soc_temp_mc() {
         [ "$_st_v" -lt 125000 ] 2>/dev/null || continue
         [ "$_st_v" -gt "$_st_max" ] && _st_max=$_st_v
     done
-    printf '%s' "$_st_max"
+    SOC_MC="$_st_max"
 }
 
 batt_temp_mc() {
     read -r _bt < "$SYS_POWER/battery/temp" 2>/dev/null
-    case "$_bt" in ''|*[!0-9-]*) printf '0' ;; *) printf '%s' $((_bt * 100)) ;; esac
+    case "$_bt" in ''|*[!0-9-]*) BAT_MC=0 ;; *) BAT_MC=$((_bt * 100)) ;; esac
 }
 
 # a > b untuk timestamp 14+ digit: expr memakai 64-bit (shell ROM ini 32-bit, tidak boleh dibandingkan di sini).
@@ -412,7 +413,15 @@ sample() {
     _s_pkg="$1"
     _s_fps=""
     _s_lat=""
-    if [ -n "$_s_pkg" ]; then
+    if [ -n "$_s_pkg" ] && [ "$LIGHT" = 1 ]; then
+        # App biasa (bukan game): tanpa dumpsys sama sekali. Di ROM ini counter
+        # SurfaceFlinger (service call 1013) balas error, dan jalur layer tidak
+        # menghasilkan angka untuk app biasa (diukur: fps_x10 kosong 10 sampel
+        # berturut-turut), jadi dumpsys tiap 2 dtk hanya memakan CPU tanpa data.
+        # Daemon fpsd dipakai kalau sedang jalan; kalau tidak, APK menampilkan
+        # refresh rate layar (sudah ada di FloatingOverlay: shown == null -> hzNow).
+        fpsd_read "$_s_pkg" && _s_lat=$FL_LAT
+    elif [ -n "$_s_pkg" ]; then
         if [ "$CNT_FAIL" -lt 3 ]; then
             sf_counter; _s_cnt=$SC_RES
             case "$_s_cnt" in
@@ -446,15 +455,26 @@ sample() {
         fi
     fi
     set -- $_s_fps
-    printf 'fps_x10=%s\nlast_ts=%s\n' "${1:-}" "${2:-}"
-    printf 'pkg=%s\n' "$_s_pkg"
-    printf 'lat=%s\n' "$_s_lat"
+    # echo = builtin di mksh; printf di ROM ini /system/bin/printf (proses baru, ~10 ms).
+    # Delapan printf per sampel = ~80 ms, hampir separuh biaya tick.
+    echo "fps_x10=${1:-}"
+    echo "last_ts=${2:-}"
+    echo "pkg=$_s_pkg"
+    echo "lat=$_s_lat"
     gp_path   # cache path GPU di shell utama (di $(...) cache hilang tiap sampel)
-    printf 'gpu=%s\n' "$(gpu_load || printf '%s' '--')"
-    printf 'gpu_freq=%s\n' "$(gpu_freq_mhz || printf '%s' '--')"
+    # Tanpa $( ): tiap $( ) = satu proses baru, dan di ROM ini satu fork+exec
+    # makan ~80-100 ms CPU. Empat $( ) per sampel = ~300 ms, lebih besar dari
+    # seluruh sisa pekerjaan sampel. Fungsi mengisi variabel seperti SC_RES.
+    GPU_LOAD=""; GPU_FREQ=""
+    gpu_load || GPU_LOAD="--"
+    gpu_freq_mhz || GPU_FREQ="--"
+    echo "gpu=$GPU_LOAD"
+    echo "gpu_freq=$GPU_FREQ"
     read -r _s_cpu < /proc/stat 2>/dev/null
-    printf 'cpu=%s\n' "$_s_cpu"
-    printf 'temp_mc=%s\nsoc_mc=%s\n' "$(batt_temp_mc)" "$(soc_temp_mc)"
+    echo "cpu=$_s_cpu"
+    batt_temp_mc; soc_temp_mc
+    echo "temp_mc=$BAT_MC"
+    echo "soc_mc=$SOC_MC"
 }
 
 # matikan timestats yang kita nyalakan sendiri (jangan dibiarkan aktif terus di SurfaceFlinger)

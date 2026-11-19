@@ -39,9 +39,10 @@ monitor_epoch_now; _a2=$MONITOR_NOW
 chk "monitor_epoch_now konsisten" "$((_a2 - _a <= 1))" "1"
 sed -n '/^first_int() {/,/^}/p' "$C/hud_sample.sh" > "$T/fn3.sh"; . "$T/fn3.sh"
 printf '  1234 kHz\nabc\n' > "$T/fi1"; printf 'x=77 9\n' > "$T/fi2"; printf 'none\n' > "$T/fi3"
-chk "first_int awalan spasi" "$(first_int "$T/fi1")" "1234"
-chk "first_int dengan awalan teks" "$(first_int "$T/fi2")" "77"
-chk "first_int tanpa angka gagal" "$(first_int "$T/fi3"; echo rc=$?)" "rc=1"
+# first_int mengisi FI (bukan mencetak): printf di HP adalah proses baru, ~10 ms.
+FI=""; first_int "$T/fi1"; chk "first_int awalan spasi" "$FI" "1234"
+FI=""; first_int "$T/fi2"; chk "first_int dengan awalan teks" "$FI" "77"
+FI=""; first_int "$T/fi3"; chk "first_int tanpa angka gagal" "rc=$?" "rc=1"
 # jalur cepat layar: backlight > 0 = ON tanpa dumpsys
 sed -n '/^monitor_screen_fast_on() {/,/^}/p' "$C/monitor.sh" > "$T/fn4.sh"; . "$T/fn4.sh"
 mkdir -p "$T/bl/x"; printf '120\n' > "$T/bl/x/brightness"
