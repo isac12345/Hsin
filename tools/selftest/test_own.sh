@@ -40,7 +40,7 @@ export SYSFS_POWER_PREFIX="$T/power" SYSFS_THERMAL_PREFIX="$T/thermal" SYSFS_MOD
 mkdir -p "$T/mod"
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
-AD_WARM_SECS=0; AD_SAMP_GAP=0; AD_MIGRATE=0
+AD_WARM_SECS=0; AD_FIRST_WARM=0; AD_SAMP_GAP=0; AD_MIGRATE=0
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
 ad_memavail_kb() { printf '2000000'; }
 monitor_fps_stat() { [ "$T_FPS" = none ] || printf '%s' "${T_FPS:-60 60 16}"; }
@@ -310,6 +310,55 @@ T_NOW=40070; ad_tick com.game.b1
 chk "setelah 60 dtk: tersimpan tanpa ad_end" "$([ "$(ad_cget com.game.b1 n)" -ge 1 ] && echo ok)" "ok"
 chk "memori dikosongkan setelah simpan (tidak dobel)" "$AD_SN" "0"
 ad_tick com.other.app
+echo "== pola loading: dibuang, dipelajari per game, drop panjang tetap dihitung"
+AD_SAMP_GAP=10; AD_SAVE_EVERY=100000; AD_LOAD_LIMIT_DEF=60
+rm -rf "$AD_DIR"; mkdir -p "$AD_DIR"; : > "$T/log"
+T_NOW=50000; T_FPS="30 40 50"
+ad_tick com.game.l1; T_NOW=50010; ad_tick com.game.l1; T_NOW=50020; ad_tick com.game.l1
+chk "main normal: 3 sampel" "$AD_SN" "3"
+T_FPS="2 6 120"                                   # layar loading: rata-rata 6 fps
+for t in 50030 50040 50050 50060; do T_NOW=$t; ad_tick com.game.l1; done
+chk "loading 40 dtk: tidak dicatat" "$AD_SN" "3"
+chk "loading: tidak dihitung tersendat" "$AD_SJ" "0"
+T_FPS="30 40 50"; T_NOW=50070; ad_tick com.game.l1
+chk "pulih: loading dipelajari (load_n=1)" "$(ad_cget com.game.l1 load_n)" "1"
+chk "pulih: load_max 40" "$(ad_cget com.game.l1 load_max)" "40"
+chk "jendela campuran setelah loading dibuang" "$AD_SN" "3"
+T_NOW=50082; ad_tick com.game.l1
+chk "sesudahnya dicatat lagi" "$AD_SN" "4"
+echo "== drop panjang (lebih dari batas) dihitung tersendat"
+T_FPS="2 6 120"
+for t in 50090 50100 50110 50120 50130 50140 50150 50160 50170 50180 50190 50200; do T_NOW=$t; ad_tick com.game.l1; done
+chk "drop panjang: ada sampel tersendat" "$([ "$AD_SJ" -ge 1 ] && echo ya)" "ya"
+chk "drop panjang: dilog" "$(grep -c 'drop panjang: com.game.l1' "$T/log")" "1"
+T_FPS="30 40 50"; T_NOW=50210; ad_tick com.game.l1
+ad_tick com.other.app
+echo "== batas loading belajar dari loading game itu"
+printf 'load_n=4\nload_sum=360\nload_max=120\n' > "$AD_DIR/com.game.l2.conf"
+AD_PKG=com.game.l2; chk "batas dari riwayat (rata 90 -> 200, maks 135, dibatasi 180)" "$(ad_load_limit)" "180"
+printf 'load_n=4\nload_sum=120\nload_max=40\n' > "$AD_DIR/com.game.l2.conf"
+chk "loading singkat (rata 30 -> 80)" "$(ad_load_limit)" "80"
+rm -f "$AD_DIR/com.game.l2.conf"; chk "tanpa riwayat: batas bawaan" "$(ad_load_limit)" "60"
+echo "== FPS rata-rata main tanpa loading"
+rm -rf "$AD_DIR"; mkdir -p "$AD_DIR"; : > "$T/log"; T_NOW=51000; T_FPS="30 40 50"
+ad_tick com.game.f1; T_NOW=51010; ad_tick com.game.f1
+T_FPS="1 4 100"; T_NOW=51020; ad_tick com.game.f1; T_NOW=51030; ad_tick com.game.f1
+T_FPS="30 20 25"; T_NOW=51040; ad_tick com.game.f1
+ad_tick com.other.app
+chk "fps_avg = rata-rata jendela main (tanpa loading)" "$(ad_cget com.game.f1 fps_avg)" "40"
+chk "n_avg tercatat" "$(ad_cget com.game.f1 n_avg)" "$(ad_cget com.game.f1 n)"
+chk "log sesi memuat fps_rata" "$(grep -c 'selesai com.game.f1 .*sesi: fps_rata=40' "$T/log")" "1"
+echo "== sesi pertama game: 5 menit awal (shader) tidak dicatat"
+rm -rf "$AD_DIR"; mkdir -p "$AD_DIR"; AD_FIRST_WARM=300; AD_WARM_SECS=0; T_FPS="30 25 20"
+T_NOW=52000; ad_tick com.game.first; T_NOW=52100; ad_tick com.game.first
+chk "100 dtk pertama sesi 1: tidak dicatat" "$AD_SN" "0"
+T_NOW=52320; ad_tick com.game.first
+chk "lewat 300 dtk: dicatat" "$AD_SN" "1"
+ad_tick com.other.app
+T_NOW=53000; ad_tick com.game.first
+chk "sesi 2: pemanasan normal, langsung dicatat" "$AD_SN" "1"
+ad_tick com.other.app
+AD_FIRST_WARM=0
 echo "== sisa penanda lama (crash) dipulihkan"
 ad_own_on com.game.i; AD_OWN=0; AD_OPEN=0
 printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"

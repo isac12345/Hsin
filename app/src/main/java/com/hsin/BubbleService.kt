@@ -205,7 +205,7 @@ class BubbleService : Service() {
                 // Status modul (satu proses su) tiap 4 putaran = 8 dtk; notifikasi sendiri
                 // disegarkan tiap 2 dtk dari data lokal, jadi angkanya tidak terasa telat.
                 tick++
-                val s = if (tick % 4 == 1) Hsin.status() else null
+                val s = if (tick % 4 == 1) Hsin.status(6_000L) else null
                 if (s == null) {
                     // status gagal/lambat: floating tetap dipastikan ada (jangan hilang menunggu su)
                     if (orbAllowed()) floating?.setGame("auto")
@@ -241,7 +241,7 @@ class BubbleService : Service() {
                     }
                 }
                 // Lantai FPS dari modul (.fps_rescue): hanya saat game, satu toast per kejadian (epoch sama tidak diulang).
-                if (gamePkg.isNotEmpty()) {
+                if (gamePkg.isNotEmpty() && tick % 4 == 1) {   // su hanya di putaran status (8 dtk), bukan tiap 2 dtk
                     val rp = Hsin.fpsRescue().split("|")
                     val ep = rp.getOrNull(0)?.trim()?.toLongOrNull() ?: 0L
                     if (ep > 0L && ep != prefs.rescueEpoch) {

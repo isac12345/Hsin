@@ -43,6 +43,10 @@ AD_RAISE_SECS="${AD_RAISE_SECS:-15}"
 AD_LOWER_SECS="${AD_LOWER_SECS:-60}"
 AD_MAX_RAISE="${AD_MAX_RAISE:-2}"     # maksimal kenaikan per sesi
 AD_RAISE_RESET="${AD_RAISE_RESET:-600}"  # tiap 10 menit main: jatah naik diisi ulang
+AD_LOAD_FPS="${AD_LOAD_FPS:-10}"         # jendela dengan FPS rata-rata di bawah ini = kandidat loading
+AD_LOAD_LIMIT_DEF="${AD_LOAD_LIMIT_DEF:-60}"   # batas awal (dtk): lebih lama dari ini dianggap drop sungguhan
+AD_LOAD_MIN_LEARN="${AD_LOAD_MIN_LEARN:-15}"   # rentang rendah >= ini (dtk) dipelajari sebagai loading game itu
+AD_FIRST_WARM="${AD_FIRST_WARM:-300}"          # sesi pertama game: shader dibangun, abaikan 5 menit awal
 AD_WARM_SECS="${AD_WARM_SECS:-90}"     # awal sesi game: loading tidak memakai jatah naik
 AD_FPS_HOLD="${AD_FPS_HOLD:-92}"       # 1% low harus >= 92% kandidat FPS supaya dinilai sanggup
 AD_CHG_GAP="${AD_CHG_GAP:-30}"        # jeda minimal antar perubahan beban
@@ -95,6 +99,9 @@ AD_SS=0
 AD_SJ=0
 AD_SMIN=""
 AD_SSTALL=0
+AD_SA=0; AD_SNA=0               # jumlah FPS rata-rata jendela dan banyaknya (untuk fps_avg)
+AD_SESS_N=0; AD_SESS_SA=0; AD_SESS_SJ=0   # ringkasan sesi (tidak ikut direset saat simpan berkala)
+AD_LRUN=0; AD_LLIM=0; AD_LREAL=0; AD_LTAIL=0; AD_LOADSECS=0; AD_WARM_EFF=90
 AD_LAST_MENTOK=0
 
 # Adapt memegang frekuensi CPU/GPU selama game (spek "Adapt pengendali penuh").
@@ -616,6 +623,32 @@ ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     fi
 }
 
+# Batas "masih loading" (dtk) per game, dari loading yang pernah dipelajari: 2x rata-rata + 20,
+# minimal rata-rata terpanjang + 15, dibatasi 45..180. Belum ada data: AD_LOAD_LIMIT_DEF.
+ad_load_limit() {
+    _lln=$(ad_cget "$AD_PKG" load_n);   case "$_lln" in ''|*[!0-9]*) _lln=0 ;; esac
+    _lls=$(ad_cget "$AD_PKG" load_sum); case "$_lls" in ''|*[!0-9]*) _lls=0 ;; esac
+    _llm=$(ad_cget "$AD_PKG" load_max); case "$_llm" in ''|*[!0-9]*) _llm=0 ;; esac
+    if [ "$_lln" -lt 3 ]; then printf '%s' "$AD_LOAD_LIMIT_DEF"; return 0; fi
+    _lla=$((_lls / _lln))
+    _llv=$((_lla * 2 + 20))
+    [ "$_llv" -lt $((_llm + 15)) ] && _llv=$((_llm + 15))
+    [ "$_llv" -lt 45 ] && _llv=45
+    [ "$_llv" -gt 180 ] && _llv=180
+    printf '%s' "$_llv"
+}
+
+ad_load_learn() {   # $1=lama rentang rendah (dtk) yang berakhir normal
+    _lln=$(ad_cget "$AD_PKG" load_n);   case "$_lln" in ''|*[!0-9]*) _lln=0 ;; esac
+    _lls=$(ad_cget "$AD_PKG" load_sum); case "$_lls" in ''|*[!0-9]*) _lls=0 ;; esac
+    _llm=$(ad_cget "$AD_PKG" load_max); case "$_llm" in ''|*[!0-9]*) _llm=0 ;; esac
+    _lln=$((_lln + 1)); _lls=$((_lls + $1))
+    [ "$1" -gt "$_llm" ] && _llm=$1
+    if [ "$_lln" -gt 100 ]; then _lln=$((_lln / 2)); _lls=$((_lls / 2)); fi
+    ad_cset "$AD_PKG" load_n "$_lln"; ad_cset "$AD_PKG" load_sum "$_lls"; ad_cset "$AD_PKG" load_max "$_llm"
+    ad_log "loading dipelajari: $AD_PKG ${1}s (rata-rata $((_lls / _lln))s, terpanjang ${_llm}s, $_lln kali)"
+}
+
 ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
     [ -n "$AD_PKG" ] || return 0
     mkdir -p "$AD_DIR" 2>/dev/null
@@ -626,6 +659,9 @@ ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
     _min=$(ad_cget "$AD_PKG" p1_min); case "$_min" in ''|*[!0-9]*) _min="" ;; esac
     _stm=$(ad_cget "$AD_PKG" stall_max); case "$_stm" in ''|*[!0-9]*) _stm=0 ;; esac
     _jn=$(ad_cget "$AD_PKG" jank_n);  case "$_jn" in ''|*[!0-9]*) _jn=0 ;; esac
+    _na=$(ad_cget "$AD_PKG" n_avg);   case "$_na" in ''|*[!0-9]*) _na=0 ;; esac
+    _sa=$(ad_cget "$AD_PKG" sum_avg); case "$_sa" in ''|*[!0-9]*) _sa=0 ;; esac
+    _na=$((_na + AD_SNA)); _sa=$((_sa + AD_SA))
     _n=$((_n + AD_SN))
     _sum=$((_sum + AD_SS))
     _jn=$((_jn + AD_SJ))
@@ -637,16 +673,18 @@ ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
     if [ "$_n" -gt "$AD_HIST_MAX" ]; then
         _sum=$((_sum * AD_HIST_MAX / _n)); _jn=$((_jn * AD_HIST_MAX / _n)); _n=$AD_HIST_MAX
     fi
+    if [ "$_na" -gt "$AD_HIST_MAX" ]; then _sa=$((_sa * AD_HIST_MAX / _na)); _na=$AD_HIST_MAX; fi
     # Clamp: data lama bisa punya jank_n > n (mis. dua monitor sempat jalan
     # bersamaan). Persentase tidak boleh lebih dari 100.
     [ "$_jn" -gt "$_n" ] && _jn=$_n
     _avg=0; _jp=0
     [ "$_n" -gt 0 ] && { _avg=$((_sum / _n)); _jp=$((_jn * 100 / _n)); }
-    grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct)=' "$_f" > "$_f.tmp.$$" 2>/dev/null
-    printf 'n=%s\nsum_p1=%s\np1_min=%s\nstall_max=%s\njank_n=%s\np1_avg=%s\njank_pct=%s\n' \
-        "$_n" "$_sum" "${_min:-0}" "$_stm" "$_jn" "$_avg" "$_jp" >> "$_f.tmp.$$"
+    _fa=0; [ "$_na" -gt 0 ] && _fa=$((_sa / _na))
+    grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|n_avg|sum_avg|fps_avg)=' "$_f" > "$_f.tmp.$$" 2>/dev/null
+    printf 'n=%s\nsum_p1=%s\np1_min=%s\nstall_max=%s\njank_n=%s\np1_avg=%s\njank_pct=%s\nn_avg=%s\nsum_avg=%s\nfps_avg=%s\n' \
+        "$_n" "$_sum" "${_min:-0}" "$_stm" "$_jn" "$_avg" "$_jp" "$_na" "$_sa" "$_fa" >> "$_f.tmp.$$"
     mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
-    AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
+    AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0; AD_SA=0; AD_SNA=0
 }
 
 ad_flush() {
@@ -700,7 +738,9 @@ ad_open() {   # $1=pkg
     AD_WN=0; AD_WJ=0; AD_PREV_JR=-1; AD_FPS_TRIED=0; AD_GOT_SAMPLE=0; AD_NOSAMP_WARN=0; AD_LAST_SAMP_TS=0; AD_LAST_SAVE_TS=$AD_LAST_TS
     ad_migrate_v2
     AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
-    AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
+    AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0; AD_SA=0; AD_SNA=0
+    AD_SESS_N=0; AD_SESS_SA=0; AD_SESS_SJ=0; AD_LRUN=0; AD_LLIM=0; AD_LREAL=0; AD_LTAIL=0; AD_LOADSECS=0
+    AD_WARM_EFF=$AD_WARM_SECS
     if ad_charging; then AD_BKEY=beban_cas; else AD_BKEY=beban; fi
     AD_BEBAN=$(ad_cget "$1" "$AD_BKEY")
     # catatan lama yang tetap patah parah (>=60%) dibuang seluruhnya: beban dan
@@ -711,7 +751,7 @@ ad_open() {   # $1=pkg
         AD_BEBAN=""
         _f="$AD_DIR/$1.conf"
         if [ -f "$_f" ]; then
-            grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
+            grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|n_avg|sum_avg|fps_avg)=' "$_f" > "$_f.tmp.$$" 2>/dev/null \
                 && mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
         fi
     fi
@@ -721,6 +761,9 @@ ad_open() {   # $1=pkg
     _sesi=$(ad_cget "$1" sesi)
     case "$_sesi" in ''|*[!0-9]*) _sesi=0 ;; esac
     ad_cset "$1" sesi $((_sesi + 1))
+    # Game yang baru pertama kali dibuka membangun cache shader: FPS awalnya rendah dan
+    # bukan kemampuan HP, jadi 5 menit pertama tidak dicatat.
+    [ "$_sesi" -eq 0 ] && [ "$AD_FIRST_WARM" -gt "$AD_WARM_EFF" ] && AD_WARM_EFF=$AD_FIRST_WARM
     [ "$AD_IS_GAME" = "1" ] && ad_own_on "$1"
     [ "$AD_IS_GAME" = "1" ] && [ "$_sesi" -eq 0 ] && ad_seed_game "$1"
     [ "$AD_IS_GAME" = "1" ] && ad_fpsd_point "$1"
@@ -947,7 +990,9 @@ ad_end() {
     [ "$AD_IS_GAME" = "1" ] && ad_saran "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_preset_learn "$AD_PKG"
     [ "$AD_IS_GAME" = "1" ] && ad_auto_tune "$AD_PKG"
-    _tail="p1_min=$(ad_cget "$AD_PKG" p1_min) p1_rata=$(ad_cget "$AD_PKG" p1_avg) jank=$(ad_cget "$AD_PKG" jank_pct)% fps=${AD_LAST_AVG:--}"
+    _sfa=-; _sjp=-
+    if [ "$AD_SESS_N" -gt 0 ]; then _sfa=$((AD_SESS_SA / AD_SESS_N)); _sjp=$((AD_SESS_SJ * 100 / AD_SESS_N)); fi
+    _tail="sesi: fps_rata=$_sfa tersendat=${_sjp}% sampel=$AD_SESS_N loading=${AD_LOADSECS}s | riwayat: fps_rata=$(ad_cget "$AD_PKG" fps_avg) 1%low_rata=$(ad_cget "$AD_PKG" p1_avg) 1%low_min=$(ad_cget "$AD_PKG" p1_min) tersendat=$(ad_cget "$AD_PKG" jank_pct)%"
     [ "$AD_OWN" = "1" ] && ad_own_off selesai
     ad_kbase_own_restore
     rm -f "$AD_STATE/.adapt_now" 2>/dev/null
@@ -1061,8 +1106,35 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # Awal sesi game = loading dan pemanasan. Jangan pakai jatah naik di sini,
     # karena dulu dua kenaikan habis sebelum game benar-benar mulai.
     _warm=0
-    if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_SECS" ] 2>/dev/null; then
+    if [ "$AD_IS_GAME" = "1" ] && [ $((_now - AD_OPEN_TS)) -lt "$AD_WARM_EFF" ] 2>/dev/null; then
         _jank=0; _calm=0; _warm=1
+    fi
+    # Loading dikenali dari POLA, bukan angka tetap: jendela dengan FPS rata-rata < AD_LOAD_FPS
+    # (atau jeda sangat panjang) yang berlangsung sebentar = loading; dibuang dari statistik.
+    # "Sebentar" dipelajari per game dari loading sebelumnya (ad_load_limit). Kalau rendahnya
+    # lebih lama dari batas itu, itu drop sungguhan: dicatat sebagai tersendat dan boleh memicu
+    # kenaikan beban. Jendela 10 dtk sesudah loading juga dibuang (masih campuran).
+    if [ "$AD_IS_GAME" = "1" ] && [ "$_warm" = "0" ] && [ -n "$_avg" ]; then
+        if [ "$_avg" -lt "$AD_LOAD_FPS" ] || [ "${_stall:-0}" -ge "$AD_STALL_LOADING" ]; then
+            [ "$AD_LRUN" -eq 0 ] && AD_LLIM=$(ad_load_limit)
+            AD_LRUN=$((AD_LRUN + _dt))
+            if [ "$AD_LRUN" -le "$AD_LLIM" ]; then
+                _jank=0; _calm=0; _warm=1; AD_LOADSECS=$((AD_LOADSECS + _dt))
+            else
+                _jank=1; _calm=0; _why="drop panjang ${AD_LRUN}s fps=$_avg"
+                if [ "$AD_LREAL" = "0" ]; then
+                    AD_LREAL=1
+                    ad_log "drop panjang: $AD_PKG fps=$_avg sudah ${AD_LRUN}s (batas loading game ini ${AD_LLIM}s), dihitung tersendat"
+                fi
+            fi
+        else
+            if [ "$AD_LRUN" -gt 0 ]; then
+                # pulih: rentang yang cukup panjang dipelajari sebagai loading game ini
+                [ "$AD_LRUN" -ge "$AD_LOAD_MIN_LEARN" ] && [ "$AD_LRUN" -le 300 ] && ad_load_learn "$AD_LRUN"
+                AD_LTAIL=$((_now + AD_SAMP_GAP)); AD_LRUN=0; AD_LREAL=0
+            fi
+            if [ "$AD_LTAIL" -gt "$_now" ]; then _jank=0; _calm=0; _warm=1; fi
+        fi
     fi
     # Jeda sangat panjang (loading, pindah area, app ditahan) bukan masalah render.
     # Tanpa ini satu freeze 2 detik menurunkan resolusi sesi berikutnya.
@@ -1070,7 +1142,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # --- batas FPS mengikuti kemampuan nyata perangkat (sekali per sesi) ---
     if [ "$AD_IS_GAME" = "1" ] && [ "$AD_FPS_TRIED" = "0" ] && [ -n "$_avg" ] && [ -n "$_p1" ] \
-        && [ $((_now - AD_OPEN_TS)) -ge "$AD_WARM_SECS" ] 2>/dev/null; then
+        && [ $((_now - AD_OPEN_TS)) -ge "$AD_WARM_EFF" ] 2>/dev/null; then
         AD_FPS_TRIED=1
         ad_fps_once "$_avg" "$_p1"
     fi
@@ -1097,13 +1169,13 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # Reset dari APK/hsinctl (gameauto reset): buang sampel yang masih di memori supaya
     # tidak ditulis balik ke statistik yang baru saja dikosongkan.
     if [ -f "$AD_DIR/$AD_PKG.reset" ]; then
-        AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0
+        AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0; AD_SA=0; AD_SNA=0
         rm -f "$AD_DIR/$AD_PKG.reset" 2>/dev/null
         ad_log "statistik $AD_PKG direset dari luar, sampel di memori dibuang"
     fi
     # Game sudah lewat pemanasan 60 dtk tanpa satu sampel pun: catat sebabnya (sekali per sesi).
     if [ "$AD_IS_GAME" = "1" ] && [ "$AD_GOT_SAMPLE" = "0" ] && [ "$AD_NOSAMP_WARN" = "0" ] \
-        && [ $((_now - AD_OPEN_TS)) -ge $((AD_WARM_SECS + 60)) ] 2>/dev/null; then
+        && [ $((_now - AD_OPEN_TS)) -ge $((AD_WARM_EFF + 60)) ] 2>/dev/null; then
         AD_NOSAMP_WARN=1
         ad_log "peringatan: $AD_PKG belum menghasilkan sampel FPS setelah $((_now - AD_OPEN_TS)) dtk; fpsd.status=[$(head -n 1 "$AD_STATE/fpsd.status" 2>/dev/null)]"
     fi
@@ -1116,6 +1188,9 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         AD_GOT_SAMPLE=1
         AD_SN=$((AD_SN + 1))
         AD_SS=$((AD_SS + _p1))
+        AD_SESS_N=$((AD_SESS_N + 1))
+        if [ -n "$_avg" ]; then AD_SA=$((AD_SA + _avg)); AD_SNA=$((AD_SNA + 1)); AD_SESS_SA=$((AD_SESS_SA + _avg)); fi
+        [ "$_jank" -eq 1 ] && AD_SESS_SJ=$((AD_SESS_SJ + 1))
         if [ -z "$AD_SMIN" ] || [ "$_p1" -lt "$AD_SMIN" ]; then AD_SMIN=$_p1; fi
         [ "${_stall:-0}" -gt "$AD_SSTALL" ] && AD_SSTALL=$_stall
         [ "$_jank" -eq 1 ] && AD_SJ=$((AD_SJ + 1))

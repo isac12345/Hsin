@@ -34,8 +34,8 @@ object Hsin {
 
     private fun b(m: Map<String, String>, k: String) = m[k] == "1"
 
-    suspend fun status(): Status? {
-        val r = ctl("status")
+    suspend fun status(timeout: Long = 20_000L): Status? {
+        val r = ctl("status", timeout)
         val m = kv(r.out)
         if (m.isEmpty() || !m.containsKey("profile")) return null
         return Status(

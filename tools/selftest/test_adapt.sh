@@ -28,7 +28,7 @@ export AD_HUD="$T/hud.sh"
 export HSIN_SYS_CPUFREQ="$T/nocpu" HSIN_SYS_DEVFREQ="$T/nodev"   # Adapt tidak boleh menyentuh sysfs asli saat uji
 . "$C/gameboost.sh" 2>/dev/null
 . "$C/adapt.sh"
-AD_SAMP_GAP=0; AD_MIGRATE=0   # uji lama menghitung tiap tick, tanpa migrasi data; gerbang 10 dtk diuji khusus
+AD_FIRST_WARM=0; AD_SAMP_GAP=0; AD_MIGRATE=0   # uji lama menghitung tiap tick, tanpa migrasi data; gerbang 10 dtk diuji khusus
 AD_WARM_SECS=0   # uji lain tidak perlu menunggu pemanasan; diuji khusus di bawah
 
 # ganti pembacaan PSI/RAM dengan nilai uji

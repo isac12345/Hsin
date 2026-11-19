@@ -18,7 +18,8 @@ data class AdaptRow(val pkg: String, val v: Map<String, String>) {
     val bebanCas: Int? get() = num("cas")           // "-" atau tidak ada = belum pernah saat mengisi daya
     val sesi: Int? get() = num("sesi")
     val p1Min: Int? get() = num("p1_min")
-    val rata: Int? get() = num("rata")
+    val rata: Int? get() = num("rata")          // rata-rata 1% low
+    val fps: Int? get() = num("fps")            // FPS rata-rata main (tanpa loading)
     val jank: Int? get() = (num("tersendat") ?: num("jank"))
     val stallMs: Int? get() = num("stall")
     val terakhir: String get() = v["terakhir"].orEmpty()
@@ -73,7 +74,7 @@ internal fun AdaptTab(vm: AppViewModel) {
             HBtn(tx("Segarkan", "Refresh")) { reload++ }
             val copiedMsg = tx("Laporan disalin", "Report copied")
             HBtn(tx("Salin laporan", "Copy report")) {
-                val txt = (rows ?: emptyList()).joinToString("\n") { r -> "${r.pkg} beban=${r.beban ?: "-"} sesi=${r.sesi ?: "-"} fps=${r.rata ?: "-"} 1%low=${r.p1Min ?: "-"} tersendat=${r.jank ?: "-"}% stall=${r.stallMs ?: "-"}ms terakhir=${r.terakhir}" }
+                val txt = (rows ?: emptyList()).joinToString("\n") { r -> "${r.pkg} beban=${r.beban ?: "-"} sesi=${r.sesi ?: "-"} fps_rata=${r.fps ?: "-"} 1%low_rata=${r.rata ?: "-"} 1%low_min=${r.p1Min ?: "-"} tersendat=${r.jank ?: "-"}% stall=${r.stallMs ?: "-"}ms terakhir=${r.terakhir}" }
                 (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("adapt", txt))
                 android.widget.Toast.makeText(ctx, copiedMsg, android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -98,7 +99,7 @@ internal fun AdaptTab(vm: AppViewModel) {
                             SText(tx("beban", "load") + " " + (r.beban ?: "-") + (r.bebanCas?.let { " · " + tx("cas", "chg") + " " + it } ?: ""), 12.sp, SP.gold)
                         }
                         SText(
-                            "FPS ${r.rata ?: "-"} · 1% low ${r.p1Min ?: "-"} · " + tx("tersendat", "janky time") + " ${r.jank ?: "-"}% · " + tx("jeda", "stall") + " ${r.stallMs ?: "-"} ms · " + tx("sesi", "sessions") + " ${r.sesi ?: "-"}",
+                            "FPS ${tx("rata-rata", "avg")} ${r.fps ?: "-"} · 1% low ${tx("rata-rata", "avg")} ${r.rata ?: "-"} (min ${r.p1Min ?: "-"}) · " + tx("tersendat", "janky time") + " ${r.jank ?: "-"}% · " + tx("jeda", "stall") + " ${r.stallMs ?: "-"} ms · " + tx("sesi", "sessions") + " ${r.sesi ?: "-"}",
                             11.sp, SP.dim
                         )
                         SText(r.terakhir, 10.sp, SP.dim)
