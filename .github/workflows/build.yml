@@ -36,7 +36,8 @@ jobs:
 
       - name: Cek script modul
         run: |
-          sudo apt-get install -y mksh >/dev/null 2>&1 || true
+          sudo apt-get install -y mksh >/dev/null
+          command -v mksh >/dev/null || { echo "mksh tidak terpasang"; exit 1; }
           bash tools/check_module.sh
 
       - name: Selftest modul (dash, mirip shell HP)
