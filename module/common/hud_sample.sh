@@ -137,7 +137,7 @@ sf_counter() {
     # Hasil "Result: Parcel(00000000 0000abcd   '....')": dua kata hex 8 digit setelah "Parcel(".
     # Dipotong dengan shell (dulu printf | sed = 2 fork per sampel).
     case "$_sc_out" in
-        *"Parcel("*) _sc_g=${_sc_out#*Parcel(}; set -- $_sc_g ;;
+        *"Parcel("*) _sc_g=${_sc_out#*"Parcel("}; set -- $_sc_g ;;
         *) set -- ;;
     esac
     case "$1:$2" in

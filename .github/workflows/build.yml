@@ -35,7 +35,9 @@ jobs:
           gradle-version: '8.7'
 
       - name: Cek script modul
-        run: bash tools/check_module.sh
+        run: |
+          sudo apt-get install -y mksh >/dev/null 2>&1 || true
+          bash tools/check_module.sh
 
       - name: Selftest modul (dash, mirip shell HP)
         run: |

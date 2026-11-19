@@ -3,8 +3,11 @@
 set -e
 cd "$(dirname "$0")/.."
 fail=0
+# Shell HP Android = mksh, dan mksh lebih ketat dari dash (mis. `${v#*Parcel(}` ditolak).
+# Jadi tiap file dicek dua kali: dash (sh) dan mksh.
 for f in $(find module -name '*.sh' -not -path '*/fasrs/*' -not -path '*/uperf/*'); do
-  sh -n "$f" 2>/dev/null || { echo "SYNTAX ERROR: $f"; fail=1; }
+  sh -n "$f" 2>/dev/null || { echo "SYNTAX ERROR (sh): $f"; fail=1; }
+  command -v mksh >/dev/null 2>&1 && { mksh -n "$f" 2>/dev/null || { echo "SYNTAX ERROR (mksh): $f"; fail=1; }; }
 done
 VER=$(tr -d '[:space:]' < version.txt)
 MP=$(sed -n 's/^versionCode=//p' module/module.prop | head -n 1)
