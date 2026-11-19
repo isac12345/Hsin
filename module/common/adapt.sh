@@ -132,16 +132,31 @@ ad_log() {
 }
 
 ad_cget() {   # $1=pkg $2=key
-    sed -n "s/^$2=//p" "$AD_DIR/$1.conf" 2>/dev/null | tail -n 1 | tr -d '[:space:]'
+    _acg=""
+    if [ -r "$AD_DIR/$1.conf" ]; then
+        while IFS= read -r _acgl || [ -n "$_acgl" ]; do
+            case "$_acgl" in "$2="*) _acg=${_acgl#*=} ;; esac   # baris terakhir menang
+        done < "$AD_DIR/$1.conf"
+    fi
+    # Buang spasi kiri-kanan (nilai ditulis dengan angka, tapi berkas bisa diedit tangan)
+    _acg=${_acg#"${_acg%%[![:space:]]*}"}
+    _acg=${_acg%"${_acg##*[![:space:]]}"}
+    echo -n "$_acg"
 }
 
 ad_cset() {   # $1=pkg $2=key $3=val  (ganti satu baris, sisanya tetap)
-    mkdir -p "$AD_DIR" 2>/dev/null
+    [ -d "$AD_DIR" ] || mkdir -p "$AD_DIR" 2>/dev/null
     _f="$AD_DIR/$1.conf"
-    touch "$_f" 2>/dev/null
-    grep -v "^$2=" "$_f" > "$_f.tmp.$$" 2>/dev/null
-    printf '%s=%s\n' "$2" "$3" >> "$_f.tmp.$$"
-    mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
+    _at="$_f.tmp.$$"
+    : > "$_at"
+    if [ -r "$_f" ]; then
+        while IFS= read -r _asl || [ -n "$_asl" ]; do
+            case "$_asl" in "$2="*) continue ;; esac   # baris lama dibuang
+            echo "$_asl" >> "$_at"
+        done < "$_f"
+    fi
+    echo "$2=$3" >> "$_at"
+    mv -f "$_at" "$_f" 2>/dev/null
 }
 
 ad_kbase_set() {   # $1=beban -> titip ke gameboost (satu penulis)
@@ -733,9 +748,20 @@ ad_save() {   # tulis catatan GABUNGAN (bukan per sesi)
     _avg=0; _jp=0
     [ "$_n" -gt 0 ] && { _avg=$((_sum / _n)); _jp=$((_jn * 100 / _n)); }
     _fa=0; [ "$_na" -gt 0 ] && _fa=$((_sa / _na))
-    grep -v -E '^(n|sum_p1|p1_min|stall_max|jank_n|p1_avg|jank_pct|n_avg|sum_avg|fps_avg)=' "$_f" > "$_f.tmp.$$" 2>/dev/null
-    printf 'n=%s\nsum_p1=%s\np1_min=%s\nstall_max=%s\njank_n=%s\np1_avg=%s\njank_pct=%s\nn_avg=%s\nsum_avg=%s\nfps_avg=%s\n' \
-        "$_n" "$_sum" "${_min:-0}" "$_stm" "$_jn" "$_avg" "$_jp" "$_na" "$_sa" "$_fa" >> "$_f.tmp.$$"
+    : > "$_f.tmp.$$"
+    if [ -r "$_f" ]; then
+        while IFS= read -r _asl || [ -n "$_asl" ]; do
+            case "$_asl" in
+                n=*|sum_p1=*|p1_min=*|stall_max=*|jank_n=*|p1_avg=*|jank_pct=*|n_avg=*|sum_avg=*|fps_avg=*) continue ;;
+                *) echo "$_asl" >> "$_f.tmp.$$" ;;
+            esac
+        done < "$_f"
+    fi
+    {
+        echo "n=$_n"; echo "sum_p1=$_sum"; echo "p1_min=${_min:-0}"; echo "stall_max=$_stm"
+        echo "jank_n=$_jn"; echo "p1_avg=$_avg"; echo "jank_pct=$_jp"
+        echo "n_avg=$_na"; echo "sum_avg=$_sa"; echo "fps_avg=$_fa"
+    } >> "$_f.tmp.$$"
     mv -f "$_f.tmp.$$" "$_f" 2>/dev/null
     AD_SN=0; AD_SS=0; AD_SJ=0; AD_SMIN=""; AD_SSTALL=0; AD_SA=0; AD_SNA=0
 }
