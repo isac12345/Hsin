@@ -877,7 +877,12 @@ gh_foreground() {
 }
 
 gh_tick() {
-    _ght_now=$(_gh_now)
+    # Tanpa $( ): subshell = satu proses baru (~20 ms) tiap tick.
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now; _ght_now=$MONITOR_NOW
+    else
+        _ght_now=$(_gh_now)
+    fi
     _gh_num "$_ght_now" || return 0
     # Penjaga Overdrive mati tapi uperf/fas-rs masih beku atau frekuensi masih terkunci: pulihkan.
     if _gh_ovd_exists; then

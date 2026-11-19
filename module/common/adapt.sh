@@ -454,7 +454,22 @@ ADEOF
 
 # Panggilan telepon/video aktif = jangan sentuh apa pun.
 ad_in_call() {
-    dumpsys audio 2>/dev/null | grep -qE 'MODE_IN_COMMUNICATION|MODE_IN_CALL'
+    # dumpsys audio | grep = dua proses (~68 ms). Panggilan tidak berubah dalam
+    # hitungan detik, jadi hasilnya dipakai 30 dtk. Uptime dibaca tanpa fork.
+    _ic_u=""; read -r _ic_u _ 2>/dev/null < /proc/uptime
+    _ic_u=${_ic_u%%.*}
+    case "$_ic_u" in ''|*[!0-9]*) _ic_u="" ;; esac
+    if [ -n "$_ic_u" ] && [ -n "${AD_INCALL_AT:-}" ] && [ "$_ic_u" -lt "$AD_INCALL_AT" ]; then
+        [ "${AD_INCALL_V:-0}" = "1" ]
+        return
+    fi
+    if dumpsys audio 2>/dev/null | grep -qE 'MODE_IN_COMMUNICATION|MODE_IN_CALL'; then
+        AD_INCALL_V=1
+    else
+        AD_INCALL_V=0
+    fi
+    [ -n "$_ic_u" ] && AD_INCALL_AT=$((_ic_u + 30))
+    [ "$AD_INCALL_V" = "1" ]
 }
 
 # --- pengukuran -------------------------------------------------------------
@@ -465,14 +480,15 @@ ad_psi() {   # $1=cpu|io -> some avg10 (bulat)
     case "$_apl" in "some avg10="*) ;; *) return 0 ;; esac
     _apl=${_apl#some avg10=}; _apl=${_apl%% *}; _apl=${_apl%%.*}
     case "$_apl" in ''|*[!0-9]*) return 0 ;; esac
-    printf '%s' "$_apl"
+    # echo -n = builtin; printf di Android proses baru (~20 ms per panggilan).
+    echo -n "$_apl"
 }
 
 ad_memavail_kb() {
     while read -r _amk _amv _ 2>/dev/null; do
         [ "$_amk" = "MemAvailable:" ] || continue
         case "$_amv" in ''|*[!0-9]*) return 0 ;; esac
-        printf '%s' "$_amv"; return 0
+        echo -n "$_amv"; return 0
     done < /proc/meminfo
     return 0
 }
@@ -482,8 +498,8 @@ ad_memavail_kb() {
 ad_temp_mc() {
     _t=""; read -r _t 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp"
     _t=${_t%%[[:space:]]*}
-    case "$_t" in ''|*[!0-9]*) printf '0'; return ;; esac
-    printf '%s' $((_t * 100))
+    case "$_t" in ''|*[!0-9]*) echo -n 0; return ;; esac
+    echo -n $((_t * 100))
 }
 
 # Suhu terpanas dari semua thermal zone (mili-C). 0 bila tidak terbaca.
@@ -502,12 +518,12 @@ ad_soc_temp_mc() {
         [ "$_v" -gt 105000 ] 2>/dev/null && continue
         [ "$_v" -gt "$_mx" ] && _mx=$_v
     done
-    printf '%s' "$_mx"
+    echo -n "$_mx"
 }
 
 ad_batt_pct() {
     _abp=""; read -r _abp 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity"
-    printf '%s' "${_abp%%[[:space:]]*}"
+    echo -n "${_abp%%[[:space:]]*}"
 }
 
 # --- kbase milik sendiri (di luar game) ------------------------------------

@@ -201,7 +201,7 @@ monitor_screen_fast_on() {
 
 get_screen_state() {
     if monitor_screen_fast_on; then
-        printf '%s\n' ON
+        echo ON          # echo = builtin; printf di Android proses baru
         return 0
     fi
     if ! run_dumpsys power; then
@@ -210,12 +210,12 @@ get_screen_state() {
 
     if grep -qiE 'mWakefulness[=:][[:space:]]*Awake|Wakefulness[=:][[:space:]]*Awake' "$monitor_dump_file"; then
         rm -f "$monitor_dump_file"
-        printf '%s\n' ON
+        echo ON
         return 0
     fi
 
     rm -f "$monitor_dump_file"
-    printf '%s\n' OFF
+    echo OFF
     return 0
 }
 
@@ -814,24 +814,32 @@ check_daily_loadavg_guard() {
     [ -f "$CURRENT_STATE_FILE" ] && current_prof=$(tr -d '[:space:]' < "$CURRENT_STATE_FILE" 2>/dev/null)
     [ "$current_prof" != "battery" ] && return 0
 
-    local load1
-    load1=$(cut -d' ' -f1 /proc/loadavg 2>/dev/null)
+    local load1=""
+    read -r load1 _ 2>/dev/null < /proc/loadavg   # tanpa cut
     case "$load1" in ''|*[!0-9.]*) return 0 ;; esac
 
     # Compare as integer (truncate decimals): load1 > 6.5 means >= 6.5
-    local load1_int
-    load1_int=$(printf '%.0f' "$load1" 2>/dev/null)
+    local load1_int load1_dec
+    load1_int=${load1%%.*}
     case "$load1_int" in ''|*[!0-9]*) return 0 ;; esac
+    # Bulatkan seperti printf %.0f tapi tanpa proses baru: 6.5 ke atas jadi 7,
+    # supaya ambang "loadavg1 >= 6.5" tetap sama artinya.
+    case "$load1" in
+        *.*) load1_dec=${load1#*.}; load1_dec=${load1_dec%"${load1_dec#?}"} ;;
+        *) load1_dec=0 ;;
+    esac
+    case "$load1_dec" in ''|*[!0-9]*) load1_dec=0 ;; esac
+    [ "$load1_dec" -ge 5 ] && load1_int=$((load1_int + 1))
 
     local balanced_applied=0
-    [ -f "$DAILY_LOADBAL_FILE" ] && balanced_applied=$(cat "$DAILY_LOADBAL_FILE" 2>/dev/null)
+    [ -f "$DAILY_LOADBAL_FILE" ] && monitor_rd "$DAILY_LOADBAL_FILE" && balanced_applied="$MONITOR_RD"
 
     if [ "$load1_int" -ge 7 ] 2>/dev/null; then
         local high_count=0
-        [ -f "$DAILY_LOADHIGH_FILE" ] && high_count=$(cat "$DAILY_LOADHIGH_FILE" 2>/dev/null)
+        [ -f "$DAILY_LOADHIGH_FILE" ] && monitor_rd "$DAILY_LOADHIGH_FILE" && high_count="$MONITOR_RD"
         case "$high_count" in ''|*[!0-9]*) high_count=0 ;; esac
         high_count=$((high_count + 1))
-        printf '%s\n' "$high_count" > "$DAILY_LOADHIGH_FILE" 2>/dev/null
+        echo "$high_count" > "$DAILY_LOADHIGH_FILE" 2>/dev/null
 
         if [ "$high_count" -ge 2 ] 2>/dev/null && [ "$balanced_applied" != "1" ]; then
             monitor_log "MONITOR" "DAILY LOADGUARD: loadavg1=$load1 >= 6.5 twice, temporarily applying balanced VM/IO"
@@ -859,7 +867,7 @@ check_daily_loadavg_guard() {
             VM_STAT_INTERVAL="$saved_stat"
             VM_SWAPPINESS="$saved_swap"
             IO_READ_AHEAD_KB="$saved_ra"
-            printf '%s\n' "1" > "$DAILY_LOADBAL_FILE" 2>/dev/null
+            echo "1" > "$DAILY_LOADBAL_FILE" 2>/dev/null
         fi
     else
         # Load normal: if we were balanced, restore battery VM/IO

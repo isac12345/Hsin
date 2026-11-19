@@ -26,11 +26,17 @@ _mf_ok() { command -v gh_feat_ok >/dev/null 2>&1 || return 0; gh_feat_ok "$1"; }
 
 _mf_log() { printf '[%s] [MEMFX] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" "$1" "$2" >> "$MF_LOG" 2>/dev/null; }
 _mf_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
-_mf_conf() {
-    _mfc=""
-    [ -f "$MF_CONF" ] && _mfc=$(sed -n "s/^$1=//p" "$MF_CONF" 2>/dev/null | tail -n 1)
-    [ -n "$_mfc" ] && printf '%s' "$_mfc" || printf '%s' "$2"
+_mf_conf_v() {   # $1=kunci [$2=bawaan] -> hasil di MFC_V (tanpa subshell)
+    MFC_V=""
+    if [ -r "$MF_CONF" ]; then
+        while IFS= read -r _mfl; do
+            case "$_mfl" in "$1="*) MFC_V=${_mfl#*=} ;; esac   # yang terakhir menang
+        done < "$MF_CONF"
+    fi
+    [ -n "$MFC_V" ] || MFC_V="$2"
 }
+
+_mf_conf() { _mf_conf_v "$@"; echo -n "$MFC_V"; }
 # titik tunggal tulis sysfs; test meng-override fungsi ini untuk meniru kernel
 _mf_write() { printf '%s' "$2" > "$1" 2>/dev/null; }
 
@@ -39,17 +45,21 @@ _mf_x100() {
     _mx_i=${1%%.*}
     _mx_f=${1#*.}
     [ "$_mx_f" = "$1" ] && _mx_f=00
-    _mx_f=$(printf '%.2s' "${_mx_f}00")
+    _mx_f="${_mx_f}00"
+    _mx_f=${_mx_f%"${_mx_f#??}"}   # dua digit pertama, tanpa printf
     _mx_f=${_mx_f#0}
     _mf_num "$_mx_i" || return 1
     _mf_num "${_mx_f:-0}" || return 1
-    printf '%s' $(( _mx_i * 100 + ${_mx_f:-0} ))
+    echo -n $(( _mx_i * 100 + ${_mx_f:-0} ))
 }
 
 # mf_psi_x100 some|full avg10|avg60|avg300
 mf_psi_x100() {
     [ -r "$MF_PSI" ] || return 1
-    _mp=$(sed -n "s/^$1 //p" "$MF_PSI" 2>/dev/null | head -n 1)
+    _mp=""
+    while IFS= read -r _mpl; do
+        case "$_mpl" in "$1 "*) _mp=$_mpl; break ;; esac
+    done < "$MF_PSI"
     [ -n "$_mp" ] || return 1
     for _mp_t in $_mp; do
         case "$_mp_t" in "$2="*) _mf_x100 "${_mp_t#*=}"; return $? ;; esac
@@ -62,11 +72,13 @@ _mf_meminfo_kb() { sed -n "s/^$1:[[:space:]]*\([0-9]*\).*/\1/p" "$MF_MEMINFO" 2>
 # Ambang = ambang stall parsial lmkd perangkat ini. lmkd memicu bila stall parsial >= N ms dalam jendela 1000 ms,
 # jadi N ms = N/10 persen. Default sistem 70 ms (normal) / 200 ms (RAM kecil); dibaca dari properti, bukan ditanam.
 mf_psi_threshold_x100() {
+    # Sengaja tidak di-cache: test_memfx mengganti properti di tengah proses, dan
+    # properti bisa dibaca ulang dengan murah. Dua getprop ~40 ms per tick.
     _mt=$(getprop ro.lmk.psi_partial_stall_ms 2>/dev/null)
     if ! _mf_num "$_mt"; then
         if [ "$(getprop ro.config.low_ram 2>/dev/null)" = "true" ]; then _mt=200; else _mt=70; fi
     fi
-    printf '%s' $(( _mt * 10 ))
+    echo -n $(( _mt * 10 ))
 }
 
 mf_memstat() {
@@ -140,12 +152,13 @@ mf_mglru_restore() {
 # selama MEMCLEAN_HITS sampel berturut-turut, dan sudah lewat MEMCLEAN_COOLDOWN detik dari tindakan terakhir.
 # Tindakan: `am kill-all` (hanya proses yang aman dimatikan: cached/background, bukan app foreground).
 mf_relief_tick() {
-    [ "$(_mf_conf MEMCLEAN 0)" = 1 ] || return 0
+    _mf_conf_v MEMCLEAN 0
+    [ "$MFC_V" = 1 ] || return 0
     _mf_ok memclean || return 0
     _mv=$(mf_psi_x100 some avg10) || return 0
     _mth=$(mf_psi_threshold_x100)
-    _mhn=$(_mf_conf MEMCLEAN_HITS 3); _mf_num "$_mhn" || _mhn=3
-    _mcd=$(_mf_conf MEMCLEAN_COOLDOWN 180); _mf_num "$_mcd" || _mcd=180
+    _mf_conf_v MEMCLEAN_HITS 3; _mhn=$MFC_V; _mf_num "$_mhn" || _mhn=3
+    _mf_conf_v MEMCLEAN_COOLDOWN 180; _mcd=$MFC_V; _mf_num "$_mcd" || _mcd=180
     if [ "$_mv" -ge "$_mth" ]; then
         _mh=$(cat "$MF_HITS" 2>/dev/null); _mf_num "$_mh" || _mh=0
         _mh=$((_mh + 1)); printf '%s\n' "$_mh" > "$MF_HITS"
@@ -157,7 +170,10 @@ mf_relief_tick() {
     _ml=$(cat "$MF_LAST" 2>/dev/null); _mf_num "$_ml" || _ml=0
     [ $(( _mn - _ml )) -ge "$_mcd" ] || return 0
     # ROM ini bisa tidak punya `am kill-all` (terbukti di itel P65): jangan pura-pura bertindak.
-    if ! am help 2>&1 | grep -q 'kill-all'; then
+    if [ -z "${MF_AM_KILLALL:-}" ]; then
+        if am help 2>&1 | grep -q 'kill-all'; then MF_AM_KILLALL=1; else MF_AM_KILLALL=0; fi
+    fi
+    if [ "$MF_AM_KILLALL" != "1" ]; then
         printf '%s\n' "$_mn" > "$MF_LAST"; rm -f "$MF_HITS"
         _mf_log INFO "am kill-all tidak ada di ROM ini; pembersihan RAM dilakukan app HSIN (Ritual / tombol Bersihkan RAM)"
         return 0
@@ -181,7 +197,8 @@ mf_caps() {
 # Bebaskan RAM sekali saat game mulai (opt-in: MEMCLEAN_ON_START=1). Setara "Free RAM" di AZenith tapi
 # memakai `am kill-all` (hanya proses yang aman dimatikan), bukan force-stop massal.
 mf_start_clean() {
-    [ "$(_mf_conf MEMCLEAN_ON_START 0)" = 1 ] || return 0
+    _mf_conf_v MEMCLEAN_ON_START 0
+    [ "$MFC_V" = 1 ] || return 0
     _mf_ok memclean || return 0
     am help 2>&1 | grep -q 'kill-all' || { _mf_log INFO "am kill-all tidak ada di ROM ini; RAM dibersihkan oleh app HSIN saat Ritual"; return 0; }
     am kill-all >/dev/null 2>&1
