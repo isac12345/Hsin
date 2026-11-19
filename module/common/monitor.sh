@@ -70,8 +70,8 @@ case "$GAME_SNAP_EVERY_SECS" in ''|*[!0-9]*) GAME_SNAP_EVERY_SECS=300 ;; esac
 # atau file $STATE_DIR/MONITOR_LOOP_SECS (angka 1-8, dibaca tiap putaran).
 # Maks 8 supaya cek termal tiap 15 dtk tidak melambat jauh (termal tetap menang).
 # Tick saat BUKAN game di depan (mode event). Game tetap EVENT_LOOP_SECS_DEFAULT.
-EVENT_IDLE_SECS="${HSIN_EVENT_IDLE_SECS:-6}"
-case "$EVENT_IDLE_SECS" in ''|*[!0-9]*) EVENT_IDLE_SECS=6 ;; esac
+EVENT_IDLE_SECS="${HSIN_EVENT_IDLE_SECS:-10}"   # app biasa: cek tiap 10 dtk (dulu 6). Game tetap 2 dtk
+case "$EVENT_IDLE_SECS" in ''|*[!0-9]*) EVENT_IDLE_SECS=10 ;; esac
 [ "$EVENT_IDLE_SECS" -le 30 ] 2>/dev/null || EVENT_IDLE_SECS=30
 EVENT_LOOP_SECS_DEFAULT="${HSIN_EVENT_LOOP_SECS:-2}"
 case "$EVENT_LOOP_SECS_DEFAULT" in ''|*[!0-9]*) EVENT_LOOP_SECS_DEFAULT=2 ;; esac
