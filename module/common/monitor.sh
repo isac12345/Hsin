@@ -822,8 +822,9 @@ check_daily_loadavg_guard() {
     local load1_int load1_dec
     load1_int=${load1%%.*}
     case "$load1_int" in ''|*[!0-9]*) return 0 ;; esac
-    # Bulatkan seperti printf %.0f tapi tanpa proses baru: 6.5 ke atas jadi 7,
-    # supaya ambang "loadavg1 >= 6.5" tetap sama artinya.
+    # Pembulatan setengah ke ATAS, bukan ke genap seperti printf %.0f: 6.50 jadi 7
+    # (printf: 6), 0.5 jadi 1 (printf: 0). Ambang di bawah memakai ">= 6.5", jadi
+    # 6.5 memang harus ikut terhitung.
     case "$load1" in
         *.*) load1_dec=${load1#*.}; load1_dec=${load1_dec%"${load1_dec#?}"} ;;
         *) load1_dec=0 ;;

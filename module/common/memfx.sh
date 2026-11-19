@@ -29,7 +29,9 @@ _mf_num() { case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
 _mf_conf_v() {   # $1=kunci [$2=bawaan] -> hasil di MFC_V (tanpa subshell)
     MFC_V=""
     if [ -r "$MF_CONF" ]; then
-        while IFS= read -r _mfl; do
+        # `|| [ -n "$_mfl" ]`: baris terakhir tanpa newline tetap terbaca (dulu sed
+        # juga membacanya, jadi berkas yang diedit tangan tidak berubah arti).
+        while IFS= read -r _mfl || [ -n "$_mfl" ]; do
             case "$_mfl" in "$1="*) MFC_V=${_mfl#*=} ;; esac   # yang terakhir menang
         done < "$MF_CONF"
     fi
