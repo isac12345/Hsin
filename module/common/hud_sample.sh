@@ -52,6 +52,23 @@ fpsd_ensure() {
     ( "$_fe_bin" "$FPSD_DIR" >/dev/null 2>&1 & )
     return 0
 }
+# Epoch detik tanpa fork date: /proc/uptime + offset (date sekali, diperbarui tiap 600 dtk).
+HS_EP0=""; HS_EP0_AT=0
+hs_now() {
+    HS_NOW=""
+    _hn_u=""; read -r _hn_u _ 2>/dev/null < /proc/uptime
+    _hn_u=${_hn_u%%.*}
+    case "$_hn_u" in
+        ''|*[!0-9]*) HS_NOW=$(date +%s) ;;
+        *)
+            if [ -z "$HS_EP0" ] || [ $((_hn_u - HS_EP0_AT)) -ge 600 ] || [ "$_hn_u" -lt "$HS_EP0_AT" ]; then
+                HS_NOW=$(date +%s)
+                HS_EP0=$((HS_NOW - _hn_u)); HS_EP0_AT=$_hn_u
+            else
+                HS_NOW=$((HS_EP0 + _hn_u))
+            fi ;;
+    esac
+}
 # Hasil daemon bila segar (< 4 dtk) dan untuk game yang sama. FL_LAT diisi baris timestamp.
 fpsd_read() {
     FL_LAT=""
@@ -59,7 +76,7 @@ fpsd_read() {
     printf '%s' "$1" > "$FPSD_PKG" 2>/dev/null
     [ -r "$FPSD_OUT" ] || return 1
     _fr_m=$(stat -c %Y "$FPSD_OUT" 2>/dev/null) || return 1
-    _fr_n=$(date +%s)
+    hs_now; _fr_n=$HS_NOW
     [ $((_fr_n - _fr_m)) -le 4 ] || return 1
     _fr_pkg=""; _fr_lat=""
     while IFS= read -r _fr_l; do
@@ -117,13 +134,22 @@ sf_counter() {
     SC_RES=""
     _sc_g=""
     _sc_out=$(service call SurfaceFlinger 1013 2>/dev/null)
-    [ -n "$_sc_out" ] && _sc_g=$(printf '%s' "$_sc_out" | sed -n 's/.*Parcel([[:space:]]*\([0-9a-fA-F]\{8\}\)[[:space:]]\+\([0-9a-fA-F]\{8\}\).*/\1 \2/p')
-    set -- $_sc_g
+    # Hasil "Result: Parcel(00000000 0000abcd   '....')": dua kata hex 8 digit setelah "Parcel(".
+    # Dipotong dengan shell (dulu printf | sed = 2 fork per sampel).
+    case "$_sc_out" in
+        *"Parcel("*) _sc_g=${_sc_out#*Parcel(}; set -- $_sc_g ;;
+        *) set -- ;;
+    esac
+    case "$1:$2" in
+        ????????:????????) ;;
+        *) set --; ;;
+    esac
+    case "$1$2" in *[!0-9a-fA-F]*) set -- ;; esac
     [ "$1" = "00000000" ] || { CNT_FAIL=$((CNT_FAIL + 1)); return 1; }
     _sc_c=$((0x$2)); CNT_FAIL=0
     _sc_p=$CNT_PREV; CNT_PREV=$_sc_c
     # selang NYATA dari /proc/uptime (centidetik): iterasi bisa molor, jangan asumsikan 1 dtk
-    _sc_u=$(cut -d' ' -f1 /proc/uptime 2>/dev/null)
+    _sc_u=""; read -r _sc_u _ 2>/dev/null < /proc/uptime
     _sc_t=${_sc_u%.*}${_sc_u#*.}
     case "$_sc_t" in ''|*[!0-9]*) _sc_t="" ;; esac
     _sc_tp=$CNT_TPREV; CNT_TPREV=$_sc_t
@@ -178,7 +204,12 @@ EOF
 # Bilangan bulat pertama dari isi node (format beda antar vendor: "45", "45 %", "46@800000000Hz", "36 36 4")
 first_int() {
     [ -r "$1" ] || return 1
-    _fi=$(head -n 1 "$1" 2>/dev/null | tr -cs '0-9' ' ' | sed 's/^ *//' | cut -d' ' -f1)
+    # Tanpa proses anak: baris pertama, buang awalan non-digit, ambil deret digit pertama
+    # (dulu head | tr | sed | cut = 4 fork per node, dua kali per sampel).
+    _fi=""
+    IFS= read -r _fi 2>/dev/null < "$1" || [ -n "$_fi" ] || return 1
+    _fi=${_fi#"${_fi%%[0-9]*}"}
+    _fi=${_fi%%[!0-9]*}
     [ -n "$_fi" ] || return 1
     printf '%s' "$_fi"
 }
@@ -418,6 +449,7 @@ sample() {
     printf 'fps_x10=%s\nlast_ts=%s\n' "${1:-}" "${2:-}"
     printf 'pkg=%s\n' "$_s_pkg"
     printf 'lat=%s\n' "$_s_lat"
+    gp_path   # cache path GPU di shell utama (di $(...) cache hilang tiap sampel)
     printf 'gpu=%s\n' "$(gpu_load || printf '%s' '--')"
     printf 'gpu_freq=%s\n' "$(gpu_freq_mhz || printf '%s' '--')"
     read -r _s_cpu < /proc/stat 2>/dev/null
@@ -485,12 +517,12 @@ case "$1" in
             [ -n "$_lp_gm" ] && [ "$_lp_gm" = "$_lp_pkg" ] && { LIGHT=0; _lp_slp=1; }
             [ "$_lp_auto" = 1 ] || { LIGHT=0; _lp_slp=1; }
             TICK_S=$_lp_slp
-            _lp_u0=$(cut -d' ' -f1 /proc/uptime 2>/dev/null)
+            _lp_u0=""; read -r _lp_u0 _ 2>/dev/null < /proc/uptime
             sample "$_lp_pkg" || exit 0
             echo "--" || exit 0
             # sampel lambat (>=0,6 dtk) = SurfaceFlinger sedang berat: di app non-game mundur ke 5 dtk
             if [ "$LIGHT" = 1 ]; then
-                _lp_u1=$(cut -d' ' -f1 /proc/uptime 2>/dev/null)
+                _lp_u1=""; read -r _lp_u1 _ 2>/dev/null < /proc/uptime
                 _lp_c0=${_lp_u0%.*}${_lp_u0#*.}; _lp_c1=${_lp_u1%.*}${_lp_u1#*.}
                 case "$_lp_c0$_lp_c1" in ''|*[!0-9]*) ;; *)
                     # hanya mundur bila dua sampel berturut-turut lambat (satu sampel lambat = pencarian layer awal, wajar)

@@ -69,6 +69,10 @@ case "$GAME_SNAP_EVERY_SECS" in ''|*[!0-9]*) GAME_SNAP_EVERY_SECS=300 ;; esac
 # Kadensi loop: default 2 dtk (perilaku lama). Override: env HSIN_EVENT_LOOP_SECS
 # atau file $STATE_DIR/MONITOR_LOOP_SECS (angka 1-8, dibaca tiap putaran).
 # Maks 8 supaya cek termal tiap 15 dtk tidak melambat jauh (termal tetap menang).
+# Tick saat BUKAN game di depan (mode event). Game tetap EVENT_LOOP_SECS_DEFAULT.
+EVENT_IDLE_SECS="${HSIN_EVENT_IDLE_SECS:-6}"
+case "$EVENT_IDLE_SECS" in ''|*[!0-9]*) EVENT_IDLE_SECS=6 ;; esac
+[ "$EVENT_IDLE_SECS" -le 30 ] 2>/dev/null || EVENT_IDLE_SECS=30
 EVENT_LOOP_SECS_DEFAULT="${HSIN_EVENT_LOOP_SECS:-2}"
 case "$EVENT_LOOP_SECS_DEFAULT" in ''|*[!0-9]*) EVENT_LOOP_SECS_DEFAULT=2 ;; esac
 [ "$EVENT_LOOP_SECS_DEFAULT" -ge 1 ] 2>/dev/null || EVENT_LOOP_SECS_DEFAULT=2
@@ -180,7 +184,26 @@ run_dumpsys() {
     return 0
 }
 
+# Jalur cepat: lampu layar menyala (brightness > 0) = layar nyala. Dibaca dengan read
+# bawaan shell, tanpa dumpsys power (162 ms, 252 KB per panggilan). Layar mati / tidak ada
+# node backlight tetap diputuskan dumpsys. HSIN_SCREEN_FAST=0 mematikan jalur ini.
+monitor_screen_fast_on() {
+    [ "${HSIN_SCREEN_FAST:-1}" = "0" ] && return 1
+    for _msf in "${SYSFS_BACKLIGHT_PREFIX:-/sys/class/backlight}"/*/brightness; do
+        [ -r "$_msf" ] || continue
+        _msv=""; read -r _msv 2>/dev/null < "$_msf"
+        case "$_msv" in ''|*[!0-9]*) continue ;; esac
+        [ "$_msv" -gt 0 ] 2>/dev/null && return 0
+        return 1
+    done
+    return 1
+}
+
 get_screen_state() {
+    if monitor_screen_fast_on; then
+        printf '%s\n' ON
+        return 0
+    fi
     if ! run_dumpsys power; then
         return 1
     fi
@@ -198,7 +221,18 @@ get_screen_state() {
 
 get_foreground_package() {
     if run_dumpsys activity activities; then
+        # Jalur murah: grep satu baris + potong di shell (dulu sed -E dengan tiga pola).
+        monitor_fg_line=$(grep 'ResumedActivity' "$monitor_dump_file" | tail -n 1)
+        monitor_foreground_package=${monitor_fg_line%%/*}
+        monitor_foreground_package=${monitor_foreground_package##* }
+        case "$monitor_foreground_package" in
+            *[!A-Za-z0-9_.]*|''|*.|.*) monitor_foreground_package="" ;;
+            *.*) ;;
+            *) monitor_foreground_package="" ;;
+        esac
+        if [ -z "$monitor_foreground_package" ]; then
         monitor_foreground_package=$(sed -n -E 's/.*mResumedActivity:.* ([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)\/.*$/\1/p; s/.*ResumedActivity:.* ([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)\/.*$/\1/p; s/.*topResumedActivity=ActivityRecord\{[^ ]+ u[0-9]+ ([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)\/.*$/\1/p' "$monitor_dump_file" | tail -n 1)
+        fi
         rm -f "$monitor_dump_file"
         if [ -n "$monitor_foreground_package" ]; then
             printf '%s\n' "$monitor_foreground_package"
@@ -882,6 +916,24 @@ monitor_uptime() {
     case "$MONITOR_UP" in ''|*[!0-9]*) MONITOR_UP="" ;; esac
 }
 
+# Epoch detik tanpa fork: uptime (CLOCK_BOOTTIME) + offset yang dihitung dari date
+# sekali, diperbarui tiap 600 dtk supaya koreksi jam (NTP) ikut. Hasil di MONITOR_NOW.
+monitor_epoch_now() {
+    MONITOR_NOW=""
+    monitor_uptime
+    if [ -n "$MONITOR_UP" ]; then
+        if [ -z "${MONITOR_EP0:-}" ] || [ $((MONITOR_UP - ${MONITOR_EP0_AT:-0})) -ge 600 ] || [ "$MONITOR_UP" -lt "${MONITOR_EP0_AT:-0}" ]; then
+            _men=$(date +%s 2>/dev/null)
+            case "$_men" in
+                ''|*[!0-9]*) MONITOR_EP0="" ;;
+                *) MONITOR_EP0=$((_men - MONITOR_UP)); MONITOR_EP0_AT=$MONITOR_UP; MONITOR_NOW=$_men ;;
+            esac
+        fi
+        [ -z "$MONITOR_NOW" ] && [ -n "${MONITOR_EP0:-}" ] && MONITOR_NOW=$((MONITOR_EP0 + MONITOR_UP))
+    fi
+    [ -n "$MONITOR_NOW" ] || MONITOR_NOW=$(date +%s 2>/dev/null)
+}
+
 # Override kadensi loop dari file MONITOR_LOOP_SECS (1-8). Kosong = default.
 monitor_loop_override() {
     MONITOR_LOOP_OVR=""
@@ -977,8 +1029,7 @@ thermal_kernel_cap() {
 
 # Check GameBoost grace period and safety
 check_gb_grace_period() {
-    local now
-    now=$(date +%s 2>/dev/null)
+    local now=""
 
     # Ekstra game (prioritas proses, DND, refresh rate): grace keluar game, ulang prioritas, bersih-bersih
     if command -v gh_tick >/dev/null 2>&1; then
@@ -988,7 +1039,8 @@ check_gb_grace_period() {
     # Check pending restore
     if [ -f "$GB_PENDING_FILE" ]; then
         local pending_time
-        pending_time=$(cat "$GB_PENDING_FILE" 2>/dev/null)
+        now=$(date +%s 2>/dev/null)
+        monitor_rd "$GB_PENDING_FILE"; pending_time="$MONITOR_RD"
         case "$pending_time" in ''|*[!0-9]*) rm -f "$GB_PENDING_FILE"; return 0 ;; esac
         
         local elapsed=$((now - pending_time))
@@ -1015,9 +1067,10 @@ check_gb_grace_period() {
     
     # Safety check every 15 seconds if gameboost is active
     local gb_active=0
-    [ -f "$GB_ACTIVE_FILE" ] && gb_active=$(cat "$GB_ACTIVE_FILE" 2>/dev/null)
+    if [ -f "$GB_ACTIVE_FILE" ]; then monitor_rd "$GB_ACTIVE_FILE"; gb_active="$MONITOR_RD"; fi
     
     if [ "$gb_active" = "1" ]; then
+        [ -n "$now" ] || now=$(date +%s 2>/dev/null)
         local time_since_last=$((now - GB_SAFETY_LAST))
         if [ "$time_since_last" -ge "$GB_SAFETY_INTERVAL" ] 2>/dev/null; then
             GB_SAFETY_LAST=$now
@@ -1190,16 +1243,33 @@ FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
 monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall_ms"
     # Berkas basi = daemon mati/diam. Tanpa cek ini angka terakhir dipakai ulang
     # sebagai sampel baru (n naik padahal tidak ada yang diukur). Jendela daemon 10 dtk.
-    _mfs_now=$(date +%s 2>/dev/null)
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now; _mfs_now=$MONITOR_NOW
+    else
+        _mfs_now=$(date +%s 2>/dev/null)
+    fi
     _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
     case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
     [ $((_mfs_now - _mfs_mt)) -le 15 ] || return 1
+    # Satu sed untuk paket dan lat (dulu dua sed + dua head). Hasil sama untuk berkas tanpa pkg=.
+    _mfs_pl=$(sed -n 's/^pkg=/P /p;s/^lat=/L /p' "$1" 2>/dev/null)
     # Data milik app lain (mis. com.termux) bukan FPS game: jangan dipakai, kalau tidak 1% low palsu memicu boost.
     if [ -n "$2" ]; then
-        _mfs_p=$(sed -n 's/^pkg=//p' "$1" 2>/dev/null | head -n 1)
+        _mfs_p=""
+        while IFS= read -r _mfs_l; do
+            case "$_mfs_l" in "P "*) _mfs_p=${_mfs_l#P }; break ;; esac
+        done <<MFSEOF
+$_mfs_pl
+MFSEOF
         [ "$_mfs_p" = "$2" ] || return 1
     fi
-    sed -n 's/^lat=//p' "$1" 2>/dev/null | head -n 1 | awk '{
+    _mfs_lat=""
+    while IFS= read -r _mfs_l; do
+        case "$_mfs_l" in "L "*) _mfs_lat=${_mfs_l#L }; break ;; esac
+    done <<MFSEOF
+$_mfs_pl
+MFSEOF
+    printf '%s\n' "$_mfs_lat" | awk '{
         n = 0
         for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
         if (n < 3) exit 1
@@ -1349,8 +1419,23 @@ run_event_supervised_loop() {
         # Jika jendela lewat tapi NOL event ter-parse, fallback polling permanen
         # sisa sesi. Layar-mati tidak dihitung, jadi "sepi karena idle" tidak
         # disalahartikan sebagai "filter rusak".
+        monitor_epoch_now   # panaskan offset epoch di shell utama (subshell mewarisi, tanpa fork date)
+        # Di mode event-driven, handler event berjalan di proses anak (reader
+        # fifo), jadi variabel paket di loop ini tidak pernah diperbarui. Baca
+        # berkas HUD yang ditulis handler tiap tick supaya tick selalu tahu
+        # aplikasi yang sedang di depan, bukan paket basi dari tick pertama.
+        if [ -f "$HUD_FOREGROUND_FILE" ]; then
+            monitor_rd "$HUD_FOREGROUND_FILE" && monitor_foreground_package="${MONITOR_RD%%[[:space:]]*}"
+        fi
         monitor_loop_override
         monitor_ev_secs="${MONITOR_LOOP_OVR:-$EVENT_LOOP_SECS_DEFAULT}"
+        # Bukan game di depan: tick lebih jarang (EVENT_IDLE_SECS). Game tetap 2 dtk karena
+        # Adapt, grace keluar game, dan penjaga FPS butuh kadensi rapat. Override file menang.
+        if [ -z "$MONITOR_LOOP_OVR" ] && [ "$EVENT_IDLE_SECS" -gt "$monitor_ev_secs" ] 2>/dev/null; then
+            if [ -z "$monitor_foreground_package" ] || [ -z "$(get_game_profile "$monitor_foreground_package")" ]; then
+                monitor_ev_secs="$EVENT_IDLE_SECS"
+            fi
+        fi
         EVENT_ON_SECS=$((EVENT_ON_SECS + monitor_ev_secs))
         if [ "$EVENT_FALLBACK_DONE" -eq 0 ] && [ "$EVENT_ON_SECS" -ge "$EVENT_HEALTH_SECS" ] 2>/dev/null; then
             event_parsed=$(event_count_get)
@@ -1366,13 +1451,6 @@ run_event_supervised_loop() {
                 EVENT_HEALTH_LOGGED=1
                 monitor_log "EVENT" "event stream healthy (${event_parsed} parsed in ${EVENT_ON_SECS}s)"
             fi
-        fi
-        # Di mode event-driven, handler event berjalan di proses anak (reader
-        # fifo), jadi variabel paket di loop ini tidak pernah diperbarui. Baca
-        # berkas HUD yang ditulis handler tiap tick supaya tick selalu tahu
-        # aplikasi yang sedang di depan, bukan paket basi dari tick pertama.
-        if [ -f "$HUD_FOREGROUND_FILE" ]; then
-            monitor_foreground_package=$(tr -d '[:space:]' < "$HUD_FOREGROUND_FILE" 2>/dev/null)
         fi
         # GameBoost: check grace period + thermal safety
         check_gb_grace_period
@@ -1395,6 +1473,7 @@ run_polling_loop() {
         fi
         monitor_cycle=$((monitor_cycle + 1))
 
+        monitor_epoch_now
         monitor_screen_state=$(get_screen_state)
         if [ "$?" -ne 0 ]; then
             monitor_log "WARNING" "dumpsys power failed; skipping cycle=$monitor_cycle"

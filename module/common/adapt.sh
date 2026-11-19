@@ -419,7 +419,29 @@ ADSEED
     [ -f "$AD_STATE/adapt_deny.conf" ] && cat "$AD_STATE/adapt_deny.conf"
 }
 
+# Epoch detik tanpa fork bila monitor.sh menyediakan monitor_epoch_now (uptime + offset);
+# selain itu (uji, hsinctl) jatuh ke date.
+ad_now() {
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now; AD_NOW=$MONITOR_NOW
+    else
+        AD_NOW=$(date +%s 2>/dev/null)
+    fi
+}
+
 ad_denied() {   # $1=pkg; return 0 = jangan disentuh
+    # Hasil di-cache per paket: daftar tolak (heredoc + cat) hanya dibaca saat paket berganti.
+    AD_DENY_N=$(( ${AD_DENY_N:-0} + 1 ))
+    if [ "$1" = "${AD_DENY_PKG:-}" ] && [ -n "${AD_DENY_RES:-}" ] && [ "$AD_DENY_N" -lt 30 ]; then
+        [ "$AD_DENY_RES" = "1" ]; return
+    fi
+    AD_DENY_N=0
+    AD_DENY_PKG="$1"
+    if ad_denied_scan "$1"; then AD_DENY_RES=1; else AD_DENY_RES=0; fi
+    [ "$AD_DENY_RES" = "1" ]
+}
+
+ad_denied_scan() {
     while IFS= read -r _pat; do
         case "$_pat" in ''|'#'*) continue ;; esac
         # shellcheck disable=SC2254
@@ -436,18 +458,30 @@ ad_in_call() {
 }
 
 # --- pengukuran -------------------------------------------------------------
-ad_psi() {   # $1=cpu|io -> some avg10
-    sed -n 's/^some avg10=\([0-9][0-9]*\).*/\1/p' "/proc/pressure/$1" 2>/dev/null | head -n 1
+# Pembacaan sensor tanpa proses anak (read bawaan shell): dipanggil tiap tick monitor.
+ad_psi() {   # $1=cpu|io -> some avg10 (bulat)
+    _apl=""
+    read -r _apl 2>/dev/null < "/proc/pressure/$1" || [ -n "$_apl" ] || return 0
+    case "$_apl" in "some avg10="*) ;; *) return 0 ;; esac
+    _apl=${_apl#some avg10=}; _apl=${_apl%% *}; _apl=${_apl%%.*}
+    case "$_apl" in ''|*[!0-9]*) return 0 ;; esac
+    printf '%s' "$_apl"
 }
 
 ad_memavail_kb() {
-    sed -n 's/^MemAvailable:[[:space:]]*\([0-9][0-9]*\).*/\1/p' /proc/meminfo 2>/dev/null | head -n 1
+    while read -r _amk _amv _ 2>/dev/null; do
+        [ "$_amk" = "MemAvailable:" ] || continue
+        case "$_amv" in ''|*[!0-9]*) return 0 ;; esac
+        printf '%s' "$_amv"; return 0
+    done < /proc/meminfo
+    return 0
 }
 
 # Temp baterai dibaca dalam 0,1 C (mis. 361 = 36,1 C), lalu disimpan milli-C
 # supaya sama dengan ambang AD_TEMP_MAX (50000 = 50 C).
 ad_temp_mc() {
-    _t=$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp" 2>/dev/null | tr -d '[:space:]')
+    _t=""; read -r _t 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp"
+    _t=${_t%%[[:space:]]*}
     case "$_t" in ''|*[!0-9]*) printf '0'; return ;; esac
     printf '%s' $((_t * 100))
 }
@@ -458,7 +492,8 @@ ad_soc_temp_mc() {
     _mx=0
     for _z in "$_zt"/thermal_zone*/temp; do
         [ -r "$_z" ] || continue
-        _v=$(cat "$_z" 2>/dev/null | tr -d '[:space:]')
+        _v=""; read -r _v 2>/dev/null < "$_z"
+        _v=${_v%%[[:space:]]*}
         case "$_v" in ''|*[!0-9]*) continue ;; esac
         [ "$_v" -lt 1000 ] 2>/dev/null && _v=$((_v * 1000))   # sebagian kernel pakai 0,1 C
         # Sebagian zona di ROM tertentu melaporkan angka ngawur (930 C, 114 C).
@@ -471,7 +506,8 @@ ad_soc_temp_mc() {
 }
 
 ad_batt_pct() {
-    cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity" 2>/dev/null | tr -d '[:space:]'
+    _abp=""; read -r _abp 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity"
+    printf '%s' "${_abp%%[[:space:]]*}"
 }
 
 # --- kbase milik sendiri (di luar game) ------------------------------------
@@ -542,7 +578,8 @@ ad_kbase_own_restore() {
 }
 
 ad_charging() {
-    case "$(cat "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status" 2>/dev/null)" in Charging|Full) return 0 ;; esac
+    _ach=""; read -r _ach 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status"
+    case "$_ach" in Charging|Full) return 0 ;; esac
     return 1
 }
 # --- batas FPS sesuai kemampuan perangkat --------------------------------
@@ -1010,6 +1047,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     _pkg="$1"
     case "$_pkg" in ''|*[!A-Za-z0-9._]*) return 0 ;; esac
 
+    ad_now   # panaskan offset epoch di shell ini (dipakai subshell sensor)
     if ad_denied "$_pkg"; then
         [ "$AD_OPEN" = "1" ] && ad_end
         return 0
@@ -1018,7 +1056,8 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # (mulai dari beban tinggi, lihat ad_tier_beban) supaya tidak mati selamanya setelah Puncak.
     # Overdrive yang sedang menyala memegang frekuensi: Adapt tidak boleh ikut menulis.
     [ -f "$AD_STATE/.ovd_active" ] && { [ "$AD_OPEN" = "1" ] && ad_end; return 0; }
-    case "$(tr -d '[:space:]' < "$AD_STATE/active_profile" 2>/dev/null)" in
+    _apf=""; read -r _apf 2>/dev/null < "$AD_STATE/active_profile"
+    case "$_apf" in
         puncak|overdrive)
             [ "$AD_OPEN" = "1" ] && ad_end
             return 0
@@ -1034,7 +1073,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         if [ ! -f "$AD_OWN_FILE" ]; then
             AD_OWN=0   # penanda dicabut pihak lain (Puncak): jangan menulis frekuensi lagi
         else
-            _ozn=$(date +%s 2>/dev/null)
+            ad_now; _ozn=$AD_NOW
             case "$_ozn" in ''|*[!0-9]*) _ozn=0 ;; esac
             if [ $((_ozn - AD_OWN_FZ_TS)) -ge 20 ]; then AD_OWN_FZ_TS=$_ozn; ad_own_freeze; fi
         fi
@@ -1096,7 +1135,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     [ "$_jank" -eq 1 ] && AD_WJ=$((AD_WJ + 1))
 
     # --- akumulasi waktu (bukan jumlah tick: interval game dan app beda) ---
-    _now=$(date +%s 2>/dev/null)
+    ad_now; _now=$AD_NOW
     case "$_now" in ''|*[!0-9]*) _now=$AD_LAST_TS ;; esac
     _dt=$((_now - AD_LAST_TS))
     [ "$_dt" -gt 30 ] && _dt=30

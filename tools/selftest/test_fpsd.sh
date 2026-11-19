@@ -29,6 +29,28 @@ HSIN_STATE_DIR="$T/st" HSIN_MODDIR="$T/modfake" HSIN_FPSD=0 sh "$C/hud_sample.sh
 chk "daemon mati: gagal (rc 1)" "$?" "1"
 chk "daemon mati: pkg tidak ditimpa" "$(cat "$T/st/fpsd.pkg")" "com.termux"
 chk "tanpa paket: ditolak" "$(HSIN_STATE_DIR="$T/st" HSIN_MODDIR="$T/modfake" sh "$C/hud_sample.sh" --fpsd >/dev/null 2>&1; echo $?)" "1"
+
+# --- diet fork: pembantu tanpa proses anak ---
+sed -n '/^monitor_rd() {/,/^}/p;/^monitor_uptime() {/,/^}/p;/^monitor_epoch_now() {/,/^}/p' "$C/monitor.sh" > "$T/fn2.sh"
+. "$T/fn2.sh"
+monitor_epoch_now; _a=$MONITOR_NOW; _b=$(date +%s)
+chk "monitor_epoch_now dekat date" "$((_b - _a <= 1 && _a - _b <= 1))" "1"
+monitor_epoch_now; _a2=$MONITOR_NOW
+chk "monitor_epoch_now konsisten" "$((_a2 - _a <= 1))" "1"
+sed -n '/^first_int() {/,/^}/p' "$C/hud_sample.sh" > "$T/fn3.sh"; . "$T/fn3.sh"
+printf '  1234 kHz\nabc\n' > "$T/fi1"; printf 'x=77 9\n' > "$T/fi2"; printf 'none\n' > "$T/fi3"
+chk "first_int awalan spasi" "$(first_int "$T/fi1")" "1234"
+chk "first_int dengan awalan teks" "$(first_int "$T/fi2")" "77"
+chk "first_int tanpa angka gagal" "$(first_int "$T/fi3"; echo rc=$?)" "rc=1"
+# jalur cepat layar: backlight > 0 = ON tanpa dumpsys
+sed -n '/^monitor_screen_fast_on() {/,/^}/p' "$C/monitor.sh" > "$T/fn4.sh"; . "$T/fn4.sh"
+mkdir -p "$T/bl/x"; printf '120\n' > "$T/bl/x/brightness"
+SYSFS_BACKLIGHT_PREFIX="$T/bl" monitor_screen_fast_on; chk "backlight 120 = ON" "$?" "0"
+printf '0\n' > "$T/bl/x/brightness"
+SYSFS_BACKLIGHT_PREFIX="$T/bl" monitor_screen_fast_on; chk "backlight 0 = tidak yakin (dumpsys)" "$?" "1"
+printf '120\n' > "$T/bl/x/brightness"
+HSIN_SCREEN_FAST=0 SYSFS_BACKLIGHT_PREFIX="$T/bl" monitor_screen_fast_on; chk "HSIN_SCREEN_FAST=0 mematikan" "$?" "1"
+SYSFS_BACKLIGHT_PREFIX="$T/none" monitor_screen_fast_on; chk "tanpa node backlight" "$?" "1"
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

@@ -41,6 +41,16 @@ values.
 - screen off: every 60 seconds;
 - foreground game polling: every 2 seconds.
 
+In event mode (the normal case) the tick is 2 seconds while a game is in the
+foreground and `EVENT_IDLE_SECS` = 6 seconds otherwise (`HSIN_EVENT_IDLE_SECS`,
+max 30; a `MONITOR_LOOP_SECS` override wins). The screen state is read from the
+backlight node (`/sys/class/backlight/*/brightness` > 0 means on) and `dumpsys
+power` is only run when that is unavailable or reads 0 (`HSIN_SCREEN_FAST=0`
+disables the shortcut). Sensors, timestamps and the HUD sampler use shell
+builtins instead of `cat|tr|sed|date|cut` child processes: measured with
+`strace -f` on the sandbox harness, the monitor tick went from about 23 to 6
+`execve` calls and `hud_sample.sh --loop` from about 16 to 3 per tick.
+
 Each iteration reads the foreground package, updates the game hooks, runs the
 Adapt engine for that package, runs the memory cleaner when a game is active,
 and writes the current state.

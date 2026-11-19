@@ -41,7 +41,10 @@ GH_GRACE="${HSIN_GB_GRACE:-1}"
 GH_PRIO_EVERY=45
 GH_RENDER_TIMEOUT=90
 
-_gh_now() { date +%s 2>/dev/null; }
+_gh_now() {
+    if command -v monitor_epoch_now >/dev/null 2>&1; then monitor_epoch_now; printf '%s\n' "$MONITOR_NOW"
+    else date +%s 2>/dev/null; fi
+}
 
 _gh_log() {
     printf '[%s] [GAMEHOOK] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" "$1" "$2" \
