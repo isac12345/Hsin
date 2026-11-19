@@ -818,7 +818,7 @@ check_daily_loadavg_guard() {
     read -r load1 _ 2>/dev/null < /proc/loadavg   # tanpa cut
     case "$load1" in ''|*[!0-9.]*) return 0 ;; esac
 
-    # Compare as integer (truncate decimals): load1 > 6.5 means >= 6.5
+    # Dibandingkan sebagai bilangan bulat: load1 >= 6.5 dihitung 7 (lihat pembulatan di bawah).
     local load1_int load1_dec
     load1_int=${load1%%.*}
     case "$load1_int" in ''|*[!0-9]*) return 0 ;; esac
