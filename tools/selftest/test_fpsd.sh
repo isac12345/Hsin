@@ -106,5 +106,23 @@ monitor_fps_stat_v "$T/fo.out" com.g
 chk "detik berikutnya dihitung ulang" "$(wc -l < "$T/fs.calls" | tr -d ' ')" "2"
 monitor_fps_stat_v "$T/fo.out" com.other
 chk "paket lain dihitung ulang" "$(wc -l < "$T/fs.calls" | tr -d ' ')" "3"
+
+# --- check_fpsd_alive: daemon mati dihidupkan lagi, terbatas ---
+sed -n '/^check_fpsd_alive() {/,/^}/p' "$C/monitor.sh" > "$T/fn8.sh"; . "$T/fn8.sh"
+FA="$T/fa"; mkdir -p "$FA/common" "$FA/bin"; : > "$FA/bin/hsin-fpsd-arm64"; chmod +x "$FA/bin/hsin-fpsd-arm64"
+printf '#!/bin/sh\necho "$*" >> "%s/fa.calls"\nexit 0\n' "$T" > "$FA/common/hud_sample.sh"
+MODDIR="$FA/common"; STATE_DIR="$FA/state"; mkdir -p "$STATE_DIR"; rm -f "$T/fa.calls"; : > "$T/fa.log"
+monitor_log() { printf '%s %s\n' "$1" "$2" >> "$T/fa.log"; }
+echo 999999 > "$STATE_DIR/fpsd.pid"             # pid tidak ada
+check_fpsd_alive com.g                             # tick 1: dicek, dihidupkan
+for i in 2 3 4 5 6 7 8 9 10; do check_fpsd_alive com.g; done
+chk "tidak dicek di tick 2-10" "$(wc -l < "$T/fa.calls" | tr -d ' ')" "1"
+for n in 1 2 3 4 5 6 7 8; do for i in 1 2 3 4 5 6 7 8 9 10; do check_fpsd_alive com.g; done; done
+chk "paling banyak 5 kali per game" "$(wc -l < "$T/fa.calls" | tr -d ' ')" "5"
+sleep 30 & echo $! > "$STATE_DIR/fpsd.pid"
+rm -f "$T/fa.calls"; FPSD_REV_PKG=""; FPSD_CHK_N=0
+check_fpsd_alive com.h
+chk "pid hidup: tidak dihidupkan ulang" "$([ -f "$T/fa.calls" ] && echo ya || echo tidak)" "tidak"
+kill %1 2>/dev/null
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

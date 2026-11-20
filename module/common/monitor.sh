@@ -1313,9 +1313,34 @@ monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
     return "$MFS_RC"
 }
 
+# Daemon FPS mati di tengah sesi (dibunuh ROM, crash) dan tidak ada orb yang menghidupkannya:
+# Adapt dan penjaga FPS buta sampai game ditutup. Tiap 10 tick (~20 dtk) cek pid-nya; kalau mati,
+# hidupkan lewat hud_sample --fpsd (selftest biner dulu, jadi aman). Paling banyak 5 kali per game
+# supaya biner rusak tidak diulang selamanya. Daemon yang macet (pid hidup) belum bisa dideteksi
+# dari shell: fpsd.out hanya ditulis saat ada frame, jadi basi juga wajar di layar loading.
+check_fpsd_alive() {
+    _fa_pkg="$1"
+    FPSD_CHK_N=$(( ${FPSD_CHK_N:-0} + 1 ))
+    [ $((FPSD_CHK_N % 10)) -eq 1 ] || return 0
+    if [ "$_fa_pkg" != "${FPSD_REV_PKG:-}" ]; then FPSD_REV_PKG="$_fa_pkg"; FPSD_REVIVES=0; fi
+    [ "${FPSD_REVIVES:-0}" -lt 5 ] || return 0
+    [ -x "$MODDIR/../bin/hsin-fpsd-arm64" ] || [ -x "$MODDIR/../bin/hsin-fpsd-arm32" ] || return 0
+    _fa_pid=""
+    [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fa_pid 2>/dev/null < "$STATE_DIR/fpsd.pid"
+    if [ -n "$_fa_pid" ] && kill -0 "$_fa_pid" 2>/dev/null; then return 0; fi
+    FPSD_REVIVES=$((FPSD_REVIVES + 1))
+    if sh "$MODDIR/hud_sample.sh" --fpsd "$_fa_pkg" >/dev/null 2>&1; then
+        monitor_log "FPSD" "daemon FPS tidak jalan saat $_fa_pkg bermain; dihidupkan lagi (${FPSD_REVIVES}/5)"
+    else
+        monitor_log "FPSD" "daemon FPS tidak jalan dan gagal dihidupkan (${FPSD_REVIVES}/5): lihat fpsd.status"
+    fi
+    return 0
+}
+
 check_fps_floor() {
     _ff_pkg="$1"
     [ -f "$STATE_DIR/.game_t0" ] || return 0
+    check_fpsd_alive "$_ff_pkg"
     [ -r "$STATE_DIR/fpsd.out" ] || return 0
     monitor_fps_stat_v "$STATE_DIR/fpsd.out" "$_ff_pkg" || return 0
     _ff_now=$MONITOR_NOW

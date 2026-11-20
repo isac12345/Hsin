@@ -215,6 +215,14 @@ cmd_status() {
     printf 'saran_pkg=%s\nsaran_nilai=%s\nsaran_why=%s\n' "${_sv:+$_gp}" "$_sv" "$_sw"
     printf 'hud_pkg=%s\n' "$(rd "$STATE_DIR/.gh_active")"
     printf 'fps_rescue=%s\n' "$(rd "$STATE_DIR/.fps_rescue")"
+    # Keadaan pembaca FPS: dead = daemon tidak jalan, <isi fpsd.status> = ok/binder-fail/dump-fail,
+    # none = belum pernah jalan. APK memakai ini untuk menjelaskan kenapa FPS kosong.
+    _fd_p=""; [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fd_p < "$STATE_DIR/fpsd.pid" 2>/dev/null
+    if [ -n "$_fd_p" ] && kill -0 "$_fd_p" 2>/dev/null; then
+        _fd_s=$(rd "$STATE_DIR/fpsd.status"); [ -n "$_fd_s" ] || _fd_s=ok
+    elif [ -n "$_fd_p" ]; then _fd_s=dead
+    else _fd_s=none; fi
+    printf 'fpsd_state=%s\n' "$_fd_s"
     pid_alive "$STATE_DIR/.rec_pid" screenrec.sh && echo rec=1 || echo rec=0
     printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
     if [ -f "$COMMON/overdrive.sh" ]; then
