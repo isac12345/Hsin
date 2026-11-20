@@ -66,8 +66,8 @@ done
 echo "cmd game list-modes? $(cmd game list-modes com.android.settings 2>&1 | head -n 1)"
 
 echo; echo "== 5. logcat -b events: tag yang dipakai monitor"
-logcat -b events -d -t 500 -v raw 2>/dev/null | grep -Eo 'wm_resume_activity|am_focused_activity|wm_set_resumed_activity|am_resume_activity|wm_focused_app' | sort | uniq -c
-echo "baris events total: $(logcat -b events -d -t 500 -v raw 2>/dev/null | wc -l)"
+logcat -b events -d -t 500 -v tag 2>/dev/null | grep -Eo 'wm_resume_activity|am_focused_activity|wm_set_resumed_activity|am_resume_activity|wm_focused_app' | sort | uniq -c
+echo "baris events total: $(logcat -b events -d -t 500 -v tag 2>/dev/null | wc -l)"
 
 echo; echo "== 6. biaya proses HSIN sekarang (sampel 30 dtk, induk+anak)"
 for n in monitor.sh hud_sample.sh watchdog.sh hsin-fpsd uperf fas-rs; do

@@ -145,6 +145,8 @@ chk "jeda kedua melepas lagi" "$(grep -c log:PAUSE "$T/pz.calls")" "1"
 sed -n '/^event_line_package() {/,/^}/p;/^event_count_inc() {/,/^}/p;/^event_count_get() {/,/^}/p;/^event_verify_quiet() {/,/^}/p' "$C/monitor.sh" > "$T/fn10.sh"; . "$T/fn10.sh"
 event_line_package "wm_set_resumed_activity: [0,com.tencent.ig/com.epicgames.ue4.GameActivity,resume]"; chk "paket dari event" "$EVENT_PKG" "com.tencent.ig"
 event_line_package "[0,com.a.b/.Main,x]"; chk "paket dengan .Main" "$EVENT_PKG" "com.a.b"
+event_line_package "I/wm_set_resumed_activity: [0,com.tencent.ig/com.epicgames.ue4.GameActivity,resume]"; chk "format -v tag" "$EVENT_PKG" "com.tencent.ig"
+event_line_package "I/wm_task_moved: [1,2,3]"; chk "baris bertag tanpa paket: kosong" "$EVENT_PKG" ""
 event_line_package "[0,12345,x]"; chk "tanpa slash: kosong" "$EVENT_PKG" ""
 event_line_package "Focus entering abc u0 com.x.y/com.x.y.Main"; chk "Focus entering" "$EVENT_PKG" "com.x.y"
 EV="$T/ev"; mkdir -p "$EV"; EVENT_COUNT_FILE="$EV/count"; EVENT_N=0

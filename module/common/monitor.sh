@@ -21,7 +21,7 @@ MAX_CYCLES="${HSIN_MONITOR_MAX_CYCLES:-0}"
 # dianggap tidak cocok dengan ROM ini -> turun ke polling permanen
 # untuk sisa proses (satu keputusan per boot, hemat resource).
 EVENT_HEALTH_SECS="${HSIN_EVENT_HEALTH_SECS:-45}"
-EVENT_PRECHECK_LINES="${HSIN_EVENT_PRECHECK_LINES:-100}"
+EVENT_PRECHECK_LINES="${HSIN_EVENT_PRECHECK_LINES:-500}"
 EVENT_COUNT_FILE="$STATE_DIR/.foreground-events.$$.count"
 EVENT_ON_SECS=0
 EVENT_FALLBACK_DONE=0
@@ -651,7 +651,7 @@ event_line_package() {
     while :; do
         case "$_elp" in .*) _elp=${_elp#.} ;; *) break ;; esac
     done
-    EVENT_PKG=$_elp
+    case "$_elp" in *.*) EVENT_PKG=$_elp ;; esac   # tanpa titik bukan paket (mis. "I" dari "I/tag")
     return 0
 }
 
@@ -1457,7 +1457,7 @@ start_event_stream() {
     mkfifo "$EVENT_FIFO" 2>/dev/null || return 1
     event_stream_reader > /dev/null 2>&1 &
     READER_PID="$!"
-    logcat -b events -v raw > "$EVENT_FIFO" 2>/dev/null &
+    logcat -b events -v tag > "$EVENT_FIFO" 2>/dev/null &
     LOGCAT_PID="$!"
     sleep 1
     kill -0 "$READER_PID" 2>/dev/null || return 1
@@ -1615,7 +1615,7 @@ event_precheck_ok=0
 event_precheck_log=""
 event_precheck_reason="logcat-events-unavailable"
 if command -v logcat >/dev/null 2>&1 && command -v mkfifo >/dev/null 2>&1; then
-    event_precheck_log=$(logcat -b events -v raw -d -t "$EVENT_PRECHECK_LINES" 2>/dev/null)
+    event_precheck_log=$(logcat -b events -v tag -d -t "$EVENT_PRECHECK_LINES" 2>/dev/null)
     event_precheck_regex=$(printf '%s' "$EVENT_TAG_PATTERN" | sed 's/,/|/g')
     if printf '%s\n' "$event_precheck_log" | grep -Eq "$event_precheck_regex"; then
         event_precheck_ok=1
