@@ -26,6 +26,11 @@ EVENT_COUNT_FILE="$STATE_DIR/.foreground-events.$$.count"
 EVENT_ON_SECS=0
 EVENT_FALLBACK_DONE=0
 EVENT_HEALTH_LOGGED=0
+# Stream sepi (layar diam, tidak ada pergantian app) BUKAN stream tuli. Saat nol event, monitor
+# membandingkan dengan dumpsys sekali per EVENT_VERIFY_SECS (bukan turun ke polling permanen).
+EVENT_VERIFY_AT="$EVENT_HEALTH_SECS"
+EVENT_VERIFY_SECS="${HSIN_EVENT_VERIFY_SECS:-300}"
+EVENT_BOOTSTRAPPED=0
 # Satu sumber tag untuk reader dan pre-check. Separator koma menjaga
 # tiap token bisa dipakai sebagai glob `case` sekaligus ERE `grep -E`.
 EVENT_TAG_PATTERN='wm_set_resumed_activity,wm_set_top_resumed_activity,wm_top_resumed,wm_resume_activity,wm_on_resume_called,wm_on_top_resumed_called,am_focused_activity,am_on_resume_called,minimalResumeActivityLocked,Focus[ ]entering'
@@ -604,20 +609,50 @@ stop_event_stream() {
     return 0
 }
 
+# Dijalankan di proses reader (satu-satunya penulis): hitungan disimpan di variabel,
+# berkas hanya ditulis ulang. Dulu tr + printf luar per event (dua fork+exec).
+EVENT_N=0
 event_count_inc() {
-    event_c=$(tr -cd '0-9' < "$EVENT_COUNT_FILE" 2>/dev/null)
-    [ -z "$event_c" ] && event_c=0
-    printf '%s' "$((event_c + 1))" > "$EVENT_COUNT_FILE" 2>/dev/null
+    EVENT_N=$((EVENT_N + 1))
+    echo "$EVENT_N" > "$EVENT_COUNT_FILE" 2>/dev/null
     return 0
 }
 
 event_count_get() {
-    tr -cd '0-9' < "$EVENT_COUNT_FILE" 2>/dev/null
+    EVENT_PARSED=0
+    monitor_rd "$EVENT_COUNT_FILE" || return 0
+    case "$MONITOR_RD" in ''|*[!0-9]*) ;; *) EVENT_PARSED=$MONITOR_RD ;; esac
     return 0
 }
 
+# Nol event ter-parse: cocokkan dengan dumpsys. Return 0 = sepi/sehat atau tak bisa dipastikan,
+# 1 = tuli (app sudah berpindah sejak verifikasi pertama tetapi tidak ada event satu pun).
+event_verify_quiet() {
+    _evq=$(get_foreground_package) || return 0
+    [ -n "$_evq" ] || return 0
+    is_transient_package "$_evq" && return 0
+    _evc=""; [ -r "$HUD_FOREGROUND_FILE" ] && read -r _evc < "$HUD_FOREGROUND_FILE" 2>/dev/null
+    [ "$_evq" = "$_evc" ] && return 0
+    handle_foreground_event "$_evq" "poll"
+    if [ "$EVENT_BOOTSTRAPPED" -eq 0 ]; then
+        EVENT_BOOTSTRAPPED=1
+        return 0
+    fi
+    return 1
+}
+
+# Nama paket sebelum "/" terakhir pada baris event, tanpa fork (dulu printf|sed|head dalam
+# $(...) = 4 proses per baris). Hasil di EVENT_PKG; kosong bila baris tidak memuat paket/aktivitas.
 event_line_package() {
-    printf '%s' "$1" | sed -n 's/.*[^A-Za-z0-9_.]\([A-Za-z0-9_][A-Za-z0-9_.]*\)\/.*/\1/p' | head -n 1
+    EVENT_PKG=""
+    case "$1" in */*) ;; *) return 0 ;; esac
+    _elp=${1%/*}
+    _elp=${_elp##*[!A-Za-z0-9_.]}
+    while :; do
+        case "$_elp" in .*) _elp=${_elp#.} ;; *) break ;; esac
+    done
+    EVENT_PKG=$_elp
+    return 0
 }
 
 # Kill-switch: `hsinctl pause on` membuat berkas .paused. Monitor berhenti memasang apa pun,
@@ -657,7 +692,7 @@ handle_foreground_event() {
     fi
     
     handle_last=""
-    [ -f "$LAST_EVENT_PKG_FILE" ] && handle_last=$(cat "$LAST_EVENT_PKG_FILE" 2>/dev/null)
+    [ -r "$LAST_EVENT_PKG_FILE" ] && read -r handle_last < "$LAST_EVENT_PKG_FILE" 2>/dev/null
     [ "$handle_pkg" = "$handle_last" ] && return 0
     printf '%s' "$handle_pkg" > "$LAST_EVENT_PKG_FILE" 2>/dev/null
     printf '%s' "$handle_pkg" > "$HUD_FOREGROUND_FILE" 2>/dev/null
@@ -856,10 +891,10 @@ event_stream_reader() {
         # celah sempit (<2s) pas transisi layar off dimana 1 event nyasar
         # masih bisa kepakai, tapi ini lebih ringan buat SoC lemah & sudah
         # self-correct di event berikutnya.
-        event_pkg=$(event_line_package "$event_line")
-        if [ -n "$event_pkg" ]; then
+        event_line_package "$event_line"
+        if [ -n "$EVENT_PKG" ]; then
             event_count_inc
-            handle_foreground_event "$event_pkg" "event"
+            handle_foreground_event "$EVENT_PKG" "event"
         fi
     done < "$EVENT_FIFO"
     return 0
@@ -1428,14 +1463,19 @@ start_event_stream() {
     kill -0 "$READER_PID" 2>/dev/null || return 1
     kill -0 "$LOGCAT_PID" 2>/dev/null || { stop_event_stream; return 1; }
     EVENT_ON_SECS=0
+    EVENT_VERIFY_AT="$EVENT_HEALTH_SECS"
     printf '%s' "0" > "$EVENT_COUNT_FILE" 2>/dev/null
     return 0
 }
 
 run_event_supervised_loop() {
     while [ "$STOP_MONITOR" -eq 0 ]; do
-        monitor_screen_state=$(get_screen_state)
-        if [ "$?" -ne 0 ]; then
+        if monitor_screen_fast_on; then
+            monitor_screen_state=ON; monitor_screen_rc=0
+        else
+            monitor_screen_state=$(get_screen_state); monitor_screen_rc=$?
+        fi
+        if [ "$monitor_screen_rc" -ne 0 ]; then
             monitor_log "WARNING" "dumpsys power failed; pausing event stream"
             stop_event_stream
             sleep "$SCREEN_OFF_INTERVAL"
@@ -1484,19 +1524,27 @@ run_event_supervised_loop() {
             fi
         fi
         EVENT_ON_SECS=$((EVENT_ON_SECS + monitor_ev_secs))
-        if [ "$EVENT_FALLBACK_DONE" -eq 0 ] && [ "$EVENT_ON_SECS" -ge "$EVENT_HEALTH_SECS" ] 2>/dev/null; then
-            event_parsed=$(event_count_get)
-            [ -z "$event_parsed" ] && event_parsed=0
-            if [ "$event_parsed" -lt 1 ] 2>/dev/null; then
+        if [ "$EVENT_FALLBACK_DONE" -eq 0 ] && [ "$EVENT_ON_SECS" -ge "$EVENT_VERIFY_AT" ] 2>/dev/null; then
+            event_count_get
+            if [ "$EVENT_PARSED" -ge 1 ] 2>/dev/null; then
+                EVENT_VERIFY_AT=999999999
+                if [ "$EVENT_HEALTH_LOGGED" -eq 0 ]; then
+                    EVENT_HEALTH_LOGGED=1
+                    monitor_log "EVENT" "event stream healthy (${EVENT_PARSED} parsed in ${EVENT_ON_SECS}s)"
+                fi
+            elif event_verify_quiet; then
+                EVENT_VERIFY_AT=$((EVENT_ON_SECS + EVENT_VERIFY_SECS))
+                if [ "$EVENT_HEALTH_LOGGED" -eq 0 ]; then
+                    EVENT_HEALTH_LOGGED=1
+                    monitor_log "EVENT" "event stream sepi (0 event dalam ${EVENT_ON_SECS}s), cocok dengan dumpsys; dicek lagi tiap ${EVENT_VERIFY_SECS}s"
+                fi
+            else
                 EVENT_FALLBACK_DONE=1
-                monitor_log "WARNING" "event stream deaf (${EVENT_ON_SECS}s on, 0 parsed); falling back to polling permanently"
+                monitor_log "WARNING" "event stream deaf (${EVENT_ON_SECS}s on, 0 parsed, app berpindah); falling back to polling permanently"
                 stop_event_stream
                 MONITOR_METHOD="polling (event fallback)"
                 run_polling_loop
                 return 0
-            elif [ "$EVENT_HEALTH_LOGGED" -eq 0 ]; then
-                EVENT_HEALTH_LOGGED=1
-                monitor_log "EVENT" "event stream healthy (${event_parsed} parsed in ${EVENT_ON_SECS}s)"
             fi
         fi
         # GameBoost: check grace period + thermal safety
@@ -1520,8 +1568,12 @@ run_polling_loop() {
 
         monitor_epoch_now
         if monitor_paused; then sleep 5; continue; fi
-        monitor_screen_state=$(get_screen_state)
-        if [ "$?" -ne 0 ]; then
+        if monitor_screen_fast_on; then
+            monitor_screen_state=ON; monitor_screen_rc=0
+        else
+            monitor_screen_state=$(get_screen_state); monitor_screen_rc=$?
+        fi
+        if [ "$monitor_screen_rc" -ne 0 ]; then
             monitor_log "WARNING" "dumpsys power failed; skipping cycle=$monitor_cycle"
             sleep "$SCREEN_OFF_INTERVAL"
             continue

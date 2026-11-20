@@ -71,14 +71,22 @@ echo "baris events total: $(logcat -b events -d -t 500 -v raw 2>/dev/null | wc -
 
 echo; echo "== 6. biaya proses HSIN sekarang (sampel 30 dtk, induk+anak)"
 for n in monitor.sh hud_sample.sh watchdog.sh hsin-fpsd uperf fas-rs; do
-    for p in $(pidof $n 2>/dev/null) $(for d in /proc/[0-9]*; do c=$(tr '\0' ' ' < $d/cmdline 2>/dev/null); case "$c" in *$n*) echo ${d#/proc/} ;; esac; done); do
+    # Pola "[x]nama" tidak cocok dengan cmdline grep sendiri; satu fork saja, tanpa noise.
+    pat="[$(echo "$n" | cut -c1)]$(echo "$n" | cut -c2-)"
+    for p in $(pidof $n 2>/dev/null) $(grep -la "$pat" /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/\([0-9]*\)/cmdline#\1#'); do
+        [ "$p" = "$$" ] && continue
         a=$(ticks $p) && echo "$n:$p:$a"
     done
 done | sort -u > $PD/.hp_a
 sleep 30
 while IFS=: read -r n p a; do
     b=$(ticks $p) || continue
-    d=$((b - a)); echo "$n pid=$p ticks/30dtk=$d => $((d / 3))% satu core"
+    d=$((b - a)); echo "$n pid=$p ticks/30dtk=$d => $((d / 30))% satu core"
 done < $PD/.hp_a
 rm -f $PD/.hp_a
+echo; echo "== 7. mode monitor (dari log HSIN)"
+HL=/data/adb/hsin/hsin.log
+grep -E "MONITOR\] \[(START|EVENT|WARNING)\]" "$HL" 2>/dev/null | grep -E "method=|event stream|polling" | tail -n 6 | cut -c1-200
+echo "ragam tag events (500 baris terakhir):"
+logcat -b events -d -t 500 -v brief 2>/dev/null | sed -n 's#^I/\([A-Za-z0-9_]*\).*#\1#p' | sort | uniq -c | sort -rn | head -n 12
 echo; echo "selesai. Kirim berkas ini ke Claude/agent."

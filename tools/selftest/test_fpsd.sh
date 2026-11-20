@@ -140,5 +140,25 @@ chk ".game_t0 dibuang" "$([ -f "$PZ/.game_t0" ] && echo ada || echo tidak)" "tid
 rm -f "$PZ/.paused"; monitor_paused; chk "dilanjutkan" "$?" "1"
 : > "$PZ/.paused"; rm -f "$T/pz.calls"; monitor_paused
 chk "jeda kedua melepas lagi" "$(grep -c log:PAUSE "$T/pz.calls")" "1"
+
+# --- event stream: parse paket tanpa fork, hitungan, verifikasi stream sepi ---
+sed -n '/^event_line_package() {/,/^}/p;/^event_count_inc() {/,/^}/p;/^event_count_get() {/,/^}/p;/^event_verify_quiet() {/,/^}/p' "$C/monitor.sh" > "$T/fn10.sh"; . "$T/fn10.sh"
+event_line_package "wm_set_resumed_activity: [0,com.tencent.ig/com.epicgames.ue4.GameActivity,resume]"; chk "paket dari event" "$EVENT_PKG" "com.tencent.ig"
+event_line_package "[0,com.a.b/.Main,x]"; chk "paket dengan .Main" "$EVENT_PKG" "com.a.b"
+event_line_package "[0,12345,x]"; chk "tanpa slash: kosong" "$EVENT_PKG" ""
+event_line_package "Focus entering abc u0 com.x.y/com.x.y.Main"; chk "Focus entering" "$EVENT_PKG" "com.x.y"
+EV="$T/ev"; mkdir -p "$EV"; EVENT_COUNT_FILE="$EV/count"; EVENT_N=0
+event_count_inc; event_count_inc; event_count_inc; event_count_get; chk "hitungan event" "$EVENT_PARSED" "3"
+rm -f "$EVENT_COUNT_FILE"; event_count_get; chk "tanpa berkas: 0" "$EVENT_PARSED" "0"
+HUD_FOREGROUND_FILE="$EV/fg"; rm -f "$EV/calls"
+get_foreground_package() { echo "$EV_TRUTH"; }
+is_transient_package() { return 1; }
+handle_foreground_event() { echo "$1" >> "$EV/calls"; echo "$1" > "$HUD_FOREGROUND_FILE"; }
+EVENT_BOOTSTRAPPED=0; EV_TRUTH=com.g1; echo com.stale > "$HUD_FOREGROUND_FILE"
+event_verify_quiet; chk "verifikasi pertama: bootstrap, sehat" "$?" "0"
+event_verify_quiet; chk "sama dengan dumpsys: sehat" "$?" "0"
+EV_TRUTH=com.g2; event_verify_quiet; chk "app berpindah tanpa event: tuli" "$?" "1"
+chk "keadaan diperbaiki dari dumpsys" "$(tr '\n' ' ' < "$EV/calls")" "com.g1 com.g2 "
+get_foreground_package() { return 1; }; event_verify_quiet; chk "dumpsys gagal: tak dipastikan, sehat" "$?" "0"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

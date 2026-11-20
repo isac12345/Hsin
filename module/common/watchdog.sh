@@ -60,7 +60,7 @@ bubble_revive() {
     command -v am >/dev/null 2>&1 || return 0
     # pidof saja tiap 5 dtk (murah). Proses hidup = service hampir pasti hidup; dumpsys
     # tiap 5 dtk terlalu berat untuk cek yang jarang gagal.
-    [ -n "$(pidof "$BUBBLE_PKG" 2>/dev/null)" ] && return 0
+    pidof "$BUBBLE_PKG" >/dev/null 2>&1 && return 0   # tanpa $(...): satu fork, bukan dua
     am start-foreground-service -n "$BUBBLE_PKG/.BubbleService" >/dev/null 2>&1 \
         || am startservice -n "$BUBBLE_PKG/.BubbleService" >/dev/null 2>&1
     wd_log REVIVE "floating mati, service dihidupkan ulang"
