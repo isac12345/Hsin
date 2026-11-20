@@ -192,6 +192,7 @@ monitor_startup_sweep() {
     return 0
 }
 monitor_startup_sweep
+thermal_kernel_cap >/dev/null 2>&1   # panaskan cache (trip tidak berubah), di shell utama
 
 run_dumpsys() {
     monitor_dump_file="$STATE_DIR/.monitor-dumpsys.$$"
@@ -385,6 +386,24 @@ thermal_user_thr() {
     [ -f "$STATE_DIR/THERMAL_GUARD_OFF" ] && TH_GUARD_OFF=1
 }
 
+# Isi GB_ZV = "|thermal_zone0=45000|thermal_zone1=..|" dari satu proses sh di bawah timeout 2 dtk.
+_gb_zone_vals() {
+    GB_ZV="|"
+    _gz_list=""
+    for _gz in "$1"/thermal_zone*; do
+        [ -r "$_gz/temp" ] && _gz_list="$_gz_list $_gz"
+    done
+    [ -n "$_gz_list" ] || return 0
+    command -v timeout >/dev/null 2>&1 || return 0   # tanpa timeout: jalur per zona (lama)
+    _gz_out=$(timeout 2 sh -c 'for z; do v=""; read -r v < "$z/temp" 2>/dev/null; [ -n "$v" ] && echo "${z##*/} $v"; done' hsin $_gz_list 2>/dev/null)
+    while IFS=' ' read -r _gz_n _gz_v _; do
+        [ -n "$_gz_n" ] && [ -n "$_gz_v" ] && GB_ZV="${GB_ZV}${_gz_n}=${_gz_v}|"
+    done <<GZEOF
+$_gz_out
+GZEOF
+    return 0
+}
+
 gb_safety_check() {
     local current_temp=0
     local max_temp=0
@@ -414,15 +433,25 @@ gb_safety_check() {
 
     # Read thermal zones
     if [ -d "$zbase" ]; then
+        # Semua zona dibaca dalam SATU proses di bawah satu timeout (dulu timeout+cat+tr per
+        # zona = ~3 exec x 30-40 zona tiap 15 dtk). Zona yang tidak muncul di hasil batch
+        # (macet / tidak terbaca) dicoba lagi sendiri dengan timeout 2 dtk seperti sebelumnya,
+        # jadi satu node macet tetap tidak membekukan monitor.
+        _gb_zone_vals "$zbase"
         for zone in "$zbase"/thermal_zone*; do
             [ -r "$zone/temp" ] || continue
             local temp_val
-            # b23: timeout 2s per zone to prevent hang on unresponsive sysfs
-            if command -v timeout >/dev/null 2>&1; then
-                temp_val=$(timeout 2 cat "$zone/temp" 2>/dev/null | tr -d '[:space:]')
-            else
-                temp_val=$(tr -d '[:space:]' < "$zone/temp" 2>/dev/null)
-            fi
+            case "$GB_ZV" in
+                *"|${zone##*/}="*)
+                    temp_val=${GB_ZV#*"|${zone##*/}="}; temp_val=${temp_val%%|*} ;;
+                *)
+                    # b23: timeout 2s per zone to prevent hang on unresponsive sysfs
+                    if command -v timeout >/dev/null 2>&1; then
+                        temp_val=$(timeout 2 cat "$zone/temp" 2>/dev/null | tr -d '[:space:]')
+                    else
+                        temp_val=$(tr -d '[:space:]' < "$zone/temp" 2>/dev/null)
+                    fi ;;
+            esac
             # Validate numeric (empty/non-numeric → skip)
             case "$temp_val" in
                 ''|*[!0-9-]*) continue ;;
@@ -957,17 +986,27 @@ log_game_snapshot() {
 }
 
 # 95% trip passive terendah dari zona SoC/CPU. Kosong = sensor tidak terbaca.
+# Titik trip dan tipe zona tidak berubah selama HP menyala: hitung sekali, simpan di TK_CAP.
+# Dipanggil juga sekali di shell utama saat start supaya subshell $(...) mewarisi cache.
 thermal_kernel_cap() {
+    if [ -n "${TK_CAP_DONE:-}" ]; then
+        [ -n "$TK_CAP" ] && printf '%s' "$TK_CAP"
+        return 0
+    fi
     _tk_min=0
     for _tk_z in "${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"/thermal_zone*; do
         [ -d "$_tk_z" ] || continue
-        _tk_ty=$(cat "$_tk_z/type" 2>/dev/null)
+        _tk_ty=""; [ -r "$_tk_z/type" ] && read -r _tk_ty 2>/dev/null < "$_tk_z/type"
         case "$_tk_ty" in *soc*|*cpu*|*gpu*) ;; *) continue ;; esac
-        _tk_t=$(cat "$_tk_z/trip_point_1_temp" 2>/dev/null | tr -d '[:space:]')
+        _tk_t=""; [ -r "$_tk_z/trip_point_1_temp" ] && read -r _tk_t 2>/dev/null < "$_tk_z/trip_point_1_temp"
+        _tk_t=${_tk_t%%[[:space:]]*}
         case "$_tk_t" in ''|*[!0-9]*|0) continue ;; esac
         if [ "$_tk_min" -eq 0 ] || [ "$_tk_t" -lt "$_tk_min" ]; then _tk_min=$_tk_t; fi
     done
-    [ "$_tk_min" -gt 0 ] 2>/dev/null && printf '%s' $((_tk_min * 95 / 100))
+    TK_CAP=""
+    [ "$_tk_min" -gt 0 ] 2>/dev/null && TK_CAP=$((_tk_min * 95 / 100))
+    TK_CAP_DONE=1
+    [ -n "$TK_CAP" ] && printf '%s' "$TK_CAP"
     return 0
 }
 
@@ -1192,7 +1231,8 @@ monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall
     else
         _mfs_now=$(date +%s 2>/dev/null)
     fi
-    _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
+    _mfs_mt=${MFS_MT_IN:-}
+    [ -n "$_mfs_mt" ] || _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
     case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
     [ $((_mfs_now - _mfs_mt)) -le 15 ] || return 1
     # Satu sed untuk paket dan lat (dulu dua sed + dua head). Hasil sama untuk berkas tanpa pkg=.
@@ -1255,16 +1295,34 @@ fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"
     printf '%s' "${_fdc:-tak jelas}"
 }
 
+# Satu hasil per detik untuk semua pemanggil (check_fps_floor dan ad_tick dulu masing-masing
+# menjalankan stat + sed + awk atas berkas yang sama). Hasil di MONITOR_FS, umur berkas
+# (detik) di MFS_AGE; return 1 bila tidak ada data segar. Dipanggil langsung, bukan lewat $( ).
+monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
+    monitor_epoch_now
+    _mfv_key="$1|$2|$MONITOR_NOW"
+    if [ -n "$MONITOR_NOW" ] && [ "$_mfv_key" = "${MFS_KEY:-}" ]; then
+        MONITOR_FS=$MFS_VAL; MFS_AGE=$MFS_AGE_M; return "$MFS_RC"
+    fi
+    MFS_MT_IN=$(stat -c %Y "$1" 2>/dev/null)
+    MFS_AGE=""
+    case "$MONITOR_NOW$MFS_MT_IN" in ''|*[!0-9]*) ;; *) MFS_AGE=$((MONITOR_NOW - MFS_MT_IN)) ;; esac
+    MONITOR_FS=$(monitor_fps_stat "$1" "$2"); MFS_RC=$?
+    MFS_MT_IN=""
+    MFS_KEY=$_mfv_key; MFS_VAL=$MONITOR_FS; MFS_AGE_M=$MFS_AGE
+    return "$MFS_RC"
+}
+
 check_fps_floor() {
     _ff_pkg="$1"
     [ -f "$STATE_DIR/.game_t0" ] || return 0
     [ -r "$STATE_DIR/fpsd.out" ] || return 0
-    _ff_now=$(date +%s 2>/dev/null)
-    _ff_mt=$(stat -c %Y "$STATE_DIR/fpsd.out" 2>/dev/null)
-    case "$_ff_now$_ff_mt" in ''|*[!0-9]*) return 0 ;; esac
+    monitor_fps_stat_v "$STATE_DIR/fpsd.out" "$_ff_pkg" || return 0
+    _ff_now=$MONITOR_NOW
     # Data lebih tua dari 5 dtk = daemon sedang mati/tidak melaporkan game ini.
-    [ $((_ff_now - _ff_mt)) -le 5 ] || return 0
-    _ff_stat=$(monitor_fps_stat "$STATE_DIR/fpsd.out" "$_ff_pkg") || return 0
+    case "$MFS_AGE" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$MFS_AGE" -le 5 ] || return 0
+    _ff_stat=$MONITOR_FS
     _ff_p1=${_ff_stat%% *}
     _ff_rest=${_ff_stat#* }
     _ff_stall=${_ff_rest##* }

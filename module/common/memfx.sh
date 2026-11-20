@@ -156,6 +156,13 @@ mf_mglru_restore() {
 mf_relief_tick() {
     _mf_conf_v MEMCLEAN 0
     [ "$MFC_V" = 1 ] || return 0
+    # Dipanggil dari gh_tick DAN ad_tick di tick yang sama: hitung satu sampel per detik,
+    # kalau tidak penghitung "3 sampel berturut-turut" naik dua kali lebih cepat dari seharusnya.
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now
+        [ -n "$MONITOR_NOW" ] && [ "$MONITOR_NOW" = "${MF_TICK_AT:-}" ] && return 0
+        MF_TICK_AT=$MONITOR_NOW
+    fi
     _mf_ok memclean || return 0
     _mv=$(mf_psi_x100 some avg10) || return 0
     _mth=$(mf_psi_threshold_x100)

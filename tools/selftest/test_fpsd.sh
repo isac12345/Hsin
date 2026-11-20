@@ -68,5 +68,43 @@ chk "gameboost, gamehooks, adapt dipulihkan" "$(tr '\n' ' ' < "$T/sweep.calls")"
 chk ".gb_active dinolkan" "$(tr -d '[:space:]' < "$GB_ACTIVE_FILE")" "0"
 chk "log SWEEP" "$(grep -c '^SWEEP' "$T/sweep.log")" "1"
 echo
+
+# --- gb_safety_check / thermal_kernel_cap: satu proses per panggilan, hasil sama ---
+sed -n '/^_gb_zone_vals() {/,/^}/p;/^gb_safety_check() {/,/^}/p;/^_gb_zone_has_critical_trip() {/,/^}/p;/^thermal_kernel_cap() {/,/^}/p' "$C/monitor.sh" > "$T/fn6.sh"
+. "$T/fn6.sh"
+TH="$T/therm"; mkdir -p "$TH"; SYSFS_THERMAL_PREFIX="$TH"; STATE_DIR="$T/thstate"; mkdir -p "$STATE_DIR"
+mkz() { mkdir -p "$TH/thermal_zone$1"; printf '%s\n' "$2" > "$TH/thermal_zone$1/type"; printf '%s\n' "$3" > "$TH/thermal_zone$1/temp"; }
+mkz 0 soc-thermal 45000; mkz 1 cpu-thermal 61000; mkz 2 gpu-thermal 52000; mkz 3 battery 38
+chk "max termal dari semua zona" "$(gb_safety_check)" "61000"
+mkz 4 fake 120000                       # palsu: >95000 dan >median+25000, tanpa trip critical
+chk "zona palsu dibuang" "$(gb_safety_check)" "61000"
+printf 'critical\n' > "$TH/thermal_zone4/trip_point_0_type"
+chk "zona dengan trip critical tetap sah" "$(gb_safety_check)" "120000"
+rm -rf "$TH"/thermal_zone*; 
+chk "tanpa zona: sentinel 75000" "$(gb_safety_check)" "75000"
+mkz 0 soc-thermal 45000
+printf '90000\n' > "$TH/thermal_zone0/trip_point_1_temp"; mkz 1 battery 40000; printf '50000\n' > "$TH/thermal_zone1/trip_point_1_temp"
+unset TK_CAP_DONE TK_CAP
+chk "kernel cap = 95% trip terendah soc/cpu/gpu" "$(thermal_kernel_cap)" "85500"
+thermal_kernel_cap >/dev/null
+chk "cache terisi di shell utama" "$TK_CAP_DONE:$TK_CAP" "1:85500"
+printf '10000\n' > "$TH/thermal_zone0/trip_point_1_temp"
+chk "hasil cache tidak berubah (trip statis)" "$(thermal_kernel_cap)" "85500"
+
+# --- monitor_fps_stat_v: satu hitungan per detik dibagi pemanggil ---
+sed -n '/^monitor_fps_stat_v() {/,/^}/p' "$C/monitor.sh" > "$T/fn7.sh"; . "$T/fn7.sh"
+FSN=0; printf 'x\n' > "$T/fo.out"
+monitor_epoch_now() { MONITOR_NOW=5000; }
+monitor_fps_stat() { echo c >> "$T/fs.calls"; printf '30 60 90'; }
+rm -f "$T/fs.calls"
+monitor_fps_stat_v "$T/fo.out" com.g; r1=$?; v1=$MONITOR_FS
+monitor_fps_stat_v "$T/fo.out" com.g; r2=$?; v2=$MONITOR_FS
+chk "hasil sama untuk dua pemanggil" "$v1|$v2|$r1$r2" "30 60 90|30 60 90|00"
+chk "dihitung sekali dalam detik yang sama" "$(wc -l < "$T/fs.calls" | tr -d ' ')" "1"
+monitor_epoch_now() { MONITOR_NOW=5001; }
+monitor_fps_stat_v "$T/fo.out" com.g
+chk "detik berikutnya dihitung ulang" "$(wc -l < "$T/fs.calls" | tr -d ' ')" "2"
+monitor_fps_stat_v "$T/fo.out" com.other
+chk "paket lain dihitung ulang" "$(wc -l < "$T/fs.calls" | tr -d ' ')" "3"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

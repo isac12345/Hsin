@@ -1135,8 +1135,12 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # --- ukur ---
     _st=""
-    command -v monitor_fps_stat >/dev/null 2>&1 && \
+    if command -v monitor_fps_stat_v >/dev/null 2>&1; then
+        # Hasil dibagi dengan check_fps_floor (satu perhitungan per detik, tanpa subshell).
+        monitor_fps_stat_v "${AD_STATE}/fpsd.out" "$_pkg" 2>/dev/null && _st=$MONITOR_FS
+    elif command -v monitor_fps_stat >/dev/null 2>&1; then
         _st=$(monitor_fps_stat "${AD_STATE}/fpsd.out" "$_pkg" 2>/dev/null)
+    fi
     _p1=""; _avg=""; _stall=""
     if [ -n "$_st" ]; then
         _p1=${_st%% *}
