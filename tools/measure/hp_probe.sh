@@ -75,6 +75,9 @@ for n in monitor.sh hud_sample.sh watchdog.sh hsin-fpsd uperf fas-rs; do
     pat="[$(echo "$n" | cut -c1)]$(echo "$n" | cut -c2-)"
     for p in $(pidof $n 2>/dev/null) $(grep -la "$pat" /proc/[0-9]*/cmdline 2>/dev/null | sed 's#/proc/\([0-9]*\)/cmdline#\1#'); do
         [ "$p" = "$$" ] && continue
+        # subshell ($(...), &) punya induk dengan nama sama: lewati, biaya anaknya sudah ikut induk
+        _pp=$(cat "/proc/$p/stat" 2>/dev/null); _pp=${_pp##*) }; set -- $_pp; _pp=$2
+        case " $(pidof $n 2>/dev/null) $(grep -la "$pat" /proc/$_pp/cmdline 2>/dev/null | sed 's#/proc/\([0-9]*\)/cmdline#\1#') " in *" $_pp "*) continue ;; esac
         a=$(ticks $p) && echo "$n:$p:$a"
     done
 done | sort -u > $PD/.hp_a
