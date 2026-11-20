@@ -81,10 +81,6 @@ MONITOR_LOOP_FILE="$STATE_DIR/MONITOR_LOOP_SECS"
 MONITOR_LOOP_OVR=""
 GB_COOLDOWN_COUNT_FILE="$STATE_DIR/.gb_cooldown_count"
 
-# DAILY anti-lag guard: loadavg threshold tracking
-DAILY_LOADHIGH_FILE="$STATE_DIR/.daily_loadhigh_count"
-DAILY_LOADBAL_FILE="$STATE_DIR/.daily_loadbalanced"
-
 monitor_log() {
     monitor_log_status="$1"
     monitor_log_message="$2"
@@ -168,6 +164,34 @@ rm -f "$LAST_EVENT_PKG_FILE" 2>/dev/null
 
 printf '%s\n' "$$" > "$PID_FILE" || exit 1
 monitor_log "START" "monitor pid=$$ interval_on=${SCREEN_ON_INTERVAL}s interval_off=${SCREEN_OFF_INTERVAL}s"
+
+# Penyapu saat monitor (re)start: monitor yang mati mendadak (dibunuh ROM, crash) tidak sempat
+# melepas boost. Watchdog menjalankannya lagi, dan tanpa ini .gb_active=1, DND, prioritas I/O,
+# lantai frekuensi Adapt, dan uperf/fas-rs yang di-STOP tetap terpasang tanpa pemilik.
+# Kalau game masih di depan, tick pertama memasang ulang semuanya dari awal.
+monitor_startup_sweep() {
+    _sw_did=""
+    if [ -f "$GB_ACTIVE_FILE" ] && [ "$(tr -d '[:space:]' < "$GB_ACTIVE_FILE" 2>/dev/null)" = "1" ]; then
+        if command -v gb_restore >/dev/null 2>&1; then
+            gb_restore >/dev/null 2>&1
+            _sw_did="$_sw_did gameboost"
+        fi
+        printf '%s\n' "0" > "$GB_ACTIVE_FILE" 2>/dev/null
+    fi
+    if command -v gh_recover >/dev/null 2>&1 &&
+       { [ -f "$STATE_DIR/.gh_active" ] || [ -f "$STATE_DIR/.gh_dnd_prev" ] || [ -f "$STATE_DIR/.gh_refresh_prev" ]; }; then
+        gh_recover >/dev/null 2>&1
+        _sw_did="$_sw_did gamehooks"
+    fi
+    if command -v ad_own_recover >/dev/null 2>&1 &&
+       { [ -f "$STATE_DIR/.adapt_own" ] || [ -f "$STATE_DIR/.adapt_prev" ] || [ -f "$STATE_DIR/.adapt_stopped" ]; }; then
+        ad_own_recover
+        _sw_did="$_sw_did adapt"
+    fi
+    [ -n "$_sw_did" ] && monitor_log "SWEEP" "sisa boost dari monitor sebelumnya dipulihkan:$_sw_did"
+    return 0
+}
+monitor_startup_sweep
 
 run_dumpsys() {
     monitor_dump_file="$STATE_DIR/.monitor-dumpsys.$$"
@@ -627,8 +651,7 @@ handle_foreground_event() {
             monitor_uptime
             printf '%s %s\n' "${MONITOR_UP:-0}" "$handle_pkg" > "$GAME_T0_FILE" 2>/dev/null
             rm -f "$GAME_SNAP_DONE_FILE" 2>/dev/null
-            # Beban adaptif: pilih dari hasil sesi sebelumnya lalu pasang.
-            command -v ad_begin >/dev/null 2>&1 && ad_begin "$handle_pkg"
+            # Beban adaptif dipilih oleh ad_tick saat sesi dibuka (ad_open); tidak ada langkah terpisah di sini.
         fi
         if [ "$gb_active" != "1" ]; then
             # Check DISABLE_GAMEBOOST gate
@@ -794,95 +817,6 @@ event_stream_reader() {
     return 0
 }
 
-# DAILY anti-lag guard: check loadavg1 > 6.5 (8-core) 2x consecutively
-# When triggered, temporarily apply balanced VM/IO to relieve pressure,
-# then return to battery when load drops.
-check_daily_loadavg_guard() {
-    # monitor.sh hanya source gameboost.sh; tune_vm/tune_io ada di engine.sh dan
-    # TIDAK dimuat di proses ini, jadi pemanggilan di bawah selalu "not found"
-    # (disenyapkan 2>/dev/null) dan guard tidak mengubah apa pun. Jujur: log
-    # sekali, lalu keluar. Perilaku kernel tidak berubah.
-    if ! command -v tune_vm >/dev/null 2>&1 || ! command -v tune_io >/dev/null 2>&1; then
-        if [ "${DAILY_LOADGUARD_NOOP_LOGGED:-0}" != "1" ]; then
-            DAILY_LOADGUARD_NOOP_LOGGED=1
-            monitor_log "DAILY-LOADGUARD" "NO-OP: tune_vm/tune_io tidak dimuat di proses monitor, guard tidak mengubah VM/IO"
-        fi
-        return 0
-    fi
-    local current_prof
-    current_prof=""
-    [ -f "$CURRENT_STATE_FILE" ] && current_prof=$(tr -d '[:space:]' < "$CURRENT_STATE_FILE" 2>/dev/null)
-    [ "$current_prof" != "battery" ] && return 0
-
-    local load1=""
-    read -r load1 _ 2>/dev/null < /proc/loadavg   # tanpa cut
-    case "$load1" in ''|*[!0-9.]*) return 0 ;; esac
-
-    # Dibandingkan sebagai bilangan bulat: load1 >= 6.5 dihitung 7 (lihat pembulatan di bawah).
-    local load1_int load1_dec
-    load1_int=${load1%%.*}
-    case "$load1_int" in ''|*[!0-9]*) return 0 ;; esac
-    # Pembulatan setengah ke ATAS, bukan ke genap seperti printf %.0f: 6.50 jadi 7
-    # (printf: 6), 0.5 jadi 1 (printf: 0). Ambang di bawah memakai ">= 6.5", jadi
-    # 6.5 memang harus ikut terhitung.
-    case "$load1" in
-        *.*) load1_dec=${load1#*.}; load1_dec=${load1_dec%"${load1_dec#?}"} ;;
-        *) load1_dec=0 ;;
-    esac
-    case "$load1_dec" in ''|*[!0-9]*) load1_dec=0 ;; esac
-    [ "$load1_dec" -ge 5 ] && load1_int=$((load1_int + 1))
-
-    local balanced_applied=0
-    [ -f "$DAILY_LOADBAL_FILE" ] && monitor_rd "$DAILY_LOADBAL_FILE" && balanced_applied="$MONITOR_RD"
-
-    if [ "$load1_int" -ge 7 ] 2>/dev/null; then
-        local high_count=0
-        [ -f "$DAILY_LOADHIGH_FILE" ] && monitor_rd "$DAILY_LOADHIGH_FILE" && high_count="$MONITOR_RD"
-        case "$high_count" in ''|*[!0-9]*) high_count=0 ;; esac
-        high_count=$((high_count + 1))
-        echo "$high_count" > "$DAILY_LOADHIGH_FILE" 2>/dev/null
-
-        if [ "$high_count" -ge 2 ] 2>/dev/null && [ "$balanced_applied" != "1" ]; then
-            monitor_log "MONITOR" "DAILY LOADGUARD: loadavg1=$load1 >= 6.5 twice, temporarily applying balanced VM/IO"
-            # Save current battery VM/IO values, apply balanced temporarily
-            local saved_vfs saved_dirty saved_dirty_bg saved_stat saved_swap saved_ra
-            saved_vfs="$VM_VFS_CACHE_PRESSURE"
-            saved_dirty="$VM_DIRTY_RATIO"
-            saved_dirty_bg="$VM_DIRTY_BACKGROUND_RATIO"
-            saved_stat="$VM_STAT_INTERVAL"
-            saved_swap="$VM_SWAPPINESS"
-            saved_ra="$IO_READ_AHEAD_KB"
-            # Apply balanced VM/IO values
-            VM_VFS_CACHE_PRESSURE="${BALANCED_VM_VFS_CACHE_PRESSURE:-100}"
-            VM_DIRTY_RATIO="${BALANCED_VM_DIRTY_RATIO:-20}"
-            VM_DIRTY_BACKGROUND_RATIO="${BALANCED_VM_DIRTY_BACKGROUND_RATIO:-10}"
-            VM_STAT_INTERVAL="${BALANCED_VM_STAT_INTERVAL:-10}"
-            VM_SWAPPINESS="${BALANCED_VM_SWAPPINESS:-60}"
-            IO_READ_AHEAD_KB="${BALANCED_IO_READ_AHEAD_KB:-128}"
-            tune_vm 2>/dev/null
-            tune_io 2>/dev/null
-            # Restore battery values in memory (applied when load drops)
-            VM_VFS_CACHE_PRESSURE="$saved_vfs"
-            VM_DIRTY_RATIO="$saved_dirty"
-            VM_DIRTY_BACKGROUND_RATIO="$saved_dirty_bg"
-            VM_STAT_INTERVAL="$saved_stat"
-            VM_SWAPPINESS="$saved_swap"
-            IO_READ_AHEAD_KB="$saved_ra"
-            echo "1" > "$DAILY_LOADBAL_FILE" 2>/dev/null
-        fi
-    else
-        # Load normal: if we were balanced, restore battery VM/IO
-        if [ "$balanced_applied" = "1" ]; then
-            monitor_log "MONITOR" "DAILY LOADGUARD: loadavg1=$load1 < 6.5, restoring Daily VM/IO"
-            tune_vm 2>/dev/null
-            tune_io 2>/dev/null
-            rm -f "$DAILY_LOADBAL_FILE" 2>/dev/null
-        fi
-        rm -f "$DAILY_LOADHIGH_FILE" 2>/dev/null
-    fi
-    return 0
-}
-
 # Forced-level bookkeeping (safety step-down): simpan level user,
 # tulis performance sementara, kembalikan saat cooldown/restore.
 _gb_force_level() {
@@ -914,6 +848,7 @@ _gb_unforce_level() {
 # Baca 1 baris file TANPA fork. Hasil di MONITOR_RD.
 monitor_rd() {
     MONITOR_RD=""
+    [ -r "$1" ] || return 1
     IFS= read -r MONITOR_RD 2>/dev/null < "$1" || [ -n "$MONITOR_RD" ]
 }
 
@@ -1466,8 +1401,6 @@ run_event_supervised_loop() {
         check_fps_floor "$monitor_foreground_package"
         command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
-        # DAILY: anti-lag guard (loadavg)
-        check_daily_loadavg_guard
         sleep "$monitor_ev_secs"
     done
     stop_event_stream
@@ -1516,8 +1449,6 @@ run_polling_loop() {
         check_fps_floor "$monitor_foreground_package"
         command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
         log_game_snapshot
-        # DAILY: anti-lag guard (loadavg)
-        check_daily_loadavg_guard
         sleep "$monitor_poll_interval"
     done
     return 0

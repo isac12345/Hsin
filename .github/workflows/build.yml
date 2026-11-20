@@ -98,6 +98,19 @@ jobs:
           (cd module && zip -r9 -q "../dist/HSIN-v5.0-module.zip" . -x '*.git*')
           ls -la dist
 
+      - name: Periksa daemon FPS ada di modul
+        env:
+          DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.draft_release }}
+        run: |
+          Z=$(ls dist/HSIN-v*-module.zip)
+          miss=0
+          for b in bin/hsin-fpsd-arm64 bin/hsin-fpsd-arm32; do
+            unzip -l "$Z" | grep -q " $b\$" || { echo "::warning::$b tidak ada di $Z"; miss=1; }
+          done
+          # Draft rilis tanpa daemon FPS = FPS hilang diam-diam di HP pengguna: gagalkan.
+          if [ "$miss" = 1 ] && [ "$DRAFT" = "true" ]; then echo "::error::modul rilis tanpa hsin-fpsd"; exit 1; fi
+          [ "$miss" = 0 ] && echo "daemon FPS ada di modul"; exit 0
+
       - uses: actions/upload-artifact@v4
         with:
           name: HSIN-v5.0

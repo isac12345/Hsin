@@ -189,14 +189,20 @@ ad_gpu_dir() {
 }
 
 ad_own_freeze() {   # bekukan uperf/fas-rs; pid yang lahir ulang ikut dibekukan
+    # Daftar ditulis (tmp+mv) SEBELUM kill -STOP: kalau monitor mati di antaranya, pid sudah
+    # tercatat dan dilanjutkan oleh ad_own_thaw. Urutan lama (STOP lalu tulis) bisa
+    # meninggalkan proses beku yang tidak ada di daftar mana pun.
     _owz=$(cat "$AD_OWN_STOP" 2>/dev/null)
+    _own_new=""
     for _own in uperf fas-rs; do
         for _owp in $(pidof "$_own" 2>/dev/null); do
             case " $_owz " in *" $_owp "*) continue ;; esac
-            kill -STOP "$_owp" 2>/dev/null && _owz="$_owz $_owp"
+            _owz="$_owz $_owp"; _own_new="$_own_new $_owp"
         done
     done
-    printf '%s\n' "$_owz" > "$AD_OWN_STOP" 2>/dev/null
+    [ -n "$_own_new" ] || return 0
+    printf '%s\n' "$_owz" > "$AD_OWN_STOP.tmp" 2>/dev/null && mv -f "$AD_OWN_STOP.tmp" "$AD_OWN_STOP" 2>/dev/null || return 0
+    for _owp in $_own_new; do kill -STOP "$_owp" 2>/dev/null; done
 }
 
 ad_own_mark() {   # penanda: paket, epoch mulai, lantai CPU/GPU sekarang (dibaca hsinctl status)
@@ -208,9 +214,11 @@ ad_own_mark() {   # penanda: paket, epoch mulai, lantai CPU/GPU sekarang (dibaca
 ad_own_thaw() {
     # Overdrive yang membeku ulang memegang pid-nya sendiri; ENGINE_MODE=off membekukan permanen.
     if [ ! -f "$AD_STATE/.ovd_stopped" ] && [ "$(cat "$AD_STATE/ENGINE_MODE" 2>/dev/null | tr -d '[:space:]')" != "off" ]; then
-        for _owp in $(cat "$AD_OWN_STOP" 2>/dev/null); do kill -CONT "$_owp" 2>/dev/null; done
+        # Pid di daftar plus pid uperf/fas-rs yang hidup sekarang: CONT pada proses yang
+        # tidak beku tidak berbuat apa-apa, jadi aman dan menutup sisa dari crash.
+        for _owp in $(cat "$AD_OWN_STOP" 2>/dev/null) $(pidof uperf fas-rs 2>/dev/null); do kill -CONT "$_owp" 2>/dev/null; done
     fi
-    rm -f "$AD_OWN_STOP"
+    rm -f "$AD_OWN_STOP" "$AD_OWN_STOP.tmp"
 }
 
 ad_own_on() {   # $1=pkg; return 0 = Adapt memegang frekuensi sesi ini
@@ -491,6 +499,7 @@ ad_in_call() {
 # Pembacaan sensor tanpa proses anak (read bawaan shell): dipanggil tiap tick monitor.
 ad_psi() {   # $1=cpu|io -> some avg10 (bulat)
     _apl=""
+    [ -r "/proc/pressure/$1" ] || return 0
     read -r _apl 2>/dev/null < "/proc/pressure/$1" || [ -n "$_apl" ] || return 0
     case "$_apl" in "some avg10="*) ;; *) return 0 ;; esac
     _apl=${_apl#some avg10=}; _apl=${_apl%% *}; _apl=${_apl%%.*}
@@ -511,7 +520,7 @@ ad_memavail_kb() {
 # Temp baterai dibaca dalam 0,1 C (mis. 361 = 36,1 C), lalu disimpan milli-C
 # supaya sama dengan ambang AD_TEMP_MAX (50000 = 50 C).
 ad_temp_mc() {
-    _t=""; read -r _t 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp"
+    _t=""; _ad_f="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp"; [ -r "$_ad_f" ] && read -r _t 2>/dev/null < "$_ad_f"
     _t=${_t%%[[:space:]]*}
     case "$_t" in ''|*[!0-9]*) echo -n 0; return ;; esac
     echo -n $((_t * 100))
@@ -537,7 +546,7 @@ ad_soc_temp_mc() {
 }
 
 ad_batt_pct() {
-    _abp=""; read -r _abp 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity"
+    _abp=""; _ad_f="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity"; [ -r "$_ad_f" ] && read -r _abp 2>/dev/null < "$_ad_f"
     echo -n "${_abp%%[[:space:]]*}"
 }
 
@@ -609,7 +618,7 @@ ad_kbase_own_restore() {
 }
 
 ad_charging() {
-    _ach=""; read -r _ach 2>/dev/null < "${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status"
+    _ach=""; _ad_f="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/status"; [ -r "$_ad_f" ] && read -r _ach 2>/dev/null < "$_ad_f"
     case "$_ach" in Charging|Full) return 0 ;; esac
     return 1
 }
@@ -1098,7 +1107,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     # (mulai dari beban tinggi, lihat ad_tier_beban) supaya tidak mati selamanya setelah Puncak.
     # Overdrive yang sedang menyala memegang frekuensi: Adapt tidak boleh ikut menulis.
     [ -f "$AD_STATE/.ovd_active" ] && { [ "$AD_OPEN" = "1" ] && ad_end; return 0; }
-    _apf=""; read -r _apf 2>/dev/null < "$AD_STATE/active_profile"
+    _apf=""; [ -r "$AD_STATE/active_profile" ] && read -r _apf 2>/dev/null < "$AD_STATE/active_profile"
     case "$_apf" in
         puncak|overdrive)
             [ "$AD_OPEN" = "1" ] && ad_end

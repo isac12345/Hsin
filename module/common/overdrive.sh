@@ -308,25 +308,28 @@ restore_prev() {
 
 # ---------------------------------------------------------------- bekukan / lanjutkan
 freeze_engines() {
+    # Daftar ditulis (tmp+mv) sebelum kill -STOP supaya crash di tengah tidak menyisakan pid beku tak tercatat.
     _fz=""
     for _nm in uperf fas-rs; do
-        for _pid in $(pidof "$_nm" 2>/dev/null); do
-            kill -STOP "$_pid" 2>/dev/null && _fz="$_fz $_pid"
-        done
+        for _pid in $(pidof "$_nm" 2>/dev/null); do _fz="$_fz $_pid"; done
     done
-    printf '%s\n' "$_fz" > "$OVD_STOPPED" 2>/dev/null
+    printf '%s\n' "$_fz" > "$OVD_STOPPED.tmp" 2>/dev/null && mv -f "$OVD_STOPPED.tmp" "$OVD_STOPPED" 2>/dev/null
+    for _pid in $_fz; do kill -STOP "$_pid" 2>/dev/null; done
 }
 
 # Proses yang lahir ulang (pid baru) ikut dibekukan; pid yang sudah beku dilewati.
 keep_frozen() {
     _fz=$(cat "$OVD_STOPPED" 2>/dev/null)
+    _kf_new=""
     for _nm in uperf fas-rs; do
         for _pid in $(pidof "$_nm" 2>/dev/null); do
             case " $_fz " in *" $_pid "*) continue ;; esac
-            kill -STOP "$_pid" 2>/dev/null && _fz="$_fz $_pid"
+            _fz="$_fz $_pid"; _kf_new="$_kf_new $_pid"
         done
     done
-    printf '%s\n' "$_fz" > "$OVD_STOPPED" 2>/dev/null
+    [ -n "$_kf_new" ] || return 0
+    printf '%s\n' "$_fz" > "$OVD_STOPPED.tmp" 2>/dev/null && mv -f "$OVD_STOPPED.tmp" "$OVD_STOPPED" 2>/dev/null || return 0
+    for _pid in $_kf_new; do kill -STOP "$_pid" 2>/dev/null; done
 }
 
 thaw_engines() {
@@ -335,7 +338,7 @@ thaw_engines() {
     for _pid in $(cat "$OVD_STOPPED" 2>/dev/null) $(pidof uperf fas-rs 2>/dev/null); do
         kill -CONT "$_pid" 2>/dev/null
     done
-    rm -f "$OVD_STOPPED"
+    rm -f "$OVD_STOPPED" "$OVD_STOPPED.tmp"
 }
 
 # ---------------------------------------------------------------- start / stop

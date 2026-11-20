@@ -52,6 +52,21 @@ SYSFS_BACKLIGHT_PREFIX="$T/bl" monitor_screen_fast_on; chk "backlight 0 = tidak 
 printf '120\n' > "$T/bl/x/brightness"
 HSIN_SCREEN_FAST=0 SYSFS_BACKLIGHT_PREFIX="$T/bl" monitor_screen_fast_on; chk "HSIN_SCREEN_FAST=0 mematikan" "$?" "1"
 SYSFS_BACKLIGHT_PREFIX="$T/none" monitor_screen_fast_on; chk "tanpa node backlight" "$?" "1"
+
+# --- penyapu startup monitor: sisa boost dipulihkan ---
+sed -n '/^monitor_startup_sweep() {/,/^}/p' "$C/monitor.sh" > "$T/fn5.sh"; . "$T/fn5.sh"
+SW="$T/sweep"; mkdir -p "$SW"; STATE_DIR="$SW"; GB_ACTIVE_FILE="$SW/.gb_active"; : > "$T/sweep.log"
+monitor_log() { printf '%s %s\n' "$1" "$2" >> "$T/sweep.log"; }
+gb_restore() { echo gb >> "$T/sweep.calls"; }
+gh_recover() { echo gh >> "$T/sweep.calls"; }
+ad_own_recover() { echo ad >> "$T/sweep.calls"; }
+rm -f "$T/sweep.calls"; monitor_startup_sweep
+chk "bersih: tidak ada pemulihan" "$([ -f "$T/sweep.calls" ] && echo ada || echo tidak)" "tidak"
+printf '1\n' > "$GB_ACTIVE_FILE"; : > "$SW/.gh_dnd_prev"; : > "$SW/.adapt_stopped"
+monitor_startup_sweep
+chk "gameboost, gamehooks, adapt dipulihkan" "$(tr '\n' ' ' < "$T/sweep.calls")" "gb gh ad "
+chk ".gb_active dinolkan" "$(tr -d '[:space:]' < "$GB_ACTIVE_FILE")" "0"
+chk "log SWEEP" "$(grep -c '^SWEEP' "$T/sweep.log")" "1"
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

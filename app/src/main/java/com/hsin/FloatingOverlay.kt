@@ -877,15 +877,20 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
             probeOn = false
             return
         }
-        probe.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            if (v.width > 0 && v.height > 0 && (v.width != screenW || v.height != screenH)) {
-                screenW = v.width
-                screenH = v.height
-                if (attached && landscape() != builtLand) {
-                    rebuild()
-                } else if (attached) {
-                    repos()
-                }
+        // View probe dipakai ulang tiap overlay dipasang lagi; listener yang sama dilepas dulu
+        // supaya tidak menumpuk (dulu tiap re-attach menambah satu, dan ukuran layar diproses N kali).
+        probe.removeOnLayoutChangeListener(probeLayoutListener)
+        probe.addOnLayoutChangeListener(probeLayoutListener)
+    }
+
+    private val probeLayoutListener = View.OnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+        if (v.width > 0 && v.height > 0 && (v.width != screenW || v.height != screenH)) {
+            screenW = v.width
+            screenH = v.height
+            if (attached && landscape() != builtLand) {
+                rebuild()
+            } else if (attached) {
+                repos()
             }
         }
     }

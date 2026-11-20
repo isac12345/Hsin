@@ -26,7 +26,7 @@ printf '45000\n' > "$T/thermal/thermal_zone0/temp"
 sleep 300 >/dev/null 2>&1 & echo $! > "$T/sleep.pid"
 cat > "$T/bin/pidof" <<EOP
 #!/bin/sh
-case "\$1" in fas-rs) cat "$T/sleep.pid" ;; esac
+for a in "\$@"; do case "\$a" in fas-rs) cat "$T/sleep.pid" ;; esac; done
 EOP
 chmod +x "$T/bin/pidof"; PATH="$T/bin:$PATH"
 st() { sed 's/.*) //' "/proc/$(cat "$T/sleep.pid")/stat" 2>/dev/null | cut -c1; }
@@ -365,6 +365,19 @@ printf '1100000\n' > "$T/cf/policy0/scaling_min_freq"
 ad_own_recover
 chk "recover: penanda hilang" "$([ -f "$AD_OWN_FILE" ] && echo ada || echo hilang)" "hilang"
 chk "recover: nilai asli" "$(mn policy0)" "500000"
+
+echo "== pid beku yang tidak ada di daftar (crash antara STOP dan tulis) tetap dilanjutkan"
+ad_own_on com.game.z
+chk "dibekukan" "$(st)" "T"
+printf '\n' > "$AD_OWN_STOP"            # daftar hilang/kosong, proses tetap beku
+chk "masih beku" "$(st)" "T"
+ad_own_off selesai
+chk "dilanjutkan lewat pidof walau tidak tercatat" "$([ "$(st)" = T ] && echo beku || echo jalan)" "jalan"
+echo "== daftar ditulis sebelum STOP (tmp+mv), tanpa berkas .tmp tersisa"
+ad_own_on com.game.y
+chk "daftar berisi pid" "$(tr -d '[:space:]' < "$AD_OWN_STOP")" "$(cat "$T/sleep.pid")"
+chk "tanpa .tmp" "$([ -f "$AD_OWN_STOP.tmp" ] && echo ada || echo tidak)" "tidak"
+ad_own_off selesai
 
 echo
 echo "HASIL: $PASS lolos, $FAIL gagal"
