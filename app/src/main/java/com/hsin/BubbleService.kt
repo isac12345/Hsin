@@ -241,8 +241,8 @@ class BubbleService : Service() {
                     }
                 }
                 // Lantai FPS dari modul (.fps_rescue): hanya saat game, satu toast per kejadian (epoch sama tidak diulang).
-                if (gamePkg.isNotEmpty() && tick % 4 == 1) {   // su hanya di putaran status (8 dtk), bukan tiap 2 dtk
-                    val rp = Hsin.fpsRescue().split("|")
+                if (gamePkg.isNotEmpty() && s != null) {   // dari status (8 dtk), tanpa su terpisah
+                    val rp = s.fpsRescue.split("|")
                     val ep = rp.getOrNull(0)?.trim()?.toLongOrNull() ?: 0L
                     if (ep > 0L && ep != prefs.rescueEpoch) {
                         prefs.rescueEpoch = ep

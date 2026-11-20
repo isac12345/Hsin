@@ -442,10 +442,24 @@ class FloatingOverlay(private val ctx: Context, private val prefs: Prefs) {
         if (recOn) tickTimer()
     }
 
+    private var streamStartMs = 0L
+    private var quickFails = 0
+
     fun setGame(pkg: String) {
         // aliran mati sendiri (su mati / pipa putus) atau jendela hilang: jangan berhenti di sini, mulai ulang
         val healthy = job?.isActive == true && attached
         if (pkg == game && healthy) return
+        // Aliran yang mati cepat berulang (su ditolak, skrip gagal) tidak dimulai ulang tiap 2 dtk:
+        // jeda naik 4, 8, 16, 32 sampai 60 dtk. Ganti paket tetap langsung mulai.
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        if (pkg == game && job != null) {
+            if (nowMs - streamStartMs < 5_000L) quickFails++ else quickFails = 0
+            if (quickFails > 0) {
+                val wait = minOf(60_000L, 2_000L shl minOf(quickFails, 5))
+                if (nowMs - streamStartMs < wait) return
+            }
+        } else quickFails = 0
+        streamStartMs = nowMs
         stopStream()
         game = pkg
         prevTs = ""

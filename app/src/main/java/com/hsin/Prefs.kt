@@ -188,8 +188,15 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putStringSet("ram_keep", v.toSet()).apply() }
     /** Riwayat sesi FPS, terbaru di atas, maksimal 12 baris (FpsSession.encode). */
     var fpsSessions: List<FpsSession>
-        get() = (sp.getString("fps_sessions", "") ?: "").lines().mapNotNull { FpsSession.decode(it) }
+        get() {
+            // Dibaca dari komposisi layar berkali-kali: hasil decode disimpan selama teks mentahnya sama.
+            val raw = sp.getString("fps_sessions", "") ?: ""
+            if (raw != fsRaw) { fsCache = raw.lines().mapNotNull { FpsSession.decode(it) }; fsRaw = raw }
+            return fsCache
+        }
         set(v) { sp.edit().putString("fps_sessions", v.take(20).joinToString("\n") { it.encode() }).apply() }
+    private var fsRaw: String? = null
+    private var fsCache: List<FpsSession> = emptyList()
     /** Riwayat uji performa: "epoch|mode|tunggal|banyak", terbaru di atas, maksimal 10. */
     var benchHist: List<List<String>>
         get() = (sp.getString("bench_hist", "") ?: "").lines().map { it.split('|') }.filter { it.size >= 4 }

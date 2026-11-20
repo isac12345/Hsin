@@ -214,6 +214,7 @@ cmd_status() {
     fi
     printf 'saran_pkg=%s\nsaran_nilai=%s\nsaran_why=%s\n' "${_sv:+$_gp}" "$_sv" "$_sw"
     printf 'hud_pkg=%s\n' "$(rd "$STATE_DIR/.gh_active")"
+    printf 'fps_rescue=%s\n' "$(rd "$STATE_DIR/.fps_rescue")"
     pid_alive "$STATE_DIR/.rec_pid" screenrec.sh && echo rec=1 || echo rec=0
     printf 'thermal_warm_c=%s\n' "$(cmd_thermal_get)"
     if [ -f "$COMMON/overdrive.sh" ]; then

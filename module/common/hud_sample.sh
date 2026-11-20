@@ -2,6 +2,7 @@
 # HSIN - hud_sample: metrik live untuk HUD di HSIN.
 #
 #   hud_sample.sh --once <pkg>   satu sampel (key=value), buat uji lewat `hsinctl hud sample <pkg>`
+#   hud_sample.sh --live         gpu/gpu_freq/cpu/suhu saja (tanpa FPS dan layer)
 #   hud_sample.sh --loop <pkg>   sampel tiap detik, tiap blok diakhiri baris "--"
 #                                (APK membaca stream ini lewat satu proses su; berhenti sendiri
 #                                 saat pembaca menutup pipa)
@@ -461,6 +462,11 @@ sample() {
     echo "last_ts=${2:-}"
     echo "pkg=$_s_pkg"
     echo "lat=$_s_lat"
+    emit_live
+}
+
+# GPU, suhu, dan CPU saja (tanpa FPS, tanpa layer). Dipakai sample() dan --live.
+emit_live() {
     gp_path   # cache path GPU di shell utama (di $(...) cache hilang tiap sampel)
     # Tanpa $( ): tiap $( ) = satu proses baru, dan di ROM ini satu fork+exec
     # makan ~80-100 ms CPU. Empat $( ) per sampel = ~300 ms, lebih besar dari
@@ -512,7 +518,8 @@ EOF
 
 case "$1" in
     --diag) diag "$2" ;;
-    --once) CNT_FAIL=3; sample "$2" ;;   # satu sampel: counter butuh dua titik, jadi langsung jalur layer
+    --once) CNT_FAIL=3; sample "$2" ;;
+    --live) emit_live ;;   # layar Space/Tema di APK: hanya gpu/gpu_freq/cpu/temp_mc/soc_mc, tanpa pencarian layer   # satu sampel: counter butuh dua titik, jadi langsung jalur layer
     --loop)
         # "--loop auto [cadangan]": paket diikuti otomatis dari app yang sedang di depan
         # (ditulis monitor.sh ke .hud_foreground_pkg), jadi satu proses cukup untuk game
@@ -563,5 +570,5 @@ case "$1" in
         printf '%s' "$2" > "$FPSD_PKG" 2>/dev/null || { echo "gagal tulis $FPSD_PKG"; exit 1; }
         echo "OK: fpsd -> $2"
         ;;
-    *) echo "Usage: hud_sample.sh --once|--loop|--fpsd <package|auto>"; exit 1 ;;
+    *) echo "Usage: hud_sample.sh --once|--loop|--fpsd <package|auto> | --live"; exit 1 ;;
 esac

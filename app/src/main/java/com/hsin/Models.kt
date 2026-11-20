@@ -40,6 +40,8 @@ data class Status(
     val adaptDs: String = "",
     val adaptFps: String = "",
     val adaptTier: String = "",
+    /** isi .fps_rescue (epoch|paket|aksi|penyebab), kosong bila tidak ada; ikut status supaya tanpa su terpisah. */
+    val fpsRescue: String = "",
     /** sakelar "Adapt pegang frekuensi": true = nyala (bawaan). */
     val adaptOwnSwitch: Boolean = true,
     /** uperf/fas-rs: false = dibekukan hanya saat Adapt/Puncak, true = dibekukan permanen. */

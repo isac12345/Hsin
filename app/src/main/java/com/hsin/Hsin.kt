@@ -70,6 +70,7 @@ object Hsin {
             adaptDs = m["adapt_ds"].orEmpty(),
             adaptFps = m["adapt_fps"].orEmpty(),
             adaptTier = m["adapt_tier"].orEmpty(),
+            fpsRescue = m["fps_rescue"].orEmpty(),
             adaptOwnSwitch = m["adapt_own_switch"] != "off",
             engineOff = m["engine_mode"] == "off",
         )
