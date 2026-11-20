@@ -620,10 +620,29 @@ event_line_package() {
     printf '%s' "$1" | sed -n 's/.*[^A-Za-z0-9_.]\([A-Za-z0-9_][A-Za-z0-9_.]*\)\/.*/\1/p' | head -n 1
 }
 
+# Kill-switch: `hsinctl pause on` membuat berkas .paused. Monitor berhenti memasang apa pun,
+# melepas semua yang sedang terpasang SEKALI (boost game, hook, lantai Adapt, uperf/fas-rs
+# yang dibekukan), lalu hanya memeriksa berkas itu tiap 5 dtk sampai dihapus (`pause off`).
+monitor_paused() {
+    [ -f "$STATE_DIR/.paused" ] || { MONITOR_PAUSE_DONE=""; return 1; }
+    if [ -z "${MONITOR_PAUSE_DONE:-}" ]; then
+        MONITOR_PAUSE_DONE=1
+        command -v ad_end >/dev/null 2>&1 && [ "${AD_OPEN:-0}" = "1" ] && ad_end
+        command -v gb_restore >/dev/null 2>&1 && gb_restore >/dev/null 2>&1
+        printf '%s\n' "0" > "$GB_ACTIVE_FILE" 2>/dev/null
+        command -v gh_recover >/dev/null 2>&1 && gh_recover >/dev/null 2>&1
+        command -v ad_own_recover >/dev/null 2>&1 && ad_own_recover
+        rm -f "$STATE_DIR/.game_t0" "$STATE_DIR/.adapt_now" 2>/dev/null
+        monitor_log "PAUSE" "dijeda: semua boost dilepas, monitor menunggu"
+    fi
+    return 0
+}
+
 handle_foreground_event() {
     handle_pkg="$1"
     handle_source="$2"
     [ -n "$handle_pkg" ] || return 0
+    [ -f "$STATE_DIR/.paused" ] && return 0
     case "$handle_pkg" in
         ''|*[!A-Za-z0-9._]*) return 0 ;;
     esac
@@ -1447,6 +1466,7 @@ run_event_supervised_loop() {
         # sisa sesi. Layar-mati tidak dihitung, jadi "sepi karena idle" tidak
         # disalahartikan sebagai "filter rusak".
         monitor_epoch_now   # panaskan offset epoch di shell utama (subshell mewarisi, tanpa fork date)
+        if monitor_paused; then sleep 5; continue; fi
         # Di mode event-driven, handler event berjalan di proses anak (reader
         # fifo), jadi variabel paket di loop ini tidak pernah diperbarui. Baca
         # berkas HUD yang ditulis handler tiap tick supaya tick selalu tahu
@@ -1499,6 +1519,7 @@ run_polling_loop() {
         monitor_cycle=$((monitor_cycle + 1))
 
         monitor_epoch_now
+        if monitor_paused; then sleep 5; continue; fi
         monitor_screen_state=$(get_screen_state)
         if [ "$?" -ne 0 ]; then
             monitor_log "WARNING" "dumpsys power failed; skipping cycle=$monitor_cycle"

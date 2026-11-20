@@ -74,6 +74,7 @@ object Hsin {
             fpsdState = m["fpsd_state"].orEmpty(),
             adaptOwnSwitch = m["adapt_own_switch"] != "off",
             engineOff = m["engine_mode"] == "off",
+            paused = m["paused"] == "1",
         )
     }
 
@@ -88,6 +89,8 @@ object Hsin {
     suspend fun conf(): Map<String, String> = kv(ctl("conf all").out)
 
     suspend fun setAdaptOwn(on: Boolean): Boolean = ctl("adapt own ${if (on) "on" else "off"}").out.startsWith("OK")
+
+    suspend fun setPaused(on: Boolean): Boolean = ctl("pause ${if (on) "on" else "off"}").out.startsWith("OK")
 
     suspend fun setEngineOff(off: Boolean): Boolean = ctl("engine mode ${if (off) "off" else "freeze"}").out.startsWith("OK")
 

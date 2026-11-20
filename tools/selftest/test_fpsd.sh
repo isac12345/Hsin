@@ -124,5 +124,21 @@ rm -f "$T/fa.calls"; FPSD_REV_PKG=""; FPSD_CHK_N=0
 check_fpsd_alive com.h
 chk "pid hidup: tidak dihidupkan ulang" "$([ -f "$T/fa.calls" ] && echo ya || echo tidak)" "tidak"
 kill %1 2>/dev/null
+
+# --- kill-switch pause: monitor_paused melepas sekali lalu menunggu ---
+sed -n '/^monitor_paused() {/,/^}/p' "$C/monitor.sh" > "$T/fn9.sh"; . "$T/fn9.sh"
+PZ="$T/pz"; mkdir -p "$PZ"; STATE_DIR="$PZ"; GB_ACTIVE_FILE="$PZ/.gb_active"; rm -f "$T/pz.calls"
+monitor_log() { echo "log:$1" >> "$T/pz.calls"; }
+gb_restore() { echo gb >> "$T/pz.calls"; }; gh_recover() { echo gh >> "$T/pz.calls"; }; ad_own_recover() { echo ad >> "$T/pz.calls"; }
+ad_end() { echo end >> "$T/pz.calls"; }; AD_OPEN=1
+monitor_paused; chk "tanpa .paused: jalan normal" "$?" "1"
+: > "$PZ/.paused"; : > "$PZ/.game_t0"
+monitor_paused; chk "dijeda" "$?" "0"
+monitor_paused; monitor_paused
+chk "pelepasan hanya sekali" "$(tr '\n' ' ' < "$T/pz.calls")" "end gb gh ad log:PAUSE "
+chk ".game_t0 dibuang" "$([ -f "$PZ/.game_t0" ] && echo ada || echo tidak)" "tidak"
+rm -f "$PZ/.paused"; monitor_paused; chk "dilanjutkan" "$?" "1"
+: > "$PZ/.paused"; rm -f "$T/pz.calls"; monitor_paused
+chk "jeda kedua melepas lagi" "$(grep -c log:PAUSE "$T/pz.calls")" "1"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

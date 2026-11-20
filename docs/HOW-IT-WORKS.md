@@ -55,6 +55,23 @@ Each iteration reads the foreground package, updates the game hooks, runs the
 Adapt engine for that package, runs the memory cleaner when a game is active,
 and writes the current state.
 
+### 2.1 Safety nets in the monitor
+
+- **Start-up sweep.** When the monitor starts (first boot or restarted by the watchdog) it
+  releases whatever a dead predecessor left behind: game boost (`.gb_active`), game hooks
+  (DND, refresh, I/O priority) and the Adapt frequency floors, including `uperf`/`fas-rs`
+  processes that were stopped with `SIGSTOP`. The list of stopped pids is written (tmp + mv)
+  before the signal is sent, and thawing also resumes the live `uperf`/`fas-rs` pids.
+- **Pause switch.** `hsinctl pause on|off|get` (app: Tools, "Pause HSIN") creates `.paused`.
+  The monitor then releases everything once, applies nothing, and only checks the flag every
+  5 seconds. It stays paused across reboots until switched off.
+- **FPS daemon revival.** While a game runs the monitor checks every ~20 s that the daemon pid
+  is alive and restarts it through `hud_sample.sh --fpsd` (at most 5 times per game). A daemon
+  that is alive but stuck cannot be detected from shell; that needs a heartbeat in `hsin-fpsd`.
+- **`hsinctl status` cache.** The output is kept for 2 seconds in `.status.cache`; any other
+  `hsinctl` command removes it so a change shows up in the next status. `fpsd_state` reports the
+  FPS reader (`ok`, `dead`, `none`, `binder-fail`, `dump-fail`).
+
 ## 3. Adapt engine
 
 The engine is `adapt.sh`. It keeps one load level per application, from 0 to

@@ -48,6 +48,8 @@ data class Status(
     val adaptOwnSwitch: Boolean = true,
     /** uperf/fas-rs: false = dibekukan hanya saat Adapt/Puncak, true = dibekukan permanen. */
     val engineOff: Boolean = false,
+    /** kill-switch: monitor dijeda, semua boost dilepas (hsinctl pause). */
+    val paused: Boolean = false,
 )
 
 data class GameEntry(val pkg: String, val profile: String, val fps: String)

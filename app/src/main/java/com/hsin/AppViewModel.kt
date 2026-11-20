@@ -466,6 +466,13 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setPaused(on: Boolean) {
+        viewModelScope.launch {
+            status = status.copy(paused = on)
+            if (!Hsin.setPaused(on)) toast("Gagal menyimpan pengaturan")
+        }
+    }
+
     fun setEngineOff(off: Boolean) {
         viewModelScope.launch {
             status = status.copy(engineOff = off)

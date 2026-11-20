@@ -215,6 +215,7 @@ cmd_status() {
     printf 'saran_pkg=%s\nsaran_nilai=%s\nsaran_why=%s\n' "${_sv:+$_gp}" "$_sv" "$_sw"
     printf 'hud_pkg=%s\n' "$(rd "$STATE_DIR/.gh_active")"
     printf 'fps_rescue=%s\n' "$(rd "$STATE_DIR/.fps_rescue")"
+    [ -f "$STATE_DIR/.paused" ] && echo paused=1 || echo paused=0
     # Keadaan pembaca FPS: dead = daemon tidak jalan, <isi fpsd.status> = ok/binder-fail/dump-fail,
     # none = belum pernah jalan. APK memakai ini untuk menjelaskan kenapa FPS kosong.
     _fd_p=""; [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fd_p < "$STATE_DIR/fpsd.pid" 2>/dev/null
@@ -824,6 +825,16 @@ cmd_adapt() {
 
 # engine mode freeze|off: freeze (bawaan) = uperf/fas-rs dibekukan hanya selama Adapt/Puncak memegang
 # frekuensi. off = dibekukan permanen dan tidak dijalankan saat boot, sampai diubah kembali.
+# Kill-switch satu tombol: monitor berhenti memasang apa pun dan melepas yang terpasang.
+cmd_pause() {
+    case "$1" in
+        on)  printf '1\n' > "$STATE_DIR/.paused"; echo "OK: HSIN dijeda (monitor melepas semua boost dalam beberapa detik)" ;;
+        off) rm -f "$STATE_DIR/.paused"; echo "OK: HSIN dilanjutkan" ;;
+        ''|get) [ -f "$STATE_DIR/.paused" ] && echo "paused=1" || echo "paused=0" ;;
+        *) echo "Usage: hsinctl pause [on|off|get]"; return 1 ;;
+    esac
+}
+
 cmd_engine() {
     case "$1" in
         mode)
@@ -947,8 +958,26 @@ cmd_gamefps() {
     esac
 }
 
+
+# `status` memanggil puluhan proses dan dibaca beberapa pembaca (notifikasi, orb, layar beranda).
+# Hasil disimpan 2 dtk di .status.cache; perintah lain menghapusnya supaya perubahan yang baru
+# dibuat langsung terlihat di status berikutnya.
+cmd_status_cached() {
+    _sc_f="$STATE_DIR/.status.cache"
+    if [ -r "$_sc_f" ]; then
+        _sc_mt=$(stat -c %Y "$_sc_f" 2>/dev/null); _sc_now=$(date +%s 2>/dev/null)
+        case "$_sc_mt$_sc_now" in ''|*[!0-9]*) ;; *)
+            if [ $((_sc_now - _sc_mt)) -le 2 ] && [ $((_sc_now - _sc_mt)) -ge 0 ]; then cat "$_sc_f"; return 0; fi ;;
+        esac
+    fi
+    cmd_status > "$_sc_f.$$" 2>/dev/null; _sc_rc=$?
+    if [ "$_sc_rc" -eq 0 ] && [ -s "$_sc_f.$$" ]; then mv -f "$_sc_f.$$" "$_sc_f" 2>/dev/null; cat "$_sc_f"; else cat "$_sc_f.$$" 2>/dev/null; rm -f "$_sc_f.$$"; fi
+    return "$_sc_rc"
+}
+[ "$1" != "status" ] && [ -f "$STATE_DIR/.status.cache" ] && rm -f "$STATE_DIR/.status.cache"
+
 case "$1" in
-    status) cmd_status ;;
+    status) cmd_status_cached ;;
     profile) cmd_profile "$2" ;;
     flag) cmd_flag "$2" "$3" ;;
     flags) cmd_flags ;;
@@ -969,6 +998,7 @@ case "$1" in
     device) cmd_device ;;
     adapt) cmd_adapt "$2" "$3" ;;
     engine) cmd_engine "$2" "$3" ;;
+    pause) cmd_pause "$2" ;;
     redetect) cmd_redetect ;;
     render) sh "$COMMON/render_manager.sh" "$2" "$3" ;;
     gamerender) cmd_gamerender "$2" "$3" "$4" ;;
