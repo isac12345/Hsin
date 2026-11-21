@@ -76,8 +76,23 @@ _gh_device_ids() {
 }
 
 # return 0 = fitur $1 DILARANG oleh aturan mitigasi
+# Hasil per fitur disimpan 300 dtk (dulu tiap panggilan = printf+tr+pipa, belasan proses; dipanggil
+# tiap tick lewat memfx). Tanpa jam monitor (hsinctl, tes) tidak ada cache.
 gh_mit_hit() {
     [ -f "$GH_MIT" ] || return 1
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now
+        eval "_ghm_ct=\${_GHMC_T_$1:-0}; _ghm_cv=\${_GHMC_V_$1:-}"
+        if [ -n "$MONITOR_NOW" ] && [ -n "$_ghm_cv" ] && [ $((MONITOR_NOW - _ghm_ct)) -lt 300 ] 2>/dev/null; then
+            [ "$_ghm_cv" = 1 ]; return $?
+        fi
+        _gh_mit_scan "$1"; _ghm_r=$?
+        eval "_GHMC_T_$1=\${MONITOR_NOW:-0}; _GHMC_V_$1=\$((_ghm_r == 0))"
+        return $_ghm_r
+    fi
+    _gh_mit_scan "$1"
+}
+_gh_mit_scan() {
     while read -r _ghm_pat _ghm_ft _ghm_rest; do
         case "$_ghm_pat" in ''|'#'*) continue ;; esac
         case "$_ghm_ft" in "$1"|all) ;; *) continue ;; esac
@@ -886,24 +901,25 @@ gh_tick() {
     _gh_num "$_ght_now" || return 0
     # Penjaga Overdrive mati tapi uperf/fas-rs masih beku atau frekuensi masih terkunci: pulihkan.
     if _gh_ovd_exists; then
-        _gop=$(cat "$GH_STATE/.ovd_pid" 2>/dev/null | tr -d '[:space:]')
+        _gop=""; [ -r "$GH_STATE/.ovd_pid" ] && read -r _gop < "$GH_STATE/.ovd_pid" 2>/dev/null
         if ! _gh_num "$_gop" || [ ! -d "/proc/$_gop" ]; then _gh_ovd recover; fi
     fi
     if [ -f "$GH_MARK" ]; then
-        command -v mf_relief_tick >/dev/null 2>&1 && mf_relief_tick "$(cat "$GH_MARK" 2>/dev/null)"
+        _ght_m=""; read -r _ght_m < "$GH_MARK" 2>/dev/null
+        command -v mf_relief_tick >/dev/null 2>&1 && mf_relief_tick "$_ght_m"
         if [ -f "$GH_PEND" ]; then
-            _ght_p=$(tr -d '[:space:]' < "$GH_PEND" 2>/dev/null)
+            _ght_p=""; read -r _ght_p < "$GH_PEND" 2>/dev/null
             if _gh_num "$_ght_p" && [ $((_ght_now - _ght_p)) -ge "$(_gh_grace)" ]; then
                 gh_stop
                 return 0
             fi
         fi
         _ght_l=""
-        [ -f "$GH_PRIO_T" ] && _ght_l=$(tr -d '[:space:]' < "$GH_PRIO_T" 2>/dev/null)
+        [ -r "$GH_PRIO_T" ] && read -r _ght_l < "$GH_PRIO_T" 2>/dev/null
         _gh_num "$_ght_l" || _ght_l=0
         if [ $((_ght_now - _ght_l)) -ge "$GH_PRIO_EVERY" ]; then
-            _gh_prio_apply "$(cat "$GH_MARK" 2>/dev/null)"
-            printf '%s\n' "$_ght_now" > "$GH_PRIO_T" 2>/dev/null
+            _gh_prio_apply "$_ght_m"
+            echo "$_ght_now" > "$GH_PRIO_T" 2>/dev/null
         fi
         return 0
     fi

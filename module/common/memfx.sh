@@ -76,11 +76,20 @@ _mf_meminfo_kb() { sed -n "s/^$1:[[:space:]]*\([0-9]*\).*/\1/p" "$MF_MEMINFO" 2>
 mf_psi_threshold_x100() {
     # Sengaja tidak di-cache: test_memfx mengganti properti di tengah proses, dan
     # properti bisa dibaca ulang dengan murah. Dua getprop ~40 ms per tick.
+    # Cache 300 dtk bila jam monitor ada (properti sistem tidak berubah saat jalan; dulu 1-2 getprop
+    # per tick). Tanpa jam monitor (tes, hsinctl) dibaca tiap panggilan.
+    if command -v monitor_epoch_now >/dev/null 2>&1; then
+        monitor_epoch_now
+        if [ -n "${_MF_THR:-}" ] && [ -n "$MONITOR_NOW" ] && [ $((MONITOR_NOW - ${_MF_THR_T:-0})) -lt 300 ] 2>/dev/null; then
+            echo -n "$_MF_THR"; return 0
+        fi
+    fi
     _mt=$(getprop ro.lmk.psi_partial_stall_ms 2>/dev/null)
     if ! _mf_num "$_mt"; then
         if [ "$(getprop ro.config.low_ram 2>/dev/null)" = "true" ]; then _mt=200; else _mt=70; fi
     fi
-    echo -n $(( _mt * 10 ))
+    _MF_THR=$(( _mt * 10 )); _MF_THR_T=${MONITOR_NOW:-0}
+    echo -n "$_MF_THR"
 }
 
 mf_memstat() {

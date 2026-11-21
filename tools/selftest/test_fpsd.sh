@@ -173,5 +173,15 @@ chk "tanpa .profile: tidak mencatat" "$([ -f "$PF/log" ] && echo ada || echo tid
 for i in 1 2 3 4 5; do prof_lap head; for j in 1 2 3; do ls / >/dev/null; done; prof_lap gb; prof_lap fps; prof_lap adapt; prof_lap snap; done
 chk "dengan .profile: baris PROFIL" "$(grep -c "^PROFIL 3 tick, ticks(10ms):" "$PF/log")" "1"
 rm -f "$PF/.profile"; prof_lap head; chk "dimatikan lagi" "$PROF_ON" "0"
+
+# --- cache mitigasi gamehooks: sekali pindai per 300 dtk ---
+sed -n '/^gh_mit_hit() {/,/^_gh_mit_scan() {/p' "$C/gamehooks.sh" | sed '$d' > "$T/fn12.sh"; . "$T/fn12.sh"
+GH_MIT="$T/mit.conf"; : > "$GH_MIT"; MONITOR_NOW=1000; monitor_epoch_now() { :; }
+SCANS=0; SCAN_RC=0; _gh_mit_scan() { SCANS=$((SCANS + 1)); return $SCAN_RC; }
+gh_mit_hit memclean; r1=$?; gh_mit_hit memclean; r2=$?
+chk "mitigasi: hasil sama, dipindai sekali" "$r1$r2$SCANS" "001"
+MONITOR_NOW=1301; gh_mit_hit memclean; chk "mitigasi: pindai ulang setelah 300 dtk" "$SCANS" "2"
+SCAN_RC=1; MONITOR_NOW=1700; gh_mit_hit prio; r3=$?; gh_mit_hit prio; r4=$?
+chk "mitigasi: tidak kena (1), dicache per fitur" "$r3$r4$SCANS" "113"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

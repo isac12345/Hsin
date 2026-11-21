@@ -1079,6 +1079,7 @@ check_gb_grace_period() {
     if command -v gh_tick >/dev/null 2>&1; then
         gh_tick
     fi
+    prof_lap gb_gh
     
     # Check pending restore
     if [ -f "$GB_PENDING_FILE" ]; then
@@ -1296,69 +1297,30 @@ monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall
     [ -n "$_mfs_mt" ] || _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
     case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
     [ $((_mfs_now - _mfs_mt)) -le 15 ] || return 1
-    # Satu sed untuk paket dan lat (dulu dua sed + dua head). Hasil sama untuk berkas tanpa pkg=.
-    _mfs_pl=$(sed -n 's/^pkg=/P /p;s/^lat=/L /p' "$1" 2>/dev/null)
-    # Data milik app lain (mis. com.termux) bukan FPS game: jangan dipakai, kalau tidak 1% low palsu memicu boost.
-    if [ -n "$2" ]; then
-        _mfs_p=""
-        while IFS= read -r _mfs_l; do
-            case "$_mfs_l" in "P "*) _mfs_p=${_mfs_l#P }; break ;; esac
-        done <<MFSEOF
-$_mfs_pl
-MFSEOF
-        [ "$_mfs_p" = "$2" ] || return 1
-    fi
-    _mfs_lat=""
-    while IFS= read -r _mfs_l; do
-        case "$_mfs_l" in "L "*) _mfs_lat=${_mfs_l#L }; break ;; esac
-    done <<MFSEOF
-$_mfs_pl
-MFSEOF
-    printf '%s\n' "$_mfs_lat" | awk '{
-        n = 0
-        for (i = 1; i <= NF; i++) { v = $i + 0; if (v > 0) { n++; t[n] = v } }
-        if (n < 3) exit 1
-        m = 0
-        for (i = 2; i <= n; i++) { d = t[i] - t[i - 1]; if (d > 0) { m++; dt[m] = d } }
-        if (m < 3) exit 1
-        for (i = 1; i <= m; i++) a[i] = dt[i]
-        for (i = 2; i <= m; i++) { k = a[i]; j = i - 1; while (j > 0 && a[j] > k) { a[j + 1] = a[j]; j-- } a[j + 1] = k }
-        idx = int(m * 0.99); if (idx < 1) idx = 1; if (idx > m) idx = m
-        span = t[n] - t[1]
-        avg = (span > 0) ? int((n - 1) * 1000000000 / span) : 0
-        printf "%d %d %d", int(1000000000 / a[idx]), avg, int(a[m] / 1000000)
-    }'
+    # Satu awk membaca berkas langsung: paket dicocokkan, lalu persentil dihitung (dulu sed +
+    # dua pembacaan heredoc + printf luar + awk = 3 proses baru per tick). Baris pkg= dan lat=
+    # yang PERTAMA dipakai, sama seperti sebelumnya. Data app lain (mis. com.termux) bukan FPS
+    # game: ditolak supaya 1% low palsu tidak memicu boost.
+    awk -v want="$2" '
+        /^pkg=/ && !hp { p = substr($0, 5); hp = 1 }
+        /^lat=/ && !hl { lat = substr($0, 5); hl = 1 }
+        END {
+            if (want != "" && p != want) exit 1
+            nf = split(lat, f, " ")
+            n = 0
+            for (i = 1; i <= nf; i++) { v = f[i] + 0; if (v > 0) { n++; t[n] = v } }
+            if (n < 3) exit 1
+            m = 0
+            for (i = 2; i <= n; i++) { d = t[i] - t[i - 1]; if (d > 0) { m++; dt[m] = d } }
+            if (m < 3) exit 1
+            for (i = 1; i <= m; i++) a[i] = dt[i]
+            for (i = 2; i <= m; i++) { k = a[i]; j = i - 1; while (j > 0 && a[j] > k) { a[j + 1] = a[j]; j-- } a[j + 1] = k }
+            idx = int(m * 0.99); if (idx < 1) idx = 1; if (idx > m) idx = m
+            span = t[n] - t[1]
+            avg = (span > 0) ? int((n - 1) * 1000000000 / span) : 0
+            printf "%d %d %d", int(1000000000 / a[idx]), avg, int(a[m] / 1000000)
+        }' "$1" 2>/dev/null
 }
-
-fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"
-    _fdc=""
-    for _fdc_p in ${CPU_POLICIES:-}; do
-        _fdc_d="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}/cpufreq/$_fdc_p"
-        _fdc_c=$(cat "$_fdc_d/scaling_cur_freq" 2>/dev/null | tr -d '[:space:]')
-        _fdc_m=$(cat "$_fdc_d/cpuinfo_max_freq" 2>/dev/null | tr -d '[:space:]')
-        case "$_fdc_c" in ''|*[!0-9]*) continue ;; esac
-        case "$_fdc_m" in ''|*[!0-9]*|0) continue ;; esac
-        [ $((_fdc_c * 100 / _fdc_m)) -ge 90 ] && { _fdc="cpu"; break; }
-    done
-    _fdc_g="${GPU_DEVFREQ_PATH:-}"
-    if [ -n "$_fdc_g" ] && [ -r "$_fdc_g/cur_freq" ] && [ -r "$_fdc_g/max_freq" ]; then
-        _fdc_gc=$(cat "$_fdc_g/cur_freq" 2>/dev/null | tr -d '[:space:]')
-        _fdc_gm=$(cat "$_fdc_g/max_freq" 2>/dev/null | tr -d '[:space:]')
-        case "$_fdc_gc$_fdc_gm" in ''|*[!0-9]*) ;; *)
-            if [ "$_fdc_gm" -gt 0 ] 2>/dev/null && [ $((_fdc_gc * 100 / _fdc_gm)) -ge 90 ]; then
-                _fdc="${_fdc:+$_fdc+}gpu"
-            fi ;;
-        esac
-    fi
-    _fdc_io=$(awk '/^some/{print int($2); exit}' /proc/pressure/io 2>/dev/null)
-    case "$_fdc_io" in ''|*[!0-9]*) _fdc_io=0 ;; esac
-    [ "$_fdc_io" -ge 10 ] 2>/dev/null && _fdc="${_fdc:+$_fdc+}io"
-    printf '%s' "${_fdc:-tak jelas}"
-}
-
-# Satu hasil per detik untuk semua pemanggil (check_fps_floor dan ad_tick dulu masing-masing
-# menjalankan stat + sed + awk atas berkas yang sama). Hasil di MONITOR_FS, umur berkas
-# (detik) di MFS_AGE; return 1 bila tidak ada data segar. Dipanggil langsung, bukan lewat $( ).
 monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
     monitor_epoch_now
     _mfv_key="$1|$2|$MONITOR_NOW"
@@ -1401,9 +1363,12 @@ check_fpsd_alive() {
 check_fps_floor() {
     _ff_pkg="$1"
     [ -f "$STATE_DIR/.game_t0" ] || return 0
+    prof_lap f_pre
     check_fpsd_alive "$_ff_pkg"
+    prof_lap f_alive
     [ -r "$STATE_DIR/fpsd.out" ] || return 0
     monitor_fps_stat_v "$STATE_DIR/fpsd.out" "$_ff_pkg" || return 0
+    prof_lap f_stat
     _ff_now=$MONITOR_NOW
     # Data lebih tua dari 5 dtk = daemon sedang mati/tidak melaporkan game ini.
     case "$MFS_AGE" in ''|*[!0-9]*) return 0 ;; esac
@@ -1480,7 +1445,7 @@ start_event_stream() {
 # anak proses ikut terhitung), dirata-rata dan dicatat ke log tiap PROF_FLUSH_N tick.
 # Tidak termasuk proses pembaca event (anak latar). Tanpa .profile: hanya satu uji berkas.
 PROF_FLUSH_N=30
-PROF_N=0; PROF_ON=0; PROF_LABELS=""
+PROF_N=0; PROF_ON=0; PROF_LABELS=""   # label muncul sesuai urutan pertama kali dilewati
 prof_lap() {
     if [ "$1" = head ]; then
         if [ -f "$STATE_DIR/.profile" ]; then
@@ -1557,6 +1522,7 @@ run_event_supervised_loop() {
         if [ -f "$HUD_FOREGROUND_FILE" ]; then
             monitor_rd "$HUD_FOREGROUND_FILE" && monitor_foreground_package="${MONITOR_RD%%[[:space:]]*}"
         fi
+        prof_lap h_fg
         monitor_loop_override
         monitor_ev_secs="${MONITOR_LOOP_OVR:-$EVENT_LOOP_SECS_DEFAULT}"
         # Bukan game di depan: tick lebih jarang (EVENT_IDLE_SECS). Game tetap 2 dtk karena
