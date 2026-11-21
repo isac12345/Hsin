@@ -1480,7 +1480,7 @@ start_event_stream() {
 # anak proses ikut terhitung), dirata-rata dan dicatat ke log tiap PROF_FLUSH_N tick.
 # Tidak termasuk proses pembaca event (anak latar). Tanpa .profile: hanya satu uji berkas.
 PROF_FLUSH_N=30
-PROF_N=0; PROF_ON=0; PROF_head=0; PROF_gb=0; PROF_fps=0; PROF_adapt=0; PROF_snap=0
+PROF_N=0; PROF_ON=0; PROF_LABELS=""
 prof_lap() {
     if [ "$1" = head ]; then
         if [ -f "$STATE_DIR/.profile" ]; then
@@ -1497,12 +1497,15 @@ prof_lap() {
     _pft=$(( ${12} + ${13} + ${14} + ${15} ))
     if [ -z "$PROF_LAST" ]; then PROF_LAST=$_pft; return 0; fi
     _pfd=$((_pft - PROF_LAST)); PROF_LAST=$_pft
+    case " $PROF_LABELS " in *" $_pfn "*) ;; *) PROF_LABELS="$PROF_LABELS $_pfn"; eval "PROF_$_pfn=0" ;; esac
     eval "PROF_$_pfn=\$((PROF_$_pfn + _pfd))"
     if [ "$_pfn" = snap ]; then
         PROF_N=$((PROF_N + 1))
         if [ "$PROF_N" -ge "$PROF_FLUSH_N" ]; then
-            monitor_log "PROFIL" "${PROF_N} tick: ticks(10ms) head=$PROF_head gb=$PROF_gb fps=$PROF_fps adapt=$PROF_adapt snap=$PROF_snap pkg=${monitor_foreground_package:-none}"
-            PROF_N=0; PROF_head=0; PROF_gb=0; PROF_fps=0; PROF_adapt=0; PROF_snap=0
+            _pfo=""
+            for _pfl in $PROF_LABELS; do eval "_pfo=\"\$_pfo \$_pfl=\$PROF_$_pfl\""; eval "PROF_$_pfl=0"; done
+            monitor_log "PROFIL" "${PROF_N} tick, ticks(10ms):$_pfo pkg=${monitor_foreground_package:-none}"
+            PROF_N=0
         fi
     fi
 }
@@ -1544,6 +1547,7 @@ run_event_supervised_loop() {
         # Jika jendela lewat tapi NOL event ter-parse, fallback polling permanen
         # sisa sesi. Layar-mati tidak dihitung, jadi "sepi karena idle" tidak
         # disalahartikan sebagai "filter rusak".
+        prof_lap h_scr
         monitor_epoch_now   # panaskan offset epoch di shell utama (subshell mewarisi, tanpa fork date)
         if monitor_paused; then sleep 5; continue; fi
         # Di mode event-driven, handler event berjalan di proses anak (reader
@@ -1562,6 +1566,7 @@ run_event_supervised_loop() {
                 monitor_ev_secs="$EVENT_IDLE_SECS"
             fi
         fi
+        prof_lap h_ovr
         EVENT_ON_SECS=$((EVENT_ON_SECS + monitor_ev_secs))
         if [ "$EVENT_FALLBACK_DONE" -eq 0 ] && [ "$EVENT_ON_SECS" -ge "$EVENT_VERIFY_AT" ] 2>/dev/null; then
             event_count_get

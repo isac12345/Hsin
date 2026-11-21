@@ -1094,6 +1094,9 @@ ad_end() {
     AD_TRIED_LVL=""; AD_HELP_LVL=0; AD_BAD_LVL=0
 }
 
+# Profil opsional (didefinisikan monitor.sh); tanpa monitor (tes) jadi kosong.
+command -v prof_lap >/dev/null 2>&1 || prof_lap() { :; }
+
 ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     _pkg="$1"
     case "$_pkg" in ''|*[!A-Za-z0-9._]*) return 0 ;; esac
@@ -1118,6 +1121,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         ad_end    # pindah aplikasi: semua kembali normal
     fi
     [ "$AD_OPEN" = "1" ] || { ad_own_recover; ad_open "$_pkg"; }
+    prof_lap a_open
 
     # Adapt memegang frekuensi: pid uperf/fas-rs yang lahir ulang ikut dibekukan (tiap >=20 dtk).
     if [ "$AD_OWN" = "1" ]; then
@@ -1132,6 +1136,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
 
     # Pembersih RAM otomatis saat sempit (memfx: PSI + ambang + jeda sendiri).
     command -v mf_relief_tick >/dev/null 2>&1 && mf_relief_tick "$_pkg"
+    prof_lap a_mf
 
     # --- ukur ---
     _st=""
@@ -1152,11 +1157,16 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
         ''|*[!0-9]*) _p1=""; _avg=""; _stall="" ;;
     esac
     _pc=$(ad_psi cpu); case "$_pc" in ''|*[!0-9]*) _pc=0 ;; esac
+    prof_lap a_psic
     _pi=$(ad_psi io);  case "$_pi" in ''|*[!0-9]*) _pi=0 ;; esac
     _mem=$(ad_memavail_kb); case "$_mem" in ''|*[!0-9]*) _mem=99999999 ;; esac
+    prof_lap a_mem
     _tmp=$(ad_temp_mc); case "$_tmp" in ''|*[!0-9]*) _tmp=0 ;; esac
+    prof_lap a_temp
     _soc=$(ad_soc_temp_mc); case "$_soc" in ''|*[!0-9]*) _soc=0 ;; esac
+    prof_lap a_soc
     _bat=$(ad_batt_pct); case "$_bat" in ''|*[!0-9]*) _bat=100 ;; esac
+    prof_lap a_bat
 
     # --- nilai: tersendat atau lancar ---
     _jank=0; _calm=0; _why=""

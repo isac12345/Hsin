@@ -165,13 +165,13 @@ get_foreground_package() { return 1; }; event_verify_quiet; chk "dumpsys gagal: 
 
 # --- profil per fase: mati tanpa .profile, mencatat bila .profile ada ---
 sed -n '/^prof_lap() {/,/^}/p' "$C/monitor.sh" > "$T/fn11.sh"; . "$T/fn11.sh"
-PF="$T/pf"; mkdir -p "$PF"; STATE_DIR="$PF"; PROF_FLUSH_N=3; PROF_N=0; PROF_ON=0; PROF_head=0; PROF_gb=0; PROF_fps=0; PROF_adapt=0; PROF_snap=0; PROF_LAST=""
+PF="$T/pf"; mkdir -p "$PF"; STATE_DIR="$PF"; PROF_FLUSH_N=3; PROF_N=0; PROF_ON=0; PROF_LABELS=""; PROF_LAST=""
 monitor_log() { echo "$1 $2" >> "$PF/log"; }
 for i in 1 2 3 4; do prof_lap head; prof_lap gb; prof_lap fps; prof_lap adapt; prof_lap snap; done
 chk "tanpa .profile: tidak mencatat" "$([ -f "$PF/log" ] && echo ada || echo tidak)" "tidak"
 : > "$PF/.profile"
 for i in 1 2 3 4 5; do prof_lap head; for j in 1 2 3; do ls / >/dev/null; done; prof_lap gb; prof_lap fps; prof_lap adapt; prof_lap snap; done
-chk "dengan .profile: baris PROFIL" "$(grep -c '^PROFIL 3 tick: ticks(10ms) head=' "$PF/log")" "1"
+chk "dengan .profile: baris PROFIL" "$(grep -c "^PROFIL 3 tick, ticks(10ms):" "$PF/log")" "1"
 rm -f "$PF/.profile"; prof_lap head; chk "dimatikan lagi" "$PROF_ON" "0"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

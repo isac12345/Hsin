@@ -92,4 +92,15 @@ HL=/data/adb/hsin/hsin.log
 grep -E "MONITOR\] \[(START|EVENT|WARNING)\]" "$HL" 2>/dev/null | grep -E "method=|event stream|polling" | tail -n 6 | cut -c1-200
 echo "ragam tag events (500 baris terakhir):"
 logcat -b events -d -t 500 -v brief 2>/dev/null | sed -n 's#^I/\([A-Za-z0-9_]*\).*#\1#p' | sort | uniq -c | sort -rn | head -n 12
+echo; echo "== 8. biaya satu pembacaan berkas sysfs/proc (read bawaan, 200x; ms per baca)"
+rd_cost() {   # $1=berkas
+    _rf=$1
+    [ -r "$_rf" ] || { echo "$_rf tidak terbaca"; return; }
+    sh -c "i=0; while [ \$i -lt 200 ]; do read -r x < $_rf; i=\$((i+1)); done; cat /proc/\$\$/stat" > "$PD/.hp_rd" 2>/dev/null
+    _s=$(cat $PD/.hp_rd); rm -f $PD/.hp_rd; _s=${_s##*) }; set -- $_s
+    _t=$(( ${12} + ${13} + ${14} + ${15} ))
+    echo "$_t tick/200 baca = $((_t * 10 / 200)).$(( (_t * 1000 / 200) % 10 )) ms  $_rf"
+}
+for z in /sys/class/thermal/thermal_zone*; do rd_cost $z/temp; done
+for f in /sys/class/power_supply/battery/capacity /sys/class/power_supply/battery/temp /proc/pressure/cpu /proc/pressure/io /proc/meminfo /proc/uptime /proc/stat /sys/class/backlight/*/brightness; do rd_cost $f; done
 echo; echo "selesai. Kirim berkas ini ke Claude/agent."
