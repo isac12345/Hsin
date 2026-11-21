@@ -1475,6 +1475,38 @@ start_event_stream() {
     return 0
 }
 
+# Profil CPU per fase tick (opsional): `touch $STATE_DIR/.profile` menyalakan, hapus berkas untuk
+# mematikan. Biaya tiap fase = tick utime+stime+cutime+cstime milik monitor ini (1 tick = 10 ms,
+# anak proses ikut terhitung), dirata-rata dan dicatat ke log tiap PROF_FLUSH_N tick.
+# Tidak termasuk proses pembaca event (anak latar). Tanpa .profile: hanya satu uji berkas.
+PROF_FLUSH_N=30
+PROF_N=0; PROF_ON=0; PROF_head=0; PROF_gb=0; PROF_fps=0; PROF_adapt=0; PROF_snap=0
+prof_lap() {
+    if [ "$1" = head ]; then
+        if [ -f "$STATE_DIR/.profile" ]; then
+            [ "$PROF_ON" = 1 ] || { PROF_ON=1; PROF_LAST=""; }
+        else
+            PROF_ON=0; return 0
+        fi
+    fi
+    [ "$PROF_ON" = 1 ] || return 0
+    _pfn=$1
+    _pfs=""; read -r _pfs < "/proc/$$/stat" 2>/dev/null || return 0
+    _pfs=${_pfs##*) }
+    set -- $_pfs
+    _pft=$(( ${12} + ${13} + ${14} + ${15} ))
+    if [ -z "$PROF_LAST" ]; then PROF_LAST=$_pft; return 0; fi
+    _pfd=$((_pft - PROF_LAST)); PROF_LAST=$_pft
+    eval "PROF_$_pfn=\$((PROF_$_pfn + _pfd))"
+    if [ "$_pfn" = snap ]; then
+        PROF_N=$((PROF_N + 1))
+        if [ "$PROF_N" -ge "$PROF_FLUSH_N" ]; then
+            monitor_log "PROFIL" "${PROF_N} tick: ticks(10ms) head=$PROF_head gb=$PROF_gb fps=$PROF_fps adapt=$PROF_adapt snap=$PROF_snap pkg=${monitor_foreground_package:-none}"
+            PROF_N=0; PROF_head=0; PROF_gb=0; PROF_fps=0; PROF_adapt=0; PROF_snap=0
+        fi
+    fi
+}
+
 run_event_supervised_loop() {
     while [ "$STOP_MONITOR" -eq 0 ]; do
         if monitor_screen_fast_on; then
@@ -1555,10 +1587,15 @@ run_event_supervised_loop() {
             fi
         fi
         # GameBoost: check grace period + thermal safety
+        prof_lap head
         check_gb_grace_period
+        prof_lap gb
         check_fps_floor "$monitor_foreground_package"
+        prof_lap fps
         command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
+        prof_lap adapt
         log_game_snapshot
+        prof_lap snap
         sleep "$monitor_ev_secs"
     done
     stop_event_stream
@@ -1608,10 +1645,15 @@ run_polling_loop() {
         handle_foreground_event "$monitor_foreground_package" "poll"
 
         # GameBoost: check grace period + thermal safety
+        prof_lap head
         check_gb_grace_period
+        prof_lap gb
         check_fps_floor "$monitor_foreground_package"
+        prof_lap fps
         command -v ad_tick >/dev/null 2>&1 && ad_tick "$monitor_foreground_package"
+        prof_lap adapt
         log_game_snapshot
+        prof_lap snap
         sleep "$monitor_poll_interval"
     done
     return 0

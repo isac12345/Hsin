@@ -313,3 +313,8 @@ The app is a thin client:
 
 The app requires root. Without root it starts but every action fails with the
 error returned by `hsinctl.sh`.
+
+### Profil CPU monitor (opsional)
+`touch /data/adb/hsin/.profile` menyalakan, hapus berkas untuk mematikan. Tiap 30 tick monitor mencatat baris
+`[PROFIL]` di log: tick CPU (1 tick = 10 ms, anak proses ikut) per fase `head` (layar/override/health),
+`gb`, `fps`, `adapt`, `snap`. Proses pembaca event tidak termasuk. Tanpa berkas itu biayanya satu uji berkas per tick.
