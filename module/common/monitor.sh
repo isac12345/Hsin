@@ -448,7 +448,7 @@ gb_safety_check() {
             local temp_val
             case "$GB_ZV" in
                 *"|${zone##*/}="*)
-                    temp_val=${GB_ZV#*"|${zone##*/}="}; temp_val=${temp_val%%|*} ;;
+                    temp_val=${GB_ZV#*"|${zone##*/}="}; temp_val=${temp_val%%"|"*} ;;
                 *)
                     # b23: timeout 2s per zone to prevent hang on unresponsive sysfs
                     if command -v timeout >/dev/null 2>&1; then
@@ -875,6 +875,13 @@ handle_foreground_event() {
 
 event_stream_reader() {
     while IFS= read -r event_line; do
+        # Saringan murah dulu: buffer events HP ini ~1600 baris/dtk (mayoritas auditd dari su).
+        # Semua tag di EVENT_TAG_PATTERN memuat salah satu kata ini; sisanya langsung dibuang
+        # tanpa loop sepuluh pola + ganti IFS.
+        case "$event_line" in
+            *wm_*|*am_*|*minimalResumeActivityLocked*|*Focus*entering*) ;;
+            *) continue ;;
+        esac
         IFS=','
         event_line_tag_matched=0
         for event_tag in $EVENT_TAG_PATTERN; do

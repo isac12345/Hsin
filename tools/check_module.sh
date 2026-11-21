@@ -9,6 +9,10 @@ for f in $(find module -name '*.sh' -not -path '*/fasrs/*' -not -path '*/uperf/*
   sh -n "$f" 2>/dev/null || { echo "SYNTAX ERROR (sh): $f"; fail=1; }
   command -v mksh >/dev/null 2>&1 && { mksh -n "$f" 2>/dev/null || { echo "SYNTAX ERROR (mksh): $f"; fail=1; }; }
 done
+# mksh membaca "|" tanpa kutip/backslash di dalam ${v%%|*} sebagai operator: hasilnya kosong
+# tanpa error sintaks (bug thermal 20 Nov). Pola harus ditulis "|" atau \|.
+bad=$(grep -rnE '\$\{[A-Za-z_0-9]+(%%?|##?)[^"\\}]*[^"\\}]\|[^}]*\}' module --include=*.sh | grep -vE '"\|"|\\\|' || true)
+[ -z "$bad" ] || { echo "PIPE TANPA KUTIP di \${..} (mksh salah baca):"; echo "$bad"; fail=1; }
 VER=$(tr -d '[:space:]' < version.txt)
 MP=$(sed -n 's/^versionCode=//p' module/module.prop | head -n 1)
 CV=$(sed -n 's/^HSIN_COMPANION_VER=//p' module/common/companion_install.sh | head -n 1)
