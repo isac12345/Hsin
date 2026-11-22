@@ -189,6 +189,7 @@ sed -n '/^fps_drop_cause() {/,/^}/p' "$C/monitor.sh" > "$T/fn13.sh"; chk "fps_dr
 . "$T/fn13.sh"; FD="$T/fd"; mkdir -p "$FD/cpufreq/policy0" "$FD/gpu"
 echo 1900000 > "$FD/cpufreq/policy0/scaling_cur_freq"; echo 2000000 > "$FD/cpufreq/policy0/cpuinfo_max_freq"
 echo 300000 > "$FD/gpu/cur_freq"; echo 800000 > "$FD/gpu/max_freq"
+echo "some avg10=0.00 avg60=0.00 avg300=0.00 total=0" > "$FD/psi_io"; PSI_IO_FILE="$FD/psi_io"
 CPU_POLICIES=policy0; SYSFS_CPU_PREFIX="$FD"; GPU_DEVFREQ_PATH="$FD/gpu"
 chk "penyebab: cpu saja" "$(fps_drop_cause)" "cpu"
 echo 790000 > "$FD/gpu/cur_freq"; chk "penyebab: cpu+gpu" "$(fps_drop_cause)" "cpu+gpu"

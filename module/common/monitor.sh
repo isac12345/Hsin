@@ -1347,8 +1347,8 @@ fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"  (read bawaan, tanpa cat
         esac
     fi
     _fdc_io=""
-    if [ -r /proc/pressure/io ]; then
-        read -r _fdc_l _fdc_a _ < /proc/pressure/io 2>/dev/null
+    if [ -r "${PSI_IO_FILE:-/proc/pressure/io}" ]; then
+        read -r _fdc_l _fdc_a _ < "${PSI_IO_FILE:-/proc/pressure/io}" 2>/dev/null
         case "$_fdc_l" in some) _fdc_io=${_fdc_a#avg10=}; _fdc_io=${_fdc_io%%.*} ;; esac
     fi
     case "$_fdc_io" in ''|*[!0-9]*) _fdc_io=0 ;; esac
