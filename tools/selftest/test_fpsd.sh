@@ -6,7 +6,7 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/fpsd.XXXXXX"); trap 'rm -rf "$T"' EXIT
 PASS=0; FAIL=0
 chk() { if [ "$2" = "$3" ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; else FAIL=$((FAIL+1)); printf '  FAIL %s (dapat=[%s] harap=[%s])\n' "$1" "$2" "$3"; fi; }
 # ambil hanya fungsi yang diuji dari monitor.sh
-sed -n '/^monitor_fps_stat() {/,/^}/p' "$C/monitor.sh" > "$T/fn.sh"
+sed -n '/^monitor_fps_stat_core() {/,/^}/p;/^monitor_fps_stat() {/,/^}/p' "$C/monitor.sh" > "$T/fn.sh"
 . "$T/fn.sh"
 LAT="1000000000 1016666667 1033333334 1050000001 1066666668"
 printf 'pkg=com.termux\nlat=%s\n' "$LAT" > "$T/a.out"
@@ -95,7 +95,7 @@ chk "hasil cache tidak berubah (trip statis)" "$(thermal_kernel_cap)" "85500"
 sed -n '/^monitor_fps_stat_v() {/,/^}/p' "$C/monitor.sh" > "$T/fn7.sh"; . "$T/fn7.sh"
 FSN=0; printf 'x\n' > "$T/fo.out"
 monitor_epoch_now() { MONITOR_NOW=5000; }
-monitor_fps_stat() { echo c >> "$T/fs.calls"; printf '30 60 90'; }
+monitor_fps_stat_core() { echo c >> "$T/fs.calls"; MONITOR_FS="30 60 90"; return 0; }
 rm -f "$T/fs.calls"
 monitor_fps_stat_v "$T/fo.out" com.g; r1=$?; v1=$MONITOR_FS
 monitor_fps_stat_v "$T/fo.out" com.g; r2=$?; v2=$MONITOR_FS
@@ -183,5 +183,16 @@ chk "mitigasi: hasil sama, dipindai sekali" "$r1$r2$SCANS" "001"
 MONITOR_NOW=1301; gh_mit_hit memclean; chk "mitigasi: pindai ulang setelah 300 dtk" "$SCANS" "2"
 SCAN_RC=1; MONITOR_NOW=1700; gh_mit_hit prio; r3=$?; gh_mit_hit prio; r4=$?
 chk "mitigasi: tidak kena (1), dicache per fitur" "$r3$r4$SCANS" "113"
+
+# --- fps_drop_cause harus ada dan jalan tanpa fork ---
+sed -n '/^fps_drop_cause() {/,/^}/p' "$C/monitor.sh" > "$T/fn13.sh"; chk "fps_drop_cause terdefinisi" "$([ -s "$T/fn13.sh" ] && echo ada || echo hilang)" "ada"
+. "$T/fn13.sh"; FD="$T/fd"; mkdir -p "$FD/cpufreq/policy0" "$FD/gpu"
+echo 1900000 > "$FD/cpufreq/policy0/scaling_cur_freq"; echo 2000000 > "$FD/cpufreq/policy0/cpuinfo_max_freq"
+echo 300000 > "$FD/gpu/cur_freq"; echo 800000 > "$FD/gpu/max_freq"
+CPU_POLICIES=policy0; SYSFS_CPU_PREFIX="$FD"; GPU_DEVFREQ_PATH="$FD/gpu"
+chk "penyebab: cpu saja" "$(fps_drop_cause)" "cpu"
+echo 790000 > "$FD/gpu/cur_freq"; chk "penyebab: cpu+gpu" "$(fps_drop_cause)" "cpu+gpu"
+echo 100000 > "$FD/cpufreq/policy0/scaling_cur_freq"; chk "penyebab: gpu saja" "$(fps_drop_cause)" "gpu"
+echo 100000 > "$FD/gpu/cur_freq"; chk "penyebab: tak jelas" "$(fps_drop_cause)" "tak jelas"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

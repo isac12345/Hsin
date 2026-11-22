@@ -33,7 +33,9 @@ AD_WARM_SECS=0   # uji lain tidak perlu menunggu pemanasan; diuji khusus di bawa
 
 # ganti pembacaan PSI/RAM dengan nilai uji
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
+ad_psi_v() { AD_R=${T_PSI:-5}; }
 ad_memavail_kb() { printf '%s' "${T_MEM:-2000000}"; }
+ad_memavail_v() { AD_R=${T_MEM:-2000000}; }
 monitor_fps_stat() { printf '%s' "${T_FPS:-60 60 16}"; }
 get_game_profile() { case "$1" in com.game.*) printf 'performance' ;; *) : ;; esac; }
 ad_in_call() { return 1; }

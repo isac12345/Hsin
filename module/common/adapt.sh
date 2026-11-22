@@ -497,37 +497,43 @@ ad_in_call() {
 
 # --- pengukuran -------------------------------------------------------------
 # Pembacaan sensor tanpa proses anak (read bawaan shell): dipanggil tiap tick monitor.
-ad_psi() {   # $1=cpu|io -> some avg10 (bulat)
-    _apl=""
+# Pembaca sensor per tick: hasil di AD_R, TANPA subshell. Di HP ini satu fork proses monitor
+# (heap besar) mahal; enam `$(ad_*)` per tick adalah sebagian besar biaya Adapt. Versi tanpa
+# akhiran _v tetap ada (pembungkus echo) untuk pemanggil lain dan tes.
+ad_psi_v() {   # $1=cpu|io -> some avg10 (bulat)
+    AD_R=""; _apl=""
     [ -r "/proc/pressure/$1" ] || return 0
     read -r _apl 2>/dev/null < "/proc/pressure/$1" || [ -n "$_apl" ] || return 0
     case "$_apl" in "some avg10="*) ;; *) return 0 ;; esac
     _apl=${_apl#some avg10=}; _apl=${_apl%% *}; _apl=${_apl%%.*}
     case "$_apl" in ''|*[!0-9]*) return 0 ;; esac
-    # echo -n = builtin; printf di Android proses baru (~20 ms per panggilan).
-    echo -n "$_apl"
+    AD_R=$_apl
 }
+ad_psi() { ad_psi_v "$1"; echo -n "$AD_R"; }
 
-ad_memavail_kb() {
+ad_memavail_v() {
+    AD_R=""
     while read -r _amk _amv _ 2>/dev/null; do
         [ "$_amk" = "MemAvailable:" ] || continue
         case "$_amv" in ''|*[!0-9]*) return 0 ;; esac
-        echo -n "$_amv"; return 0
+        AD_R=$_amv; return 0
     done < /proc/meminfo
     return 0
 }
+ad_memavail_kb() { ad_memavail_v; echo -n "$AD_R"; }
 
 # Temp baterai dibaca dalam 0,1 C (mis. 361 = 36,1 C), lalu disimpan milli-C
 # supaya sama dengan ambang AD_TEMP_MAX (50000 = 50 C).
-ad_temp_mc() {
+ad_temp_v() {
     _t=""; _ad_f="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/temp"; [ -r "$_ad_f" ] && read -r _t 2>/dev/null < "$_ad_f"
     _t=${_t%%[[:space:]]*}
-    case "$_t" in ''|*[!0-9]*) echo -n 0; return ;; esac
-    echo -n $((_t * 100))
+    case "$_t" in ''|*[!0-9]*) AD_R=0; return 0 ;; esac
+    AD_R=$((_t * 100))
 }
+ad_temp_mc() { ad_temp_v; echo -n "$AD_R"; }
 
 # Suhu terpanas dari semua thermal zone (mili-C). 0 bila tidak terbaca.
-ad_soc_temp_mc() {
+ad_soc_temp_v() {
     _zt="${SYSFS_THERMAL_PREFIX:-/sys/class/thermal}"
     _mx=0
     for _z in "$_zt"/thermal_zone*/temp; do
@@ -542,13 +548,15 @@ ad_soc_temp_mc() {
         [ "$_v" -gt 105000 ] 2>/dev/null && continue
         [ "$_v" -gt "$_mx" ] && _mx=$_v
     done
-    echo -n "$_mx"
+    AD_R=$_mx
 }
+ad_soc_temp_mc() { ad_soc_temp_v; echo -n "$AD_R"; }
 
-ad_batt_pct() {
+ad_batt_v() {
     _abp=""; _ad_f="${SYSFS_POWER_PREFIX:-/sys/class/power_supply}/battery/capacity"; [ -r "$_ad_f" ] && read -r _abp 2>/dev/null < "$_ad_f"
-    echo -n "${_abp%%[[:space:]]*}"
+    AD_R=${_abp%%[[:space:]]*}
 }
+ad_batt_pct() { ad_batt_v; echo -n "$AD_R"; }
 
 # --- kbase milik sendiri (di luar game) ------------------------------------
 ad_gb_active() {
@@ -678,15 +686,16 @@ ad_raise_helped() {
     printf '0'
 }
 
-ad_max_beban() {
+ad_max_beban_v() {
     if [ "$AD_IS_GAME" = "1" ]; then _m=3; else _m=$AD_NONGAME_MAX; fi
     # Tingkat yang sudah terbukti tidak menolong tidak dicoba lagi sesi ini.
     if [ "${AD_BAD_LVL:-0}" -ge 2 ] 2>/dev/null && [ "$_m" -ge "$AD_BAD_LVL" ]; then
         _m=$((AD_BAD_LVL - 1))
     fi
     if ad_charging && [ "$_m" -gt "$AD_CHG_MAX" ]; then _m=$AD_CHG_MAX; fi
-    printf '%s' "$_m"
+    AD_R=$_m
 }
+ad_max_beban() { ad_max_beban_v; echo -n "$AD_R"; }
 
 ad_tier_beban() {   # beban awal aplikasi tanpa riwayat
     if [ "$AD_IS_GAME" = "1" ]; then
@@ -1156,16 +1165,16 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     case "$_p1$_avg$_stall" in
         ''|*[!0-9]*) _p1=""; _avg=""; _stall="" ;;
     esac
-    _pc=$(ad_psi cpu); case "$_pc" in ''|*[!0-9]*) _pc=0 ;; esac
+    ad_psi_v cpu; _pc=$AD_R; case "$_pc" in ''|*[!0-9]*) _pc=0 ;; esac
     prof_lap a_psic
-    _pi=$(ad_psi io);  case "$_pi" in ''|*[!0-9]*) _pi=0 ;; esac
-    _mem=$(ad_memavail_kb); case "$_mem" in ''|*[!0-9]*) _mem=99999999 ;; esac
+    ad_psi_v io; _pi=$AD_R; case "$_pi" in ''|*[!0-9]*) _pi=0 ;; esac
+    ad_memavail_v; _mem=$AD_R; case "$_mem" in ''|*[!0-9]*) _mem=99999999 ;; esac
     prof_lap a_mem
-    _tmp=$(ad_temp_mc); case "$_tmp" in ''|*[!0-9]*) _tmp=0 ;; esac
+    ad_temp_v; _tmp=$AD_R; case "$_tmp" in ''|*[!0-9]*) _tmp=0 ;; esac
     prof_lap a_temp
-    _soc=$(ad_soc_temp_mc); case "$_soc" in ''|*[!0-9]*) _soc=0 ;; esac
+    ad_soc_temp_v; _soc=$AD_R; case "$_soc" in ''|*[!0-9]*) _soc=0 ;; esac
     prof_lap a_soc
-    _bat=$(ad_batt_pct); case "$_bat" in ''|*[!0-9]*) _bat=100 ;; esac
+    ad_batt_v; _bat=$AD_R; case "$_bat" in ''|*[!0-9]*) _bat=100 ;; esac
     prof_lap a_bat
 
     # --- nilai: tersendat atau lancar ---
@@ -1307,7 +1316,7 @@ ad_tick() {   # $1=pkg foreground. Dipanggil tiap tick monitor.
     fi
 
     # --- putuskan ---
-    _max=$(ad_max_beban)
+    ad_max_beban_v; _max=$AD_R
     _gap_ok=0
     [ $((_now - AD_LAST_CHG)) -ge "$AD_CHG_GAP" ] 2>/dev/null && _gap_ok=1
 

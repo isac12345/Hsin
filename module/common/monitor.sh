@@ -1285,7 +1285,7 @@ FPS_RESCUE_FILE="$STATE_DIR/.fps_rescue"
 # sini supaya monitor tidak memanggil hsinctl (banyak fork) tiap tick game.
 # Hasil: "p1 avg stall_ms". avg dipakai adapt.sh untuk membedakan aplikasi
 # yang benar-benar bergerak (game, sosmed) dari yang diam (layar baca).
-monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall_ms"
+monitor_fps_stat_core() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall_ms"
     # Berkas basi = daemon mati/diam. Tanpa cek ini angka terakhir dipakai ulang
     # sebagai sampel baru (n naik padahal tidak ada yang diukur). Jendela daemon 10 dtk.
     if command -v monitor_epoch_now >/dev/null 2>&1; then
@@ -1293,6 +1293,7 @@ monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall
     else
         _mfs_now=$(date +%s 2>/dev/null)
     fi
+    MONITOR_FS=""
     _mfs_mt=${MFS_MT_IN:-}
     [ -n "$_mfs_mt" ] || _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
     case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
@@ -1301,7 +1302,7 @@ monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall
     # dua pembacaan heredoc + printf luar + awk = 3 proses baru per tick). Baris pkg= dan lat=
     # yang PERTAMA dipakai, sama seperti sebelumnya. Data app lain (mis. com.termux) bukan FPS
     # game: ditolak supaya 1% low palsu tidak memicu boost.
-    awk -v want="$2" '
+    MONITOR_FS=$(awk -v want="$2" '
         /^pkg=/ && !hp { p = substr($0, 5); hp = 1 }
         /^lat=/ && !hl { lat = substr($0, 5); hl = 1 }
         END {
@@ -1319,7 +1320,40 @@ monitor_fps_stat() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg stall
             span = t[n] - t[1]
             avg = (span > 0) ? int((n - 1) * 1000000000 / span) : 0
             printf "%d %d %d", int(1000000000 / a[idx]), avg, int(a[m] / 1000000)
-        }' "$1" 2>/dev/null
+        }' "$1" 2>/dev/null)
+}
+# Hasil di MONITOR_FS (tanpa subshell tambahan); monitor_fps_stat = pembungkus echo untuk pemanggil lama dan tes.
+monitor_fps_stat() { monitor_fps_stat_core "$@"; _mfw=$?; echo -n "$MONITOR_FS"; return $_mfw; }
+fps_drop_cause() {   # "cpu" | "gpu" | "cpu+gpu" | "io"  (read bawaan, tanpa cat/tr/awk)
+    _fdc=""
+    for _fdc_p in ${CPU_POLICIES:-}; do
+        _fdc_d="${SYSFS_CPU_PREFIX:-/sys/devices/system/cpu}/cpufreq/$_fdc_p"
+        _fdc_c=""; _fdc_m=""
+        [ -r "$_fdc_d/scaling_cur_freq" ] && read -r _fdc_c < "$_fdc_d/scaling_cur_freq" 2>/dev/null
+        [ -r "$_fdc_d/cpuinfo_max_freq" ] && read -r _fdc_m < "$_fdc_d/cpuinfo_max_freq" 2>/dev/null
+        case "$_fdc_c" in ''|*[!0-9]*) continue ;; esac
+        case "$_fdc_m" in ''|*[!0-9]*|0) continue ;; esac
+        [ $((_fdc_c * 100 / _fdc_m)) -ge 90 ] && { _fdc="cpu"; break; }
+    done
+    _fdc_g="${GPU_DEVFREQ_PATH:-}"
+    if [ -n "$_fdc_g" ] && [ -r "$_fdc_g/cur_freq" ] && [ -r "$_fdc_g/max_freq" ]; then
+        _fdc_gc=""; _fdc_gm=""
+        read -r _fdc_gc < "$_fdc_g/cur_freq" 2>/dev/null
+        read -r _fdc_gm < "$_fdc_g/max_freq" 2>/dev/null
+        case "$_fdc_gc$_fdc_gm" in ''|*[!0-9]*) ;; *)
+            if [ "$_fdc_gm" -gt 0 ] 2>/dev/null && [ $((_fdc_gc * 100 / _fdc_gm)) -ge 90 ]; then
+                _fdc="${_fdc:+$_fdc+}gpu"
+            fi ;;
+        esac
+    fi
+    _fdc_io=""
+    if [ -r /proc/pressure/io ]; then
+        read -r _fdc_l _fdc_a _ < /proc/pressure/io 2>/dev/null
+        case "$_fdc_l" in some) _fdc_io=${_fdc_a#avg10=}; _fdc_io=${_fdc_io%%.*} ;; esac
+    fi
+    case "$_fdc_io" in ''|*[!0-9]*) _fdc_io=0 ;; esac
+    [ "$_fdc_io" -ge 10 ] 2>/dev/null && _fdc="${_fdc:+$_fdc+}io"
+    echo -n "${_fdc:-tak jelas}"
 }
 monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
     monitor_epoch_now
@@ -1330,7 +1364,7 @@ monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
     MFS_MT_IN=$(stat -c %Y "$1" 2>/dev/null)
     MFS_AGE=""
     case "$MONITOR_NOW$MFS_MT_IN" in ''|*[!0-9]*) ;; *) MFS_AGE=$((MONITOR_NOW - MFS_MT_IN)) ;; esac
-    MONITOR_FS=$(monitor_fps_stat "$1" "$2"); MFS_RC=$?
+    monitor_fps_stat_core "$1" "$2"; MFS_RC=$?
     MFS_MT_IN=""
     MFS_KEY=$_mfv_key; MFS_VAL=$MONITOR_FS; MFS_AGE_M=$MFS_AGE
     return "$MFS_RC"
@@ -1380,7 +1414,7 @@ check_fps_floor() {
     case "$_ff_p1" in ''|*[!0-9]*) return 0 ;; esac
 
     _ff_cnt=0
-    [ -f "$FPS_LOW_FILE" ] && _ff_cnt=$(cat "$FPS_LOW_FILE" 2>/dev/null)
+    [ -r "$FPS_LOW_FILE" ] && read -r _ff_cnt < "$FPS_LOW_FILE" 2>/dev/null
     case "$_ff_cnt" in ''|*[!0-9]*) _ff_cnt=0 ;; esac
 
     if [ "$_ff_p1" -lt 20 ] 2>/dev/null; then
@@ -1392,19 +1426,21 @@ check_fps_floor() {
             monitor_log "FPS-LOOP" "pulih: 1% low=${_ff_p1} FPS"
         fi
     fi
-    printf '%s\n' "$_ff_cnt" > "$FPS_LOW_FILE" 2>/dev/null
+    echo "$_ff_cnt" > "$FPS_LOW_FILE" 2>/dev/null   # echo bawaan; printf di Android = proses baru
     [ "$_ff_cnt" -ge 2 ] 2>/dev/null || return 0
 
-    _ff_cause=$(fps_drop_cause)
+    # Penyebab hanya dihitung saat benar-benar dicatat (dulu ~14 proses tiap tick selama 1% low < 20).
     if [ -f "$STATE_DIR/.ovd_active" ]; then
         # Puncak sudah di frekuensi maksimum: aksi tambahan hanya menambah panas.
         if [ ! -f "$FPS_RESCUE_FILE" ]; then
+            _ff_cause=$(fps_drop_cause)
             printf '%s|%s|ovd|%s\n' "$_ff_now" "$_ff_pkg" "$_ff_cause" > "$FPS_RESCUE_FILE" 2>/dev/null
             monitor_log "FPS-LOOP" "1% low=${_ff_p1} FPS <20 (${_ff_stall}ms, ${_ff_cause}): Puncak sudah maksimum, tanpa aksi"
         fi
         return 0
     fi
     [ -f "$FPS_RESCUE_FILE" ] && return 0
+    _ff_cause=$(fps_drop_cause)
     _ff_act="tidak ada aksi"
     if command -v gb_apply >/dev/null 2>&1; then
         _ff_orig=$(cat "${HSIN_CONF_DIR:-/data/adb/hsin}/GAMEBOOST_LEVEL" 2>/dev/null)
@@ -1638,6 +1674,12 @@ if command -v logcat >/dev/null 2>&1 && command -v mkfifo >/dev/null 2>&1; then
     event_precheck_log=$(logcat -b events -v tag -d -t "$EVENT_PRECHECK_LINES" 2>/dev/null)
     event_precheck_regex=$(printf '%s' "$EVENT_TAG_PATTERN" | sed 's/,/|/g')
     if printf '%s\n' "$event_precheck_log" | grep -Eq "$event_precheck_regex"; then
+        event_precheck_ok=1
+    elif printf '%s\n' "$event_precheck_log" | grep -Eq '^[VDIWEF]/[A-Za-z_]+'; then
+        # Buffer events HP ini dibanjiri auditd (ratusan baris per detik), jadi jendela 500 baris
+        # terakhir sering tidak memuat tag wm_* sama sekali walau stream berfungsi. Stream yang
+        # terbaca dalam format bertag diterima; stream yang benar-benar tuli ditangkap health check
+        # (dibandingkan dengan dumpsys), bukan lewat riwayat buffer.
         event_precheck_ok=1
     else
         event_precheck_reason="logcat-events-no-matching-tags"

@@ -42,7 +42,9 @@ mkdir -p "$T/mod"
 . "$C/adapt.sh"
 AD_WARM_SECS=0; AD_FIRST_WARM=0; AD_SAMP_GAP=0; AD_MIGRATE=0
 ad_psi() { printf '%s' "${T_PSI:-5}"; }
+ad_psi_v() { AD_R=${T_PSI:-5}; }
 ad_memavail_kb() { printf '2000000'; }
+ad_memavail_v() { AD_R=2000000; }
 monitor_fps_stat() { [ "$T_FPS" = none ] || printf '%s' "${T_FPS:-60 60 16}"; }
 get_game_profile() { case "$1" in com.game.*) printf 'performance' ;; *) : ;; esac; }
 ad_in_call() { return 1; }
