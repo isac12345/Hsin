@@ -225,5 +225,19 @@ get_game_profile_c com.g; r1=$GGP_R; FAKE_NOW=5004; get_game_profile_c com.g; r2
 chk "cache profil: nilai sama, satu pindai" "$r1,$r2,$(GCALLS)" "balanced,balanced,1"
 FAKE_NOW=5011; get_game_profile_c com.g; chk "cache profil: kedaluwarsa 10 dtk" "$(GCALLS)" "2"
 get_game_profile_c com.lain; chk "cache profil: paket lain langsung dipindai, kosong" "$GGP_R|$(GCALLS)" "|3"
+
+# --- umur fpsd.out tanpa stat: berubah sejak tick lalu = segar; tak pernah berubah = basi ---
+. "$T/fn.sh"; sed -n '/^monitor_fps_stat_v() {/,/^}/p' "$C/monitor.sh" > "$T/fn7.sh"; . "$T/fn7.sh"
+NT="$T/nt"; mkdir -p "$NT"; STATE_DIR="$NT"; cp "$T/b.out" "$NT/o.out"; rm -f "$NT/.fps_ref"
+FAKE_NOW=9000; monitor_epoch_now() { MONITOR_NOW=$FAKE_NOW; }; MFS_KEY=""; MFS_LASTCHG=""
+touch -d '10 seconds ago' "$NT/o.out"
+monitor_fps_stat_v "$NT/o.out" com.game.a; chk "tanpa penanda: dianggap basi" "$?" "1"
+FAKE_NOW=9003; MFS_KEY=""; touch -d "5 seconds ago" "$NT/.fps_ref"; touch "$NT/o.out"
+monitor_fps_stat_v "$NT/o.out" com.game.a; chk "berubah sejak tick lalu: segar" "$?" "0"
+chk "umur dilaporkan 0" "$MFS_AGE" "0"
+FAKE_NOW=9006; MFS_KEY=""; touch -d '20 seconds ago' "$NT/.fps_ref"; touch -d '30 seconds ago' "$NT/o.out"
+monitor_fps_stat_v "$NT/o.out" com.game.a; chk "tidak berubah 3 dtk: umur 3" "$MFS_AGE" "3"
+FAKE_NOW=9030; MFS_KEY=""; touch -d '20 seconds ago' "$NT/.fps_ref"; touch -d '30 seconds ago' "$NT/o.out"
+monitor_fps_stat_v "$NT/o.out" com.game.a; chk "tidak berubah 27 dtk: basi ditolak" "$?" "1"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

@@ -1387,7 +1387,13 @@ monitor_fps_stat_v() {   # $1=fpsd.out $2=paket
     if [ -n "$MONITOR_NOW" ] && [ "$_mfv_key" = "${MFS_KEY:-}" ]; then
         MONITOR_FS=$MFS_VAL; MFS_AGE=$MFS_AGE_M; return "$MFS_RC"
     fi
-    MFS_MT_IN=$(stat -c %Y "$1" 2>/dev/null)
+    # Umur berkas tanpa `stat` (proses baru, ~70 ms di HP): berkas lebih baru dari penanda tick
+    # sebelumnya = berubah sejak itu. Waktu perubahan terakhir yang teramati dipakai sebagai mtime
+    # (galat paling besar satu tick). Belum pernah teramati berubah = dianggap basi.
+    _mfv_ref="$STATE_DIR/.fps_ref"
+    if [ -e "$_mfv_ref" ] && [ "$1" -nt "$_mfv_ref" ]; then MFS_LASTCHG=$MONITOR_NOW; fi
+    : > "$_mfv_ref" 2>/dev/null
+    case "${MFS_LASTCHG:-}" in ''|*[!0-9]*) MFS_MT_IN=0 ;; *) MFS_MT_IN=$MFS_LASTCHG ;; esac
     MFS_AGE=""
     case "$MONITOR_NOW$MFS_MT_IN" in ''|*[!0-9]*) ;; *) MFS_AGE=$((MONITOR_NOW - MFS_MT_IN)) ;; esac
     monitor_fps_stat_core "$1" "$2"; MFS_RC=$?
@@ -1425,6 +1431,10 @@ check_fps_floor() {
     [ -f "$STATE_DIR/.game_t0" ] || return 0
     prof_lap f_pre
     check_fpsd_alive "$_ff_pkg"
+    # Daemon hanya menerima fpsd.pkg yang umurnya <= 8 dtk. Adapt mengarahkannya sekali saat game
+    # dibuka, dan penyegar lain hanya HUD: tanpa HUD daemon berhenti mengukur setelah 8 dtk
+    # (sesi MHGU 23 Nov: "belum menghasilkan sampel FPS setelah 150 dtk"). Segarkan tiap tick.
+    [ -r "$STATE_DIR/fpsd.pid" ] && echo "$_ff_pkg" > "$STATE_DIR/fpsd.pkg" 2>/dev/null
     prof_lap f_alive
     [ -r "$STATE_DIR/fpsd.out" ] || return 0
     monitor_fps_stat_v "$STATE_DIR/fpsd.out" "$_ff_pkg" || return 0
