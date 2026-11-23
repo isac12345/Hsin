@@ -219,7 +219,8 @@ cmd_status() {
     # Keadaan pembaca FPS: dead = daemon tidak jalan, <isi fpsd.status> = ok/binder-fail/dump-fail,
     # none = belum pernah jalan. APK memakai ini untuk menjelaskan kenapa FPS kosong.
     _fd_p=""; [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fd_p < "$STATE_DIR/fpsd.pid" 2>/dev/null
-    if [ -n "$_fd_p" ] && kill -0 "$_fd_p" 2>/dev/null; then
+    _fd_c=""; [ -n "$_fd_p" ] && [ -r "/proc/$_fd_p/cmdline" ] && read -r _fd_c < "/proc/$_fd_p/cmdline" 2>/dev/null
+    if [ -n "$_fd_p" ] && kill -0 "$_fd_p" 2>/dev/null && case "$_fd_c" in *hsin-fpsd*) true ;; *) false ;; esac; then
         _fd_s=$(rd "$STATE_DIR/fpsd.status"); [ -n "$_fd_s" ] || _fd_s=ok
     elif [ -n "$_fd_p" ]; then _fd_s=dead
     else _fd_s=none; fi

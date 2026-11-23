@@ -41,13 +41,20 @@ fpsd_bin() {
     return 1
 }
 # Hidupkan daemon bila belum jalan (dicek tiap ~10 sampel). Gagal selftest = tandai, jangan dicoba lagi.
+# PID daemon masih hidup DAN benar-benar hsin-fpsd (PID bisa dipakai ulang proses lain).
+fpsd_pid_ok() {
+    [ -n "$1" ] && kill -0 "$1" 2>/dev/null || return 1
+    _fo_c=""; [ -r "/proc/$1/cmdline" ] && read -r _fo_c < "/proc/$1/cmdline" 2>/dev/null
+    case "$_fo_c" in *hsin-fpsd*) return 0 ;; esac
+    return 1
+}
 fpsd_ensure() {
     [ "$FPSD_ON" = 1 ] && [ "$FPSD_BAD" = 0 ] || return 1
     FPSD_N=$((FPSD_N + 1))
     [ $((FPSD_N % 10)) -eq 1 ] || return 0
     _fe_pid=""
     [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fe_pid < "$STATE_DIR/fpsd.pid"
-    if [ -n "$_fe_pid" ] && kill -0 "$_fe_pid" 2>/dev/null; then return 0; fi
+    if fpsd_pid_ok "$_fe_pid"; then return 0; fi
     _fe_bin=$(fpsd_bin) || { FPSD_BAD=1; return 1; }
     if ! "$_fe_bin" --selftest >/dev/null 2>&1; then FPSD_BAD=1; return 1; fi
     ( "$_fe_bin" "$FPSD_DIR" >/dev/null 2>&1 & )
@@ -496,7 +503,7 @@ diag() {
         echo "daemon FPS: $("$_dg_fb" --selftest 2>&1 | head -n 1)"
         [ -r "$STATE_DIR/fpsd.status" ] && echo "status daemon: $(head -n 1 "$STATE_DIR/fpsd.status")"
         _dg_p=""; [ -r "$STATE_DIR/fpsd.pid" ] && read -r _dg_p < "$STATE_DIR/fpsd.pid"
-        if [ -n "$_dg_p" ] && kill -0 "$_dg_p" 2>/dev/null; then echo "proses daemon: jalan (pid $_dg_p)"; else echo "proses daemon: tidak jalan"; fi
+        if fpsd_pid_ok "$_dg_p"; then echo "proses daemon: jalan (pid $_dg_p)"; else echo "proses daemon: tidak jalan"; fi
     fi
     _dg_a=$(service call SurfaceFlinger 1013 2>&1 | head -n 1)
     case "$_dg_a" in *"Parcel(00000000"*) echo "counter SurfaceFlinger: ADA" ;; *) echo "counter SurfaceFlinger: TIDAK ADA" ;; esac

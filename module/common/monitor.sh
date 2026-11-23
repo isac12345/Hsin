@@ -1430,7 +1430,7 @@ check_fpsd_alive() {
     [ -x "$MODDIR/../bin/hsin-fpsd-arm64" ] || [ -x "$MODDIR/../bin/hsin-fpsd-arm32" ] || return 0
     _fa_pid=""
     [ -r "$STATE_DIR/fpsd.pid" ] && read -r _fa_pid 2>/dev/null < "$STATE_DIR/fpsd.pid"
-    if [ -n "$_fa_pid" ] && kill -0 "$_fa_pid" 2>/dev/null; then return 0; fi
+    if fpsd_pid_ok "$_fa_pid"; then return 0; fi
     FPSD_REVIVES=$((FPSD_REVIVES + 1))
     if sh "$MODDIR/hud_sample.sh" --fpsd "$_fa_pkg" >/dev/null 2>&1; then
         monitor_log "FPSD" "daemon FPS tidak jalan saat $_fa_pkg bermain; dihidupkan lagi (${FPSD_REVIVES}/5)"
@@ -1440,6 +1440,13 @@ check_fpsd_alive() {
     return 0
 }
 
+# PID daemon masih hidup DAN benar-benar hsin-fpsd (PID bisa dipakai ulang proses lain).
+fpsd_pid_ok() {
+    [ -n "$1" ] && kill -0 "$1" 2>/dev/null || return 1
+    _fo_c=""; [ -r "/proc/$1/cmdline" ] && read -r _fo_c < "/proc/$1/cmdline" 2>/dev/null
+    case "$_fo_c" in *hsin-fpsd*) return 0 ;; esac
+    return 1
+}
 check_fps_floor() {
     _ff_pkg="$1"
     [ -f "$STATE_DIR/.game_t0" ] || return 0
