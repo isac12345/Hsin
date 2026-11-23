@@ -195,5 +195,35 @@ chk "penyebab: cpu saja" "$(fps_drop_cause)" "cpu"
 echo 790000 > "$FD/gpu/cur_freq"; chk "penyebab: cpu+gpu" "$(fps_drop_cause)" "cpu+gpu"
 echo 100000 > "$FD/cpufreq/policy0/scaling_cur_freq"; chk "penyebab: gpu saja" "$(fps_drop_cause)" "gpu"
 echo 100000 > "$FD/gpu/cur_freq"; chk "penyebab: tak jelas" "$(fps_drop_cause)" "tak jelas"
+
+# --- nice dari /proc/<tid>/stat tanpa fork; varian _v memfx ---
+sed -n '/^_gh_nice_v() {/,/^}/p;/^_gh_nice_of() {/p' "$C/gamehooks.sh" > "$T/fn14.sh"; . "$T/fn14.sh"
+echo "4242 (Render) Thread) S 1 2 3 0 -1 4194560 100 0 0 0 5 6 0 0 20 -8 90 0 12345" > "$T/stat1"
+_gh_nice_v "$T/stat1"; chk "nice dari stat (comm berkurung)" "$_GHN" "-8"
+echo "7 (x) S 1 2 3 0 -1 4 5 6 7 8 9 10 11 12 20 0 1" > "$T/stat2"; _gh_nice_v "$T/stat2"; chk "nice 0" "$_GHN" "0"
+echo "garbage" > "$T/stat3"; _gh_nice_v "$T/stat3"; chk "stat rusak: gagal" "$?" "1"
+sed -n '/^_mf_num() {/p;/^_mf_x100_v() {/,/^}/p;/^_mf_x100() {/p;/^mf_psi_x100_v() {/,/^}/p;/^mf_psi_x100() {/p' "$C/memfx.sh" > "$T/fn15.sh"; . "$T/fn15.sh"
+MF_PSI="$T/psi"; printf 'some avg10=12.34 avg60=1.50 avg300=0.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$MF_PSI"
+mf_psi_x100_v some avg10; chk "psi some avg10 x100" "$MF_R" "1234"
+mf_psi_x100_v full avg10; chk "psi full x100" "$MF_R" "0"
+chk "pembungkus echo" "$(mf_psi_x100 some avg60)" "150"
+rm -f "$MF_PSI"; mf_psi_x100_v some avg10; chk "tanpa berkas: gagal" "$?" "1"
+
+# --- stat dipakai ulang 6 dtk; berkas basi tetap ditolak setelahnya ---
+. "$T/fn.sh"; cp "$T/b.out" "$T/c.out"; unset MFS_MT_IN; MFS_CHK_OK=0; MFS_CHK_AT=0
+monitor_epoch_now() { MONITOR_NOW=$FAKE_NOW; }
+FAKE_NOW=$(date +%s); monitor_fps_stat_core "$T/c.out" com.game.a; chk "stat: berkas segar diterima" "$?" "0"
+touch -d '1 hour ago' "$T/c.out"; FAKE_NOW=$((FAKE_NOW + 3)); monitor_fps_stat_core "$T/c.out" com.game.a; chk "stat: dalam 6 dtk memakai hasil lama" "$?" "0"
+FAKE_NOW=$((FAKE_NOW + 4)); monitor_fps_stat_core "$T/c.out" com.game.a; chk "stat: lewat 6 dtk berkas basi ditolak" "$?" "1"
+
+# --- cache profil game per tick: 10 dtk, paket baru langsung dibaca ---
+sed -n '/^get_game_profile_c() {/,/^}/p' "$C/monitor.sh" > "$T/fn16.sh"; . "$T/fn16.sh"
+rm -f "$T/gc"; get_game_profile() { echo x >> "$T/gc"; [ "$1" = com.g ] && echo balanced; return 0; }; GCALLS() { wc -l < "$T/gc" | tr -d " "; }
+FAKE_NOW=5000; monitor_epoch_now() { MONITOR_NOW=$FAKE_NOW; }
+_GGPC_PKG=""; _GGPC_VAL=""; _GGPC_AT=0
+get_game_profile_c com.g; r1=$GGP_R; FAKE_NOW=5004; get_game_profile_c com.g; r2=$GGP_R
+chk "cache profil: nilai sama, satu pindai" "$r1,$r2,$(GCALLS)" "balanced,balanced,1"
+FAKE_NOW=5011; get_game_profile_c com.g; chk "cache profil: kedaluwarsa 10 dtk" "$(GCALLS)" "2"
+get_game_profile_c com.lain; chk "cache profil: paket lain langsung dipindai, kosong" "$GGP_R|$(GCALLS)" "|3"
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

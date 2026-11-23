@@ -331,7 +331,21 @@ get_game_profile() {
         fi
     done < "$MAP_FILE"
 
-    [ -n "$monitor_lookup_profile" ] && printf '%s\n' "$monitor_lookup_profile"
+    [ -n "$monitor_lookup_profile" ] && echo "$monitor_lookup_profile"   # echo bawaan, printf = proses baru
+}
+
+# Versi per-tick: hasil di GGP_R, di-cache 10 dtk per paket. Memindai seluruh daftar game (500+
+# baris) lewat $(...) di tiap tick mahal di HP; cukup sekali per 10 dtk. Pergantian app memakai
+# get_game_profile langsung (selalu segar), jadi game yang baru ditambahkan tetap dikenali.
+_GGPC_PKG=""; _GGPC_VAL=""; _GGPC_AT=0
+get_game_profile_c() {
+    monitor_epoch_now
+    if [ "$1" = "$_GGPC_PKG" ] && [ -n "$MONITOR_NOW" ] && [ $((MONITOR_NOW - _GGPC_AT)) -lt 10 ] 2>/dev/null; then
+        GGP_R=$_GGPC_VAL; return 0
+    fi
+    GGP_R=$(get_game_profile "$1")
+    _GGPC_PKG=$1; _GGPC_VAL=$GGP_R; _GGPC_AT=${MONITOR_NOW:-0}
+    return 0
 }
 
 check_notify_available() {
@@ -1295,7 +1309,19 @@ monitor_fps_stat_core() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg 
     fi
     MONITOR_FS=""
     _mfs_mt=${MFS_MT_IN:-}
-    [ -n "$_mfs_mt" ] || _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
+    if [ -z "$_mfs_mt" ]; then
+        # stat = proses baru (mahal di HP). Hasil "segar" dipakai ulang 6 dtk; batas basi 15 dtk
+        # tetap terjaga, dan daemon mati juga ditangkap check_fpsd_alive.
+        case "$_mfs_now" in ''|*[!0-9]*) return 1 ;; esac
+        if [ "${MFS_CHK_OK:-0}" = 1 ] && [ $((_mfs_now - ${MFS_CHK_AT:-0})) -lt 6 ] 2>/dev/null; then
+            _mfs_mt=$_mfs_now
+        else
+            _mfs_mt=$(stat -c %Y "$1" 2>/dev/null)
+            MFS_CHK_AT=$_mfs_now; MFS_CHK_OK=0
+            case "$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
+            [ $((_mfs_now - _mfs_mt)) -le 15 ] && MFS_CHK_OK=1
+        fi
+    fi
     case "$_mfs_now$_mfs_mt" in ''|*[!0-9]*) return 1 ;; esac
     [ $((_mfs_now - _mfs_mt)) -le 15 ] || return 1
     # Satu awk membaca berkas langsung: paket dicocokkan, lalu persentil dihitung (dulu sed +
@@ -1564,9 +1590,9 @@ run_event_supervised_loop() {
         # Bukan game di depan: tick lebih jarang (EVENT_IDLE_SECS). Game tetap 2 dtk karena
         # Adapt, grace keluar game, dan penjaga FPS butuh kadensi rapat. Override file menang.
         if [ -z "$MONITOR_LOOP_OVR" ] && [ "$EVENT_IDLE_SECS" -gt "$monitor_ev_secs" ] 2>/dev/null; then
-            if [ -z "$monitor_foreground_package" ] || [ -z "$(get_game_profile "$monitor_foreground_package")" ]; then
-                monitor_ev_secs="$EVENT_IDLE_SECS"
-            fi
+            GGP_R=""
+            [ -n "$monitor_foreground_package" ] && get_game_profile_c "$monitor_foreground_package"
+            [ -n "$GGP_R" ] || monitor_ev_secs="$EVENT_IDLE_SECS"
         fi
         prof_lap h_ovr
         EVENT_ON_SECS=$((EVENT_ON_SECS + monitor_ev_secs))
@@ -1644,7 +1670,8 @@ run_polling_loop() {
         fi
 
         monitor_poll_interval="$SCREEN_ON_INTERVAL"
-        if [ -n "$(get_game_profile "$monitor_foreground_package")" ]; then
+        get_game_profile_c "$monitor_foreground_package"
+        if [ -n "$GGP_R" ]; then
             monitor_loop_override
             monitor_poll_interval="${MONITOR_LOOP_OVR:-$GAME_POLL_INTERVAL_SECS}"
         fi

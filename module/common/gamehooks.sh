@@ -214,18 +214,24 @@ gh_opt_list() {
 # ---------------------------------------------------------------- 1. prioritas
 # nice thread dari /proc/<pid>/task/<tid>/stat (kolom 19). Nama proses bisa
 # mengandung spasi/kurung, jadi buang semuanya sampai ") " terakhir dulu.
-_gh_nice_of() {
+# Nice dari /proc/<tid>/stat tanpa fork (dulu $(sed|cut) + printf = 4-5 proses per thread).
+# Hasil di _GHN; setelah ") " field ke-17 adalah nice.
+_gh_nice_v() {
+    _GHN=""
     [ -r "$1" ] || return 1
-    _ghn=$(sed 's/^.*) //' "$1" 2>/dev/null | cut -d' ' -f17)
-    case "$_ghn" in ''|*[!0-9-]*) return 1 ;; esac
-    printf '%s' "$_ghn"
+    read -r _ghn_l < "$1" 2>/dev/null || [ -n "$_ghn_l" ] || return 1
+    _ghn_l=${_ghn_l##*) }
+    set -- $_ghn_l
+    _GHN=${17}
+    case "$_GHN" in ''|*[!0-9-]*) _GHN=""; return 1 ;; esac
 }
+_gh_nice_of() { _gh_nice_v "$1" || return 1; echo -n "$_GHN"; }
 
 # Terapkan hanya bila nice sekarang masih di atas target. Aman dipanggil
 # berulang, dan tidak menumpuk walau renice versi ini memakai increment relatif.
 _gh_renice_tid() {
-    _ghr_cur=$(_gh_nice_of "/proc/$1/stat") || return 0
-    [ "$_ghr_cur" -gt "$2" ] 2>/dev/null || return 0
+    _gh_nice_v "/proc/$1/stat" || return 0
+    [ "$_GHN" -gt "$2" ] 2>/dev/null || return 0
     renice -n "$2" -p "$1" >/dev/null 2>&1
 }
 
@@ -239,7 +245,7 @@ _gh_prio_apply() {
         _gh_renice_tid "$_ghp_pid" -10
         ionice -c 2 -n 0 -p "$_ghp_pid" >/dev/null 2>&1
         if [ -w "/proc/$_ghp_pid/oom_score_adj" ]; then
-            _ghp_oom=$(tr -d '[:space:]' < "/proc/$_ghp_pid/oom_score_adj" 2>/dev/null)
+            _ghp_oom=""; read -r _ghp_oom < "/proc/$_ghp_pid/oom_score_adj" 2>/dev/null
             case "$_ghp_oom" in ''|*[!0-9-]*) ;; *)
                 [ "$_ghp_oom" -gt -300 ] 2>/dev/null && printf '%s' "-300" 2>/dev/null > "/proc/$_ghp_pid/oom_score_adj"
             ;; esac

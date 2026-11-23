@@ -43,7 +43,8 @@ _mf_conf() { _mf_conf_v "$@"; echo -n "$MFC_V"; }
 _mf_write() { printf '%s' "$2" > "$1" 2>/dev/null; }
 
 # "12.34" -> 1234, "0.5" -> 50, "100.00" -> 10000. Tanpa awk/bc; aman dari jebakan oktal ("08").
-_mf_x100() {
+_mf_x100_v() {   # hasil di MF_R, tanpa subshell
+    MF_R=""
     _mx_i=${1%%.*}
     _mx_f=${1#*.}
     [ "$_mx_f" = "$1" ] && _mx_f=00
@@ -52,11 +53,13 @@ _mf_x100() {
     _mx_f=${_mx_f#0}
     _mf_num "$_mx_i" || return 1
     _mf_num "${_mx_f:-0}" || return 1
-    echo -n $(( _mx_i * 100 + ${_mx_f:-0} ))
+    MF_R=$(( _mx_i * 100 + ${_mx_f:-0} ))
 }
+_mf_x100() { _mf_x100_v "$1" || return 1; echo -n "$MF_R"; }
 
 # mf_psi_x100 some|full avg10|avg60|avg300
-mf_psi_x100() {
+mf_psi_x100_v() {
+    MF_R=""
     [ -r "$MF_PSI" ] || return 1
     _mp=""
     while IFS= read -r _mpl; do
@@ -64,16 +67,17 @@ mf_psi_x100() {
     done < "$MF_PSI"
     [ -n "$_mp" ] || return 1
     for _mp_t in $_mp; do
-        case "$_mp_t" in "$2="*) _mf_x100 "${_mp_t#*=}"; return $? ;; esac
+        case "$_mp_t" in "$2="*) _mf_x100_v "${_mp_t#*=}"; return $? ;; esac
     done
     return 1
 }
+mf_psi_x100() { mf_psi_x100_v "$1" "$2" || return 1; echo -n "$MF_R"; }
 
 _mf_meminfo_kb() { sed -n "s/^$1:[[:space:]]*\([0-9]*\).*/\1/p" "$MF_MEMINFO" 2>/dev/null | head -n 1; }
 
 # Ambang = ambang stall parsial lmkd perangkat ini. lmkd memicu bila stall parsial >= N ms dalam jendela 1000 ms,
 # jadi N ms = N/10 persen. Default sistem 70 ms (normal) / 200 ms (RAM kecil); dibaca dari properti, bukan ditanam.
-mf_psi_threshold_x100() {
+mf_psi_threshold_v() {
     # Sengaja tidak di-cache: test_memfx mengganti properti di tengah proses, dan
     # properti bisa dibaca ulang dengan murah. Dua getprop ~40 ms per tick.
     # Cache 300 dtk bila jam monitor ada (properti sistem tidak berubah saat jalan; dulu 1-2 getprop
@@ -81,7 +85,7 @@ mf_psi_threshold_x100() {
     if command -v monitor_epoch_now >/dev/null 2>&1; then
         monitor_epoch_now
         if [ -n "${_MF_THR:-}" ] && [ -n "$MONITOR_NOW" ] && [ $((MONITOR_NOW - ${_MF_THR_T:-0})) -lt 300 ] 2>/dev/null; then
-            echo -n "$_MF_THR"; return 0
+            MF_R=$_MF_THR; return 0
         fi
     fi
     _mt=$(getprop ro.lmk.psi_partial_stall_ms 2>/dev/null)
@@ -89,8 +93,9 @@ mf_psi_threshold_x100() {
         if [ "$(getprop ro.config.low_ram 2>/dev/null)" = "true" ]; then _mt=200; else _mt=70; fi
     fi
     _MF_THR=$(( _mt * 10 )); _MF_THR_T=${MONITOR_NOW:-0}
-    echo -n "$_MF_THR"
+    MF_R=$_MF_THR
 }
+mf_psi_threshold_x100() { mf_psi_threshold_v; echo -n "$MF_R"; }
 
 mf_memstat() {
     if [ -r "$MF_PSI" ]; then
@@ -173,15 +178,17 @@ mf_relief_tick() {
         MF_TICK_AT=$MONITOR_NOW
     fi
     _mf_ok memclean || return 0
-    _mv=$(mf_psi_x100 some avg10) || return 0
-    _mth=$(mf_psi_threshold_x100)
+    mf_psi_x100_v some avg10 || return 0
+    _mv=$MF_R
+    mf_psi_threshold_v; _mth=$MF_R
     _mf_conf_v MEMCLEAN_HITS 3; _mhn=$MFC_V; _mf_num "$_mhn" || _mhn=3
     _mf_conf_v MEMCLEAN_COOLDOWN 180; _mcd=$MFC_V; _mf_num "$_mcd" || _mcd=180
     if [ "$_mv" -ge "$_mth" ]; then
-        _mh=$(cat "$MF_HITS" 2>/dev/null); _mf_num "$_mh" || _mh=0
-        _mh=$((_mh + 1)); printf '%s\n' "$_mh" > "$MF_HITS"
+        _mh=""; [ -r "$MF_HITS" ] && read -r _mh < "$MF_HITS" 2>/dev/null; _mf_num "$_mh" || _mh=0
+        _mh=$((_mh + 1)); echo "$_mh" > "$MF_HITS"
     else
-        rm -f "$MF_HITS"; return 0
+        [ -e "$MF_HITS" ] && rm -f "$MF_HITS"   # rm = proses baru: hanya bila berkasnya ada
+        return 0
     fi
     [ "$_mh" -ge "$_mhn" ] || return 0
     _mn=$(date +%s 2>/dev/null); _mf_num "$_mn" || return 0
