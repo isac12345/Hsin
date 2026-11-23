@@ -239,5 +239,15 @@ FAKE_NOW=9006; MFS_KEY=""; touch -d '20 seconds ago' "$NT/.fps_ref"; touch -d '3
 monitor_fps_stat_v "$NT/o.out" com.game.a; chk "tidak berubah 3 dtk: umur 3" "$MFS_AGE" "3"
 FAKE_NOW=9030; MFS_KEY=""; touch -d '20 seconds ago' "$NT/.fps_ref"; touch -d '30 seconds ago' "$NT/o.out"
 monitor_fps_stat_v "$NT/o.out" com.game.a; chk "tidak berubah 27 dtk: basi ditolak" "$?" "1"
+
+# --- st= dari daemon: dibaca tanpa awk; pkg tetap dicocokkan ---
+. "$T/fn.sh"; unset MFS_MT_IN; MFS_CHK_OK=0; MFS_CHK_AT=0; FAKE_NOW=$(date +%s); monitor_epoch_now() { MONITOR_NOW=$FAKE_NOW; }
+printf 'pkg=com.game.a\nstatus=ok\nlat= 1 2 3\nst=17 24 120\n' > "$T/st.out"
+awk() { echo "AWK DIPANGGIL" >> "$T/awk.calls"; command awk "$@"; }
+rm -f "$T/awk.calls"; monitor_fps_stat_core "$T/st.out" com.game.a; chk "st= dibaca" "$?|$MONITOR_FS" "0|17 24 120"
+chk "st= tanpa awk" "$([ -f "$T/awk.calls" ] && echo dipanggil || echo tidak)" "tidak"
+monitor_fps_stat_core "$T/st.out" com.lain; chk "st= paket beda ditolak" "$?" "1"
+printf 'pkg=com.game.a\nlat= 1 2 3\nst=abc\n' > "$T/st2.out"; touch "$T/st2.out"; MFS_CHK_AT=0; monitor_fps_stat_core "$T/st2.out" com.game.a; chk "st= rusak jatuh ke awk (gagal: data kurang)" "$?" "1"
+unset -f awk
 echo "HASIL: $PASS lolos, $FAIL gagal"
 [ "$FAIL" -eq 0 ]

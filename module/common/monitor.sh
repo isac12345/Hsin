@@ -1328,6 +1328,20 @@ monitor_fps_stat_core() {   # $1=fpsd.out [$2=paket yang diharapkan] -> "p1 avg 
     # dua pembacaan heredoc + printf luar + awk = 3 proses baru per tick). Baris pkg= dan lat=
     # yang PERTAMA dipakai, sama seperti sebelumnya. Data app lain (mis. com.termux) bukan FPS
     # game: ditolak supaya 1% low palsu tidak memicu boost.
+    # Daemon baru menulis "st=<1% low> <rata-rata> <frame terpanjang ms>" (dihitung di C dari
+    # jendela 10 dtk). Dibaca dengan read bawaan: tanpa proses baru. awk di bawah hanya cadangan
+    # untuk daemon lama; atas ratusan timestamp ia ~120 ms per tick di HP.
+    _mfs_p=""; _mfs_st=""
+    while IFS= read -r _mfs_l; do
+        case "$_mfs_l" in
+            pkg=*) [ -n "$_mfs_p" ] || _mfs_p=${_mfs_l#pkg=} ;;
+            st=*) [ -n "$_mfs_st" ] || _mfs_st=${_mfs_l#st=} ;;
+        esac
+    done < "$1" 2>/dev/null
+    if [ -n "$_mfs_st" ]; then
+        [ -z "$2" ] || [ "$_mfs_p" = "$2" ] || return 1
+        case "$_mfs_st" in *[!0-9\ ]*|'') ;; *) MONITOR_FS=$_mfs_st; return 0 ;; esac
+    fi
     MONITOR_FS=$(awk -v want="$2" '
         /^pkg=/ && !hp { p = substr($0, 5); hp = 1 }
         /^lat=/ && !hl { lat = substr($0, 5); hl = 1 }

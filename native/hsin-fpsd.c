@@ -181,6 +181,11 @@ static void write_file(const char *dir, const char *name, const char *content) {
     rename(tmp, path);
 }
 
+static int cmp_ll(const void *a, const void *b) {
+    long long x = *(const long long *)a, y = *(const long long *)b;
+    return (x > y) - (x < y);
+}
+
 static int read_pkg(const char *dir, char *pkg, size_t sz) {
     char path[512];
     snprintf(path, sizeof path, "%s/fpsd.pkg", dir);
@@ -223,7 +228,7 @@ int main(int argc, char **argv) {
     write_file(dir, "fpsd.pid", pidbuf);
 
     char *buf = malloc(OUTBUF);
-    char *out = malloc(MAXTS * 24 + 256);
+    char *out = malloc((size_t)HIST * 24 + 512);   /* sebelumnya MAXTS*24+256: tidak cukup untuk jendela 10 dtk */
     if (!buf || !out) return 1;
     char pkg[256] = "", cur_pkg[256] = "", layer[512] = "";
     int stale = 0, fail_run = 0;
@@ -272,6 +277,25 @@ int main(int argc, char **argv) {
             for (int i = 0; i < cnt; i++)
                 o += snprintf(out + o, 32, " %lld", hist[(start + i) % HIST]);
             out[o++] = '\n'; out[o] = 0;
+            /* Statistik dihitung di sini: "st=<1% low fps> <fps rata-rata> <frame terpanjang ms>".
+             * Monitor membacanya tanpa proses baru (awk atas ratusan timestamp ~120 ms di HP). */
+            {
+                static long long dt[HIST];
+                int m = 0;
+                for (int i = 1; i < cnt; i++) {
+                    long long d = hist[(start + i) % HIST] - hist[(start + i - 1) % HIST];
+                    if (d > 0) dt[m++] = d;
+                }
+                if (m >= 3) {
+                    qsort(dt, (size_t)m, sizeof dt[0], cmp_ll);
+                    int idx = (int)(m * 0.99);
+                    if (idx < 1) idx = 1;
+                    if (idx > m) idx = m;
+                    long long span = hist[(start + cnt - 1) % HIST] - hist[start % HIST];
+                    long long avg = span > 0 ? (long long)(cnt - 1) * 1000000000LL / span : 0;
+                    o += snprintf(out + o, 96, "st=%lld %lld %lld\n", 1000000000LL / dt[idx - 1], avg, dt[m - 1] / 1000000LL);
+                }
+            }
             write_file(dir, "fpsd.out", out);
             write_file(dir, "fpsd.status", "ok\n");
         } else if (++fail_run == 5) {
